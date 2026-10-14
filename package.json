@@ -1,0 +1,12 @@
+{
+  "name": "sixcharge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sixcharge: Superhero Cricket — mobile web vertical slice",
+  "scripts": {
+    "start": "npx --yes http-server -c-1 -p 8080 .",
+    "test": "node --test tests/*.test.js",
+    "smoke": "node tests/smoke.mjs"
+  }
+}
