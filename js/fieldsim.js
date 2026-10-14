@@ -1,4 +1,5 @@
 import { CFG } from './config.js';
+import { positionName } from './tactics.js';
 
 // Top-down field: origin at the striker's stumps, +y toward the bowler, +x the off side.
 const G = 9.8;
@@ -27,8 +28,20 @@ export const FIELD_PRESETS = {
 const INNER = 27; // the 30-yard circle, measured from the pitch centre
 
 // Builds the 9 outfielders plus bowler and keeper. In the Power Burst only 2 may stay outside the ring.
+export function presetPositions(preset) {
+  return FIELD_PRESETS[preset].map(([id, name, x, y]) => ({ id, name, x, y }));
+}
+
+export const ringRadius = INNER;
+export const outsideRing = f => Math.hypot(f.x, f.y - CY) > INNER;
+
 export function buildField(preset, powerplay) {
-  const list = FIELD_PRESETS[preset].map(([id, name, x, y]) => ({ id, name, x, y, hx: x, hy: y }));
+  return buildFieldFrom(presetPositions(preset), powerplay);
+}
+
+// A field from your own positions (the field editor). Names follow where each fielder stands.
+export function buildFieldFrom(positions, powerplay) {
+  const list = positions.map(p => ({ id: p.id, name: p.name || positionName(p.x, p.y), x: p.x, y: p.y, hx: p.x, hy: p.y }));
   if (powerplay) {
     let outside = 0;
     for (const f of list) {
@@ -36,6 +49,8 @@ export function buildField(preset, powerplay) {
       if (r > INNER && ++outside > 2) {
         const k = (INNER - 2) / r;
         f.x = f.hx = f.x * k; f.y = f.hy = CY + (f.y - CY) * k;
+        f.name = positionName(f.x, f.y);
+        f.pulledIn = true;
       }
     }
   }

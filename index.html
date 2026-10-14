@@ -36,18 +36,17 @@
     <div id="hint" class="hint"></div>
 
     <div class="hud-bottom">
-      <div id="bowlPanel" class="panel bowlpanel" hidden>
-        <canvas id="miniPitch" aria-label="Drag to set line and length"></canvas>
-        <div class="bp-side">
-          <div class="bp-label">Delivery</div>
-          <div class="chips" id="typeChips"></div>
-          <div class="bp-label">Field</div>
-          <div class="chips" id="fieldChips"></div>
+      <div id="banterBox" class="banter" hidden>
+        <div class="banter-row">
+          <button id="btnSmack" class="banterbtn smack">Talk smack</button>
+          <button id="btnCool" class="banterbtn cool">Leave it</button>
         </div>
-        <button id="bowlBtn" class="bowlbtn" hidden>
-          <svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-target" cx="50" cy="50" r="30"/><circle id="bowlRing" class="ring-live" cx="50" cy="50" r="46"/></svg>
-          <span id="bowlBtnText">HOLD<br>TO BOWL</span>
-        </button>
+        <div class="banter-timer"><i id="banterBar"></i></div>
+      </div>
+      <div id="fieldSheet" class="panel fieldsheet" hidden>
+        <div class="fs-head"><b>Set your field</b><span id="fieldNote">Drag a fielder to move them.</span></div>
+        <div class="chips" id="fieldPresets"></div>
+        <button id="fieldDone" class="bigbtn primary">Done</button>
       </div>
       <div class="chargerow">
         <div id="charge" class="charge" role="meter" aria-label="Charge" aria-valuemin="0" aria-valuemax="100">
@@ -57,6 +56,7 @@
         </div>
       </div>
       <div class="actionrow">
+        <button id="fieldBtn" class="fieldbtn" hidden aria-label="Set your field">FIELD</button>
         <div id="powers" class="powers"></div>
       </div>
     </div>

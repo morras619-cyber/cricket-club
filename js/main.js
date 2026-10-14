@@ -16,6 +16,7 @@ sound.on = profile.settings.sound;
 sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
 window.__sixcharge = { game, ui, profile };
+game.onFieldSaved = choice => { profile.field = { preset: choice.field, custom: choice.custom }; saveProfile(profile); };
 
 let challenge = decodeChallenge(location.hash.slice(1));
 let pending = null; // { mode, challenge }
@@ -138,7 +139,7 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   const sq = opts.mode === 'tutorial' ? { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') } : squad();
   const seed = opts.mode === 'challenge' ? opts.challenge.seed : randomSeed();
-  const summary = await game.runMatch({ mode: opts.mode, squad: sq, seed, challenge: opts.challenge });
+  const summary = await game.runMatch({ mode: opts.mode, squad: sq, seed, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
   if (!summary) return; // quit mid-match
   if (opts.mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);

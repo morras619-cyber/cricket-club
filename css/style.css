@@ -78,21 +78,24 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .power.ready:not(:disabled) { box-shadow: 3px 3px 0 var(--ink), 0 0 0 3px var(--bolt); }
 @keyframes armed { to { transform: translateY(-3px); } }
 
-.bowlbtn { pointer-events: auto; position: relative; align-self: center; margin: 0 10px 0 4px; width: 96px; height: 96px; flex: none; border-radius: 50%; border: 3px solid var(--ink); background: var(--hot); color: var(--paper); font-family: var(--display); font-size: 17px; letter-spacing: 1px; line-height: 1; box-shadow: 4px 4px 0 var(--ink); touch-action: none; }
-.bowlbtn svg { position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px); pointer-events: none; overflow: visible; }
-.bowlbtn .ring-target { fill: none; stroke: var(--good); stroke-width: 7; opacity: .9; }
-.bowlbtn .ring-live { fill: none; stroke: var(--paper); stroke-width: 4; transform-origin: 50px 50px; }
-.bowlbtn span { position: relative; text-shadow: 2px 2px 0 var(--ink); }
-.bowlbtn.down { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
-
-.bowlpanel { pointer-events: auto; display: flex; gap: 10px; padding: 8px; align-items: stretch; }
-#miniPitch { width: 92px; height: 132px; border-radius: 8px; flex: none; touch-action: none; }
-.bp-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.bp-label { font-family: var(--display); letter-spacing: 1px; font-size: 12px; color: var(--muted); }
 .chips { display: flex; gap: 5px; flex-wrap: wrap; }
-.chip { border: 2px solid var(--ink); background: var(--night-2); color: var(--paper); border-radius: 10px; padding: 4px 9px; font-weight: 700; font-size: 12.5px; }
+.chip { border: 2px solid var(--ink); background: var(--night-2); color: var(--paper); border-radius: 10px; padding: 5px 11px; font-weight: 700; font-size: 13px; }
 .chip.on { background: var(--bolt); color: var(--ink); }
-.chip.sig { border-style: dashed; }
+.fieldbtn { pointer-events: auto; flex: none; width: 58px; height: 52px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--sky); color: var(--ink); font-family: var(--display); font-size: 17px; letter-spacing: 1px; box-shadow: 3px 3px 0 var(--ink); }
+.fieldsheet { pointer-events: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.fs-head { display: flex; flex-direction: column; gap: 2px; }
+.fs-head b { font-family: var(--display); font-size: 20px; letter-spacing: 1px; color: var(--bolt); }
+.fs-head span { font-size: 13px; font-weight: 600; color: var(--paper); }
+.fs-head span.warn { color: #ff8a8a; }
+.fieldsheet .bigbtn { font-size: 21px; padding: 10px; }
+.banter { pointer-events: auto; display: flex; flex-direction: column; gap: 6px; }
+.banter-row { display: flex; gap: 10px; }
+.banterbtn { flex: 1; padding: 12px 8px; border-radius: 16px; border: 3px solid var(--ink); font-family: var(--display); font-size: 22px; letter-spacing: 1px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(-1.5deg); }
+.banterbtn.smack { background: var(--hot); color: var(--paper); text-shadow: 2px 2px 0 var(--ink); }
+.banterbtn.cool { background: var(--paper); color: var(--ink); transform: rotate(1.5deg); }
+.banterbtn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+.banter-timer { height: 6px; border-radius: 3px; background: var(--night-2); border: 1.5px solid var(--ink); overflow: hidden; }
+.banter-timer i { display: block; height: 100%; width: 100%; background: var(--bolt); }
 
 /* ---------- Screens ---------- */
 .screen { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding-top: var(--safe-t); padding-bottom: var(--safe-b);
@@ -162,10 +165,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 @media (max-height: 640px) {
   .score { font-size: 28px; }
-  #miniPitch { height: 108px; width: 80px; }
-  .bowlbtn { width: 80px; height: 80px; font-size: 14px; }
   .banner { top: 20%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hint.show, .power.armed, .charge.t3 { animation: none; }
+  .banterbtn { transform: none; }
 }

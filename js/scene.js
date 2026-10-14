@@ -216,6 +216,9 @@ export class OutfieldView {
     const a = 1 - Math.exp(-dt / 220);
     this.cx += (this.tcx - this.cx) * a; this.cy += (this.tcy - this.cy) * a; this.k += (this.tk - this.k) * a;
   }
+  from(sx, sy) {
+    return { x: this.cx + (sx - this.W / 2) / this.k, y: this.cy - (sy - this.H * 0.5) / (this.k * 0.78) };
+  }
   to(x, y, h = 0) {
     return { x: this.W / 2 + (x - this.cx) * this.k, y: this.H * 0.5 - (y - this.cy) * this.k * 0.78 - h * this.k * 0.85 };
   }
@@ -260,14 +263,15 @@ export class OutfieldView {
     ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     return p;
   }
-  label(ctx, x, y, text, color = '#ffd23f') {
+  label(ctx, x, y, text, color = '#ffd23f', size = 12) {
     const p = this.to(x, y);
-    ctx.font = `600 12px ${FONT_BODY}`;
-    const w = ctx.measureText(text).width + 12;
+    ctx.font = `600 ${size}px ${FONT_BODY}`;
+    const w = ctx.measureText(text).width + size;
+    const h = size + 6;
     ctx.fillStyle = color; ctx.strokeStyle = INK; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(p.x - w / 2, p.y + 6, w, 18, 9); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(p.x - w / 2, p.y + 6, w, h, h / 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, p.x, p.y + 15.5);
+    ctx.fillText(text, p.x, p.y + 6 + h / 2 + 0.5);
   }
 }
 

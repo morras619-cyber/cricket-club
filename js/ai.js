@@ -74,21 +74,25 @@ function chooseShot(d, ctx, rng) {
 // ctx: { ballNo, need, ballsLeft, wicketsLeft, release ('perfect'|'good'|'loose'|'bad'), repeats, fx, stance, power }
 export function aiBat(d, ctx, rng) {
   let sigma = 78;
-  if (ctx.release === 'perfect') sigma *= 1.35;
+  if (ctx.release === 'perfect') sigma *= 1.2;
   if (ctx.release === 'loose') sigma *= 0.8;
   if (ctx.repeats >= 3) sigma *= 0.8;
   if (ctx.power === 'thunder') sigma *= 0.7;
+  const mods = ctx.mods || {};
+  sigma *= mods.sigmaMul || 1;
   const w = { ...CFG.timing };
   if (ctx.release === 'loose') for (const k in w) w[k] *= 1.2;
   if (ctx.repeats >= 3) for (const k in w) w[k] += 20;
   if (ctx.fx?.tornado) w.perfect /= 2;
-  const errMs = rng.normal() * sigma + 6;
+  const errMs = rng.normal() * sigma + 6 + (mods.bias || 0);
   const shot = chooseShot(d, ctx, rng);
+  if (mods.loftAdd && !shot.loft && rng.chance(mods.loftAdd)) shot.loft = true;
 
   if (ctx.fx?.maya && !rng.chance(0.5)) {
     return { errMs, shot, grade: 'miss', res: { outcome: 'bowled', grade: 'miss', mayaFooled: true } };
   }
-  const grade = gradeTiming(errMs, w, d.xt > 0.08);
+  let grade = gradeTiming(errMs, w, d.xt > 0.08);
+  if (mods.edgeBoost && ['good', 'early', 'late'].includes(grade) && d.xt > -0.05 && rng.chance(mods.edgeBoost)) grade = 'edge';
   const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder' }, rng });
   if (ctx.fx?.tornado && (grade === 'miss' || res.outcome === 'beaten')) res.outcome = 'bowled';
   if (ctx.stance === 'charge' && res.outcome === 'beaten') res.outcome = 'stumping-chance';

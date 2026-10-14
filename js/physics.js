@@ -32,6 +32,7 @@ export const laneById = id => LANES.find(l => l.id === id);
 // opts: { x (line at the stumps), length (id), kmh, move (seam/spin after bounce, m), swing (m), loop (arc) }
 export function makeDelivery(opts) {
   const L = lengthById(opts.length) || LENGTHS[2];
+  const bounce = opts.bounce !== undefined ? opts.bounce : L.bounce; // a swipe can pitch the ball anywhere
   const xt = opts.x;
   const h = opts.h ?? L.h;
   const v = (opts.kmh / 3.6) * CFG.paceScale;
@@ -41,7 +42,7 @@ export function makeDelivery(opts) {
   const move = opts.move || 0;
   const d = { ...opts, lengthName: L.name, v, rx, xt, h };
 
-  if (L.bounce == null) {
+  if (bounce == null) {
     const tz = z => (RELEASE_Z - z) / v;
     d.bounceT = null;
     d.pos = t => {
@@ -55,7 +56,7 @@ export function makeDelivery(opts) {
     };
     d.timeAt = tz;
   } else {
-    const zb = L.bounce;
+    const zb = bounce;
     const xb = xt - move;
     const t1 = (RELEASE_Z - zb) / v;
     const v2 = v * 0.92;

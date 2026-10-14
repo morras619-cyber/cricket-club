@@ -17,7 +17,10 @@ Open it on a phone on the same network, or use desktop Chrome's device toolbar. 
 | Moment | Control |
 | --- | --- |
 | Batting | Touch and hold as the ball comes, swipe in the shot direction, **lift your finger when the shrinking ring meets the target ring**. Short swipe = along the ground, long swipe = lofted. Don't touch = leave. |
-| Bowling | Drag the marker on the mini pitch (line × length), pick a delivery type and field, then **hold BOWL and release when the ring turns green**. |
+| Bowling | **One swipe from your bowler up the pitch.** How far you swipe sets the length (short swipe = bouncer, long = yorker), sideways sets the line, a curve in the swipe adds swing or spin, and flick speed sets pace (green zone = perfect; too slow = slower ball; too fast sprays it or oversteps for a no-ball). While the ball is in the air, **drag sideways to bend it late**. |
+| Reading the batter | Before each ball the batter shows what length he expects (some bluff). Surprise him, hit his weak spot (scouted after the first over), or chain setups: bouncer → yorker, inswinger ↔ outswinger, or a slower ball after two quick ones. Repeat yourself and he reads you. |
+| Field | Tap **FIELD** before a delivery to drag your nine fielders anywhere. Presets are starting points; the Power Burst still allows only 2 outside the circle. Your field is remembered. |
+| Banter | After a good ball, **Talk smack** or **Leave it**. Smack talk can rattle a batter (more mistakes) or fire him up (more aggressive, better timing). Leaving it earns Composure, sometimes Respect. When the opposition sledges you, answer with a dot/wicket (bowling) or a boundary (batting) for +10 REVENGE. |
 | Keeper Mode | Tap when the ball reaches the gloves, or swipe toward it to dive. A juggle needs a second tap. Stumpings need a swipe up. |
 | Outfield Mode | Catch: tap as the ring closes (swipe to dive if it's out of reach). Run-out: tap to pick up, then swipe at the stumps you want to hit. Rope save: swipe to dive. |
 | Powers | Tap a hero button when you have the Charge. Batting powers lock when the ball is bowled; bowling powers lock when you press BOWL. |
@@ -47,6 +50,8 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/fieldsim.js` | Where the ball goes; catch, run-out and boundary-save chances; runs |
 | `js/ai.js` | Seeded AI bowling scripts and the AI batter |
 | `js/rules.js` | When the player gets fielding control; share-card moment scoring |
+| `js/tactics.js` | The bowling swipe, batter expectations, weak spots, setup combos, fielding position names |
+| `js/banter.js` | Sledges, comebacks and compliments |
 | `js/game.js` | Match flow, ball sequences, fielding events, tutorial, rendering |
 | `js/scene.js`, `js/figure.js`, `js/fx.js` | Cameras, comic figures, onomatopoeia and impact effects |
 | `js/ui.js`, `js/main.js` | HUD, menus, squad picker, results and sharing |
