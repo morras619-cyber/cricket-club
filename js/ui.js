@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 
 export class UI {
   constructor() {
-    this.screens = ['home', 'squad', 'cover', 'pause', 'result'];
+    this.screens = ['home', 'squad', 'toss', 'cover', 'pause', 'result'];
     this.portraits = new Map();
     this.bannerTimer = 0;
     this.powerKeys = '';
@@ -114,13 +114,15 @@ export class UI {
     box.innerHTML = '';
     for (const [id, name] of opts.presets) {
       const c = document.createElement('button');
-      c.className = 'chip';
+      c.className = 'chip' + (id === opts.current ? ' on' : '');
+      c.dataset.preset = id;
       c.textContent = name;
       c.addEventListener('click', e => { e.stopPropagation(); opts.onPreset(id); for (const x of box.children) x.classList.toggle('on', x === c); });
       box.append(c);
     }
     this.fieldNote('Drag a fielder to move them.', false);
   }
+  fieldPreset(id) { for (const x of $('fieldPresets').children) x.classList.toggle('on', x.dataset.preset === id); }
   fieldNote(text, warn) {
     const n = $('fieldNote');
     if (n.textContent !== text) n.textContent = text;

@@ -44,7 +44,7 @@
         <div class="banter-timer"><i id="banterBar"></i></div>
       </div>
       <div id="fieldSheet" class="panel fieldsheet" hidden>
-        <div class="fs-head"><b>Set your field</b><span id="fieldNote">Drag a fielder to move them.</span></div>
+        <div class="fs-head"><b>Set your field</b><span id="fieldNote">Drag a fielder, or tap one then tap a spot.</span></div>
         <div class="chips" id="fieldPresets"></div>
         <button id="fieldDone" class="bigbtn primary">Done</button>
       </div>
@@ -56,7 +56,7 @@
         </div>
       </div>
       <div class="actionrow">
-        <button id="fieldBtn" class="fieldbtn" hidden aria-label="Set your field">FIELD</button>
+        <button id="fieldBtn" class="fieldbtn" hidden aria-label="Set your field">SET<br>FIELD</button>
         <div id="powers" class="powers"></div>
       </div>
     </div>
@@ -97,6 +97,23 @@
         <button class="bigbtn ghost" id="squadBack">Back</button>
         <button class="bigbtn primary" id="squadGo">Start match</button>
       </div>
+    </div>
+  </section>
+
+  <section id="toss" class="screen" hidden>
+    <div class="screen-inner">
+      <h2 class="title">Coin toss</h2>
+      <p class="lede" id="tossText">Call it in the air!</p>
+      <div class="coinwrap"><div class="coin" id="coin"><div class="face heads">HEADS</div><div class="face tails">TAILS</div></div></div>
+      <div class="menu row" id="tossCall">
+        <button class="bigbtn" data-call="heads">Heads</button>
+        <button class="bigbtn" data-call="tails">Tails</button>
+      </div>
+      <div class="menu row" id="tossChoose" hidden>
+        <button class="bigbtn primary" data-choose="bat">Bat first</button>
+        <button class="bigbtn" data-choose="bowl">Bowl first</button>
+      </div>
+      <button class="bigbtn primary" id="tossGo" hidden>Let's play</button>
     </div>
   </section>
 

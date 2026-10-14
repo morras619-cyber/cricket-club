@@ -19,7 +19,9 @@ Open it on a phone on the same network, or use desktop Chrome's device toolbar. 
 | Batting | Touch and hold as the ball comes, swipe in the shot direction, **lift your finger when the shrinking ring meets the target ring**. Short swipe = along the ground, long swipe = lofted. Don't touch = leave. |
 | Bowling | **One swipe from your bowler up the pitch.** How far you swipe sets the length (short swipe = bouncer, long = yorker), sideways sets the line, a curve in the swipe adds swing or spin, and flick speed sets pace (green zone = perfect; too slow = slower ball; too fast sprays it or oversteps for a no-ball). While the ball is in the air, **drag sideways to bend it late**. |
 | Reading the batter | Before each ball the batter shows what length he expects (some bluff). Surprise him, hit his weak spot (scouted after the first over), or chain setups: bouncer → yorker, inswinger ↔ outswinger, or a slower ball after two quick ones. Repeat yourself and he reads you. |
-| Field | Tap **FIELD** before a delivery to drag your nine fielders anywhere. Presets are starting points; the Power Burst still allows only 2 outside the circle. Your field is remembered. |
+| Field | Before a delivery, tap **SET FIELD** or the field map (top right) to move your nine fielders: drag one, or tap one and then tap where they should stand. Presets are starting points; the Power Burst still allows only 2 outside the circle. Your field is remembered. |
+| Their field | While batting, the map in the top right shows the opposition's fielders. Tap it before the ball to see it full size with position names. |
+| Coin toss | Quick Match starts with a toss: call heads or tails; win it and choose to bat or bowl first. |
 | Banter | After a good ball, **Talk smack** or **Leave it**. Smack talk can rattle a batter (more mistakes) or fire him up (more aggressive, better timing). Leaving it earns Composure, sometimes Respect. When the opposition sledges you, answer with a dot/wicket (bowling) or a boundary (batting) for +10 REVENGE. |
 | Keeper Mode | Tap when the ball reaches the gloves, or swipe toward it to dive. A juggle needs a second tap. Stumpings need a swipe up. |
 | Outfield Mode | Catch: tap as the ring closes (swipe to dive if it's out of reach). Run-out: tap to pick up, then swipe at the stumps you want to hit. Rope save: swipe to dive. |
@@ -29,7 +31,7 @@ Fielding control triggers only on chances you can swing (5–90% success), at mo
 
 ## What's in this build
 
-- **Quick Match** vs AI: you bat 30 balls, then defend your total. 3 wickets per side, about 5–7 minutes.
+- **Quick Match** vs AI: a coin toss decides who bats first; each side gets 30 balls and 3 wickets, about 5–7 minutes.
 - **Challenge links**: the result screen makes a WhatsApp share and a link (`…/#c<token>`). Your friend faces the exact same 30 deliveries and must beat your score.
 - **Issue #1 tutorial**: a scripted final over that can't be lost — a timed shot, a hero power, and a keeper catch in about 90 seconds. Shown automatically on first launch.
 - **Charge Meter** per the GDD: tiers at 30/60/100, overheat above 60, −20 on losing a wicket, 25% carry-over between innings, 20% discount in the last 6 balls, perfect-timing streaks.

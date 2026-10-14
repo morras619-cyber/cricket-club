@@ -1,5 +1,5 @@
 import { UI } from './ui.js';
-import { Game } from './game.js';
+import { Game, pickRivals } from './game.js';
 import { SPARKS, heroById, heroesFor } from './heroes.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
@@ -139,7 +139,9 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   const sq = opts.mode === 'tutorial' ? { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') } : squad();
   const seed = opts.mode === 'challenge' ? opts.challenge.seed : randomSeed();
-  const summary = await game.runMatch({ mode: opts.mode, squad: sq, seed, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
+  const order = opts.mode === 'quick' ? await coinToss(pickRivals(seed, sq)) : 'bat';
+  for (const s of ui.screens) $(s).hidden = true;
+  const summary = await game.runMatch({ mode: opts.mode, squad: sq, seed, order, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
   if (!summary) return; // quit mid-match
   if (opts.mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
@@ -148,6 +150,48 @@ async function startMatch(opts) {
 $('btnPause').addEventListener('pointerdown', e => { e.stopPropagation(); game.paused = true; ui.show('pause'); });
 $('resumeBtn').addEventListener('click', () => { game.paused = false; $('pause').hidden = true; });
 $('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
+
+// ---------- coin toss ----------
+function coinToss(rival) {
+  return new Promise(resolve => {
+    ui.show('toss');
+    const coin = $('coin'), text = $('tossText');
+    coin.className = 'coin';
+    $('tossCall').hidden = false; $('tossChoose').hidden = true; $('tossGo').hidden = true;
+    text.textContent = `Your captain vs ${rival.bat.name}. Call it in the air!`;
+    const call = side => {
+      $('tossCall').hidden = true;
+      const result = Math.random() < 0.5 ? 'heads' : 'tails';
+      coin.style.setProperty('--end', result === 'heads' ? '1800deg' : '1980deg');
+      void coin.offsetWidth;
+      coin.classList.add('flipping');
+      sfx.whoosh();
+      text.textContent = 'It\'s in the air…';
+      setTimeout(() => {
+        coin.style.transition = 'none';
+        coin.classList.remove('flipping');
+        coin.classList.toggle('show-tails', result === 'tails');
+        void coin.offsetWidth;
+        coin.style.transition = '';
+        sfx.dhol();
+        if (side === result) {
+          text.textContent = `${result.toUpperCase()}! You won the toss. What will you do?`;
+          $('tossChoose').hidden = false;
+          if (window.__SIXCHARGE_BOT) setTimeout(() => resolve(Math.random() < 0.5 ? 'bat' : 'bowl'), 100);
+        } else {
+          const aiBats = Math.random() < 0.4;
+          text.textContent = `${result.toUpperCase()}. ${rival.bat.name} won the toss and will ${aiBats ? 'bat' : 'bowl'} first — you ${aiBats ? 'bowl' : 'bat'} first.`;
+          $('tossGo').hidden = false;
+          $('tossGo').onclick = () => resolve(aiBats ? 'bowl' : 'bat');
+          if (window.__SIXCHARGE_BOT) setTimeout(() => resolve(aiBats ? 'bowl' : 'bat'), 100);
+        }
+      }, window.__SIXCHARGE_BOT ? 300 : 1350);
+    };
+    for (const b of $('tossCall').querySelectorAll('button')) b.onclick = () => call(b.dataset.call);
+    for (const b of $('tossChoose').querySelectorAll('button')) b.onclick = () => resolve(b.dataset.choose);
+    if (window.__SIXCHARGE_BOT) setTimeout(() => call(Math.random() < 0.5 ? 'heads' : 'tails'), 100);
+  });
+}
 
 // ---------- result + sharing ----------
 function shareBase() {

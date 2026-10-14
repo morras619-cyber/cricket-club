@@ -22,6 +22,15 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 const SHOT_WORDS = ['THWACK!', 'DHOOM!', 'KRAK!', 'BLAM!', 'SMASH!'];
 
+// The rival XI's star batter and bowler, fixed by the seed so a challenge faces the same opponents.
+export function pickRivals(seed, team) {
+  const r = makeRng(seed ^ 0x5eed);
+  return {
+    bat: r.pick(heroesFor('bat').filter(h => h !== team.bat)),
+    bowl: r.pick(heroesFor('bowl').filter(h => h !== team.bowl)),
+  };
+}
+
 export class Game {
   constructor(ui) {
     this.ui = ui;
@@ -32,6 +41,7 @@ export class Game {
     this.fx = new FX();
     this.timers = []; this.waiters = [];
     this.gameTime = 0; this.realTime = 0; this.lastNow = performance.now();
+    this.powerFxUntil = 0; this.mapBig = false;
     this.timeScale = 1; this.hitStopUntil = 0;
     this.view = 'idle'; this.paused = false;
     this.S = this.freshScene(); this.O = null;
@@ -109,6 +119,7 @@ export class Game {
     this.onInput = null;
   }
   hitStop(ms) { this.hitStopUntil = this.realTime + ms; }
+  powerPause() { return this.until(() => this.realTime >= this.powerFxUntil); }
 
   bindInput() {
     const cv = this.cv;
@@ -161,11 +172,7 @@ export class Game {
     this.mode = mode;
     this.seed = opts.seed;
     this.team = opts.squad; // { bat, bowl, field } heroes
-    const r = makeRng(this.seed ^ 0x5eed);
-    this.rival = {
-      bat: r.pick(heroesFor('bat').filter(h => h !== this.team.bat)),
-      bowl: r.pick(heroesFor('bowl').filter(h => h !== this.team.bowl)),
-    };
+    this.rival = pickRivals(this.seed, this.team);
     this.charge = new Charge(0);
     this.charge.on(ev => this.onCharge(ev));
     this.ui.charge(0);
@@ -188,6 +195,17 @@ export class Game {
         this.innings.push(inn);
         await this.introBanner('CHALLENGE!', `Beat ${opts.challenge.name}'s ${opts.challenge.target} off the same 30 balls`);
         await this.battingInnings(inn, script);
+      } else if (opts.order === 'bowl') {
+        const first = new Innings('ai');
+        this.innings.push(first);
+        await this.bowlingInnings(first);
+        const carry = this.charge.carryOver();
+        await this.inningsBreak(first, carry);
+        const second = new Innings('player', first.runs + 1);
+        this.innings.push(second);
+        this.newCharge(carry);
+        await this.introBanner('YOUR CHASE', `${first.runs + 1} to win · ${this.rival.bowl.name} has the ball`);
+        await this.battingInnings(second, script);
       } else {
         const first = new Innings('player');
         this.innings.push(first);
@@ -197,9 +215,7 @@ export class Game {
         await this.inningsBreak(first, carry);
         const second = new Innings('ai', first.runs + 1);
         this.innings.push(second);
-        this.charge = new Charge(carry);
-        this.charge.on(ev => this.onCharge(ev));
-        this.ui.charge(carry);
+        this.newCharge(carry);
         await this.bowlingInnings(second);
       }
       return this.summary();
@@ -209,6 +225,12 @@ export class Game {
     } finally {
       this.ui.hud(false); this.clearBowlUI(); this.ui.hint(null);
     }
+  }
+
+  newCharge(value) {
+    this.charge = new Charge(value);
+    this.charge.on(ev => this.onCharge(ev));
+    this.ui.charge(value);
   }
 
   quit() { this.cancelAll(); this.ui.hud(false); this.clearBowlUI(); this.view = 'idle'; this.paused = false; }
@@ -224,7 +246,8 @@ export class Game {
 
   async inningsBreak(first, carry) {
     this.clearBowlUI();
-    this.ui.banner('INNINGS BREAK', `Defend ${first.runs}. ${carry} charge carries over.`, 2200);
+    const task = first.side === 'player' ? `Defend ${first.runs}` : `Chase ${first.runs + 1}`;
+    this.ui.banner('INNINGS BREAK', `${task}. ${carry} charge carries over.`, 2200);
     await this.sleepReal(this.bot ? 200 : 2300);
   }
 
@@ -319,8 +342,9 @@ export class Game {
     this.fx.flash(color, 0.45);
     this.fx.burst(this.W / 2, this.H * 0.42, { color, r: Math.max(this.W, this.H) * 0.6 });
     this.fx.word(def.word, this.W / 2, this.H * 0.42, { size: def.ultimate ? 76 : 60, color, stroke: INK, dur: 1300 });
-    this.fx.bubble(hero.quote, this.W * 0.5, this.H * 0.56, { dur: 1500 });
-    this.ui.banner(def.name.toUpperCase(), def.desc, 1600);
+    this.fx.bubble(hero.quote, this.W * 0.5, this.H * 0.56, { dur: 1300 });
+    this.ui.banner(def.name.toUpperCase(), def.desc, 1300);
+    this.powerFxUntil = this.realTime + (this.bot ? 0 : 1350);
     if (def.ultimate || def.cost >= 100) sfx.boom(); else sfx.full();
     buzz([40, 30, 80]);
     if (this.phase === 'bowl' && this.aiBatPower && (key === 'bowlpower' || key === 'pinpoint')) {
@@ -340,7 +364,7 @@ export class Game {
       need = inn.side === 'player'
         ? (n > 0 ? `Need ${n} off ${inn.ballsLeft}` : 'Target reached!')
         : (n > 0 ? `They need ${n} off ${inn.ballsLeft}` : 'They got there');
-    } else need = 'Set a target';
+    } else need = inn.side === 'player' ? 'Set a target' : 'They\'re setting a target';
     this.ui.score(inn, { label: inn.side === 'player' ? 'YOU BAT' : 'YOU BOWL', need, phase: phaseFor(ball).name });
   }
 
@@ -410,11 +434,23 @@ export class Game {
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
     else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('HOLD · SWIPE · LIFT ON THE RING');
+    // before the delivery a tap on the field map enlarges it
+    this.onInput = (type, g) => { if (type === 'down' && this.inMap(g)) this.mapBig = !this.mapBig; };
     if (opt.waitPower) await opt.waitPower();
-    await this.sleepReal(this.bot ? 150 : aiPower ? 1300 : 650);
+    await this.sleepReal(this.bot ? 150 : aiPower ? 1700 : 650);
+    await this.powerPause();
 
-    // run-up
-    await this.animate(850, p => { S.bowler.z = 27.5 - 6.9 * p; S.bowler.pose = POSES.run(p * 13); });
+    // run-up: freezes mid-stride while a power's comic panel is on screen
+    let prog = 0, last = this.gameTime;
+    await this.until(() => {
+      const dt = this.gameTime - last; last = this.gameTime;
+      if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / 850;
+      const p = Math.min(1, prog);
+      S.bowler.z = 27.5 - 6.9 * p; S.bowler.pose = POSES.run(p * 13);
+      return p >= 1;
+    });
+    this.onInput = null;
+    this.mapBig = false;
     this.powerLock = true;
     this.refreshPowers();
     const fx = this.consumeBatEffects();
@@ -732,7 +768,7 @@ export class Game {
     this.freeHit = false;
     this.aiPowerBalls = new Set([16, 26]);
     this.hud(inn);
-    await this.introBanner('YOUR TURN TO BOWL', `Defend ${inn.target - 1} with ${this.team.bowl.name}`);
+    await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `Keep ${this.rival.bat.name} quiet with ${this.team.bowl.name}` : `Defend ${inn.target - 1} with ${this.team.bowl.name}`);
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
       this.phaseBanner(ballNo);
@@ -747,7 +783,7 @@ export class Game {
       if (r?.rebowl) { this.rebowls = (this.rebowls || 0) + 1; continue; }
       if (inn.balls % 6 === 0 && !inn.done()) {
         const runs = inn.log.slice(-6).reduce((s, x) => s + (x === 'W' ? 0 : Number(x)), 0);
-        this.ui.banner(`END OF OVER ${inn.balls / 6}`, `${runs} off the over · they need ${Math.max(0, inn.target - inn.runs)}`, 1300);
+        this.ui.banner(`END OF OVER ${inn.balls / 6}`, inn.target == null ? `${runs} off the over · ${inn.runs}/${inn.wkts}` : `${runs} off the over · they need ${Math.max(0, inn.target - inn.runs)}`, 1300);
         await this.sleepReal(this.bot ? 100 : 1300);
       } else await this.sleepReal(this.bot ? 80 : 300);
     }
@@ -782,7 +818,7 @@ export class Game {
 
     // the AI batter may power up
     this.aiBatPower = null; this.clash = false;
-    const need = inn.target - inn.runs;
+    const need = inn.target != null ? inn.target - inn.runs : Math.max(12, 48 - inn.runs); // batting first, the AI paces itself to a par score
     if (!opt.scripted && this.aiPowerBalls.has(ballNo) && need / Math.max(1, inn.ballsLeft) > 1.0) {
       this.aiPowerBalls.delete(ballNo);
       const k = this.rival.bat.power.kind;
@@ -1006,7 +1042,8 @@ export class Game {
     this.ui.fieldButton(true, () => { if (!pts) this.fieldEditRequested = true; });
     this.onInput = (type, g) => {
       if (type === 'down') {
-        if (g.y < this.H * 0.28) return;
+        if (this.inMap(g)) { this.fieldEditRequested = true; return; }
+        if (g.y < this.H * 0.28 || this.realTime < this.powerFxUntil) return;
         pts = [{ x: g.x, y: g.y, t: g.t }];
         S.runStart = this.realTime;
         this.ui.hint(null);
@@ -1082,7 +1119,7 @@ export class Game {
     // start from the field as it will actually stand (Power Burst limits already applied)
     const asPlayed = list => buildFieldFrom(list, pp).filter(f => !f.keeper && f.id !== 'bowler').map(f => ({ id: f.id, name: f.name, x: f.x, y: f.y }));
     const start = this.bowlChoice.custom || presetPositions(this.bowlChoice.field);
-    const E = this.E = { draft: asPlayed(start), pp, drag: null, done: false, preset: this.bowlChoice.custom ? null : this.bowlChoice.field, moved: false };
+    const E = this.E = { draft: asPlayed(start), pp, drag: null, selected: null, done: false, preset: this.bowlChoice.custom ? null : this.bowlChoice.field, moved: false, touched: false, t0: this.realTime };
     this.view = 'fieldedit';
     this.fx.bubbles = [];
     const V = this.of;
@@ -1093,34 +1130,45 @@ export class Game {
     this.ui.hint(null);
     this.ui.fieldEditor(true, {
       presets: [['attack', 'Attack'], ['balanced', 'Balanced'], ['defend', 'Defend']],
-      onPreset: id => { E.draft = asPlayed(presetPositions(id)); E.preset = id; E.moved = false; sfx.click(); },
+      current: this.bowlChoice.custom ? null : this.bowlChoice.field,
+      onPreset: id => { E.draft = asPlayed(presetPositions(id)); E.preset = id; E.moved = false; E.selected = null; sfx.click(); },
       onDone: () => { E.done = true; },
     });
+    // Drag a fielder, or tap one and then tap where they should stand.
+    const place = (f, sx, sy) => {
+      const w = this.of.from(sx, sy);
+      const c = { x: w.x, y: w.y };
+      const r = Math.hypot(c.x, c.y - CFG.ground.centerY), max = CFG.ground.boundaryR - 3;
+      if (r > max) { c.x *= max / r; c.y = CFG.ground.centerY + (c.y - CFG.ground.centerY) * max / r; }
+      if (Math.abs(c.x) < 2.4 && c.y > -4.5 && c.y < 23) c.x = c.x < 0 ? -2.4 : 2.4; // keep off the pitch
+      f.x = c.x; f.y = c.y; f.name = positionName(c.x, c.y);
+      E.moved = true; E.preset = null; E.touched = true;
+      this.ui.fieldPreset(null);
+    };
     this.onInput = (type, g) => {
       if (type === 'down') {
-        let best = null, bd = 34;
+        let best = null, bd = 44;
         for (const f of E.draft) {
           const p = this.of.to(f.x, f.y);
-          const dd = Math.hypot(p.x - g.x, p.y - 12 - g.y);
+          const dd = Math.hypot(p.x - g.x, p.y - 14 - g.y);
           if (dd < bd) { bd = dd; best = f; }
         }
-        E.drag = best;
-        if (best) sfx.click();
+        if (best) { E.drag = best; E.dragMoved = false; E.touched = true; sfx.click(); }
+        else if (E.selected) { place(E.selected, g.x, g.y + 12); E.selected = null; sfx.click(); }
       } else if (type === 'move' && E.drag) {
-        const w = this.of.from(g.x, g.y + 12);
-        const c = { x: w.x, y: w.y };
-        const r = Math.hypot(c.x, c.y - CFG.ground.centerY), max = CFG.ground.boundaryR - 3;
-        if (r > max) { c.x *= max / r; c.y = CFG.ground.centerY + (c.y - CFG.ground.centerY) * max / r; }
-        if (Math.abs(c.x) < 2.4 && c.y > -4.5 && c.y < 23) c.x = c.x < 0 ? -2.4 : 2.4; // keep off the pitch
-        E.drag.x = c.x; E.drag.y = c.y; E.drag.name = positionName(c.x, c.y);
-        E.moved = true; E.preset = null;
-      } else if (type === 'up') E.drag = null;
+        if (Math.hypot(g.x - g.x0, g.y - g.y0) > 8) E.dragMoved = true;
+        if (E.dragMoved) place(E.drag, g.x, g.y + 12);
+      } else if (type === 'up' && E.drag) {
+        E.selected = E.dragMoved ? null : (E.selected === E.drag ? null : E.drag);
+        E.drag = null;
+      }
     };
     if (this.bot) this.sleepReal(400).then(() => { E.done = true; }).catch(() => {});
     await this.until(() => {
       const out = E.draft.filter(outsideRing).length;
       if (E.pp && out > 2) this.ui.fieldNote(`${out} outside the circle — Power Burst allows 2. Extras move in when you're done.`, true);
-      else this.ui.fieldNote(E.pp ? `Power Burst: ${out}/2 outside the circle.` : 'Drag a fielder to move them.', false);
+      else if (E.selected) this.ui.fieldNote(`Now tap where ${E.selected.name} should stand.`, false);
+      else this.ui.fieldNote(`Drag a fielder, or tap one then tap a spot.${E.pp ? ` Power Burst: ${out}/2 outside the circle.` : ''}`, false);
       return E.done;
     });
     this.onInput = null;
@@ -1842,8 +1890,58 @@ export class Game {
 
     // timing ring (batting)
     if (kind === 'bat' && S.ring && S.delivery) this.drawTimingRing(cam);
+    if ((kind === 'bat' || kind === 'bowl') && S.field3d && !S.delivery && !S.flight) this.drawFieldMap(S.field3d, kind);
     if (kind === 'keeper' && S.reticle) this.drawReticle(cam);
     if (S.frozen) { ctx.fillStyle = 'rgba(62,198,255,0.15)'; ctx.fillRect(0, 0, this.W, this.H); }
+  }
+
+  // Top-down field map. Batting: their field (tap to enlarge). Bowling: yours (tap to move fielders).
+  mapRect() {
+    const big = this.mapBig && this.view === 'bat';
+    const w = big ? Math.min(this.W - 32, 320) : 92, h = w * 1.12;
+    const x = big ? (this.W - w) / 2 : this.W - w - Math.max(12, this.W * 0.03);
+    const y = big ? this.H * 0.18 : 128;
+    return { x, y, w, h };
+  }
+  inMap(g) {
+    const r = this.mapRect();
+    return (this.view === 'bat' || this.view === 'bowl') && g.x >= r.x - 6 && g.x <= r.x + r.w + 6 && g.y >= r.y - 6 && g.y <= r.y + r.h + 22;
+  }
+
+  drawFieldMap(fielders, kind) {
+    const ctx = this.ctx, { x, y, w, h } = this.mapRect();
+    const big = w > 150;
+    const R0 = CFG.ground.boundaryR, k = (w / 2 - 6) / R0;
+    const cx = x + w / 2, cy = y + h / 2;
+    const P = (fx, fy) => ({ x: cx + fx * k, y: cy - (fy - CFG.ground.centerY) * k });
+    ctx.save();
+    ctx.fillStyle = 'rgba(16,22,50,0.9)'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#23853f'; ctx.strokeStyle = '#fff4da'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, R0 * k, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.arc(cx, cy, 27 * k, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    const a = P(-1.5, 21), b = P(1.5, -1);
+    ctx.fillStyle = '#d8b878'; ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    const color = kind === 'bat' ? '#e8343b' : '#3ec6ff';
+    ctx.font = `600 ${big ? 10 : 8}px "Baloo 2", system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (const f of fielders) {
+      const p = P(f.x, f.y);
+      ctx.fillStyle = color; ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, big ? 5 : 3.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (big) { ctx.fillStyle = '#fff4da'; ctx.fillText(f.name, p.x, p.y + 6); }
+    }
+    const bat = P(0, 0);
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(bat.x, bat.y, big ? 4 : 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.font = `${big ? 15 : 11}px "Bangers", Impact, sans-serif`; ctx.textBaseline = 'top'; ctx.fillStyle = '#fff4da';
+    ctx.fillText(kind === 'bat' ? (big ? 'THEIR FIELD · TAP TO CLOSE' : 'THEIR FIELD') : 'TAP TO SET', cx, y + h + 3);
+    if (big) {
+      ctx.font = `600 10px "Baloo 2", system-ui, sans-serif`; ctx.fillStyle = 'rgba(255,244,218,0.8)';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('OFF SIDE →', x + w - 34, y + h - 4);
+      ctx.fillText('← LEG SIDE', x + 34, y + h - 4);
+    }
+    ctx.restore();
   }
 
   drawTimingRing(cam) {
@@ -2003,11 +2101,26 @@ export class Game {
     const figs = [...E.draft].sort((a, b) => b.y - a.y);
     for (const f of figs) {
       const warn = E.pp && out > 2 && outsideRing(f);
-      V.figure(ctx, f.x, f.y, SIDEKICK_LOOKS[0], E.drag === f ? POSES.celebrate() : POSES.crouch(), { glow: E.drag === f ? '#ffd23f' : warn ? '#e8343b' : null });
-      V.label(ctx, f.x, f.y, f.name || positionName(f.x, f.y), warn ? '#ff8a8a' : E.drag === f ? '#ffd23f' : '#fff4da', 10);
+      const hot = E.drag === f || E.selected === f;
+      V.figure(ctx, f.x, f.y, SIDEKICK_LOOKS[0], hot ? POSES.celebrate() : POSES.crouch(), { glow: hot ? '#ffd23f' : warn ? '#e8343b' : null });
+      V.label(ctx, f.x, f.y, f.name || positionName(f.x, f.y), warn ? '#ff8a8a' : hot ? '#ffd23f' : '#fff4da', 10);
     }
     V.figure(ctx, 0, -3, this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1], POSES.keeper(), { emblem: this.team.field.id === 'rani' ? 'R' : null });
     V.figure(ctx, -0.6, 1.2, this.rival.bat.look, POSES.bat(-0.4));
+    if (!E.touched) {
+      // a hand showing the drag, until the player touches a fielder
+      const f = E.draft.find(q => q.id === 'cover') || E.draft[0];
+      const p = V.to(f.x, f.y);
+      const t = ((this.realTime - E.t0) % 1600) / 1600;
+      const k = t < 0.2 ? 0 : t > 0.8 ? 1 : (t - 0.2) / 0.6;
+      const hx = p.x + 10 + k * 50, hy = p.y - 6 - k * 40;
+      ctx.save();
+      ctx.globalAlpha = t > 0.9 ? (1 - t) * 10 : 1;
+      ctx.fillStyle = '#fff4da'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.roundRect(hx - 7, hy - 4, 14, 22, 6); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(hx - 4, hy - 18, 8, 18, 4); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
   }
 
   renderOutfield() {
