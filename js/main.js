@@ -2,7 +2,6 @@ import { UI } from './ui.js';
 import { Game, pickRivals } from './game.js';
 import { SPARKS, heroById, heroesFor } from './heroes.js';
 import { TEAMS } from './teams.js';
-import { drawTeamThumb } from './batsprite.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
@@ -180,9 +179,8 @@ function teamPicker() {
     b.className = 'team' + (on ? ' on' : '');
     b.setAttribute('aria-pressed', on);
     b.style.setProperty('--suit', t.suit); b.style.setProperty('--trim', t.trim);
-    const c = document.createElement('canvas'); c.width = 120; c.height = 150;
-    drawTeamThumb(c, t.id);
-    b.append(c, el('b', '', t.name));
+    const logo = document.createElement('img'); logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
+    b.append(logo, el('b', '', t.name));
     b.addEventListener('click', () => {
       profile.team = t.id; saveProfile(profile); sfx.click();
       for (const x of row.children) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }

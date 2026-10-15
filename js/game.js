@@ -271,6 +271,7 @@ export class Game {
   async introBanner(head, sub) {
     this.view = 'bat';
     this.S = this.freshScene();
+    if (this.myTeam && this.mode !== 'tutorial') this.ui.matchup(this.myTeam.id, this.oppTeam.id);
     this.ui.banner(head, sub, 1800);
     sfx.crowd(0.8);
     await this.sleepReal(this.bot ? 200 : 1700);
@@ -406,7 +407,7 @@ export class Game {
     let heroLine;
     if (inn.side === 'player') heroLine = `${short(this.team.bat)} ${inn.cur.runs}* (${inn.cur.balls})`;
     else { const b = inn.bowler; heroLine = `${short(this.team.bowl)} ${b.wkts}/${b.runs} · ${Math.floor(b.balls / 6)}.${b.balls % 6} ov`; }
-    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${this.team.bat.name.toUpperCase()}` : `YOU BOWL · ${this.team.bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine });
+    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${this.team.bat.name.toUpperCase()}` : `YOU BOWL · ${this.team.bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine, logo: this.myTeam ? `img/logo-${this.myTeam.id}.webp` : null });
   }
 
   phaseBanner(ballNo) {

@@ -28,7 +28,10 @@ export class UI {
   }
   hud(on) { $('hud').hidden = !on; }
 
-  score(inn, { label, need, phase, heroLine = '' }) {
+  score(inn, { label, need, phase, heroLine = '', logo }) {
+    const lg = $('hudLogo');
+    if (logo && !lg.src.endsWith(logo)) lg.src = logo;
+    lg.hidden = !logo;
     setFit($('hudTeam'), label);
     $('hudRuns').textContent = inn.runs;
     $('hudWkts').textContent = inn.wkts;
@@ -49,13 +52,18 @@ export class UI {
     $('hudOver').innerHTML = cells.join('');
   }
 
+  // team v team, shown with the next banner (cleared after it)
+  matchup(a, b) {
+    $('vsA').src = `img/logo-${a}.webp`; $('vsB').src = `img/logo-${b}.webp`;
+    $('bannerVs').hidden = false;
+  }
   banner(head, sub = '', ms = 1300) {
     $('bannerHead').textContent = head;
     $('bannerSub').textContent = sub;
     const b = $('banner');
     b.classList.add('show');
     clearTimeout(this.bannerTimer);
-    if (ms) this.bannerTimer = setTimeout(() => b.classList.remove('show'), ms);
+    if (ms) this.bannerTimer = setTimeout(() => { b.classList.remove('show'); $('bannerVs').hidden = true; }, ms);
   }
   clearBanner() { $('banner').classList.remove('show'); }
 
