@@ -36,6 +36,16 @@ def main():
     for team, (s, li) in zip(TEAMS, objs):
         c = a[s].copy()
         c[..., 3] = np.where(lab[s] == li, c[..., 3], 0)
+        # the sheet's background removal also ate the black inside some logos (Eagles' wing
+        # stripes, Titans' triangle): put solid ink back everywhere the outline encloses
+        m = c[..., 3] > 40
+        inside = ndimage.binary_fill_holes(ndimage.binary_closing(m, iterations=4))
+        inside = ndimage.binary_erosion(inside, iterations=1)
+        al = c[..., 3:4].astype(float) / 255
+        ink = np.array([20, 16, 24], float)
+        blended = c[..., :3] * al + ink * (1 - al)
+        c[..., :3] = np.where(inside[..., None], blended, c[..., :3]).astype(np.uint8)
+        c[..., 3] = np.where(inside, 255, c[..., 3])
         im = Image.fromarray(c)
         im = im.crop(im.getbbox())
         k = SIZE / max(im.size)
