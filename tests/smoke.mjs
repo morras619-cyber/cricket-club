@@ -13,7 +13,7 @@ try { ({ chromium } = require('playwright')); } catch { ({ chromium } = require(
 const root = resolve(new URL('..', import.meta.url).pathname);
 const shots = process.env.SHOTS_DIR || join(root, 'smoke-shots');
 mkdirSync(shots, { recursive: true });
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 const server = createServer(async (req, res) => {
   const path = join(root, decodeURIComponent(req.url.split(/[?#]/)[0]) === '/' ? 'index.html' : decodeURIComponent(req.url.split(/[?#]/)[0]));
   try { res.writeHead(200, { 'content-type': types[extname(path)] || 'application/octet-stream' }); res.end(await readFile(path)); }

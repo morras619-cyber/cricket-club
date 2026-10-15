@@ -13,7 +13,6 @@ import { playerControls, momentScore } from './rules.js';
 import { FX, INK } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
-import { sprite, drawSprite } from './sprites.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -47,9 +46,6 @@ function fisheyeFrom(L, sx, sy) {
 }
 const fishRadius = (L, r) => L.R * Math.pow(r / CFG.ground.boundaryR, FISH);
 
-// Which way the batter swings: straight, through the leg side (screen left) or the off side.
-const swingDir = (angle, len) => (len < 28 || Math.abs(angle) < 0.35 ? 'straight' : angle < 0 ? 'left' : 'right');
-
 // Short labels for fielder tokens.
 const ABBR = { 'Slip': 'SL', 'Leg slip': 'LS', 'Gully': 'GU', 'Leg gully': 'LG', 'Point': 'PT', 'Deep point': 'DP', 'Backward point': 'BP', 'Cover': 'CV', 'Deep cover': 'DC', 'Mid-off': 'MO', 'Long-off': 'LO', 'Mid-on': 'MN', 'Long-on': 'LN', 'Mid-wicket': 'MW', 'Deep mid-wicket': 'DM', 'Square leg': 'SQ', 'Deep square leg': 'DS', 'Backward square': 'BS', 'Fine leg': 'FL', 'Third man': 'TM' };
 const abbrev = name => ABBR[name] || name.split(/[ -]/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -65,7 +61,6 @@ export class Game {
     this.timers = []; this.waiters = [];
     this.gameTime = 0; this.realTime = 0; this.lastNow = performance.now();
     this.powerFxUntil = 0; this.mapBig = false;
-    sprite('raja'); // start loading the hand-drawn batter
     this.timeScale = 1; this.hitStopUntil = 0;
     this.view = 'idle'; this.paused = false;
     this.S = this.freshScene(); this.O = null;
@@ -445,7 +440,7 @@ export class Game {
     this.view = 'bat';
     this.timeScale = 1;
     const before = { runs: inn.runs, wkts: inn.wkts };
-    S.batter.look = this.team.bat.look; S.batter.emblem = this.team.bat.emblem; S.batter.heroId = this.team.bat.id;
+    S.batter.look = this.team.bat.look; S.batter.emblem = this.team.bat.emblem;
     S.bowler.look = this.rival.bowl.look;
     const rng = this.ballRng(ballNo);
     const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
@@ -510,7 +505,6 @@ export class Game {
         if (tg < S.ballT0 + 0.15) { S.batter.angle = -0.4; return; }
         swing = { t: tg, dx: g.dx, dy: g.dy };
         S.batter.swingT0 = this.realTime;
-        S.batter.swingDir = swingDir(Math.atan2(g.dx, -g.dy), Math.hypot(g.dx, g.dy));
       }
     };
     if (this.bot) this.botBat(d, S, fx, rng);
@@ -675,7 +669,6 @@ export class Game {
       await this.showAutoPlay(simulateHit({ ...res }, aiField, rng), aiField, { side: 'ai' });
       inn.ball({ runs });
       this.charge.award('six', `${runs} RUNS`);
-      await this.celebrate();
       this.addMoment('ultimate', `METEOR ${runs}!`, 'BOOOOM!', this.team.bat, { ballNo, perfect: runs === 8, detail: `${runs} runs off one ball` });
       return;
     }
@@ -708,7 +701,6 @@ export class Game {
       sfx.crowd(0.8);
       this.addMoment('four', 'FOUR!', 'FOUR!', this.team.bat, { ballNo });
     } else if (runs === 0) this.charge.dot();
-    if (runs === 6 || (inn.target != null && inn.runs >= inn.target)) await this.celebrate();
     if (inn.target != null && inn.runs >= inn.target) {
       this.addMoment('lastBallWin', 'WINNING HIT!', runs >= 4 ? 'DHOOM!' : 'YES!', this.team.bat, { ballNo, detail: `chased it with ${inn.ballsLeft} balls left` });
     }
@@ -730,7 +722,7 @@ export class Game {
     const fs = this.fieldLooks(fielders, side);
     this.O = {
       fielders: fs,
-      batters: [{ x: -0.6, y: 1.2, look: side === 'ai' ? this.team.bat.look : this.rival.bat.look, heroId: side === 'ai' ? this.team.bat.id : this.rival.bat.id }, { x: 0.8, y: 19, look: side === 'ai' ? SIDEKICK_LOOKS[0] : AI_LOOK }],
+      batters: [{ x: -0.6, y: 1.2, look: side === 'ai' ? this.team.bat.look : this.rival.bat.look }, { x: 0.8, y: 19, look: side === 'ai' ? SIDEKICK_LOOKS[0] : AI_LOOK }],
       ball: { x: 0, y: 1, h: 1 }, marks: [], ring: null, ends: null, throwLine: null, labels: [],
     };
     this.view = 'outfield';
@@ -837,7 +829,7 @@ export class Game {
     this.view = 'bowl';
     this.timeScale = 1;
     const rng = this.ballRng(ballNo);
-    S.batter.look = this.rival.bat.look; S.batter.emblem = this.rival.bat.emblem; S.batter.x = -0.5; S.batter.heroId = this.rival.bat.id;
+    S.batter.look = this.rival.bat.look; S.batter.emblem = this.rival.bat.emblem; S.batter.x = -0.5;
     S.bowler.look = this.team.bowl.look; S.bowler.emblem = this.team.bowl.emblem; S.bowler.z = 26; S.bowler.x = -0.55;
     S.keeper.look = this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1];
     const kind = this.team.bowl.bowls;
@@ -987,7 +979,7 @@ export class Game {
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
 
     await this.until(() => this.gameTime - S.ballT0 >= d.tContact);
-    if (ai.res.outcome !== 'leave') { S.batter.swingT0 = this.realTime; S.batter.swingDir = swingDir(ai.shot?.angle ?? 0, 200); }
+    if (ai.res.outcome !== 'leave') S.batter.swingT0 = this.realTime;
     const res = ai.res;
     const contact = d.pos(d.tContact);
     const cs = this.cams.bowl.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 3 };
@@ -1908,10 +1900,7 @@ export class Game {
       angle = lerp(-2.5, 2.4, p);
     }
     const batterBack = kind !== 'bowl';
-    const sp = batterBack ? sprite(b.heroId) : null;
-    if (sp) push(b.z, () => this.drawBatterSprite(cam, b, sp));
-    else if (b.anim === 'celebrate') push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.celebrate(), { back: batterBack, emblem: b.emblem }));
-    else push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow }));
+    push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow }));
     // keeper
     if (kind !== 'bat') {
       const k = S.keeper;
@@ -2001,30 +1990,6 @@ export class Game {
       ctx.fillText('← LEG SIDE', x + 34, y + h - 4);
     }
     ctx.restore();
-  }
-
-  // The hand-drawn batter: idle loop, backlift while your finger is down, a swing that matches
-  // your swipe (straight / leg side / off side), and a celebration.
-  drawBatterSprite(cam, b, sp) {
-    const p = cam.project(b.x, 0, b.z);
-    if (!p) return;
-    let anim = 'idle', frame = Math.floor(this.realTime / 130) % 6;
-    if (b.anim === 'celebrate') { anim = 'celebrate'; frame = Math.min(5, Math.floor((this.realTime - b.animT0) / 120)); }
-    else if (b.swingT0 != null) { anim = b.swingDir || 'straight'; frame = Math.min(7, 2 + Math.floor(((this.realTime - b.swingT0) / 320) * 6)); }
-    else if (b.angle < -1.5) { anim = 'straight'; frame = 1; }
-    const ctx = this.ctx;
-    if (b.glow) { ctx.save(); ctx.shadowColor = b.glow; ctx.shadowBlur = 22; }
-    drawSprite(ctx, sp, anim, frame, p.x, p.y, 1.85 * p.k * 1.08);
-    if (b.glow) ctx.restore();
-  }
-
-  async celebrate() {
-    const S = this.S;
-    this.view = 'bat';
-    S.flight = null; S.ball = null; S.delivery = null; S.trail = [];
-    S.batter.swingT0 = null; S.batter.anim = 'celebrate'; S.batter.animT0 = this.realTime;
-    await this.sleepReal(this.bot ? 50 : 900);
-    S.batter.anim = null;
   }
 
   drawTimingRing(cam) {
@@ -2264,13 +2229,7 @@ export class Game {
     }
     const figs = [
       ...O.fielders.map(f => ({ y: f.y, draw: () => { V.figure(ctx, f.x, f.y, f.look, f.pose, { emblem: f.emblem, glow: f.ctrl ? '#ffd23f' : null, scale: f.ctrl ? 1.25 : 1 }); } })),
-      ...O.batters.map(b => ({ y: b.y, draw: () => {
-        const sp = sprite(b.heroId);
-        if (sp) {
-          const p = V.to(b.x, b.y);
-          drawSprite(ctx, sp, O.running ? 'run' : 'idle', Math.floor(this.gameTime * (O.running ? 12 : 7)) % 6, p.x, p.y, Math.max(26, 1.85 * V.k * 1.5) * 1.1);
-        } else V.figure(ctx, b.x, b.y, b.look, O.running ? POSES.run(this.gameTime * 12) : POSES.bat(-0.4));
-      } })),
+      ...O.batters.map(b => ({ y: b.y, draw: () => V.figure(ctx, b.x, b.y, b.look, O.running ? POSES.run(this.gameTime * 12) : POSES.bat(-0.4)) })),
     ].sort((a, b) => b.y - a.y);
     for (const f of figs) f.draw();
     const me = O.fielders.find(f => f.ctrl);

@@ -57,7 +57,6 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/banter.js` | Sledges, comebacks and compliments |
 | `js/game.js` | Match flow, ball sequences, fielding events, tutorial, rendering |
 | `js/scene.js`, `js/figure.js`, `js/fx.js` | Cameras, comic figures, onomatopoeia and impact effects |
-| `js/sprites.js`, `assets/` | Hand-drawn sprite animations (Thunder Raja's batter: idle, backlift, straight/leg/off swings, run, celebrate) |
 | `js/ui.js`, `js/main.js` | HUD, menus, squad picker, results and sharing |
 | `js/sharecard.js`, `js/codec.js`, `js/profile.js` | Share card, challenge links, local progression |
 
