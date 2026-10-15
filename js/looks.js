@@ -198,7 +198,7 @@ function sheetMasks(key, p, w, h) {
   const looseSkin = new Uint8Array(n), looseHair = new Uint8Array(n), warmSkin = new Uint8Array(n), ink = new Uint8Array(n);
   let orangeKit = 0, opaque = 0;
   const hasBat = /^bat/.test(key); // only the batting sheets have a bat to protect
-  const darkWarm = new Uint8Array(n), bat = new Uint8Array(n), darkBrown = new Uint8Array(n);
+  const darkWarm = new Uint8Array(n), bat = new Uint8Array(n), darkBrown = new Uint8Array(n), sat = new Float32Array(n);
   for (let i = 0, q = 0; q < n; i += 4, q++) {
     if (p[i + 3] < 70) continue;
     // hue, saturation, value inline (no allocation: this runs over a million pixels)
@@ -212,7 +212,7 @@ function sheetMasks(key, p, w, h) {
     let hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
     hh = (hh * 60 + 360) % 360;
     if (hh > 50) continue;
-    H[q] = hh; V[q] = v;
+    H[q] = hh; V[q] = v; sat[q] = s;
     // skin's highlights and deep shadows: warm, not white, not a vivid kit orange, not the bright bat
     const batWood = hasBat && hh > 33 && v > 0.9 && s > 0.45;
     if (batWood) bat[q] = 1;
@@ -289,8 +289,11 @@ function sheetMasks(key, p, w, h) {
     let batZone = bat;
     for (let k = 0; k < 4; k++) batZone = morph(batZone, w, h, true); // not the bat handle either
     for (let q = 0; q < n; q++) rest[q] = looseSkin[q] & (careful[q] ^ 1) & (hr[q] ^ 1) & (batZone[q] ^ 1);
-    const tips = smallTouching(rest, morph(careful, w, h, true), w, h, 120);
-    const ok = filterParts(tips, w, h, H, V, (area, hue) => hue <= 28);
+    const tips = smallTouching(rest, morph(careful, w, h, true), w, h, 450);
+    // and almost none of it yellower (trim, bat) or redder (bat stickers) than skin
+    const offTone = new Uint8Array(n);
+    for (let q = 0; q < n; q++) if (tips[q] && V[q] > 0.3 && sat[q] > 0.3 && (H[q] > 31 || (H[q] < 8 && V[q] > 0.6))) offTone[q] = 1;
+    const ok = filterParts(tips, w, h, H, V, (area, hue, v, off) => hue <= 28 && (area <= 120 || off <= 0.12), offTone);
     for (let q = 0; q < n; q++) careful[q] |= ok[q];
   }
   // vivid orange shading on the skin (the Phoenix sheet): small orange patches touching the skin
