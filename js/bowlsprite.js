@@ -304,7 +304,21 @@ const SPIN_CYCLE = ['run1', 'run2'];
 const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3', 170], ['finish', Infinity]];
 
 import { peopleSheet, loadPeopleMask } from './looks.js';
+import { KIT_LOGOS } from './kitlogos.js';
 const tinted = new Map();
+
+// club crests for the shirts and helmets (the front sheets have a blank badge spot for them)
+const crests = new Map();
+function crestOf(id) {
+  let c = crests.get(id);
+  if (!c) {
+    c = new Image();
+    c.src = `img/logo-${id}.webp`;
+    crests.set(id, c);
+  }
+  return c.complete && c.naturalWidth ? c : null;
+}
+const CREST_SCALE = 1.1; // the crest a little bigger than the bolt it replaces
 
 // Load one sheet. A failed download (a flaky connection, or a phone short of memory) is
 // retried a few times rather than leaving the plain cartoon figures for the whole session.
@@ -328,9 +342,10 @@ export function loadBowlSprites(...teamIds) {
     if (!v || v.ready || (v.img && !v.failed)) continue;
     loadView(v);
   }
+  for (const id of teamIds) if (id) crestOf(id);
   if (teamIds.length >= 2) {
     for (const [key, c] of tinted) {
-      if (teamIds.some(id => key.endsWith(id))) continue;
+      if (teamIds.some(id => key.replace('+crest', '').endsWith(id))) continue;
       if (c instanceof HTMLCanvasElement) { c.width = 0; c.height = 0; } // frees the memory now on iOS
       tinted.delete(key);
     }
@@ -379,12 +394,19 @@ function rgb(h, s, v) {
   return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
 }
 
-// the sheet repainted in a team's kit: blue suit -> suit colour, yellow trim -> trim colour, shading kept
+// the sheet repainted in a team's kit: blue suit -> suit colour, yellow trim -> trim colour, shading
+// kept, and the club's crest on the chest and helmet (front views)
 function sheetFor(view, team) {
   const atlas = VIEWS[view].img;
-  if (VIEWS[view].own || !team || (team.suit === SHEET.suit && team.trim === SHEET.trim)) return atlas;
-  const key = view + team.id;
+  const spots = KIT_LOGOS[view];
+  if (VIEWS[view].own || !team) return atlas;
+  const same = team.suit === SHEET.suit && team.trim === SHEET.trim;
+  if (same && !spots) return atlas;
+  const crest = spots ? crestOf(team.id) : null;
+  const key = view + team.id + (crest ? '+crest' : '');
   if (tinted.has(key)) return tinted.get(key);
+  const plainKey = view + team.id; // the copy made before the crest had loaded is no longer needed
+  if (crest && tinted.has(plainKey)) { const old = tinted.get(plainKey); if (old instanceof HTMLCanvasElement) { old.width = 0; old.height = 0; } tinted.delete(plainKey); }
   const c = document.createElement('canvas');
   c.width = atlas.naturalWidth; c.height = atlas.naturalHeight;
   const g = c.getContext('2d', { willReadFrequently: true });
@@ -393,19 +415,57 @@ function sheetFor(view, team) {
   try { g.drawImage(atlas, 0, 0); } catch { tinted.set(key, atlas); return atlas; }
   const img = g.getImageData(0, 0, c.width, c.height), p = img.data;
   const suit = hexHsv(team.suit), trim = hexHsv(team.trim), rs = hexHsv(SHEET.suit), rt = hexHsv(SHEET.trim);
-  for (let i = 0; i < p.length; i += 4) {
+  // where the shirt is, and how light (the crest is shaded with the folds and kept behind arms)
+  const shirt = crest ? new Float32Array(c.width * c.height) : null;
+  for (let i = 0, q = 0; i < p.length; i += 4, q++) {
     if (p[i + 3] < 8) continue;
     const [h, s, v] = hsv(p[i], p[i + 1], p[i + 2]);
     let to, ref;
-    if (h > 200 && h < 250 && s > 0.4) { to = suit; ref = rs; }
+    if (h > 200 && h < 250 && s > 0.4) { to = suit; ref = rs; if (shirt) shirt[q] = v / rs[2]; }
     else if (h > 38 && h < 62 && s > 0.62 && v > 0.45) { to = trim; ref = rt; }
     else continue;
+    if (same) continue;
     const out = rgb(to[0], Math.min(1, to[1] * (s / ref[1])), Math.min(1, to[2] * (v / ref[2])));
     p[i] = out[0]; p[i + 1] = out[1]; p[i + 2] = out[2];
   }
+  if (crest) for (const spot of spots) stampCrest(p, shirt, c.width, c.height, crest, spot);
   g.putImageData(img, 0, 0);
+  c.crest = !!crest;
   tinted.set(key, c);
   return c;
+}
+
+// one crest onto the sheet's pixels, only where there's shirt (so an arm in front hides it),
+// darkened in the folds and lifted on the highlights like the cloth around it
+const stamp = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+const sil = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+function stampCrest(p, shirt, W, H, crest, [cx, cy, size, squash = 1]) {
+  const cw = Math.max(2, Math.round(size * CREST_SCALE)), ch = Math.max(2, Math.round(size * CREST_SCALE * squash));
+  const o = Math.max(1, Math.round(cw / 24)); // a thin dark rim, so a pink crown still reads on a pink shirt
+  const w = cw + 2 * o, h = ch + 2 * o;
+  stamp.width = w; stamp.height = h; sil.width = w; sil.height = h;
+  const g = stamp.getContext('2d', { willReadFrequently: true }), gs = sil.getContext('2d');
+  if (!g || !gs) return;
+  gs.drawImage(crest, o, o, cw, ch);
+  gs.globalCompositeOperation = 'source-in';
+  gs.fillStyle = 'rgba(12,10,24,0.85)'; gs.fillRect(0, 0, w, h);
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) g.drawImage(sil, dx * o, dy * o);
+  g.drawImage(crest, o, o, cw, ch);
+  const d = g.getImageData(0, 0, w, h).data;
+  const x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+  for (let y = 0; y < h; y++) {
+    const sy = y0 + y;
+    if (sy < 0 || sy >= H) continue;
+    for (let x = 0; x < w; x++) {
+      const sx = x0 + x;
+      if (sx < 0 || sx >= W) continue;
+      const q = sy * W + sx, light = shirt[q];
+      const a = d[(y * w + x) * 4 + 3] / 255;
+      if (!light || !a) continue;
+      const f = Math.min(1.12, Math.max(0.55, light)), i = q * 4, j = (y * w + x) * 4;
+      for (let k = 0; k < 3; k++) p[i + k] = p[i + k] * (1 - a) + Math.min(255, d[j + k] * f) * a;
+    }
+  }
 }
 
 // Draw a frame with its feet at (px, py); kPerM is pixels per metre at that depth. False until loaded.
@@ -420,7 +480,8 @@ export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, vi
   if (view === 'back') view = 'back-' + (team?.id || 'thunder');
   const v = VIEWS[view];
   if (!v || !v.ready || !v.frames[frame]) return false;
-  const img = peopleSheet(sheetFor(view, team), `${view}-${team?.id}`, look, view, v.img); // skin and hair, from the plain sheet's mask
+  const sheet = sheetFor(view, team);
+  const img = peopleSheet(sheet, `${view}-${team?.id}${sheet.crest ? '+crest' : ''}`, look, view, v.img); // skin and hair, from the plain sheet's mask
   const [sx, sy, w, h, ax, ay, s] = v.frames[frame];
   const k = kPerM * REF_HEIGHT_M / v.refPx * s;
   ctx.save();
