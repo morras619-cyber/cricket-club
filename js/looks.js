@@ -80,6 +80,9 @@ const shade = (hex, f) => {
   return `rgb(${c.join(',')})`;
 };
 
+const lum = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+const hexRgb = hex => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+
 // ---------- repainting the match sprites ----------
 // The drawn players all have the same light-tan skin and dark-brown hair. Skin is a narrow
 // orange-tan band and hair the same hue, darker. Kits can share that colour at their edges
@@ -129,19 +132,54 @@ function filterParts(m, w, h, H, V, keep) {
   }
   return out;
 }
+// the connected patches of m smaller than maxArea that touch the mask near
+function smallTouching(m, near, w, h, maxArea) {
+  const n = m.length, seen = new Uint8Array(n), out = new Uint8Array(n), stack = [], pix = [];
+  for (let i = 0; i < n; i++) {
+    if (!m[i] || seen[i]) continue;
+    pix.length = 0; let touches = false;
+    stack.push(i); seen[i] = 1;
+    while (stack.length) {
+      const j = stack.pop(); pix.push(j); if (near[j]) touches = true;
+      const x = j % w;
+      if (x > 0 && m[j - 1] && !seen[j - 1]) { seen[j - 1] = 1; stack.push(j - 1); }
+      if (x < w - 1 && m[j + 1] && !seen[j + 1]) { seen[j + 1] = 1; stack.push(j + 1); }
+      if (j >= w && m[j - w] && !seen[j - w]) { seen[j - w] = 1; stack.push(j - w); }
+      if (j + w < n && m[j + w] && !seen[j + w]) { seen[j + w] = 1; stack.push(j + w); }
+    }
+    if (touches && pix.length < maxArea) for (const j of pix) out[j] = 1;
+  }
+  return out;
+}
 function sheetMasks(key, p, w, h) {
   if (masks.has(key)) return masks.get(key);
   const n = w * h, skin = new Uint8Array(n), hair = new Uint8Array(n), H = new Float32Array(n), V = new Float32Array(n);
+  // where a skin or hair area may spread to: the same family of colours, stopped by the ink outlines
+  const looseSkin = new Uint8Array(n), looseHair = new Uint8Array(n), warmSkin = new Uint8Array(n), ink = new Uint8Array(n);
+  let orangeKit = 0, opaque = 0;
+  const hasBat = /^bat/.test(key); // only the batting sheets have a bat to protect
+  const darkWarm = new Uint8Array(n);
   for (let i = 0, q = 0; q < n; i += 4, q++) {
     if (p[i + 3] < 70) continue;
     // hue, saturation, value inline (no allocation: this runs over a million pixels)
     const r = p[i], g = p[i + 1], b = p[i + 2], mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b), d = mx - mn;
+    if (mx < 64) ink[q] = 1; // the black outlines
+    // skin is outlined and shaded with dark red-brown strokes, not pure black
+    if (d && mx < 105 && d / mx > 0.45) { const h0 = ((mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360; if (h0 <= 45 || h0 >= 340) darkWarm[q] = 1; }
     if (!d || mx < 30) continue;
     const s = d / mx, v = mx / 255;
     let hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
     hh = (hh * 60 + 360) % 360;
     if (hh > 50) continue;
     H[q] = hh; V[q] = v;
+    // skin's highlights and deep shadows: warm, not white, not a vivid kit orange, not the bright bat
+    const batWood = hasBat && hh > 33 && v > 0.9 && s > 0.45;
+    if (hh <= 48 && s >= 0.12 && v >= 0.24 && !(s > 0.85 && v > 0.6) && !batWood) looseSkin[q] = 1;
+    // some sheets shade skin with vivid orange (the Phoenix one): allowed, but only inside the outlines
+    if (hh >= 8 && hh <= 40 && s >= 0.12 && v >= 0.24 && !batWood) warmSkin[q] = 1; // not red kit trim
+    if (hh >= 12 && hh <= 34 && s > 0.8 && v > 0.55) orangeKit++;
+    opaque++;
+    if (hh <= 50 && s >= 0.1 && v >= 0.08 && v < 0.62) looseHair[q] = 1;
     if (hh >= 10 && hh < 35 && s >= 0.28 && s <= 0.8 && v >= 0.5) skin[q] = 1;
     else if (hh >= 8 && hh < 45 && s >= 0.25 && v >= 0.12 && v < 0.5) hair[q] = 1;
   }
@@ -154,48 +192,133 @@ function sheetMasks(key, p, w, h) {
   };
   const sk = fix(skin, (area, hue, v) => area >= 30 && !(hue > 30.5 && v > 0.92)); // the bat is yellower and brighter
   const hr = fix(hair, area => area >= 40);
+  // spread each area over its own shading until the outlines stop it, so the whole arm or face is repainted
+  const spread = (core, loose, other, steps) => {
+    let m = core;
+    for (let k = 0; k < steps; k++) {
+      const g2 = morph(m, w, h, true);
+      let changed = 0;
+      for (let q = 0; q < n; q++) { const v = g2[q] & loose[q] & (other[q] ^ 1) | m[q]; if (v !== m[q]) changed++; g2[q] = v; }
+      m = g2;
+      if (!changed) break;
+    }
+    return m;
+  };
+  const careful = spread(sk, looseSkin, hr, 8);
+  // vivid orange shading on the skin (the Phoenix sheet): small orange patches touching the skin
+  // are part of it; big ones are the shirt and trousers
+  const touch = morph(careful, w, h, true);
+  const vivid = new Uint8Array(n);
+  for (let q = 0; q < n; q++) vivid[q] = warmSkin[q] & (looseSkin[q] ^ 1) & (careful[q] ^ 1);
+  // on a sheet whose kit is orange, only small patches can be skin; elsewhere orange is always skin shading
+  const patches = smallTouching(vivid, touch, w, h, orangeKit > opaque * 0.08 ? 350 : 6000);
+  let skinAll = new Uint8Array(n);
+  for (let q = 0; q < n; q++) skinAll[q] = careful[q] | patches[q];
+  // warm pixels mostly surrounded by skin (fingertips drawn over the orange trousers) are skin too
+  for (let k = 0; k < 3; k++) {
+    const next = skinAll.slice();
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const q = y * w + x;
+      if (skinAll[q] || !warmSkin[q]) continue;
+      let sk2 = 0, in2 = 0, other = 0;
+      for (const j of [q - w - 1, q - w, q - w + 1, q - 1, q + 1, q + w - 1, q + w, q + w + 1]) {
+        if (skinAll[j]) sk2++; else if (ink[j]) in2++; else if (warmSkin[j]) other++;
+      }
+      // hemmed in by skin and outline (a finger), not part of a big orange area (the trousers)
+      if (sk2 >= 1 && other <= 3 && sk2 + in2 >= 4) next[q] = 1;
+    }
+    skinAll = next;
+  }
+  // the dark red-brown strokes on and around the skin take the new tone too (kept dark)
+  const ring = morph(morph(skinAll, w, h, true), w, h, true);
+  for (let q = 0; q < n; q++) if (ring[q] && darkWarm[q] && !hr[q]) skinAll[q] = 1;
+  const hairAll = spread(hr, looseHair, skinAll, 5);
   const m = new Uint8Array(n);
-  for (let q = 0; q < n; q++) m[q] = sk[q] ? 1 : hr[q] ? 2 : 0;
+  for (let q = 0; q < n; q++) m[q] = skinAll[q] ? 1 : hairAll[q] ? 2 : 0;
   masks.set(key, m);
   while (masks.size > 10) masks.delete(masks.keys().next().value);
   return m;
 }
 
-// Work out a sheet's masks ahead of time (during the pitch report), so the first repaint is instant.
-export function warmPeople(src, key) {
-  if (masks.has(key)) return;
+// The masks are worked out ahead of time (tools/build_people_masks.mjs) and shipped as
+// img/mask-<sheet>.png (red = skin, green = hair), so a phone never has to compute them.
+// If a mask file can't load, it's computed here as a fallback.
+const pre = new Map(); // mask name -> { img, ready, failed }
+export function loadPeopleMask(name) {
+  if (pre.has(name)) return;
+  const P = { img: new Image(), ready: false, failed: false };
+  P.img.onload = () => { P.ready = true; };
+  P.img.onerror = () => { P.failed = true; };
+  P.img.src = `img/mask-${name}.png`;
+  pre.set(name, P);
+}
+function pixelsOf(src) {
   const w = src?.naturalWidth || src?.width, h = src?.naturalHeight || src?.height;
-  if (!w || !h) return;
+  if (!w || !h) return null;
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true });
-  if (!g) return;
-  try { g.drawImage(src, 0, 0); sheetMasks(key, g.getImageData(0, 0, w, h).data, w, h); } catch { /* not ready yet */ }
+  if (!g) return null;
+  try { g.drawImage(src, 0, 0); } catch { return null; }
+  const d = g.getImageData(0, 0, w, h).data;
   c.width = 0; c.height = 0;
+  return { d, w, h };
+}
+// the mask for a sheet: shipped, still loading (null: draw the sheet as drawn for now), or computed
+function getMask(name, src) {
+  if (masks.has(name)) return masks.get(name);
+  const P = pre.get(name);
+  if (P && !P.ready && !P.failed) return null;
+  if (P?.ready) {
+    const px = pixelsOf(P.img);
+    if (px) {
+      const m = new Uint8Array(px.w * px.h);
+      for (let q = 0; q < m.length; q++) m[q] = px.d[q * 4] > 127 ? 1 : px.d[q * 4 + 1] > 127 ? 2 : 0;
+      masks.set(name, m);
+      return m;
+    }
+  }
+  const px = pixelsOf(src);
+  return px ? sheetMasks(name, px.d, px.w, px.h) : null;
+}
+// for the build tool: a sheet's mask as an image (red skin, green hair)
+export function maskCanvas(src, name) {
+  const px = pixelsOf(src);
+  const m = sheetMasks(name, px.d, px.w, px.h);
+  const c = document.createElement('canvas');
+  c.width = px.w; c.height = px.h;
+  const g = c.getContext('2d'), img = g.createImageData(px.w, px.h);
+  for (let q = 0; q < m.length; q++) { img.data[q * 4] = m[q] === 1 ? 255 : 0; img.data[q * 4 + 1] = m[q] === 2 ? 255 : 0; img.data[q * 4 + 3] = 255; }
+  g.putImageData(img, 0, 0);
+  return c;
 }
 
-export function peopleSheet(src, key, look) {
+// src: the sheet to draw (maybe already repainted in a team's kit); key: its cache name;
+// maskName / maskSrc: which mask, and the plain sheet to compute it from if it isn't shipped
+export function peopleSheet(src, key, look, maskName = key, maskSrc = src) {
   if (!look) return src;
   const sk = skinHex(look), hr = hairHex(look);
   const id = `${key}|${sk}|${hr}`;
   if (cache.has(id)) { const c = cache.get(id); cache.delete(id); cache.set(id, c); return c; }
   const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
   if (!w || !h) return src;
+  const m = getMask(maskName, maskSrc);
+  if (!m) return src;
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true });
   if (!g) return src;
   try { g.drawImage(src, 0, 0); } catch { return src; }
   const img = g.getImageData(0, 0, w, h), p = img.data;
-  const m = sheetMasks(key, p, w, h);
-  const S = hexHsv(sk), Hh = hexHsv(hr);
+  // repaint by brightness: each pixel keeps how light or dark it was relative to the drawn skin
+  // (or hair), so the shading survives and the new tone is smooth
+  const T = [hexRgb(sk), hexRgb(hr)], LREF = [lum(...rgb(...REF_SKIN)), lum(...rgb(...REF_HAIR))];
   for (let i = 0, q = 0; i < p.length; i += 4, q++) {
     if (!m[q]) continue;
-    const [hh, s, v] = hsv(p[i], p[i + 1], p[i + 2]);
-    const out = m[q] === 1
-      ? rgb((S[0] + (hh - REF_SKIN[0]) * 0.5 + 360) % 360, Math.min(1, S[1] * (s / REF_SKIN[1])), Math.min(1, S[2] * (v / REF_SKIN[2])))
-      : rgb(Hh[0], Math.min(1, Hh[1] * Math.min(1.5, s / REF_HAIR[1])), Math.min(1, Math.max(0.06, Hh[2] * (v / REF_HAIR[2]))));
-    p[i] = out[0]; p[i + 1] = out[1]; p[i + 2] = out[2];
+    const t = T[m[q] - 1], ratio = lum(p[i], p[i + 1], p[i + 2]) / LREF[m[q] - 1];
+    for (let k = 0; k < 3; k++) {
+      p[i + k] = ratio <= 1 ? t[k] * ratio : t[k] + (255 - t[k]) * Math.min(0.85, (ratio - 1) * 1.1);
+    }
   }
   g.putImageData(img, 0, 0);
   cache.set(id, c);

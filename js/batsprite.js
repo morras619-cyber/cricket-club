@@ -1,4 +1,4 @@
-import { peopleSheet, warmPeople } from './looks.js';
+import { peopleSheet, loadPeopleMask } from './looks.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
 // tools/build_batter_sprites.py, so a single frame table serves every team.
@@ -56,6 +56,7 @@ const atlases = new Map(); // team id -> { img, ready }
 export function loadBatSprites(...teamIds) {
   for (const id of teamIds) {
     if (!id || atlases.has(id)) continue;
+    loadPeopleMask(`batter-${id}`);
     const a = { img: null, ready: false };
     // retried a few times if the download fails, instead of cartoon batters all session
     const load = (tries = 0) => {
@@ -112,7 +113,7 @@ function drawOne(ctx, img, name, px, py, k, alpha) {
 export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   const atlas = atlases.get(b.team);
   if (!atlas || !atlas.ready) return false;
-  const img = peopleSheet(atlas.img, `bat-${b.team}`, b.people); // the batter's own skin and hair
+  const img = peopleSheet(atlas.img, `batter-${b.team}`, b.people); // the batter's own skin and hair
   const k = kPerM * REF_HEIGHT_M / REF_HEIGHT_PX;
   const { f, prev, a = 1 } = batFrame(b, now);
   ctx.save();
@@ -125,9 +126,4 @@ export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   drawOne(ctx, img, f, px, py, k, 1);
   ctx.restore();
   return true;
-}
-
-// Prepare the skin-and-hair masks for a team's batting sheet.
-export function batWarmJob(teamId) {
-  return () => { const a = atlases.get(teamId); if (a?.ready) warmPeople(a.img, `bat-${teamId}`); };
 }
