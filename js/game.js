@@ -2338,9 +2338,15 @@ export class Game {
       const right = (f.pose.arg || 1) > 0;
       return drawTopSprite(this.ctx, p.x, p.y, size * 1.1, 'dive', team, 145 * Math.PI / 180, right);
     }
-    let frame = 'ready', ang = -Math.PI / 2;
+    // everyone watches the pitch; only a fielder running away from it (back towards the rope) turns to face his run
+    const c = V.to(0, 10), toPitch = Math.atan2(c.y - p.y, c.x - p.x);
+    let frame = 'ready', ang = toPitch;
     if (pose === 'celebrate') frame = 'catch2';
-    else if (pose === 'run' || moving) { frame = ['run1', 'run2', 'run3', 'run2'][Math.floor(this.gameTime * 9 + i) % 4]; ang = face; }
+    else if (pose === 'run' || moving) {
+      frame = ['run1', 'run2', 'run3', 'run2'][Math.floor(this.gameTime * 9 + i) % 4];
+      const away = Math.cos(face - toPitch) < -0.3;
+      ang = away ? face : toPitch;
+    }
     if (f.throwT0 != null && this.realTime - f.throwT0 < 450) {
       const t = this.realTime - f.throwT0;
       frame = t < 150 ? 'throw1' : t < 300 ? 'throw2' : 'throw3'; ang = f.throwFace ?? face;
@@ -2351,7 +2357,7 @@ export class Game {
     const V = this.of, O = this.O;
     const { p, face } = this.topFace(b, null);
     const team = O.side === 'ai' ? this.myTeam : this.oppTeam;
-    const size = Math.max(30, 1.85 * V.k * 1.3);
+    const size = Math.max(22, 1.85 * V.k * 0.95);
     const frame = (i ? 'batB' : 'batA') + (O.running ? 1 + (Math.floor(this.gameTime * 8) % 2) : 1);
     return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, O.running ? face : (i ? Math.PI / 2 : -Math.PI / 2));
   }
