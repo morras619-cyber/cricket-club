@@ -60,8 +60,8 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/game.js` | Match flow, ball sequences, fielding events, tutorial, rendering |
 | `js/scene.js`, `js/figure.js`, `js/fx.js` | Cameras, night stadium, cel-shaded figures, onomatopoeia and impact effects |
 | `js/batsprite.js`, `img/batter-*.webp` | Hand-drawn batter frames seen from behind, one sheet per team: an animation per swipe (drive, pull, cut, block, leave, bowled) |
-| `js/bowlsprite.js`, `img/bowler.webp` | Hand-drawn front-view bowler (run-up, gather, coil, release, follow-through, reactions, celebrations) and fielders for the batting view, repainted in the bowling team's kit |
-| `tools/build_bowler_sprites.py` | Cuts the labelled bowler sheet into `img/bowler.webp` |
+| `js/bowlsprite.js`, `img/bowler.webp`, `img/bowler-back.webp` | Hand-drawn bowler and fielders: front view for the batting camera, back view for the bowling camera (run-up, gather, coil, release, follow-through, celebrations), repainted in the fielding team's kit |
+| `tools/build_bowler_sprites.py` | Cuts a labelled bowler sheet into an atlas (`--back` mirrors the back-view sheet into a right-arm action) |
 | `js/teams.js` | The eight teams and their kit colours |
 | `tools/build_batter_sprites.py` | Cuts labelled batting sprite sheets into the per-team images |
 | `js/cutin.js` | The comic cut-in panel for signature powers |

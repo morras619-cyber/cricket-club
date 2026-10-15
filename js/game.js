@@ -859,7 +859,7 @@ export class Game {
     this.timeScale = 1;
     const rng = this.ballRng(ballNo);
     S.batter.look = teamLook(this.oppTeam); S.batter.team = this.oppTeam.id; S.batter.emblem = null; S.batter.x = -0.5;
-    S.bowler.look = this.team.bowl.look; S.bowler.emblem = this.team.bowl.emblem; S.bowler.z = 26; S.bowler.x = -0.55;
+    S.bowler.look = this.team.bowl.look; S.bowler.emblem = this.team.bowl.emblem; S.bowler.z = 26; S.bowler.x = 1.05; // right-arm over, a little wide of the stumps so the ball leaves his hand
     S.keeper.look = this.team.field.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
     const kind = this.team.bowl.bowls;
     const profile = this.rival.bat.ai;
@@ -922,7 +922,7 @@ export class Game {
     // finish the run-up
     const left = Math.max(0, 700 - (this.realTime - S.runStart));
     const z0 = S.bowler.z;
-    await this.animate(left, p => { S.bowler.z = lerp(z0, 20.7, p); S.bowler.pose = POSES.run(p * 8 + 6); }, true);
+    await this.animate(left, p => { S.bowler.z = lerp(z0, 20.7, p); S.bowler.pose = POSES.run(p * 8 + 6); S.bowler.spr = { anim: 'run', p: (26 - S.bowler.z) / 5.3 }; }, true);
     S.aim = null; S.trail = []; this.bowlTrail = null;
 
     const words = { perfect: '#ffd23f', good: '#fff4da', loose: '#ff8a8a', bad: '#e8343b' };
@@ -932,7 +932,7 @@ export class Game {
     this.charge.timingStreak(rg === 'perfect');
 
     if (rg === 'bad') {
-      S.bowler.pose = POSES.bowl(1);
+      S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
       inn.extra(1);
       this.freeHit = true;
       this.ui.banner('NO BALL!', 'Too fast — you overstepped. +1 run, free hit next', 1700);
@@ -959,7 +959,7 @@ export class Game {
     // release, then aftertouch: drag sideways while the ball is in the air to bend it late
     const d0 = makeDelivery(spec);
     S.delivery = d0; S.ballT0 = this.gameTime; S.afterOff = 0;
-    S.bowler.pose = POSES.bowl(1); S.bowler.followT0 = this.realTime;
+    S.bowler.pose = POSES.bowl(1); S.bowler.followT0 = this.realTime; S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
     if (fxFlags.maya) S.maya = { real: 1, picked: 0 };
     sfx.whoosh();
     const budget = rg === 'perfect' ? 0.32 : rg === 'good' ? 0.24 : 0.14;
@@ -1034,6 +1034,7 @@ export class Game {
       inn.ball({ wicket: true });
       this.charge.award('wicket', 'WICKET');
       this.wicketFx(text, cs);
+      S.bowler.spr = { anim: 'celebrate', t0: this.realTime };
       this.addMoment(kind2, text, extra.word || text, hero, { ballNo, ...extra });
     };
 
@@ -1111,7 +1112,7 @@ export class Game {
         if (!r) {
           this.fx.word('SWIPE FURTHER UP THE PITCH', this.W / 2, this.H * 0.5, { size: 26, color: '#fff4da', stroke: INK, rot: 0, dur: 1000 });
           pts = null; S.aim = null; S.runStart = null; this.bowlTrail = null;
-          S.bowler.z = 26; S.bowler.pose = POSES.stand();
+          S.bowler.z = 26; S.bowler.pose = POSES.stand(); S.bowler.spr = null;
           return;
         }
         done = r;
@@ -1123,7 +1124,7 @@ export class Game {
       if (pts && S.runStart != null && !done) {
         const e = this.realTime - S.runStart;
         const p = Math.min(1, e / 1100);
-        S.bowler.z = lerp(26, 21.4, p); S.bowler.pose = POSES.run(p * 10);
+        S.bowler.z = lerp(26, 21.4, p); S.bowler.pose = POSES.run(p * 10); S.bowler.spr = { anim: 'run', p: (26 - S.bowler.z) / 5.3 };
         if (e > 2600) {
           done = gestureToDelivery(pts, kind, scale) || { x: 0.2, length: 'good', bounce: 5.5, h: 0.8, kmh: 120, swing: 0, move: 0, loop: 0.6, type: 'Seam up', grade: 'loose', lateWorld: 0, mag: 0, slower: false, speedP: 0.3 };
           done.hesitated = true;
@@ -1917,8 +1918,8 @@ export class Game {
 
     for (const f of S.field3d || []) {
       push(f.y, () => {
-        const p = kind === 'bat' && cam.project(f.x, 0, f.y);
-        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, 'field', this.oppTeam, f.x > 0)) return;
+        const p = kind !== 'keeper' && cam.project(f.x, 0, f.y);
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, 'field', kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0, kind === 'bat' ? 'front' : 'back')) return;
         drawFigure3D(ctx, cam, f.x, f.y, teamLook(kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0 ? 1 : 0), POSES.crouch(), { noShadow: false });
       });
     }
@@ -1930,13 +1931,13 @@ export class Game {
       let bx = S.bowler.x, bz = S.bowler.z;
       if (kind === 'bowl' && S.bowler.followT0 != null) {
         const p = clamp((this.realTime - S.bowler.followT0) / 600, 0, 1);
-        bx -= 1.4 * p; bz -= 1.2 * p;
+        bx += 0.45 * p; bz -= 1.6 * p; // carries on down the pitch, veering away from the stumps
       }
       // facing the batting camera the bowler is the hand-drawn sprite, carrying on a stride after release
       if (kind === 'bat' && S.bowler.spr?.anim === 'deliver') bz -= 0.9 * clamp((this.gameTime - S.bowler.spr.t0) / 0.6, 0, 1);
       push(bz, () => {
-        const p = kind === 'bat' && cam.project(bx, 0, bz);
-        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime), this.oppTeam)) return;
+        const view = kind === 'bat' ? 'front' : 'back', p = cam.project(bx, 0, bz);
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), kind === 'bat' ? this.oppTeam : this.myTeam, false, view)) return;
         drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem });
       });
     }

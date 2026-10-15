@@ -1,9 +1,12 @@
-"""Cut the labelled front-view bowler sheet (19 poses, transparent background) into img/bowler.webp.
+"""Cut a labelled bowler sheet (19 poses, transparent background) into an atlas.
 
-usage: python3 tools/build_bowler_sprites.py SHEET.png img/bowler.webp
+usage: python3 tools/build_bowler_sprites.py SHEET.png OUT.webp [--back]
 
-Pose 6 (coil) is left out: the bowling arm is already high and he holds a second ball.
-The ball drawn in pose 8 (release) is removed because the game draws the real ball.
+Front view (the batting camera, img/bowler.webp): pose 6 (coil) is left out, because the
+bowling arm is already high and he holds a second ball.
+Back view (--back, the bowling camera, img/bowler-back.webp): the sheet is drawn as a
+left-arm bowler, so it is mirrored to match the right-arm front view; poses 6 and 7 both used.
+In both, the ball drawn in pose 8 (release) is removed because the game draws the real ball.
 Prints the frame table for js/bowlsprite.js. Needs numpy, scipy and Pillow.
 """
 import sys, json
@@ -20,6 +23,8 @@ ROW_SCALE = [1.0, 1.12, 1.0]  # row 2 is drawn about 12% smaller than rows 1 and
 
 def main():
     src, out = sys.argv[1:3]
+    back = '--back' in sys.argv
+    use = {**USE, **({6: 'coil', 7: 'frontarm'} if back else {})}
     a = np.array(Image.open(src).convert('RGBA'))
     al = a[..., 3] > 40
     dark = al & (a[..., :3].astype(int).max(-1) < 80)
@@ -39,7 +44,7 @@ def main():
     assert len(objs) == 19, len(objs)
     imgs = {}
     for k, o in enumerate(objs, 1):
-        if k not in USE:
+        if k not in use:
             continue
         y0, y1, x0, x1, li = o  # only the figure's own component: loose balls stay out
         m = (lab[y0:y1, x0:x1] == li) & mask[y0:y1, x0:x1]
@@ -47,10 +52,12 @@ def main():
         c[..., 3] = np.where(m, c[..., 3], 0)
         im = Image.fromarray(c)
         im = im.crop(im.getbbox())
+        if back:
+            im = im.transpose(Image.FLIP_LEFT_RIGHT)
         arr = np.array(im)
         bottom = np.nonzero((arr[..., 3] > 40).any(1))[0].max()
         xs = np.nonzero((arr[bottom - 14:bottom + 1, :, 3] > 40).any(0))[0]
-        imgs[USE[k]] = (im, round((xs.min() + xs.max()) / 2, 1), int(bottom), ROW_SCALE[row(o)])
+        imgs[use[k]] = (im, round((xs.min() + xs.max()) / 2, 1), int(bottom), ROW_SCALE[row(o)])
     pad, W, x, y, rowh, table = 2, 1024, 0, 0, 0, {}
     for name, (im, ax, ay, s) in imgs.items():
         w, h = im.size
