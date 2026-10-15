@@ -219,7 +219,27 @@ const KEEPER_FRONT = {
 };
 const HELMET_M = 0.24;  // helmet width in metres sets each keeper frame's scale
 
+// Outfield Mode players seen from above (tools/build_field_sprites.py).
+// name: [x, y, w, h, centreX, centreY, facing in degrees on the image (-90 = up)]
+const FIELD_TOP = {
+  ready: [0, 0, 197, 228, 98.5, 114.0, -90],
+  run1: [199, 0, 165, 244, 82.5, 122.0, -90],
+  run2: [366, 0, 147, 269, 73.5, 134.5, -90],
+  run3: [515, 0, 176, 267, 88.0, 133.5, -90],
+  dive: [0, 271, 352, 270, 176.0, 135.0, 145],
+  catch1: [354, 271, 179, 240, 89.5, 120.0, -90],
+  catch2: [535, 271, 187, 260, 93.5, 130.0, -90],
+  throw1: [724, 271, 226, 229, 113.0, 114.5, -90],
+  throw2: [0, 543, 218, 244, 109.0, 122.0, -90],
+  throw3: [220, 543, 259, 269, 129.5, 134.5, -90],
+  batA1: [481, 543, 224, 245, 112.0, 122.5, -90],
+  batA2: [707, 543, 169, 256, 84.5, 128.0, -90],
+  batB1: [0, 814, 179, 202, 89.5, 101.0, -90],
+  batB2: [181, 814, 249, 275, 124.5, 137.5, -90],
+};
+
 const VIEWS = {
+  'field-top': { src: 'img/field-top.webp', frames: FIELD_TOP },
   'keeper-back': { src: 'img/keeper-back.webp', frames: KEEPER_BACK },
   'keeper-front': { src: 'img/keeper-front.webp', frames: KEEPER_FRONT },
   front: { src: 'img/bowler.webp', frames: FRONT, refPx: 323 },
@@ -237,7 +257,7 @@ const tinted = new Map();
 
 // the front sheet plus the back sheets of the teams in this match
 export function loadBowlSprites(...teamIds) {
-  for (const key of ['front', 'batfront', 'keeper-back', 'keeper-front', ...teamIds.map(id => 'back-' + id)]) {
+  for (const key of ['front', 'batfront', 'keeper-back', 'keeper-front', 'field-top', ...teamIds.map(id => 'back-' + id)]) {
     const v = VIEWS[key];
     if (!v || v.img) continue;
     v.img = new Image();
@@ -338,6 +358,25 @@ export function drawKeeperSprite(ctx, px, py, kPerM, frame, team, view, { flip =
   ctx.translate(px, py - lift * kPerM);
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(img, sx, sy, w, h, -ax * k, -ay * k, w * k, h * k);
+  ctx.restore();
+  return true;
+}
+
+// A top-down player centred at (px, py), sizePx tall (head to toe as drawn), turned to face
+// screen angle `face` (radians, 0 = right, -pi/2 = up). False until the sheet has loaded.
+export function drawTopSprite(ctx, px, py, sizePx, frame, team, face = -Math.PI / 2, flip = false) {
+  const v = VIEWS['field-top'];
+  if (!v.ready) return false;
+  const img = sheetFor('field-top', team);
+  const [sx, sy, w, h, cx, cy, deg] = v.frames[frame];
+  const k = sizePx / 240;
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.fillStyle = 'rgba(10,8,20,0.28)';
+  ctx.beginPath(); ctx.ellipse(3, 4, sizePx * 0.32, sizePx * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.rotate(face - deg * Math.PI / 180);
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(img, sx, sy, w, h, -cx * k, -cy * k, w * k, h * k);
   ctx.restore();
   return true;
 }

@@ -16,7 +16,7 @@ import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D,
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
-import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite } from './bowlsprite.js';
+import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -752,7 +752,7 @@ export class Game {
     this.O = {
       fielders: fs,
       batters: [{ x: -0.6, y: 1.2, look: teamLook(side === 'ai' ? this.myTeam : this.oppTeam) }, { x: 0.8, y: 19, look: teamLook(side === 'ai' ? this.myTeam : this.oppTeam, 1) }],
-      ball: { x: 0, y: 1, h: 1 }, marks: [], ring: null, ends: null, throwLine: null, labels: [],
+      ball: { x: 0, y: 1, h: 1 }, marks: [], ring: null, ends: null, throwLine: null, labels: [], side,
     };
     this.view = 'outfield';
     this.of.focus([{ x: -30, y: -20 }, { x: 30, y: 45 }], true);
@@ -1733,6 +1733,8 @@ export class Game {
     const margin = margins[endId] + extra; // + = batter safe
     const out = !wild && margin < 0;
     // animate the throw
+    me.throwT0 = this.realTime;
+    { const a = this.of.to(me.x, me.y), b = this.of.to(ENDS[endId].x, ENDS[endId].y); me.throwFace = Math.atan2(b.y - a.y, b.x - a.x); }
     this.timeScale = 0.5;
     const flight = throwDist / F.throwSpeed;
     const tf0 = this.gameTime;
@@ -2312,6 +2314,48 @@ export class Game {
     }
   }
 
+  // Outfield Mode players as top-down sprites, facing the way they move (or towards the ball)
+  topFace(o, toward) {
+    const V = this.of, p = V.to(o.x, o.y);
+    const dx = o.x - (o.px ?? o.x), dy = o.y - (o.py ?? o.y);
+    o.px = o.x; o.py = o.y;
+    if (Math.hypot(dx, dy) > 0.02) o.face = Math.atan2(-dy * 0.78, dx);
+    else if (o.face == null && toward) { const q = V.to(toward.x, toward.y); o.face = Math.atan2(q.y - p.y, q.x - p.x); }
+    return { p, face: o.face ?? -Math.PI / 2, moving: Math.hypot(dx, dy) > 0.02 };
+  }
+  topFielder(f, i) {
+    const V = this.of, O = this.O, pose = f.pose?.name;
+    const { p, face, moving } = this.topFace(f, O.ball);
+    // side 'ai': the AI's team is in the field
+    const team = O.side === 'ai' ? this.oppTeam : this.myTeam;
+    const size = Math.max(30, 1.85 * V.k * 1.3) * (f.ctrl ? 1.25 : 1);
+    if (f.ctrl) {
+      this.ctx.fillStyle = 'rgba(255,210,63,0.35)';
+      this.ctx.beginPath(); this.ctx.arc(p.x, p.y, size * 0.62, 0, Math.PI * 2); this.ctx.fill();
+    }
+    if (pose === 'dive') {
+      // drawn diving to the left; mirrored for a dive to the right
+      const right = (f.pose.arg || 1) > 0;
+      return drawTopSprite(this.ctx, p.x, p.y, size * 1.1, 'dive', team, 145 * Math.PI / 180, right);
+    }
+    let frame = 'ready', ang = -Math.PI / 2;
+    if (pose === 'celebrate') frame = 'catch2';
+    else if (pose === 'run' || moving) { frame = ['run1', 'run2', 'run3', 'run2'][Math.floor(this.gameTime * 9 + i) % 4]; ang = face; }
+    if (f.throwT0 != null && this.realTime - f.throwT0 < 450) {
+      const t = this.realTime - f.throwT0;
+      frame = t < 150 ? 'throw1' : t < 300 ? 'throw2' : 'throw3'; ang = f.throwFace ?? face;
+    }
+    return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, ang);
+  }
+  topBatter(b, i) {
+    const V = this.of, O = this.O;
+    const { p, face } = this.topFace(b, null);
+    const team = O.side === 'ai' ? this.myTeam : this.oppTeam;
+    const size = Math.max(30, 1.85 * V.k * 1.3);
+    const frame = (i ? 'batB' : 'batA') + (O.running ? 1 + (Math.floor(this.gameTime * 8) % 2) : 1);
+    return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, O.running ? face : (i ? Math.PI / 2 : -Math.PI / 2));
+  }
+
   renderOutfield() {
     const ctx = this.ctx, O = this.O, V = this.of;
     V.drawGround(ctx);
@@ -2326,8 +2370,8 @@ export class Game {
       ctx.beginPath(); ctx.moveTo(p.x - 7, p.y - 5); ctx.lineTo(p.x + 7, p.y + 5); ctx.moveTo(p.x + 7, p.y - 5); ctx.lineTo(p.x - 7, p.y + 5); ctx.stroke();
     }
     const figs = [
-      ...O.fielders.map(f => ({ y: f.y, draw: () => { V.figure(ctx, f.x, f.y, f.look, f.pose, { emblem: f.emblem, glow: f.ctrl ? '#ffd23f' : null, scale: f.ctrl ? 1.25 : 1 }); } })),
-      ...O.batters.map(b => ({ y: b.y, draw: () => V.figure(ctx, b.x, b.y, b.look, O.running ? POSES.run(this.gameTime * 12) : POSES.bat(-0.4), { helmet: true, pads: true }) })),
+      ...O.fielders.map((f, i) => ({ y: f.y, draw: () => { if (!this.topFielder(f, i)) V.figure(ctx, f.x, f.y, f.look, f.pose, { emblem: f.emblem, glow: f.ctrl ? '#ffd23f' : null, scale: f.ctrl ? 1.25 : 1 }); } })),
+      ...O.batters.map((b, i) => ({ y: b.y, draw: () => { if (!this.topBatter(b, i)) V.figure(ctx, b.x, b.y, b.look, O.running ? POSES.run(this.gameTime * 12) : POSES.bat(-0.4), { helmet: true, pads: true }); } })),
     ].sort((a, b) => b.y - a.y);
     for (const f of figs) f.draw();
     const me = O.fielders.find(f => f.ctrl);

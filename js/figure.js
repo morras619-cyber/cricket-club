@@ -84,6 +84,9 @@ export const POSES = {
   },
 };
 
+// tag every pose with its name (and first argument) so sprite renderers know what it is
+for (const [name, fn] of Object.entries(POSES)) POSES[name] = (...args) => Object.assign(fn(...args), { name, arg: args[0] });
+
 // ---- colour helpers ----
 const shadeCache = new Map();
 export function shade(hex, k = 0.32) {
