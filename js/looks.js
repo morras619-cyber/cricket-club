@@ -174,7 +174,7 @@ function sheetMasks(key, p, w, h) {
   const looseSkin = new Uint8Array(n), looseHair = new Uint8Array(n), warmSkin = new Uint8Array(n), ink = new Uint8Array(n);
   let orangeKit = 0, opaque = 0;
   const hasBat = /^bat/.test(key); // only the batting sheets have a bat to protect
-  const darkWarm = new Uint8Array(n), bat = new Uint8Array(n);
+  const darkWarm = new Uint8Array(n), bat = new Uint8Array(n), darkBrown = new Uint8Array(n);
   for (let i = 0, q = 0; q < n; i += 4, q++) {
     if (p[i + 3] < 70) continue;
     // hue, saturation, value inline (no allocation: this runs over a million pixels)
@@ -182,6 +182,7 @@ function sheetMasks(key, p, w, h) {
     if (mx < 64) ink[q] = 1; // the black outlines
     // skin is outlined and shaded with dark red-brown strokes, not pure black
     if (d && mx < 105 && d / mx > 0.45) { const h0 = ((mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360; if (h0 <= 45 || h0 >= 340) darkWarm[q] = 1; }
+    if (d && mx >= 8 && mx < 80 && d / mx > 0.4) { const h0 = ((mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360; if (h0 >= 8 && h0 <= 40) darkBrown[q] = 1; }
     if (!d || mx < 30) continue;
     const s = d / mx, v = mx / 255;
     let hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
@@ -244,6 +245,15 @@ function sheetMasks(key, p, w, h) {
     }
     return m;
   };
+  // small patches of skin boxed in by lines next to the hair (ears, the nape, a bit of forehead)
+  // are too thin to survive the clean-up above: skin-coloured pixels right beside the hair are skin
+  // (the hair zone includes very dark brown hair, too dark to count as hair, except on an orange kit,
+  // whose shading is dark brown too)
+  let byHair = hr.slice();
+  if (!orangeSheet) for (let q = 0; q < n; q++) if (darkBrown[q]) byHair[q] = 1;
+  byHair = open(byHair, w, h, 2); // solid dark areas only, not the thin warm strokes along arms
+  for (let k = 0; k < 6; k++) byHair = morph(byHair, w, h, true);
+  for (let q = 0; q < n; q++) if (byHair[q] && skin[q] && !hr[q] && !(hasBat && H[q] > 30.5 && V[q] > 0.92)) sk[q] = 1;
   const careful = spread(sk, looseSkin, hr, 8);
   // vivid orange shading on the skin (the Phoenix sheet): small orange patches touching the skin
   // are part of it; big ones are the shirt and trousers
