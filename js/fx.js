@@ -100,7 +100,7 @@ export class FX {
     ctx.globalAlpha = 1;
     if (this.speed > 0) drawSpeedLines(ctx, W, H, this.speed);
     for (const b of this.bubbles) drawBubble(ctx, b, W);
-    for (const w of this.words) drawWord(ctx, w);
+    for (const w of this.words) drawWord(ctx, w, W, H);
     if (this.flashA > 0) {
       ctx.globalAlpha = Math.min(1, this.flashA);
       ctx.fillStyle = this.flashColor; ctx.fillRect(0, 0, W, H);
@@ -109,15 +109,24 @@ export class FX {
   }
 }
 
-function drawWord(ctx, w) {
+function drawWord(ctx, w, W, H) {
   const p = w.t / w.dur;
   const pop = p < 0.12 ? p / 0.12 * 1.25 : p < 0.2 ? 1.25 - (p - 0.12) / 0.08 * 0.25 : 1;
   ctx.save();
   ctx.globalAlpha = p > 0.8 ? (1 - p) / 0.2 : 1;
-  ctx.translate(w.x, w.y);
-  ctx.rotate(w.rot);
-  ctx.scale(pop, pop);
   ctx.font = `${w.size}px ${FONT_DISPLAY}`;
+  // keep the whole word on screen: shrink it if it's wider than the screen, then slide it inside
+  const pad = 10, halfW = (ctx.measureText(w.text).width + w.size * 0.3) / 2, halfH = w.size * 0.62;
+  const fit = W ? Math.min(1, (W / 2 - pad) / (halfW * 1.25)) : 1;
+  let x = w.x, y = w.y;
+  if (W) {
+    const hx = halfW * 1.25 * fit, hy = halfH * 1.25 * fit;
+    x = Math.max(pad + hx, Math.min(W - pad - hx, x));
+    y = Math.max(pad + hy, Math.min(H - pad - hy, y));
+  }
+  ctx.translate(x, y);
+  ctx.rotate(w.rot);
+  ctx.scale(pop * fit, pop * fit);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   ctx.lineWidth = w.size * 0.22; ctx.strokeStyle = INK; ctx.strokeText(w.text, 4, 5);

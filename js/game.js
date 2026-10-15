@@ -661,6 +661,9 @@ export class Game {
     }).catch(() => {});
   }
 
+  // the six's carry in metres, from the shot's flight
+  sixDistance(sim) { return Math.round(sim.path?.carry || 80); }
+
   // the hand-drawn burst on the bat: big and tinted for a powered hit, smaller for a perfect one
   hitBlast(at, power, grade) {
     const big = Math.min(this.W * 0.95, 420);
@@ -730,12 +733,11 @@ export class Game {
     if (saved) this.fx.word('SAVED!', this.W / 2, this.H * 0.35, { size: 48, color: '#fff4da', stroke: '#3ec6ff' });
     inn.ball({ runs });
     if (runs === 6) {
-      this.board('SIX!');
       this.charge.award('six', 'SIX');
       sfx.crowd(1.2);
       const powered = fx.thunder;
       if (powered) this.fx.word('KRAKOOOM!', this.W / 2, this.H * 0.3, { size: 76, color: '#5fc8ff', stroke: INK });
-      this.addMoment(powered ? 'powerSix' : 'six', powered ? 'THUNDERCLAP SIX!' : `${Math.round(sim.path.carry || 80)}m SIX!`, powered ? 'KRAKOOOM!' : 'SIX!', this.team.bat, { ballNo, detail: 'into the stands' });
+      this.addMoment(powered ? 'powerSix' : 'six', powered ? `${this.sixDistance(sim)}m THUNDERCLAP SIX!` : `${this.sixDistance(sim)}m SIX!`, powered ? 'KRAKOOOM!' : 'SIX!', this.team.bat, { ballNo, detail: 'into the stands' });
     } else if (runs === 4) {
       this.board('FOUR!');
       this.charge.award('four', 'FOUR');
@@ -816,7 +818,13 @@ export class Game {
       if (!said && t >= end) {
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
-        if (sim.kind === 'six' && !o.caught) { this.fx.word('SIX!', p.x, p.y - 40, { size: 80 }); this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3); }
+        if (sim.kind === 'six' && !o.caught) {
+          this.fx.word('SIX!', p.x, p.y - 40, { size: 80 }); this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3);
+          // how far it went
+          const m = this.sixDistance(sim);
+          this.fx.word(`${m} METRES`, p.x, p.y + 30, { size: 40, color: '#fff4da', stroke: '#e8343b', rot: 0, dur: 1400 });
+          this.board(`${m}m SIX!`);
+        }
         else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
         else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); }
         else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * 0.3, { size: 44, color: '#fff4da', stroke: INK });
