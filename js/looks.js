@@ -113,22 +113,22 @@ function morph(m, w, h, grow) {
   return out;
 }
 function open(m, w, h, n) { let r = m; for (let i = 0; i < n; i++) r = morph(r, w, h, false); for (let i = 0; i < n; i++) r = morph(r, w, h, true); return r; }
-// keep the connected patches that pass keep(area, meanHue, meanV)
-function filterParts(m, w, h, H, V, keep) {
+// keep the connected patches that pass keep(area, meanHue, meanV, share of pixels marked in B)
+function filterParts(m, w, h, H, V, keep, B = null) {
   const seen = new Uint8Array(m.length), out = new Uint8Array(m.length), stack = [], pix = [];
   for (let i = 0; i < m.length; i++) {
     if (!m[i] || seen[i]) continue;
-    pix.length = 0; let sh = 0, sv = 0;
+    pix.length = 0; let sh = 0, sv = 0, sb = 0;
     stack.push(i); seen[i] = 1;
     while (stack.length) {
-      const j = stack.pop(); pix.push(j); sh += H[j]; sv += V[j];
+      const j = stack.pop(); pix.push(j); sh += H[j]; sv += V[j]; if (B) sb += B[j];
       const x = j % w;
       if (x > 0 && m[j - 1] && !seen[j - 1]) { seen[j - 1] = 1; stack.push(j - 1); }
       if (x < w - 1 && m[j + 1] && !seen[j + 1]) { seen[j + 1] = 1; stack.push(j + 1); }
       if (j >= w && m[j - w] && !seen[j - w]) { seen[j - w] = 1; stack.push(j - w); }
       if (j + w < m.length && m[j + w] && !seen[j + w]) { seen[j + w] = 1; stack.push(j + w); }
     }
-    if (keep(pix.length, sh / pix.length, sv / pix.length)) for (const j of pix) out[j] = 1;
+    if (keep(pix.length, sh / pix.length, sv / pix.length, sb / pix.length)) for (const j of pix) out[j] = 1;
   }
   return out;
 }
@@ -203,18 +203,19 @@ function sheetMasks(key, p, w, h) {
   }
   // solid patches only, then grow back one pixel into the original mask to keep clean edges
   const fix = (raw, keep) => {
-    const core = filterParts(open(raw, w, h, 2), w, h, H, V, keep);
+    const core = filterParts(open(raw, w, h, 2), w, h, H, V, keep, bat);
     const grown = morph(core, w, h, true);
     for (let q = 0; q < n; q++) grown[q] &= raw[q];
     return grown;
   };
-  // the bat is yellower and brighter than skin (only the batting sheets have one)
-  const notBat = (hue, v) => !(hasBat && hue > 30.5 && v > 0.92);
+  // the bat is yellower and brighter than skin (only the batting sheets have one). A patch is the bat
+  // when most of it is bat-wood coloured, not just when it's bright on average: a sunlit forearm is too
+  const notBat = (hue, v, batShare = 0) => !(hasBat && hue > 30.5 && v > 0.92 && batShare > 0.3);
   const orangeSheet = orangeKit > opaque * 0.08;
   // the front views, where faces and throats show (other sheets have gold kit trim close to skin)
   const facing = key === 'front' || key === 'spin-front' || key === 'batfront';
   let sk;
-  if (key !== 'batfront') sk = fix(skin, (area, hue, v) => area >= 30 && notBat(hue, v));
+  if (key !== 'batfront') sk = fix(skin, (area, hue, v, b) => area >= 30 && notBat(hue, v, b));
   else {
     // the front-view batter's face is cut into small pieces by the helmet grille, so small
     // pieces count here. Keep clear of the bat (its brown edge is skin-coloured), and keep small pieces only where
@@ -224,7 +225,7 @@ function sheetMasks(key, p, w, h) {
       for (let k = 0; k < 4; k++) near = morph(near, w, h, true);
       for (let q = 0; q < n; q++) if (near[q]) skin[q] = 0;
     }
-    const pieces = filterParts(skin, w, h, H, V, (area, hue, v) => area >= 6 && notBat(hue, v));
+    const pieces = filterParts(skin, w, h, H, V, (area, hue, v, b) => area >= 6 && notBat(hue, v, b), bat);
     let group = pieces;
     for (let k = 0; k < 3; k++) group = morph(group, w, h, true);
     const keepGroup = filterParts(group, w, h, H, V, area => area >= 180);
@@ -253,7 +254,7 @@ function sheetMasks(key, p, w, h) {
   if (!orangeSheet) for (let q = 0; q < n; q++) if (darkBrown[q]) byHair[q] = 1;
   byHair = open(byHair, w, h, 2); // solid dark areas only, not the thin warm strokes along arms
   for (let k = 0; k < 6; k++) byHair = morph(byHair, w, h, true);
-  for (let q = 0; q < n; q++) if (byHair[q] && skin[q] && !hr[q] && !(hasBat && H[q] > 30.5 && V[q] > 0.92)) sk[q] = 1;
+  for (let q = 0; q < n; q++) if (byHair[q] && skin[q] && !hr[q] && !bat[q]) sk[q] = 1;
   const careful = spread(sk, looseSkin, hr, 8);
   // vivid orange shading on the skin (the Phoenix sheet): small orange patches touching the skin
   // are part of it; big ones are the shirt and trousers
@@ -286,6 +287,12 @@ function sheetMasks(key, p, w, h) {
   // the dark red-brown strokes on and around the skin take the new tone too (kept dark)
   const ring = morph(morph(skinAll, w, h, true), w, h, true);
   for (let q = 0; q < n; q++) if (ring[q] && darkWarm[q] && !hr[q]) skinAll[q] = 1;
+  // patches lying on the bat (its shaded edge, its stickers) are not skin, however they got in
+  if (hasBat) {
+    let nearBat = bat;
+    for (let k = 0; k < 2; k++) nearBat = morph(nearBat, w, h, true);
+    skinAll = filterParts(skinAll, w, h, H, V, (area, hue, v, b) => b <= 0.3, nearBat);
+  }
   const hairAll = spread(hr, looseHair, skinAll, 5);
   const m = new Uint8Array(n);
   for (let q = 0; q < n; q++) m[q] = skinAll[q] ? 1 : hairAll[q] ? 2 : 0;
