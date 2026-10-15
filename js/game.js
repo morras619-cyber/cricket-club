@@ -1986,7 +1986,10 @@ export class Game {
     for (const f of S.field3d || []) {
       push(f.y, () => {
         const p = kind !== 'keeper' && cam.project(f.x, 0, f.y);
-        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, 'field', kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0, kind === 'bat' ? 'front' : 'back')) return;
+        // bowling view: fielders level with or behind the batter (square, slips, fine leg) face the
+        // camera, watching the batter; those between him and the bowler show their backs
+        const faceCam = kind === 'bat' || f.y < 3.5;
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, 'field', kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0, faceCam ? 'front' : 'back')) return;
         drawFigure3D(ctx, cam, f.x, f.y, teamLook(kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0 ? 1 : 0), POSES.crouch(), { noShadow: false });
       });
     }
