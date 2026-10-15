@@ -20,6 +20,7 @@ const TEAMS = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix', 'titans', '
 const SHEETS = {
   front: 'img/bowler.webp', batfront: 'img/batter-front.webp', 'spin-front': 'img/spinner-front.webp', 'spin-back': 'img/spinner-back-thunder.webp',
   ...Object.fromEntries(TEAMS.map(t => [`back-${t}`, `img/bowler-back-${t}.webp`])),
+  ...Object.fromEntries(TEAMS.map(t => [`spin-back-${t}`, `img/spinner-back-${t}.webp`])),
   ...Object.fromEntries(TEAMS.map(t => [`batter-${t}`, `img/batter-${t}.webp`])),
 };
 

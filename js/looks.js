@@ -151,6 +151,22 @@ function smallTouching(m, near, w, h, maxArea) {
   }
   return out;
 }
+// set the small gaps in m (patches under maxArea that touch nothing but m) to 1
+function fillHoles(m, w, h, maxArea) {
+  const n = m.length, seen = new Uint8Array(n), stack = [], pix = [];
+  for (let i = 0; i < n; i++) {
+    if (m[i] || seen[i]) continue;
+    pix.length = 0; let open = false;
+    stack.push(i); seen[i] = 1;
+    while (stack.length) {
+      const j = stack.pop(); pix.push(j);
+      const x = j % w;
+      if (x === 0 || x === w - 1 || j < w || j >= n - w) { open = true; continue; }
+      for (const k of [j - 1, j + 1, j - w, j + w]) if (!m[k] && !seen[k]) { seen[k] = 1; stack.push(k); }
+    }
+    if (!open && pix.length < maxArea) for (const j of pix) m[j] = 1;
+  }
+}
 function sheetMasks(key, p, w, h) {
   if (masks.has(key)) return masks.get(key);
   const n = w * h, skin = new Uint8Array(n), hair = new Uint8Array(n), H = new Float32Array(n), V = new Float32Array(n);
@@ -158,7 +174,7 @@ function sheetMasks(key, p, w, h) {
   const looseSkin = new Uint8Array(n), looseHair = new Uint8Array(n), warmSkin = new Uint8Array(n), ink = new Uint8Array(n);
   let orangeKit = 0, opaque = 0;
   const hasBat = /^bat/.test(key); // only the batting sheets have a bat to protect
-  const darkWarm = new Uint8Array(n);
+  const darkWarm = new Uint8Array(n), bat = new Uint8Array(n);
   for (let i = 0, q = 0; q < n; i += 4, q++) {
     if (p[i + 3] < 70) continue;
     // hue, saturation, value inline (no allocation: this runs over a million pixels)
@@ -174,6 +190,7 @@ function sheetMasks(key, p, w, h) {
     H[q] = hh; V[q] = v;
     // skin's highlights and deep shadows: warm, not white, not a vivid kit orange, not the bright bat
     const batWood = hasBat && hh > 33 && v > 0.9 && s > 0.45;
+    if (batWood) bat[q] = 1;
     if (hh <= 48 && s >= 0.12 && v >= 0.24 && !(s > 0.85 && v > 0.6) && !batWood) looseSkin[q] = 1;
     // some sheets shade skin with vivid orange (the Phoenix one): allowed, but only inside the outlines
     if (hh >= 8 && hh <= 40 && s >= 0.12 && v >= 0.24 && !batWood) warmSkin[q] = 1; // not red kit trim
@@ -191,8 +208,30 @@ function sheetMasks(key, p, w, h) {
     return grown;
   };
   // the bat is yellower and brighter than skin (only the batting sheets have one)
-  const sk = fix(skin, (area, hue, v) => area >= 30 && !(hasBat && hue > 30.5 && v > 0.92));
-  const hr = fix(hair, area => area >= 40);
+  const notBat = (hue, v) => !(hasBat && hue > 30.5 && v > 0.92);
+  const orangeSheet = orangeKit > opaque * 0.08;
+  // the front views, where faces and throats show (other sheets have gold kit trim close to skin)
+  const facing = key === 'front' || key === 'spin-front' || key === 'batfront';
+  let sk;
+  if (key !== 'batfront') sk = fix(skin, (area, hue, v) => area >= 30 && notBat(hue, v));
+  else {
+    // the front-view batter's face is cut into small pieces by the helmet grille, so small
+    // pieces count here. Keep clear of the bat (its brown edge is skin-coloured), and keep small pieces only where
+    // they sit among others (the grille-cut face), not a lone speck on a pad
+    if (hasBat) {
+      let near = bat;
+      for (let k = 0; k < 4; k++) near = morph(near, w, h, true);
+      for (let q = 0; q < n; q++) if (near[q]) skin[q] = 0;
+    }
+    const pieces = filterParts(skin, w, h, H, V, (area, hue, v) => area >= 6 && notBat(hue, v));
+    let group = pieces;
+    for (let k = 0; k < 3; k++) group = morph(group, w, h, true);
+    const keepGroup = filterParts(group, w, h, H, V, area => area >= 180);
+    sk = new Uint8Array(n);
+    for (let q = 0; q < n; q++) sk[q] = pieces[q] & keepGroup[q];
+  }
+  // the front-view batter's hair is all under his helmet: shadows on his face are not hair
+  const hr = key === 'batfront' ? new Uint8Array(n) : fix(hair, area => area >= 40);
   // spread each area over its own shading until the outlines stop it, so the whole arm or face is repainted
   const spread = (core, loose, other, steps) => {
     let m = core;
@@ -208,11 +247,13 @@ function sheetMasks(key, p, w, h) {
   const careful = spread(sk, looseSkin, hr, 8);
   // vivid orange shading on the skin (the Phoenix sheet): small orange patches touching the skin
   // are part of it; big ones are the shirt and trousers
-  const touch = morph(careful, w, h, true);
+  // (reaching across a thin outline: the throat in the collar is cut off from the face by the chin line)
+  let touch = careful;
+  for (let k = 0; k < (facing && !orangeSheet ? 4 : 1); k++) touch = morph(touch, w, h, true);
   const vivid = new Uint8Array(n);
   for (let q = 0; q < n; q++) vivid[q] = warmSkin[q] & (looseSkin[q] ^ 1) & (careful[q] ^ 1);
   // on a sheet whose kit is orange, only small patches can be skin; elsewhere orange is always skin shading
-  const patches = smallTouching(vivid, touch, w, h, orangeKit > opaque * 0.08 ? 350 : 6000);
+  const patches = smallTouching(vivid, touch, w, h, orangeSheet ? 350 : 6000);
   let skinAll = new Uint8Array(n);
   for (let q = 0; q < n; q++) skinAll[q] = careful[q] | patches[q];
   // warm pixels mostly surrounded by skin (fingertips drawn over the orange trousers) are skin too
@@ -230,6 +271,8 @@ function sheetMasks(key, p, w, h) {
     }
     skinAll = next;
   }
+  // bright highlights inside an arm or face (small gaps with skin all round them) are skin too
+  fillHoles(skinAll, w, h, 150);
   // the dark red-brown strokes on and around the skin take the new tone too (kept dark)
   const ring = morph(morph(skinAll, w, h, true), w, h, true);
   for (let q = 0; q < n; q++) if (ring[q] && darkWarm[q] && !hr[q]) skinAll[q] = 1;

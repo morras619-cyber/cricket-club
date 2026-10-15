@@ -283,6 +283,96 @@ const SPIN_BACK = {
   finish: [0,  882,  181,  420,  90.0,  419,  1.0],
 };
 
+// the other clubs' spinners from behind, each drawn in his own kit
+// name: [x, y, w, h, anchorX, anchorY (feet), scale]
+const SPIN_BACKS = {
+  thunder: SPIN_BACK,
+  cyclones: {
+    start: [0,  0,  200,  436,  99.5,  435,  1.0],
+    run1: [202,  0,  175,  428,  81.0,  427,  1.0],
+    run2: [379,  0,  191,  427,  82.5,  426,  1.0],
+    gather: [572,  0,  164,  431,  121.5,  430,  1.0],
+    coil: [738,  0,  150,  441,  94.0,  440,  1.0],
+    release: [0,  443,  188,  443,  75.5,  442,  1.0],
+    follow1: [190,  443,  262,  371,  116.5,  370,  1.0],
+    follow2: [454,  443,  297,  372,  154.5,  371,  1.0],
+    follow3: [753,  443,  183,  422,  88.0,  421,  1.0],
+    finish: [0,  888,  196,  427,  97.5,  426,  1.0],
+  },
+  vipers: {
+    start: [0,  0,  205,  435,  102.0,  434,  1.0],
+    run1: [207,  0,  174,  426,  81.5,  425,  1.0],
+    run2: [383,  0,  193,  425,  83.0,  424,  1.0],
+    gather: [578,  0,  161,  430,  119.5,  429,  1.0],
+    coil: [741,  0,  150,  439,  94.0,  438,  1.0],
+    release: [0,  441,  190,  445,  76.0,  444,  1.0],
+    follow1: [192,  441,  261,  371,  117.0,  370,  1.0],
+    follow2: [455,  441,  298,  372,  155.0,  371,  1.0],
+    follow3: [755,  441,  184,  423,  88.0,  422,  1.0],
+    finish: [0,  888,  196,  427,  97.5,  426,  1.0],
+  },
+  eagles: {
+    start: [0,  0,  206,  435,  102.5,  434,  1.0],
+    run1: [208,  0,  175,  426,  81.5,  425,  1.0],
+    run2: [385,  0,  193,  426,  82.0,  425,  1.0],
+    gather: [580,  0,  163,  430,  121.0,  429,  1.0],
+    coil: [745,  0,  149,  440,  94.0,  439,  1.0],
+    release: [0,  442,  191,  445,  74.5,  444,  1.0],
+    follow1: [193,  442,  264,  372,  118.5,  371,  1.0],
+    follow2: [459,  442,  300,  372,  158.0,  371,  1.0],
+    follow3: [761,  442,  186,  424,  90.0,  423,  1.0],
+    finish: [0,  889,  196,  427,  97.5,  426,  1.0],
+  },
+  phoenix: {
+    start: [0,  0,  206,  436,  102.5,  435,  1.0],
+    run1: [208,  0,  175,  428,  80.5,  427,  1.0],
+    run2: [385,  0,  194,  427,  80.5,  426,  1.0],
+    gather: [581,  0,  164,  430,  120.0,  429,  1.0],
+    coil: [747,  0,  149,  440,  93.5,  439,  1.0],
+    release: [0,  442,  189,  445,  74.5,  444,  1.0],
+    follow1: [191,  442,  262,  370,  116.5,  369,  1.0],
+    follow2: [455,  442,  294,  371,  153.0,  370,  1.0],
+    follow3: [751,  442,  186,  424,  89.5,  423,  1.0],
+    finish: [0,  889,  194,  426,  96.5,  425,  1.0],
+  },
+  titans: {
+    start: [0,  0,  207,  435,  103.0,  434,  1.0],
+    run1: [209,  0,  175,  426,  82.0,  425,  1.0],
+    run2: [386,  0,  193,  425,  81.5,  424,  1.0],
+    gather: [581,  0,  163,  429,  120.5,  428,  1.0],
+    coil: [746,  0,  149,  439,  94.0,  438,  1.0],
+    release: [0,  441,  192,  445,  75.5,  444,  1.0],
+    follow1: [194,  441,  263,  371,  118.5,  370,  1.0],
+    follow2: [459,  441,  298,  372,  156.5,  371,  1.0],
+    follow3: [759,  441,  185,  424,  90.0,  423,  1.0],
+    finish: [0,  888,  196,  426,  97.5,  425,  1.0],
+  },
+  storm: {
+    start: [0,  0,  206,  436,  102.5,  435,  1.0],
+    run1: [208,  0,  175,  427,  81.5,  426,  1.0],
+    run2: [385,  0,  193,  429,  82.0,  428,  1.0],
+    gather: [580,  0,  166,  431,  124.0,  430,  1.0],
+    coil: [748,  0,  149,  440,  95.0,  439,  1.0],
+    release: [0,  442,  191,  445,  76.0,  444,  1.0],
+    follow1: [193,  442,  262,  371,  117.0,  370,  1.0],
+    follow2: [457,  442,  299,  372,  157.0,  371,  1.0],
+    follow3: [758,  442,  185,  423,  87.5,  422,  1.0],
+    finish: [0,  889,  197,  427,  98.0,  426,  1.0],
+  },
+  royals: {
+    start: [0,  0,  202,  435,  100.5,  434,  1.0],
+    run1: [204,  0,  172,  423,  80.0,  422,  1.0],
+    run2: [378,  0,  191,  426,  79.5,  425,  1.0],
+    gather: [571,  0,  156,  430,  120.0,  429,  1.0],
+    coil: [729,  0,  146,  438,  91.0,  437,  1.0],
+    release: [0,  440,  187,  441,  76.0,  440,  1.0],
+    follow1: [189,  440,  260,  370,  113.5,  369,  1.0],
+    follow2: [451,  440,  294,  370,  152.5,  369,  1.0],
+    follow3: [747,  440,  181,  421,  86.0,  420,  1.0],
+    finish: [0,  883,  194,  426,  96.5,  425,  1.0],
+  },
+};
+
 const VIEWS = {
   'field-top': { src: 'img/field-top.webp', frames: FIELD_TOP },
   'field-front': { src: 'img/field-front.webp', frames: FIELD_FRONT },
@@ -297,6 +387,9 @@ const VIEWS = {
 };
 for (const [id, frames] of Object.entries(BACK)) {
   VIEWS['back-' + id] = { src: `img/bowler-back-${id}.webp`, frames, refPx: frames.start[5], own: true };
+}
+for (const [id, frames] of Object.entries(SPIN_BACKS)) {
+  VIEWS['spin-back-' + id] = { src: `img/spinner-back-${id}.webp`, frames, refPx: frames.start[5], own: true };
 }
 const RUN_CYCLE = ['run1', 'run2', 'run3', 'run2'];
 const SPIN_CYCLE = ['run1', 'run2'];
@@ -336,7 +429,7 @@ function loadView(v, tries = 0) {
 // the front sheets plus the back sheets of the teams in this match. Repainted copies for
 // teams that aren't playing are thrown away, so memory doesn't pile up match after match.
 export function loadBowlSprites(...teamIds) {
-  for (const key of ['front', 'spin-front', 'spin-back', 'batfront', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.map(id => 'back-' + id)]) {
+  for (const key of ['front', 'spin-front', 'spin-back', 'batfront', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.flatMap(id => ['back-' + id, 'spin-back-' + id])]) {
     const v = VIEWS[key];
     if (/^(front|batfront|spin-|back-)/.test(key)) loadPeopleMask(key); // where the players' skin and hair are
     if (!v || v.ready || (v.img && !v.failed)) continue;
@@ -471,6 +564,8 @@ function stampCrest(p, shirt, W, H, crest, [cx, cy, size, squash = 1]) {
 // Draw a frame with its feet at (px, py); kPerM is pixels per metre at that depth. False until loaded.
 // look: the player's skin and hair (looks.js), repainted onto the drawn sheet
 export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, view = 'front', look = null) {
+  // a club's own spinner sheet when it has loaded (the Thunder one, repainted, until then)
+  if (view === 'spin-back' && VIEWS['spin-back-' + team?.id]?.ready) view = 'spin-back-' + team.id;
   // a spinner frame the spin sheets don't have, or a spin sheet still loading, comes from the
   // pace bowler's sheet (mapping the spinner's frame names onto his)
   if (view.startsWith('spin') && (!VIEWS[view]?.ready || !VIEWS[view].frames[frame])) {
