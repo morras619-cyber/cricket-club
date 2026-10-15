@@ -4,10 +4,11 @@ import { SPARKS, HEROES, heroById, heroesFor } from './heroes.js';
 import { TEAMS, teamById, rivalTeam, teamOfHero } from './teams.js';
 import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
-import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
+import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
+import { flag, nationName } from './nations.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason } from './career.js';
+  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason, migrateCareer } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -26,6 +27,8 @@ const game = new Game(ui);
 const profile = loadProfile();
 // heroes already picked before unlocks existed stay unlocked (signed)
 for (const id of Object.values(profile.squad || {})) if (id && !profile.unlocked.includes(id)) profile.unlocked.push(id);
+// careers saved before players had countries
+if (profile.career) migrateCareer(profile.career);
 // start downloading the bowler sheets (pace and spin) while the menus are up
 loadBowlSprites(profile.team || 'thunder');
 sound.on = profile.settings.sound;
@@ -256,7 +259,7 @@ function teamSheet() {
       sel.setAttribute('aria-label', `${title} ${i + 1}`);
       for (const p of cands) {
         const o = document.createElement('option');
-        o.value = p.id; o.textContent = `${p.hero ? '★ ' : ''}${fullName(p)} · ${label(p)}`;
+        o.value = p.id; o.textContent = `${p.hero ? '★ ' : ''}${flagName(p)} · ${label(p)}`;
         sel.append(o);
       }
       sel.value = list[i]?.id || '';
@@ -279,7 +282,7 @@ function teamSheet() {
   squadList.append(el('h3', '', 'The squad'));
   for (const p of roster(L.id)) {
     const r = el('div', 'squadrow');
-    r.append(el('b', '', fullName(p)), el('span', '', `${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · ${p.trait}`));
+    r.append(el('b', '', flagName(p)), el('span', '', `${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · ${p.trait}`));
     squadList.append(r);
   }
   wrap.append(
@@ -519,7 +522,8 @@ function career() {
   return profile.career;
 }
 const stars = n => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
-const pname = p => `${p.heroId ? '★ ' : p.ability ? '⭐ ' : ''}${fullName(p)}`;
+const pname = p => `${p.heroId ? '★ ' : p.ability ? '⭐ ' : ''}${flagName(p)}`;
+const fname = p => `${flag(p)} ${p.name}`.trim(); // flag and plain name, for lists
 function renderCareer(notes = careerNotes) {
   const c = career();
   careerNotes = [];
@@ -588,7 +592,7 @@ function careerAuction(c, body) {
     card.append(el('div', 'eyebrow', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
     if (p.heroId) card.append(portrait(heroById(p.heroId), 96, 'celebrate'));
     card.append(el('h3', '', pname(p)),
-      el('p', 'lotmeta', `${p.label}${p.bowl ? ` · ${bowlType(p.bowl).name}` : ''} · age ${p.age} (${ageNote(p)})`),
+      el('p', 'lotmeta', `${flag(p)} ${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).name}` : ''} · age ${p.age} (${ageNote(p)})`),
       el('div', 'lotnums', ''));
     const nums = card.querySelector('.lotnums');
     for (const [k, v] of [['OVR', ovr(p)], ['Potential', stars(potentialStars(p))], ['Bat', p.bat], ['Bowl', p.bowlSkill || '—'], ['Value', money(value(p))]]) {
@@ -646,7 +650,7 @@ function careerSeason(c, body) {
     const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
     const best = [...theirs].sort((a, b) => ovr(b) - ovr(a))[0];
     card.append(el('div', 'eyebrow', f.label.toUpperCase()), logos,
-      el('p', '', `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${fullName(best)} (${ovr(best)}).`));
+      el('p', '', `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`));
     const go = el('button', 'bigbtn primary', `Play ${f.label.startsWith('Matchday') ? 'match' : f.label.toLowerCase()}`);
     go.addEventListener('click', () => startMatch({ mode: 'career' }));
     card.append(go);
@@ -682,7 +686,7 @@ function careerSquad(c, body) {
     const r = el('div', 'squadrow');
     const s = p.stats.season;
     r.append(el('b', '', `${pname(p)} · ${ovr(p)}`),
-      el('span', '', `${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · age ${p.age} · potential ${stars(potentialStars(p))} · ${p.contract} season${p.contract === 1 ? '' : 's'} left`),
+      el('span', '', `${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · age ${p.age} · potential ${stars(potentialStars(p))} · ${p.contract} season${p.contract === 1 ? '' : 's'} left`),
       el('span', '', `${p.ability ? `⭐ ${ABILITIES[p.ability].name} · ` : ''}This season: ${s.runs} runs, ${s.wkts} wkts · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`));
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
@@ -735,14 +739,14 @@ function renderRecords() {
   };
   const top = (scope, key, fmtRow, n = 5) => leaders(c, scope, key, n).filter(p => p.stats[scope][key === 'hs' ? 'hs' : key] > 0).map(fmtRow);
   if (c.phase === 'season' || c.phase === 'done') {
-    body.append(board(`Season ${c.season} · most runs`, top('season', 'runs', p => `${p.name} (${team(p)}) · ${p.stats.season.runs}`)));
-    body.append(board(`Season ${c.season} · most wickets`, top('season', 'wkts', p => `${p.name} (${team(p)}) · ${p.stats.season.wkts}`)));
+    body.append(board(`Season ${c.season} · most runs`, top('season', 'runs', p => `${fname(p)} (${team(p)}) · ${p.stats.season.runs}`)));
+    body.append(board(`Season ${c.season} · most wickets`, top('season', 'wkts', p => `${fname(p)} (${team(p)}) · ${p.stats.season.wkts}`)));
   }
-  body.append(board('All-time most runs', top('all', 'runs', p => `${p.name} (${team(p)}) · ${p.stats.all.runs} in ${p.stats.all.m} matches`, 10)));
-  body.append(board('All-time most wickets', top('all', 'wkts', p => `${p.name} (${team(p)}) · ${p.stats.all.wkts}${p.stats.all.bb ? ` · best ${p.stats.all.bb.w}/${p.stats.all.bb.r}` : ''}`, 10)));
-  body.append(board('Most sixes', top('all', 'sixes', p => `${p.name} (${team(p)}) · ${p.stats.all.sixes}`)));
-  body.append(board('Highest scores', c.records.hs.slice(0, 10).map(r => `${playerName(c, r.pid)} · ${r.runs}${r.out ? '' : '*'} (${r.balls}) · ${teamById(r.team || 'thunder').name} · S${r.season}`)));
-  body.append(board('Best bowling', c.records.bb.slice(0, 10).map(r => `${playerName(c, r.pid)} · ${r.w}/${r.r} · ${teamById(r.team || 'thunder').name} · S${r.season}`)));
+  body.append(board('All-time most runs', top('all', 'runs', p => `${fname(p)} (${team(p)}) · ${p.stats.all.runs} in ${p.stats.all.m} matches`, 10)));
+  body.append(board('All-time most wickets', top('all', 'wkts', p => `${fname(p)} (${team(p)}) · ${p.stats.all.wkts}${p.stats.all.bb ? ` · best ${p.stats.all.bb.w}/${p.stats.all.bb.r}` : ''}`, 10)));
+  body.append(board('Most sixes', top('all', 'sixes', p => `${fname(p)} (${team(p)}) · ${p.stats.all.sixes}`)));
+  body.append(board('Highest scores', c.records.hs.slice(0, 10).map(r => `${fname(c.players[r.pid])} · ${r.runs}${r.out ? '' : '*'} (${r.balls}) · ${teamById(r.team || 'thunder').name} · S${r.season}`)));
+  body.append(board('Best bowling', c.records.bb.slice(0, 10).map(r => `${fname(c.players[r.pid])} · ${r.w}/${r.r} · ${teamById(r.team || 'thunder').name} · S${r.season}`)));
   const clubs = TEAMS.map(t => ({ t, titles: c.titles[t.id] || 0, finals: c.history.filter(h => h.runnerUp === t.id).length })).sort((a, b) => b.titles - a.titles || b.finals - a.finals);
   body.append(board('Most Super League titles', clubs.filter(x => x.titles || x.finals).map(x => `${x.t.name} · ${x.titles} title${x.titles === 1 ? '' : 's'}${x.finals ? `, ${x.finals} runner-up` : ''}`)));
   body.append(board('Season by season', c.history.map(h => `S${h.season}: ${teamById(h.champion).name} champions · you: ${teamById(h.club).name} (${ordinal(h.pos)})${h.orange ? ` · most runs ${playerName(c, h.orange.pid)} ${h.orange.runs}` : ''}`)));
@@ -935,7 +939,7 @@ function showResult(summary) {
     const runs = rec.batting.reduce((a, b) => a + b.runs, 0), balls = rec.batting.reduce((a, b) => a + b.balls, 0);
     for (const st of rec.batting) {
       const r = el('div', 'row');
-      r.append(el('b', '', `${heroById(st.id) ? '★ ' : ''}${st.name || ''}`), el('span', '', `${fmt.stint(st)}${st.out && st.how ? ` · ${st.how}` : ''}`));
+      r.append(el('b', '', `${heroById(st.id) ? '★ ' : ''}${flag(st)} ${st.name || ''}`), el('span', '', `${fmt.stint(st)}${st.out && st.how ? ` · ${st.how}` : ''}`));
       ms.append(r);
     }
     const r2 = el('div', 'row');
@@ -949,7 +953,7 @@ function showResult(summary) {
     const f = rec.bowling;
     for (const b of rec.bowlingCard || []) {
       const r = el('div', 'row');
-      r.append(el('b', '', `${isHero(b.id, 'bowl') || heroById(b.id) ? '★ ' : ''}${b.name}`), el('span', '', `${fmt.figures(b)}${b.type ? ` · ${bowlType(b.type).short}` : ''}`));
+      r.append(el('b', '', `${isHero(b.id, 'bowl') || heroById(b.id) ? '★ ' : ''}${flag(b)} ${b.name}`), el('span', '', `${fmt.figures(b)}${b.type ? ` · ${bowlType(b.type).short}` : ''}`));
       ms.append(r);
     }
     const r2 = el('div', 'row');

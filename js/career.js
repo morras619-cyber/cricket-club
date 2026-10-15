@@ -10,6 +10,7 @@ import { TEAMS, teamById } from './teams.js';
 import { HEROES, heroById } from './heroes.js';
 import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating, WEAK, BOWL_TYPES } from './squads.js';
 import { newLeague, advance, playerResult, table, finish } from './tournament.js';
+import { NATIONS, pickNation } from './nations.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -61,7 +62,7 @@ function newPlayer(base, extra) {
 // in the first season) and the first youth intake.
 export function newCareer(seed = Date.now() >>> 0) {
   const rng = makeRng(seed);
-  const c = { seed, season: 1, phase: 'pick', club: null, money: START_MONEY, players: {}, league: null, auction: null,
+  const c = { nations: true, seed, season: 1, phase: 'pick', club: null, money: START_MONEY, players: {}, league: null, auction: null,
     budgets: {}, titles: {}, history: [], records: { hs: [], bb: [] }, news: [], lineup: null, youthNo: 0 };
   for (const t of TEAMS) {
     c.budgets[t.id] = AI_BUDGET[t.tier];
@@ -84,10 +85,6 @@ export function newCareer(seed = Date.now() >>> 0) {
 }
 const teamOfStar = id => TEAMS.find(t => t.star === id)?.id || null;
 
-const FIRST = ['Ayaan', 'Rehan', 'Vihaan', 'Zayan', 'Arnav', 'Ibrahim', 'Kian', 'Reyansh', 'Hadi', 'Advik', 'Musa', 'Shaurya', 'Rayyan', 'Dhruv', 'Eesa', 'Atharv',
-  'Yusuf', 'Krish', 'Ahil', 'Parth', 'Taimur', 'Om', 'Faiz', 'Veer', 'Rumi', 'Laksh', 'Sami', 'Nirvaan', 'Talha', 'Arjit', 'Shayan', 'Ojas'];
-const LAST = ['Bajwa', 'Trivedi', 'Lone', 'Rathore', 'Kazmi', 'Dutta', 'Afridi', 'Bhalla', 'Wani', 'Sethi', 'Zaidi', 'Grewal', 'Paracha', 'Mathur', 'Niazi',
-  'Bedi', 'Tiwana', 'Saxena', 'Durrani', 'Arora', 'Jatoi', 'Nanda', 'Hashmi', 'Kohli', 'Rind', 'Ghosh', 'Malhi', 'Chadha'];
 const NICKS = ['Kid', 'Rookie', 'Spark', 'Pocket Rocket', 'Wonderboy', 'Junior', 'Prodigy', 'Rising Sun', 'Little Master', 'Cub', 'Comet', 'Bullet', 'Whiz', 'Ace'];
 const ROLES = [['bat', 'Top-order prospect'], ['bat', 'Hard-hitting prospect'], ['wk', 'Keeper prospect'], ['all', 'All-round prospect'], ['bowl', 'Pace prospect'], ['bowl', 'Spin prospect']];
 
@@ -96,8 +93,9 @@ export function youthIntake(c, rng, n) {
   const used = new Set(Object.values(c.players).map(p => p.name));
   const out = [];
   for (let i = 0; i < n; i++) {
-    let name;
-    do { name = `${rng.pick(FIRST)} ${rng.pick(LAST)}`; } while (used.has(name));
+    // academy graduates come from every cricket nation
+    let name, nation;
+    do { nation = pickNation(rng); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
     used.add(name);
     const [role, label] = rng.pick(ROLES);
     const spin = label.startsWith('Spin');
@@ -108,7 +106,7 @@ export function youthIntake(c, rng, n) {
     const bowlSkill = bowl ? (role === 'all' ? rng.int(40, 52) : rng.int(46, 60)) : 0;
     const id = `y${c.season}-${++c.youthNo}`;
     const w = rng.int(0, WEAK.length - 1);
-    const p = newPlayer({ id, name, nick: rng.pick(NICKS), short: name.split(' ')[1], role, label, bat, bowl, bowlSkill,
+    const p = newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), role, label, bat, bowl, bowlSkill,
       trait: pot >= 86 ? 'Academy wonderkid' : 'Academy graduate', hero: false,
       ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
     { age: rng.int(17, 20), pot, team: null, contract: 0, youth: true });
@@ -116,6 +114,21 @@ export function youthIntake(c, rng, n) {
     out.push(p);
   }
   return out;
+}
+
+// Careers saved before players had countries: the regulars take their new names and
+// nations from the squads, heroes get theirs, and older academy graduates get one.
+export function migrateCareer(c) {
+  if (!c || c.nations) return c;
+  for (const p of Object.values(c.players)) {
+    const [team] = p.id.split('-');
+    const r = TEAMS.some(t => t.id === team) && roster(team).find(x => x.id === p.id);
+    if (r) Object.assign(p, { name: r.name, nick: r.nick, short: r.short, nation: r.nation, trait: r.trait });
+    else if (p.heroId) p.nation = heroPlayer(heroById(p.heroId)).nation;
+    else if (!p.nation) p.nation = ['IN', 'PK', 'BD'][hashStr(p.id) % 3];
+  }
+  c.nations = true;
+  return c;
 }
 
 // ---------- clubs ----------

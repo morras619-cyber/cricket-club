@@ -1,7 +1,7 @@
 import { CFG } from './config.js';
 
-const freshStint = (p = null) => ({ id: p?.id || null, name: p?.name || null, runs: 0, balls: 0, fours: 0, sixes: 0 });
-const freshFig = p => ({ id: p.id, name: p.name, short: p.short || p.name.split(' ').slice(-1)[0], type: p.bowl || null, balls: 0, runs: 0, wkts: 0, dots: 0 });
+const freshStint = (p = null) => ({ id: p?.id || null, name: p?.name || null, nation: p?.nation || null, runs: 0, balls: 0, fours: 0, sixes: 0 });
+const freshFig = p => ({ id: p.id, name: p.name, nation: p.nation || null, short: p.short || p.name.split(' ').slice(-1)[0], type: p.bowl || null, balls: 0, runs: 0, wkts: 0, dots: 0 });
 
 export const oversText = balls => `${Math.floor(balls / 6)}.${balls % 6}`;
 
@@ -21,7 +21,7 @@ export class Innings {
   }
 
   // The batter now on strike. Only valid at the start of a stint.
-  setBatter(p) { if (p && this.cur.balls === 0) Object.assign(this.cur, { id: p.id, name: p.name }); }
+  setBatter(p) { if (p && this.cur.balls === 0) Object.assign(this.cur, { id: p.id, name: p.name, nation: p.nation || null }); }
   // The bowler of the current over.
   setBowler(p) {
     if (!p) return;

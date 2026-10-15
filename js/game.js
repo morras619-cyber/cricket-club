@@ -11,8 +11,9 @@ import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBou
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
 import { powerDiscount } from './progress.js';
+import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
-import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, fullName } from './squads.js';
+import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
@@ -325,7 +326,7 @@ export class Game {
         this.view = 'bowl';
         const id = await this.ui.pickBowler({
           over: over + 1, left,
-          options: att.map(b => ({ id: b.id, name: b.name, star: !!b.hero, type: this.typeLine(b), overs: overs[b.id] || 0, max: MAX_OVERS,
+          options: att.map(b => ({ id: b.id, name: `${flag(b)} ${b.name}`.trim(), star: !!b.hero, type: this.typeLine(b), overs: overs[b.id] || 0, max: MAX_OVERS,
             figs: inn.figs[b.id] ? `${inn.figs[b.id].wkts}/${inn.figs[b.id].runs}` : '', ok: choices.includes(b),
             why: b.id === last ? 'Bowled the last over' : (overs[b.id] || 0) >= MAX_OVERS ? `Bowled his ${MAX_OVERS}` : '' })),
         });
@@ -334,7 +335,7 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
-    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500);
+    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500);
     await this.sleepReal(this.bot ? 60 : 1100);
   }
 
@@ -342,7 +343,7 @@ export class Game {
   async newBatter(inn) {
     const p = this.batterOf(inn);
     inn.setBatter(p);
-    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${fullName(p)} · ${p.trait || p.label}`, 1700);
+    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700);
     await this.sleepReal(this.bot ? 60 : 1200);
   }
 
