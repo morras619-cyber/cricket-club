@@ -241,3 +241,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .banner-vs[hidden] { display: none; }
 .banner-vs img { width: 64px; height: 64px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.5)); }
 .banner-vs b { font-family: var(--display); font-size: 30px; color: var(--hot); -webkit-text-stroke: 1px var(--ink); }
+
+/* inside another app's viewer (an iframe) the host already clears the notch */
+.embedded { --safe-t: 0px; }

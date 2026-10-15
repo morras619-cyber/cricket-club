@@ -159,18 +159,8 @@ function renderBackground(cam) {
     gr.addColorStop(0, 'rgba(255,240,190,0.2)'); gr.addColorStop(1, 'rgba(255,240,190,0)');
     g.fillStyle = gr; g.fillRect(0, hy, W, H - hy); g.restore();
   }
-  // rope, sponsor triangles and the 30-yard circle
+  // rope and the 30-yard circle
   ring(g, cam, R, '#fff4da', 3, []);
-  for (let k = 0; k < 64; k++) {
-    const a = (k / 64) * Math.PI * 2;
-    const z = CY + Math.cos(a) * (R + 1.5);
-    if (cam.depth(z) < 3) continue;
-    const p = cam.project(Math.sin(a) * (R + 1.5), 0, z);
-    if (!p) continue;
-    const s = Math.max(3, Math.min(11, p.k * 0.9));
-    g.fillStyle = k % 2 ? '#ffd23f' : '#e8343b'; g.strokeStyle = INK; g.lineWidth = 1.1;
-    g.beginPath(); g.moveTo(p.x - s, p.y); g.lineTo(p.x + s, p.y); g.lineTo(p.x, p.y - s * 1.1); g.closePath(); g.fill(); g.stroke();
-  }
   ring(g, cam, 27, 'rgba(255,255,255,0.45)', 1.5, [6, 6]);
 
   // the pitch: dry-earth texture, a worn strip down the middle, footmarks, creases

@@ -9,6 +9,9 @@ import { renderShareCard } from './sharecard.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt } from './profile.js';
 import { sound, unlockAudio, sfx } from './audio.js';
 
+// framed by another app (e.g. a viewer with its own header): don't add the notch space again
+try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
+
 const $ = id => document.getElementById(id);
 const ui = new UI();
 const game = new Game(ui);
