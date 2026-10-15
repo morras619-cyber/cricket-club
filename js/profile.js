@@ -6,6 +6,8 @@ const fresh = () => ({
   name: '', xp: 0, coins: 0, matches: 0, wins: 0, best: 0, tutorialDone: false,
   squad: { bat: 'raja', bowl: 'zara', field: 'rani' },
   team: 'thunder',
+  unlocked: ['raja', 'zara', 'rani'],
+  lineups: {}, // per team id: { order: [player ids], attack: [player ids] }
   daily: { day: 0, last: '' },
   settings: { sound: true, haptics: true, fielding: 'key' },
 });
@@ -51,6 +53,15 @@ export function matchRewards(p, summary) {
   const inn = summary.innings.find(i => i.side === 'player');
   if (inn) p.best = Math.max(p.best, inn.runs);
   return { xp, coins };
+}
+
+// Spend coins to unlock a star hero. Returns false if it can't be afforded.
+export function unlockHero(p, id, cost) {
+  p.unlocked = p.unlocked || ['raja', 'zara', 'rani'];
+  if (p.unlocked.includes(id)) return true;
+  if (p.coins < cost) return false;
+  p.coins -= cost; p.unlocked.push(id);
+  return true;
 }
 
 // ---------- career stats ----------
@@ -102,7 +113,10 @@ export function recordStats(p, summary) {
     const card = batInn.battingCard();
     const prevHS = stats.bat.inns ? stats.bat.hs : -1;
     addBatting(stats.bat, card);
-    addBatting(heroStats(stats, summary.team.bat.id, 'bat'), card);
+    // the hero's own stints (older records had no ids: the hero batted throughout)
+    const heroId = summary.team.bat.id;
+    const mine = card.filter(c => !c.id || c.id === heroId);
+    if (mine.length) addBatting(heroStats(stats, heroId, 'bat'), mine);
     out.batting = card;
     out.newHS = Math.max(...card.map(c => c.runs)) > prevHS && prevHS >= 0;
   }
@@ -111,8 +125,11 @@ export function recordStats(p, summary) {
     const f = bowlInn.bowlingFigures();
     const prevBest = stats.bowl.best;
     addBowling(stats.bowl, f);
-    addBowling(heroStats(stats, summary.team.bowl.id, 'bowl'), f);
+    const heroId = summary.team.bowl.id;
+    const hf = bowlInn.figs && Object.keys(bowlInn.figs).length ? bowlInn.figs[heroId] : f;
+    if (hf && hf.balls > 0) addBowling(heroStats(stats, heroId, 'bowl'), { maidens: 0, ...hf });
     out.bowling = f;
+    out.bowlingCard = bowlInn.bowlingCard ? bowlInn.bowlingCard() : [];
     out.newBest = !!prevBest && betterFigures({ w: f.wkts, r: f.runs }, prevBest);
   }
   return out;

@@ -37,10 +37,12 @@ Fielding control triggers only on chances you can swing (5–90% success), at mo
 - **Charge Meter** per the GDD: tiers at 30/60/100, overheat above 60, −20 on losing a wicket, 25% carry-over between innings, 20% discount in the last 6 balls, perfect-timing streaks.
 - **8 heroes** with signature powers: Thunderclap Six, Mirror Gap, Meteor Six (ultimate), Tornado Yorker, Maya Ball, Shatter Seam, Elastic Grab + Time-Freeze Stumping (ultimate), Lightning Relay. Plus three Sparks (Focus, Pinpoint, Speed Burst).
 - **Night-stadium look**: floodlit ground with a skyline, two crowd tiers, flags, a scrolling LED board that reacts to sixes, fours and wickets, a textured pitch with footmarks, and cel-shaded heroes (each with their own hair, emblem and helmet) drawn to true scale against the stumps. Signature powers fire a full-screen comic cut-in panel for you and the AI. Budget phones (≤2 GB RAM or ≤2 cores) get a lighter mode automatically.
+- **Full teams, not just heroes**: every team has ten regulars (openers, a No.3, a keeper-batter, all-rounders and bowlers) led by your star heroes. Set your batting order (four bat; when one is out the next walks in) and a three-man attack on the team sheet. The heroes' signature powers only work while that hero is batting or bowling; Sparks work for anyone. Three stars are free (Thunder Raja, Cyclone Zara, Rubber Rocket Rani); the other five unlock for 250 coins each.
+- **Bowler types**: express pace (142-153 km/h, slower bouncer), swing (outswinger/inswinger, slower ball), seam and cutters (leg-cutter, off-cutter, knuckle ball), left-arm pace (angled across, from the other side of the stumps), off-spin (off-break, arm ball) and leg-spin (leg-break, googly). Each over you pick who bowls (two overs each at most, never two in a row); the AI rotates its own attack. The speed and type show as each ball is bowled. Better batters get slightly wider timing windows; tail-enders get less.
 - **8 teams**: pick yours on the squad screen (Thunder Strikers, Green Cyclones, Volt Vipers, Golden Eagles, Phoenix Blaze, Steel Titans, Purple Storm, Pink Royals). Your batter, keeper and fielders wear your kit; the opposition is another team.
 - **Share card**: a 1080×1350 comic panel of your biggest moment, generated on the device.
 - **Light progression**: XP and levels, coins, a 7-day login calendar that pauses rather than resets. Saved in the browser.
-- **Stats**: a live hero line during play, a scorecard after each match, and Career stats (runs, balls, highest score, average, strike rate, ducks, longest six with NEW RECORD! when you beat it; overs, wickets, runs against, best figures, economy, maidens), overall and per hero. Each dismissal ends a batting innings; run-outs aren't bowler wickets.
+- **Stats**: a live hero line during play, a scorecard after each match, and Career stats (runs, balls, highest score, average, strike rate, ducks, longest six with NEW RECORD! when you beat it; overs, wickets, runs against, best figures, economy, maidens), overall and per hero. Each dismissal ends a batter's innings; run-outs aren't bowler wickets. The match scorecard lists every batter and every bowler.
 
 Not built yet: real-money store and cosmetics, online accounts and group leaderboards (they need a server), Hindi/Urdu text, licensed audio. Sound effects are synthesised in the browser.
 
@@ -68,10 +70,11 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `img/burst.webp`, `tools/build_burst.py` | Hand-drawn 8-frame impact burst on powered hits (gold Thunderclap, orange Meteor, purple Mirror) and, smaller, on perfect timing |
 | `img/logo-*.webp`, `tools/build_logos.py` | Team logos: team picker, scoreboard, and the team-v-team match intro |
 | `js/teams.js` | The eight teams and their kit colours |
+| `js/squads.js` | Bowler types and their deliveries, each team's regular players, hero unlocks, batting orders, bowling attacks and the over-by-over bowling plan |
 | `tools/build_batter_sprites.py` | Cuts labelled batting sprite sheets into the per-team images |
 | `js/cutin.js` | The comic cut-in panel for signature powers |
 | `js/quality.js` | High/low graphics setting, picked from the device |
-| `js/ui.js`, `js/main.js` | HUD, menus, squad picker, results and sharing |
+| `js/ui.js`, `js/main.js` | HUD, menus, squad picker and team sheet, the over-by-over bowler picker, results and sharing |
 | `js/sharecard.js`, `js/codec.js`, `js/profile.js` | Share card, challenge links, local progression |
 
 ## Tests

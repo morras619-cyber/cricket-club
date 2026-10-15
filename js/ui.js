@@ -172,5 +172,37 @@ export class UI {
     $('powers').hidden = on;
     this.onBanter = on ? onPick : null;
   }
+  // Choose who bowls the next over. Resolves with the chosen player id.
+  pickBowler({ over, left, options }) {
+    return new Promise(resolve => {
+      const box = document.createElement('div');
+      box.className = 'overpick';
+      const card = document.createElement('div');
+      card.className = 'panel paper overpick-card';
+      const h = document.createElement('h3');
+      h.textContent = `Over ${over} · who bowls?`;
+      const sub = document.createElement('p');
+      sub.className = 'overpick-sub';
+      sub.textContent = `${left} over${left === 1 ? '' : 's'} left · ${options[0]?.max ?? 2} max each, never two in a row`;
+      card.append(h, sub);
+      for (const o of options) {
+        const b = document.createElement('button');
+        b.className = `overpick-btn${o.star ? ' star' : ''}`;
+        b.disabled = !o.ok;
+        const name = document.createElement('b');
+        name.textContent = `${o.star ? '★ ' : ''}${o.name}`;
+        const type = document.createElement('span');
+        type.textContent = o.type;
+        const meta = document.createElement('small');
+        meta.textContent = o.ok ? `${o.overs}/${o.max} overs${o.figs ? ` · ${o.figs}` : ''}` : o.why;
+        b.append(name, type, meta);
+        b.addEventListener('click', () => { box.remove(); resolve(o.id); });
+        card.append(b);
+      }
+      box.append(card);
+      $('hud').append(box);
+    });
+  }
+
   banterTimer(p) { $('banterBar').style.width = `${Math.max(0, p) * 100}%`; }
 }

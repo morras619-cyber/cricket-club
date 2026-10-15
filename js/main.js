@@ -2,11 +2,12 @@ import { UI } from './ui.js';
 import { Game, pickRivals } from './game.js';
 import { SPARKS, heroById, heroesFor } from './heroes.js';
 import { TEAMS } from './teams.js';
+import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE } from './squads.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
-import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt } from './profile.js';
+import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero } from './profile.js';
 import { sound, unlockAudio, sfx } from './audio.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
@@ -16,6 +17,8 @@ const $ = id => document.getElementById(id);
 const ui = new UI();
 const game = new Game(ui);
 const profile = loadProfile();
+// heroes already picked before unlocks existed stay unlocked
+for (const id of Object.values(profile.squad || {})) if (id && !profile.unlocked.includes(id)) profile.unlocked.push(id);
 sound.on = profile.settings.sound;
 sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
@@ -135,7 +138,8 @@ function renderSquad() {
     row.className = 'slot-row';
     for (const hero of heroesFor(slot)) {
       const b = document.createElement('button');
-      b.className = 'hero' + (profile.squad[slot] === hero.id ? ' on' : '');
+      const locked = !isUnlocked(profile, hero.id);
+      b.className = 'hero' + (profile.squad[slot] === hero.id ? ' on' : '') + (locked ? ' locked' : '');
       b.setAttribute('aria-pressed', profile.squad[slot] === hero.id);
       const top = document.createElement('div'); top.className = 'htop';
       top.append(portrait(hero, 72, slot === 'bat' ? 'bat' : slot === 'bowl' ? 'bowl' : 'celebrate'));
@@ -158,15 +162,77 @@ function renderSquad() {
       if (statLine) b.append(el('div', 'herostat', statLine));
       const q = document.createElement('div'); q.className = 'quote'; q.textContent = `“${hero.quote}”`;
       b.append(q);
+      if (locked) b.append(el('div', 'unlock', `🔒 Unlock · ${UNLOCK_COST} coins`));
       b.addEventListener('click', () => {
-        profile.squad[slot] = hero.id; saveProfile(profile); sfx.click();
-        for (const x of row.children) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }
+        if (!isUnlocked(profile, hero.id)) {
+          if (!unlockHero(profile, hero.id, UNLOCK_COST)) { ui.toast(`You need ${UNLOCK_COST - profile.coins} more coins to unlock ${hero.name}`); return; }
+          ui.toast(`${hero.name} unlocked!`); sfx.full();
+        } else sfx.click();
+        profile.squad[slot] = hero.id; saveProfile(profile);
+        renderSquad();
       });
       row.append(b);
     }
     wrap.append(h, row);
     rows.append(wrap);
+    // keep the chosen star in view after a re-render
+    const on = row.querySelector('.on');
+    if (on) requestAnimationFrame(() => { row.scrollLeft = on.offsetLeft - 8; });
   }
+  rows.append(teamSheet());
+  $('squadCoins').textContent = `${profile.coins} coins`;
+}
+
+// ---------- team sheet: batting order and bowling attack ----------
+function currentLineup() {
+  const id = profile.team || 'thunder', heroes = squad();
+  const r = resolveLineup(id, heroes, profile.lineups?.[id]);
+  return { id, heroes, pool: squadPool(id, heroes), order: r.order, attack: r.attack };
+}
+function saveLineup(order, attack) {
+  const id = profile.team || 'thunder';
+  profile.lineups = profile.lineups || {};
+  profile.lineups[id] = { order: order.map(p => p.id), attack: attack.map(p => p.id) };
+  saveProfile(profile);
+}
+function teamSheet() {
+  const L = currentLineup();
+  const wrap = el('div', 'slot teamsheet');
+  const pick = (title, list, cands, size, label, onSet) => {
+    const box = el('div', 'panel paper sheetbox');
+    box.append(el('h3', '', title));
+    for (let i = 0; i < size; i++) {
+      const row = el('label', 'sheetrow');
+      row.append(el('span', 'sheetno', String(i + 1)));
+      const sel = document.createElement('select');
+      sel.setAttribute('aria-label', `${title} ${i + 1}`);
+      for (const p of cands) {
+        const o = document.createElement('option');
+        o.value = p.id; o.textContent = `${p.hero ? '★ ' : ''}${p.name} · ${label(p)}`;
+        sel.append(o);
+      }
+      sel.value = list[i]?.id || '';
+      sel.addEventListener('change', () => {
+        const p = cands.find(c => c.id === sel.value);
+        const j = list.indexOf(p);
+        const next = [...list];
+        if (j >= 0) next[j] = list[i]; // already picked: swap places
+        next[i] = p;
+        onSet(next); sfx.click(); renderSquad();
+      });
+      row.append(sel);
+      box.append(row);
+    }
+    return box;
+  };
+  const roleTxt = p => `${p.label} · bat ${p.bat}`;
+  wrap.append(
+    el('h3', '', `${TEAMS.find(t => t.id === L.id)?.name || 'Your'} team sheet`),
+    el('p', 'sheetnote', 'Bat in this order: when a batter is out, the next one walks in. Your three bowlers share the five overs (two each at most), and you pick who bowls each over.'),
+    pick('Batting order', L.order, batCandidates(L.pool), ORDER_SIZE, roleTxt, next => saveLineup(next, L.attack)),
+    pick('Bowling attack', L.attack, bowlCandidates(L.pool), ATTACK_SIZE, p => `${bowlType(p.bowl).name}${p.bowlSkill ? ` · ${p.bowlSkill}` : ''}`, next => saveLineup(L.order, next)),
+  );
+  return wrap;
 }
 $('squadBack').addEventListener('click', renderHome);
 $('squadGo').addEventListener('click', () => startMatch(pending || { mode: 'quick' }));
@@ -186,7 +252,7 @@ function teamPicker() {
     b.append(logo, el('b', '', t.name));
     b.addEventListener('click', () => {
       profile.team = t.id; saveProfile(profile); sfx.click();
-      for (const x of row.children) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }
+      renderSquad();
     });
     row.append(b);
   }
@@ -219,7 +285,8 @@ async function startMatch(opts) {
   const seed = opts.mode === 'challenge' ? opts.challenge.seed : randomSeed();
   const order = opts.mode === 'quick' ? await coinToss(pickRivals(seed, sq)) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
-  const summary = await game.runMatch({ mode: opts.mode, records: { longestSix: careerStats(profile).bat.longestSix || 0 }, squad: sq, team: opts.mode === 'tutorial' ? 'thunder' : profile.team, seed, order, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
+  const lineup = opts.mode === 'tutorial' ? null : profile.lineups?.[profile.team || 'thunder'] || null;
+  const summary = await game.runMatch({ lineup, mode: opts.mode, records: { longestSix: careerStats(profile).bat.longestSix || 0 }, squad: sq, team: opts.mode === 'tutorial' ? 'thunder' : profile.team, seed, order, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
   if (!summary) return; // quit mid-match
   if (opts.mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
@@ -291,7 +358,7 @@ function showResult(summary) {
   for (const inn of summary.innings) {
     const c = document.createElement('div');
     c.className = 'panel card';
-    const who = inn.side === 'player' ? `You · ${summary.team.bat.name}` : `${summary.rival.bat.name}'s XI`;
+    const who = inn.side === 'player' ? `You · ${summary.myTeam?.name || summary.team.bat.name}` : `${summary.oppTeam?.name || `${summary.rival.bat.name}'s XI`}`;
     c.innerHTML = '<div class="eyebrow"></div><div class="score"></div><div class="sub"></div>';
     c.querySelector('.eyebrow').textContent = who.toUpperCase();
     c.querySelector('.score').textContent = `${inn.runs}/${inn.wkts}`;
@@ -304,10 +371,12 @@ function showResult(summary) {
   ms.innerHTML = '';
   ms.hidden = !rec || (!rec.batting && !rec.bowling);
   if (rec?.batting) {
-    const r = el('div', 'row');
     const runs = rec.batting.reduce((a, b) => a + b.runs, 0), balls = rec.batting.reduce((a, b) => a + b.balls, 0);
-    r.append(el('b', '', `${summary.team.bat.name}`), el('span', '', rec.batting.map(fmt.stint).join(' · ')));
-    ms.append(r);
+    for (const st of rec.batting) {
+      const r = el('div', 'row');
+      r.append(el('b', '', `${st.id === summary.team.bat.id ? '★ ' : ''}${st.name || summary.team.bat.name}`), el('span', '', `${fmt.stint(st)}${st.out && st.how ? ` · ${st.how}` : ''}`));
+      ms.append(r);
+    }
     const r2 = el('div', 'row');
     r2.append(el('span', '', `${runs} runs off ${balls} · SR ${fmt.sr(runs, balls)} · ${rec.batting.reduce((a, b) => a + b.fours, 0)}×4 ${rec.batting.reduce((a, b) => a + b.sixes, 0)}×6`));
     if (rec.batting.some(st => st.out && st.runs === 0)) r2.append(el('span', 'badge', 'DUCK!'));
@@ -317,9 +386,11 @@ function showResult(summary) {
   }
   if (rec?.bowling) {
     const f = rec.bowling;
-    const r = el('div', 'row');
-    r.append(el('b', '', `${summary.team.bowl.name}`), el('span', '', fmt.figures(f)));
-    ms.append(r);
+    for (const b of rec.bowlingCard?.length ? rec.bowlingCard : [{ ...f, name: summary.team.bowl.name, id: summary.team.bowl.id }]) {
+      const r = el('div', 'row');
+      r.append(el('b', '', `${b.id === summary.team.bowl.id ? '★ ' : ''}${b.name}`), el('span', '', `${fmt.figures(b)}${b.type ? ` · ${bowlType(b.type).short}` : ''}`));
+      ms.append(r);
+    }
     const r2 = el('div', 'row');
     r2.append(el('span', '', `Econ ${fmt.econ(f.runs, f.balls)} · ${f.dots} dots${f.maidens ? ` · ${f.maidens} maiden${f.maidens > 1 ? 's' : ''}` : ''}`));
     if (rec.newBest) r2.append(el('span', 'badge', 'BEST FIGURES'));

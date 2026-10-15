@@ -2,6 +2,7 @@ import { CFG } from './config.js';
 import { makeRng } from './rng.js';
 import { LANES } from './physics.js';
 import { gradeTiming, resolveContact } from './shots.js';
+import { bowlType, deliveryParams } from './squads.js';
 
 function weighted(rng, table) {
   const total = table.reduce((s, [, w]) => s + w, 0);
@@ -29,7 +30,10 @@ export function typeParams(kind, type, rng) {
 }
 
 // The AI's 30 deliveries for one innings, fixed by the seed so challenges replay exactly.
+// kind is either 'pace' | 'spin' (one bowler all innings) or the over plan: one bowler
+// (a squads.js player) per over, each bowling his own type, speeds and variations.
 export function aiBowlingScript(seed, kind, powerKind) {
+  if (Array.isArray(kind)) return planScript(seed, kind, powerKind);
   const rng = makeRng(seed);
   const powerBalls = new Set([9, 20, 27]);
   const out = [];
@@ -42,12 +46,40 @@ export function aiBowlingScript(seed, kind, powerKind) {
     const type = rng.pick(deliveryTypes(kind));
     const params = typeParams(kind, type, rng);
     const d = { ball, length, lane, x: LANES.find(l => l.id === lane).x + rng.range(-0.04, 0.04), type, ...params, power: null };
-    if (powerBalls.has(ball) && powerKind) {
-      d.power = powerKind;
-      if (powerKind === 'tornado') Object.assign(d, { length: 'yorker', lane: 'stumps', x: 0, kmh: 160, swing: 0.05, move: 0, type: 'Tornado Yorker' });
-      if (powerKind === 'shatter') Object.assign(d, { length: 'good', lane: 'off', x: 0.2, move: 0.3, type: 'Shatter Seam' });
-      if (powerKind === 'maya') Object.assign(d, { length: 'good', type: 'Maya Ball' });
-    }
+    if (powerBalls.has(ball) && powerKind) applyPower(d, powerKind);
+    out.push(d);
+  }
+  return out;
+}
+
+function applyPower(d, powerKind) {
+  d.power = powerKind;
+  if (powerKind === 'tornado') Object.assign(d, { length: 'yorker', lane: 'stumps', x: 0, kmh: 160, swing: 0.05, move: 0, type: 'Tornado Yorker', slower: false });
+  if (powerKind === 'shatter') Object.assign(d, { length: 'good', lane: 'off', x: 0.2, move: 0.3, type: 'Shatter Seam', slower: false });
+  if (powerKind === 'maya') Object.assign(d, { length: 'good', type: 'Maya Ball' });
+}
+
+function planScript(seed, plan, powerKind) {
+  const rng = makeRng(seed);
+  const out = [];
+  for (let ball = 1; ball <= CFG.balls; ball++) {
+    const over = Math.floor((ball - 1) / 6), inOver = (ball - 1) % 6;
+    const p = plan[Math.min(over, plan.length - 1)];
+    const T = bowlType(p.bowl);
+    const finale = ball >= 25;
+    // weaker bowlers bowl more bad balls: full tosses, long hops and wides of the line
+    const loose = Math.max(0, (85 - (p.bowlSkill || 70)) / 100);
+    const length = T.spin
+      ? weighted(rng, [['good', 45], ['full', 30], ['short', 10 + 40 * loose], ['yorker', 5], ['fulltoss', 6 + 40 * loose]])
+      : weighted(rng, [['good', 38], ['full', 20], ['short', 15 + 30 * loose], ['yorker', finale ? 30 : 12], ['bouncer', T.id === 'express' ? 14 : 6], ['fulltoss', 4 + 30 * loose]]);
+    const lane = weighted(rng, [['off', 40], ['stumps', 30], ['leg', 15], ['wideoff', 10 + 20 * loose], ['wideleg', 5 + 15 * loose]]);
+    const variation = rng.chance(T.spin ? 0.18 : 0.14);
+    const type = variation ? T.variation : rng.pick(T.stock);
+    const params = deliveryParams(T.id, type, rng.range(0.2, 1), rng);
+    const d = { ball, length, lane, x: LANES.find(l => l.id === lane).x + rng.range(-0.04, 0.04), ...params, bowler: p.id, power: null };
+    if (type === 'Slower bouncer') Object.assign(d, { length: 'bouncer', lane: rng.pick(['off', 'stumps']), x: 0.05 });
+    // the star's power ball comes once in each of his overs
+    if (p.hero && powerKind && p.hero.power?.kind === powerKind && inOver === (over % 2 ? 3 : 2)) applyPower(d, powerKind);
     out.push(d);
   }
   return out;
@@ -74,6 +106,8 @@ function chooseShot(d, ctx, rng) {
 // ctx: { ballNo, need, ballsLeft, wicketsLeft, release ('perfect'|'good'|'loose'|'bad'), repeats, fx, stance, power }
 export function aiBat(d, ctx, rng) {
   let sigma = 78;
+  // the batter's own skill (a squads.js rating, 75 = a solid regular)
+  if (ctx.skill != null) sigma *= 1 + (75 - ctx.skill) / 100;
   if (ctx.release === 'perfect') sigma *= 1.2;
   if (ctx.release === 'loose') sigma *= 0.8;
   if (ctx.repeats >= 3) sigma *= 0.8;
@@ -100,6 +134,6 @@ export function aiBat(d, ctx, rng) {
 }
 
 export function aiStance(kind, rng) {
-  if (kind === 'spin' && rng.chance(0.22)) return 'charge';
+  if ((kind === 'spin' || bowlType(kind).spin && kind !== 'pace') && rng.chance(0.22)) return 'charge';
   return rng.pick(['normal', 'normal', 'open', 'back']);
 }

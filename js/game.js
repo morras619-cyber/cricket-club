@@ -10,6 +10,7 @@ import { aiBowlingScript, aiBat, aiStance } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
+import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
@@ -203,6 +204,10 @@ export class Game {
     // kits: the heroes play for the player's chosen team against a seeded rival team
     this.myTeam = teamById(opts.team);
     this.oppTeam = rivalTeam(this.seed, this.myTeam.id);
+    // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
+    this.mySide = resolveLineup(this.myTeam.id, this.team, opts.lineup);
+    this.oppSide = resolveLineup(this.oppTeam.id, { bat: this.rival.bat, bowl: this.rival.bowl, field: null }, null);
+    this.aiPlan = overPlan(this.oppSide.attack, CFG.balls / 6);
     loadBatSprites(this.myTeam.id, this.oppTeam.id);
     loadBowlSprites(this.myTeam.id);
     this.charge = new Charge(0);
@@ -223,7 +228,7 @@ export class Game {
     this.innings = [];
     try {
       if (mode === 'tutorial') return await this.runTutorial();
-      const script = aiBowlingScript(this.seed, this.rival.bowl.bowls, this.rival.bowl.power.kind);
+      const script = aiBowlingScript(this.seed, this.aiPlan, this.rival.bowl.power.kind);
       if (mode === 'challenge') {
         const inn = new Innings('player', opts.challenge.target + 1);
         this.innings.push(inn);
@@ -238,12 +243,12 @@ export class Game {
         const second = new Innings('player', first.runs + 1);
         this.innings.push(second);
         this.newCharge(carry);
-        await this.introBanner('YOUR CHASE', `${first.runs + 1} to win · ${this.rival.bowl.name} has the ball`);
+        await this.introBanner('YOUR CHASE', `${first.runs + 1} to win · ${this.aiPlan[0].name} opens the bowling`);
         await this.battingInnings(second, script);
       } else {
         const first = new Innings('player');
         this.innings.push(first);
-        await this.introBanner('YOU BAT FIRST', `${this.myTeam.name} v ${this.oppTeam.name} · ${this.rival.bowl.name} has the ball`);
+        await this.introBanner('YOU BAT FIRST', `${this.myTeam.name} v ${this.oppTeam.name} · ${this.mySide.order[0].name} opens`);
         await this.battingInnings(first, script);
         const carry = this.charge.carryOver();
         await this.inningsBreak(first, carry);
@@ -267,8 +272,62 @@ export class Game {
     this.ui.charge(value);
   }
 
+  // ---------- who's in ----------
+  sideOf(inn, batting) { return (inn.side === 'player') === batting ? this.mySide : this.oppSide; }
+  // the batter on strike: the order walks in one by one as wickets fall
+  batterOf(inn) { const o = this.sideOf(inn, true).order; return o[Math.min(inn.wkts, o.length - 1)]; }
+  bowlerOf(inn) {
+    const att = this.sideOf(inn, false).attack;
+    return att.find(p => p.id === inn.curBowler) || att.find(p => p.hero) || att[0];
+  }
+  // is this star on the field right now (his power only works while he bats or bowls)?
+  heroIn(slot) {
+    const inn = this.innings[this.innings.length - 1];
+    if (!inn) return true;
+    const p = slot === 'bat' ? this.batterOf(inn) : this.bowlerOf(inn);
+    return !!p && p.id === this.team[slot].id;
+  }
+  typeLine(p) { const T = bowlType(p.bowl); return `${T.name} · ${T.kmh[0]}-${T.kmh[1]} km/h`; }
+
+  // a new over: the AI follows its plan; you pick from your attack
+  async startOver(inn) {
+    const over = Math.floor(inn.balls / 6);
+    let p;
+    if (inn.side === 'player') p = this.aiPlan[Math.min(over, this.aiPlan.length - 1)];
+    else {
+      const att = this.mySide.attack, overs = inn.oversBy(), last = this.lastBowlerId;
+      const ok = att.filter(b => canBowl(b, overs, last));
+      const choices = ok.length ? ok : att.filter(b => b.id !== last).length ? att.filter(b => b.id !== last) : att;
+      const left = CFG.balls / 6 - over;
+      // the bot (and a lone choice) picks itself; otherwise you choose
+      if (this.bot || choices.length === 1 || this.mode === 'tutorial') p = choices[0];
+      else {
+        this.view = 'bowl';
+        const id = await this.ui.pickBowler({
+          over: over + 1, left,
+          options: att.map(b => ({ id: b.id, name: b.name, star: !!b.hero, type: this.typeLine(b), overs: overs[b.id] || 0, max: MAX_OVERS,
+            figs: inn.figs[b.id] ? `${inn.figs[b.id].wkts}/${inn.figs[b.id].runs}` : '', ok: choices.includes(b),
+            why: b.id === last ? 'Bowled the last over' : (overs[b.id] || 0) >= MAX_OVERS ? `Bowled his ${MAX_OVERS}` : '' })),
+        });
+        p = att.find(b => b.id === id) || choices[0];
+      }
+    }
+    inn.setBowler(p);
+    this.lastBowlerId = p.id;
+    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${this.typeLine(p)}`, 1500);
+    await this.sleepReal(this.bot ? 60 : 1100);
+  }
+
+  // a wicket: the next batter walks out
+  async newBatter(inn) {
+    const p = this.batterOf(inn);
+    inn.setBatter(p);
+    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${p.name} · ${p.label}`, 1500);
+    await this.sleepReal(this.bot ? 60 : 1200);
+  }
+
   quit() { this.cancelAll(); this.ui.hud(false); this.clearBowlUI(); this.view = 'idle'; this.paused = false; }
-  clearBowlUI() { this.ui.fieldButton(false); this.ui.fieldEditor(false); this.ui.editing(false); this.ui.banter(false); }
+  clearBowlUI() { document.querySelectorAll('.overpick').forEach(e => e.remove()); this.ui.fieldButton(false); this.ui.fieldEditor(false); this.ui.editing(false); this.ui.banter(false); }
 
   async introBanner(head, sub) {
     this.view = 'bat';
@@ -295,7 +354,7 @@ export class Game {
       result = { outcome: won ? 'win' : short === 1 ? 'tie' : 'loss', text: won ? `Challenge beaten with ${a.ballsLeft} balls to spare` : short === 1 ? `Level on ${a.runs}. One more run would have won it!` : `Fell ${short - 1} short of their ${a.target - 1}` };
     } else result = matchResult(a, b);
     const sorted = [...this.moments].sort((x, y) => y.score - x.score);
-    return { mode: this.mode, innings: this.innings, result, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats };
+    return { mode: this.mode, innings: this.innings, result, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats, myTeam: this.myTeam, oppTeam: this.oppTeam };
   }
 
   addMoment(kind, title, word, hero, opts = {}) {
@@ -330,17 +389,14 @@ export class Game {
     };
     const A = this.armed;
     if (this.phase === 'bat') {
-      return [
-        mk('focus', SPARKS.bat, this.team.bat, 'bat', A.focus),
-        mk('bat', this.team.bat.power, this.team.bat, 'bat', A.thunder || A.meteor || A.mirror > 0),
-      ];
+      const list = [mk('focus', SPARKS.bat, this.team.bat, 'bat', A.focus)];
+      if (this.heroIn('bat') || A.thunder || A.meteor || A.mirror > 0) list.push(mk('bat', this.team.bat.power, this.team.bat, 'bat', A.thunder || A.meteor || A.mirror > 0));
+      return list;
     }
     if (this.phase === 'bowl') {
-      const list = [
-        mk('pinpoint', SPARKS.bowl, this.team.bowl, 'bowl', A.pinpoint),
-        mk('bowlpower', this.team.bowl.power, this.team.bowl, 'bowl', A.tornado || A.maya || A.shatter),
-        mk('fieldpower', this.team.field.power, this.team.field, 'keeper', A.elastic > 0 || A.relay),
-      ];
+      const list = [mk('pinpoint', SPARKS.bowl, this.team.bowl, 'bowl', A.pinpoint)];
+      if (this.heroIn('bowl') || A.tornado || A.maya || A.shatter) list.push(mk('bowlpower', this.team.bowl.power, this.team.bowl, 'bowl', A.tornado || A.maya || A.shatter));
+      list.push(mk('fieldpower', this.team.field.power, this.team.field, 'keeper', A.elastic > 0 || A.relay));
       const ult = this.team.field.ultimate;
       if (ult && (A.freeze || this.charge.value >= this.charge.cost(ult.cost, ball))) list.push(mk('fieldult', ult, this.team.field, 'keeper', A.freeze));
       return list;
@@ -366,6 +422,7 @@ export class Game {
       default: return;
     }
     if (this.powerLock && key !== 'burst') return;
+    if ((key === 'bat' && !this.heroIn('bat')) || (key === 'bowlpower' && !this.heroIn('bowl'))) return;
     if (!this.charge.spend(def.cost, ball, def.name)) return;
     color = hero.look.trim;
     const kindMap = { focus: 'focus', pinpoint: 'pinpoint', burst: 'burst' };
@@ -405,11 +462,12 @@ export class Game {
         ? (n > 0 ? `Need ${n} off ${inn.ballsLeft}` : 'Target reached!')
         : (n > 0 ? `They need ${n} off ${inn.ballsLeft}` : 'They got there');
     } else need = inn.side === 'player' ? 'Set a target' : 'They\'re setting a target';
-    const short = h => h.name.split(' ').slice(-1)[0];
+    const short = h => h.short || h.name.split(' ').slice(-1)[0];
     let heroLine;
-    if (inn.side === 'player') heroLine = `${short(this.team.bat)} ${inn.cur.runs}* (${inn.cur.balls})`;
-    else { const b = inn.bowler; heroLine = `${short(this.team.bowl)} ${b.wkts}/${b.runs} · ${Math.floor(b.balls / 6)}.${b.balls % 6} ov`; }
-    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${this.team.bat.name.toUpperCase()}` : `YOU BOWL · ${this.team.bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine, logo: this.myTeam ? `img/logo-${this.myTeam.id}.webp` : null });
+    const bat = this.batterOf(inn), bowl = this.bowlerOf(inn);
+    if (inn.side === 'player') heroLine = `${short(bat)} ${inn.cur.runs}* (${inn.cur.balls}) · v ${short(bowl)}`;
+    else { const b = inn.figs[bowl.id] || { wkts: 0, runs: 0, balls: 0 }; heroLine = `${short(bowl)} ${b.wkts}/${b.runs} · ${Math.floor(b.balls / 6)}.${b.balls % 6} ov · v ${short(bat)}`; }
+    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${bat.name.toUpperCase()}` : `YOU BOWL · ${bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine, logo: this.myTeam ? `img/logo-${this.myTeam.id}.webp` : null });
   }
 
   phaseBanner(ballNo) {
@@ -422,11 +480,17 @@ export class Game {
   // ---------- batting innings ----------
   async battingInnings(inn, script) {
     this.phase = 'bat';
+    this.overStarted = -1;
+    inn.setBatter(this.batterOf(inn));
     this.hud(inn);
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
+      if (inn.balls % 6 === 0 && this.overStarted !== inn.balls) { this.overStarted = inn.balls; await this.startOver(inn); }
+      this.hud(inn);
       this.phaseBanner(ballNo);
+      const wk = inn.wkts;
       await this.batBall(inn, ballNo, script[ballNo - 1]);
+      if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
       if (inn.balls % 6 === 0 && !inn.done()) {
         const runs = inn.log.slice(-6).reduce((s, r) => s + (r === 'W' ? 0 : Number(r)), 0);
@@ -446,9 +510,11 @@ export class Game {
     return fx;
   }
 
-  windowsFor(fx, extra = 0, tornado = false) {
+  // skill: the batter's rating. Stars get a little more room, tail-enders a lot less.
+  windowsFor(fx, extra = 0, tornado = false, skill = 75) {
     const w = { ...CFG.timing };
-    for (const k in w) w[k] += CFG.touchSlackMs + extra + (fx.mirror ? 40 : 0);
+    const f = clamp(0.75 + skill / 300, 0.8, 1.06);
+    for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? 40 : 0);
     if (fx.focus) w.perfect += 30;
     if (tornado) w.perfect /= 2;
     w.good = Math.max(w.good, w.perfect + 20);
@@ -461,8 +527,10 @@ export class Game {
     this.view = 'bat';
     this.timeScale = 1;
     const before = { runs: inn.runs, wkts: inn.wkts };
-    S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = this.team.bat.emblem;
-    S.bowler.look = this.rival.bowl.look;
+    const striker = this.batterOf(inn), bowler = this.bowlerOf(inn), btype = bowlType(bowler.bowl);
+    S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = striker.hero?.emblem || null;
+    S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.oppTeam); S.bowler.left = !!btype.left;
+    if (btype.left) S.bowler.x = -0.6;
     const rng = this.ballRng(ballNo);
     const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
     S.field3d = aiField.filter(f => !f.keeper && f.id !== 'bowler');
@@ -489,9 +557,9 @@ export class Game {
     let prog = 0, last = this.gameTime;
     await this.until(() => {
       const dt = this.gameTime - last; last = this.gameTime;
-      if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / 850;
+      if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / (850 * (0.55 + 0.45 * btype.runup));
       const p = Math.min(1, prog);
-      S.bowler.z = 27.5 - 6.9 * p; S.bowler.pose = POSES.run(p * 13); S.bowler.spr = { anim: 'run', p };
+      S.bowler.z = 20.6 + 6.9 * btype.runup * (1 - p); S.bowler.pose = POSES.run(p * 13); S.bowler.spr = { anim: 'run', p };
       return p >= 1;
     });
     this.onInput = null;
@@ -505,8 +573,9 @@ export class Game {
     this.timeScale = (opt.slow ?? 1) * (fx.focus ? 0.7 : 1);
     if (fx.focus) this.fx.speed = 0.6;
 
-    const d = makeDelivery(spec);
+    const d = makeDelivery({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) });
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
+    if (!this.bot && !opt.hint) this.fx.word(`${Math.round(spec.kmh)} KM/H · ${String(spec.type || '').toUpperCase()}`, this.W / 2, this.H * 0.2, { size: 24, color: '#fff4da', stroke: INK, rot: 0, dur: 1100 });
     S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
     if (aiPower === 'maya') S.maya = { real: rng.chance(0.5) ? 1 : -1, picked: 0 };
     sfx.whoosh();
@@ -548,7 +617,7 @@ export class Game {
     this.fx.speed = 0;
 
     // ----- resolve -----
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado');
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado', striker.bat);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
     // defending is forgiving: anywhere in the wide window keeps the ball out
@@ -890,19 +959,26 @@ export class Game {
   async bowlingInnings(inn) {
     this.phase = 'bowl';
     this.freeHit = false;
+    this.overStarted = -1;
     this.aiPowerBalls = new Set([16, 26]);
+    this.lastBowlerId = null;
+    inn.setBatter(this.batterOf(inn));
     this.hud(inn);
-    await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `${this.myTeam.name} v ${this.oppTeam.name} · keep them quiet with ${this.team.bowl.name}` : `Defend ${inn.target - 1} with ${this.team.bowl.name}`);
+    await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `${this.myTeam.name} v ${this.oppTeam.name} · keep them quiet` : `Defend ${inn.target - 1}`);
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
+      if (inn.balls % 6 === 0 && this.overStarted !== inn.balls) { this.overStarted = inn.balls; await this.startOver(inn); }
+      this.hud(inn);
       this.phaseBanner(ballNo);
       if (ballNo === 7 && !this.scouted) {
         this.scouted = true;
-        const p = this.rival.bat.ai;
-        this.ui.banner('SCOUTING REPORT', `${this.rival.bat.name} ${p.label}. Their weak spot is now marked on the pitch.`, 2600);
+        const b = this.batterOf(inn);
+        this.ui.banner('SCOUTING REPORT', `${b.name} ${b.ai.label}. The weak spot is now marked on the pitch.`, 2600);
         await this.sleepReal(this.bot ? 100 : 2200);
       }
+      const wk = inn.wkts;
       const r = await this.bowlBall(inn, ballNo);
+      if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
       if (r?.rebowl) { this.rebowls = (this.rebowls || 0) + 1; continue; }
       if (inn.balls % 6 === 0 && !inn.done()) {
@@ -931,10 +1007,14 @@ export class Game {
     this.timeScale = 1;
     const rng = this.ballRng(ballNo);
     S.batter.look = teamLook(this.oppTeam); S.batter.team = this.oppTeam.id; S.batter.emblem = null; S.batter.x = -0.5;
-    S.bowler.look = this.team.bowl.look; S.bowler.emblem = this.team.bowl.emblem; S.bowler.z = 26; S.bowler.x = 1.05; // right-arm over, a little wide of the stumps so the ball leaves his hand
+    if (!inn.curBowler) inn.setBowler(this.bowlerOf(inn));
+    const bowler = this.bowlerOf(inn), striker = this.batterOf(inn), btype = bowlType(bowler.bowl);
+    S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.myTeam); S.bowler.emblem = bowler.hero?.emblem || null;
+    // right-arm over, a little wide of the stumps so the ball leaves his hand; left-armers from the other side
+    S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left;
     S.keeper.look = this.team.field.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
-    const kind = this.team.bowl.bowls;
-    const profile = this.rival.bat.ai;
+    const kind = bowler.bowl || this.team.bowl.bowls;
+    const profile = striker.ai;
     let field = this.currentField(ballNo);
     S.field3d = field.filter(f => !f.keeper && f.id !== 'bowler');
     S.weak = this.scouted && !opt.scripted ? profile.weak : null;
@@ -943,7 +1023,7 @@ export class Game {
     // the AI batter may power up
     this.aiBatPower = null; this.clash = false;
     const need = inn.target != null ? inn.target - inn.runs : Math.max(12, 48 - inn.runs); // batting first, the AI paces itself to a par score
-    if (!opt.scripted && this.aiPowerBalls.has(ballNo) && need / Math.max(1, inn.ballsLeft) > 1.0) {
+    if (!opt.scripted && this.aiPowerBalls.has(ballNo) && striker.id === this.rival.bat.id && need / Math.max(1, inn.ballsLeft) > 1.0) {
       this.aiPowerBalls.delete(ballNo);
       const k = this.rival.bat.power.kind;
       this.aiBatPower = k === 'meteor' ? 'thunder' : k;
@@ -998,7 +1078,7 @@ export class Game {
     S.aim = null; S.trail = []; this.bowlTrail = null;
 
     const words = { perfect: '#ffd23f', good: '#fff4da', loose: '#ff8a8a', bad: '#e8343b' };
-    const label = rg === 'bad' ? 'OVERSTEPPED!' : rg === 'loose' ? (G.hesitated ? 'HESITATED…' : 'SPRAYED IT!') : `${G.type.toUpperCase()}${rg === 'perfect' ? ' · PERFECT' : ''}`;
+    const label = rg === 'bad' ? 'OVERSTEPPED!' : rg === 'loose' ? (G.hesitated ? 'HESITATED…' : 'SPRAYED IT!') : `${G.type.toUpperCase()} · ${Math.round(G.kmh)} KM/H${rg === 'perfect' ? ' · PERFECT' : ''}`;
     this.fx.word(label, this.W / 2, this.H * 0.55, { size: rg === 'perfect' ? 38 : 30, color: words[rg], stroke: INK, rot: 0, dur: 1000 });
     if (rg === 'perfect') this.charge.award('perfectRelease', 'RELEASE');
     this.charge.timingStreak(rg === 'perfect');
@@ -1014,7 +1094,9 @@ export class Game {
     }
 
     // the delivery the swipe describes
-    const spec = { x: G.x, length: G.length, bounce: G.bounce, h: G.h, kmh: G.kmh, swing: G.swing, move: G.move, loop: G.loop };
+    const spec = { x: G.x, length: G.length, bounce: G.bounce, h: G.h, kmh: G.kmh, swing: G.swing, move: G.move, loop: G.loop, rx: btype.left ? -0.3 : 0.3 };
+    // a regular bowler's skill: weaker ones bowl a little looser
+    if (!bowler.hero && rg !== 'perfect' && rng.chance((85 - (bowler.bowlSkill || 75)) / 60)) spec.x = clamp(spec.x + rng.range(-0.08, 0.08), -0.8, 0.8);
     if (rg === 'loose') {
       spec.x = clamp(spec.x + rng.range(-0.18, 0.18), -0.8, 0.8);
       if (spec.bounce != null) { spec.bounce = clamp(spec.bounce + rng.range(-1.2, 1.2), 0.7, 11.5); spec.length = lengthForBounce(spec.bounce); spec.h = heightForBounce(spec.bounce); }
@@ -1074,7 +1156,7 @@ export class Game {
     }
     if (mood.balls > 0 && --mood.balls === 0) mood.state = 'calm';
 
-    let ai = aiBat(d, { ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
+    let ai = aiBat(d, { skill: striker.bat, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
@@ -1087,7 +1169,7 @@ export class Game {
     const cs = this.cams.bowl.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 3 };
     const outFree = () => { this.fx.word('FREE HIT · NOT OUT', this.W / 2, this.H * 0.4, { size: 40 }); };
     const freeHit = this.freeHit; this.freeHit = false;
-    const bowlerHero = this.team.bowl;
+    const bowlerHero = bowler.hero || this.team.bowl;
     const before = { runs: inn.runs, wkts: inn.wkts };
 
     if (res.outcome === 'hit' || res.outcome === 'edge') {
@@ -2029,13 +2111,13 @@ export class Game {
       let bx = S.bowler.x, bz = S.bowler.z;
       if (kind === 'bowl' && S.bowler.followT0 != null) {
         const p = clamp((this.realTime - S.bowler.followT0) / 600, 0, 1);
-        bx += 0.45 * p; bz -= 1.6 * p; // carries on down the pitch, veering away from the stumps
+        bx += (S.bowler.left ? -0.45 : 0.45) * p; bz -= 1.6 * p; // carries on down the pitch, veering away from the stumps
       }
       // facing the batting camera the bowler is the hand-drawn sprite, carrying on a stride after release
       if (kind === 'bat' && S.bowler.spr?.anim === 'deliver') bz -= 0.9 * clamp((this.gameTime - S.bowler.spr.t0) / 0.6, 0, 1);
       push(bz, () => {
         const view = kind === 'bat' ? 'front' : 'back', p = cam.project(bx, 0, bz);
-        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), kind === 'bat' ? this.oppTeam : this.myTeam, false, view)) return;
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), kind === 'bat' ? this.oppTeam : this.myTeam, !!S.bowler.left, view)) return;
         drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem });
       });
     }

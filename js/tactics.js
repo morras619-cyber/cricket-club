@@ -1,5 +1,7 @@
 // Bowling tactics: the one-swipe delivery gesture, reading the batter, and setup combos. Pure functions.
 
+import { BOWL_TYPES } from './squads.js';
+
 export const LENGTH_ORDER = ['bouncer', 'short', 'good', 'full', 'yorker', 'fulltoss'];
 export const LENGTH_LABEL = { bouncer: 'Bouncer', short: 'Short', good: 'Good length', full: 'Full', yorker: 'Yorker', fulltoss: 'Full toss' };
 
@@ -92,6 +94,24 @@ export function gestureToDelivery(points, kind, scale = 1) {
 
   const m = mag * 0.3;
   let kmh, swing, move, loop, type;
+  const T = BOWL_TYPES[kind];
+  if (T) {
+    // a real bowler type: its own speed range, and the curve picks the stock ball or the variation
+    kmh = T.kmh[0] + (T.kmh[1] - T.kmh[0]) * k;
+    if (T.spin) {
+      const stockDir = Math.sign(T.turn); // + = leg-break direction (turns toward the off side)
+      move = lateWorld * Math.max(m * 1.4, mag > 0.05 ? Math.abs(T.turn) * 0.6 : 0); swing = -lateWorld * m * 0.3; loop = 1.3;
+      type = lateWorld === 0 ? T.stock[0] : lateWorld === stockDir ? T.stock[0] : T.variation;
+      if (lateWorld === 0) move = T.turn * 0.35;
+      if (type === 'Arm ball') { move = 0.02; kmh += 6; loop = 0.9; }
+      if (type === 'Googly') loop = 1.5;
+    } else {
+      swing = -lateWorld * m * 0.9 * (T.swing / 0.2); move = lateWorld * m * 0.3 * (T.seam / 0.07); loop = 0.4;
+      type = lateWorld > 0 ? (T.swing >= T.seam ? 'Outswinger' : 'Leg-cutter') : lateWorld < 0 ? (T.swing >= T.seam ? 'Inswinger' : 'Off-cutter') : T.left ? 'Angled across' : 'Seam up';
+    }
+    if (slower) { kmh = T.kmh[0] * 0.8; loop = 1.1; type = T.spin ? 'Floater' : T.variation; }
+    return { x, length, bounce, h: heightForBounce(bounce), kmh, swing, move, loop, type, speedP: p, grade, slower, lateWorld, mag, curve, rx: T.left ? -0.3 : 0.3 };
+  }
   if (kind === 'spin') {
     kmh = 74 + 16 * k;
     move = lateWorld * m * 1.4; swing = -lateWorld * m * 0.3; loop = 1.3;

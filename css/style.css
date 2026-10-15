@@ -244,3 +244,29 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 /* inside another app's viewer (an iframe) the host already clears the notch */
 .embedded { --safe-t: 0px; }
+
+/* over-by-over bowler picker */
+.overpick { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(10, 8, 20, 0.55); pointer-events: auto; z-index: 30; }
+.overpick-card { width: min(380px, 100%); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.overpick-card h3 { margin: 0; font-family: var(--display); font-size: 28px; letter-spacing: 1px; }
+.overpick-sub { margin: 0 0 4px; font-size: 13px; opacity: 0.75; }
+.overpick-btn { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; text-align: left; padding: 10px 12px; border-radius: 14px; border: 3px solid var(--ink); background: #fff; color: var(--ink); box-shadow: 3px 3px 0 var(--ink); font: inherit; }
+.overpick-btn b { font-size: 17px; }
+.overpick-btn span { grid-column: 1; font-size: 13px; opacity: 0.8; }
+.overpick-btn small { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 12px; font-weight: 700; }
+.overpick-btn.star { background: #fff3c4; }
+.overpick-btn:disabled { opacity: 0.4; box-shadow: none; }
+.overpick-btn:not(:disabled):active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+
+/* hero unlocks and the team sheet */
+.hero.locked { background: #d9d4c6; }
+.hero.locked canvas { filter: grayscale(1) brightness(0.7); }
+.hero .unlock { margin-top: 2px; padding: 4px 8px; border-radius: 10px; background: var(--ink); color: var(--bolt); font-weight: 800; font-size: 13px; text-align: center; }
+.teamsheet { display: flex; flex-direction: column; gap: 10px; }
+.sheetnote { margin: 0; font-size: 13px; opacity: 0.8; }
+.sheetbox { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.sheetbox h3 { margin: 0 0 2px; }
+.sheetrow { display: flex; align-items: center; gap: 8px; }
+.sheetno { flex: 0 0 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--paper); font-family: var(--display); }
+.sheetrow select { flex: 1; min-width: 0; padding: 8px; border-radius: 10px; border: 2px solid var(--ink); background: #fff; color: var(--ink); font: inherit; font-size: 14px; }
+#squadCoins { white-space: nowrap; }
