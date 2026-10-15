@@ -185,11 +185,6 @@ function renderBackground(cam) {
       g.fillRect(p.x, p.y, sz * 1.4, sz);
     }
     quad(g, cam, -0.45, 0.45, 0, 20, 'rgba(160,110,50,0.18)');
-    for (const [x, z] of [[-0.35, 1.9], [0.32, 2.3], [0.15, 18.2], [-0.2, 17.8]]) {
-      const p = cam.project(x, 0, z);
-      if (!p) continue;
-      g.fillStyle = 'rgba(110,70,30,0.35)'; g.beginPath(); g.ellipse(p.x, p.y, 0.32 * p.k, 0.11 * p.k, 0.2, 0, Math.PI * 2); g.fill();
-    }
     g.restore();
   }
   quad(g, cam, -1.5, 1.5, -1.6, 21.6, null, 'rgba(20,16,24,0.55)');

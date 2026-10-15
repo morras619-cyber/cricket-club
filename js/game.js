@@ -1402,19 +1402,22 @@ export class Game {
     if (freeze) A.freeze = false;
     const tut = this.tutorialKeeper || {};
     const windowMs = (opt.window ?? tut.window ?? (elastic ? F.elasticWindow : F.keeperWindow)) * (opt.shatter ? 1.3 : 1);
-    const approach = opt.approach ?? tut.approach ?? (kind === 'edge' ? 700 : 820);
+    const approach = opt.approach ?? tut.approach ?? (kind === 'edge' ? 1050 : 1150);
     const to = { x: clamp(offset.x * 0.8, -1.05, 1.05), y: clamp(offset.y, 0.25, 1.3), z: -2.0 };
     const from = kind === 'edge' ? { x: S.batter.x + 0.35, y: 0.75, z: 1.1 } : { x: d.xt * 0.6, y: 0.5, z: 1.3 };
     const tapReach = elastic ? 0.95 : 0.45;
     const needSwipe = Math.abs(to.x - 0.3) > tapReach || to.y > 1.15;
     S.delivery = null; S.ball = null; S.flight = null;
     S.kball = { from, to, t0: this.realTime, dur: approach, done: false };
-    S.reticle = { ...to, needSwipe, elastic };
+    S.reticle = { ...to, needSwipe, elastic, t0: this.realTime, dur: approach };
     S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1], emblem: this.team.field.id === 'rani' ? this.team.field.emblem : null };
+    S.keeperGhost = true;
+    // clear leftover delivery text so nothing covers the target
+    this.fx.words = []; this.fx.bubbles = []; this.ui.clearBanner();
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
     this.fx.speed = 1;
     if (elastic) this.fx.word('BOING!', this.W * 0.5, this.H * 0.3, { size: 40, color: '#ffe14d', stroke: INK });
-    this.ui.hint(needSwipe ? 'SWIPE TO DIVE!' : 'TAP TO CATCH!');
+    this.ui.hint(needSwipe ? 'SWIPE ALONG THE ARROW AS THE RING CLOSES!' : 'TAP WHEN THE RING CLOSES!');
     sfx.whoosh();
 
     const arrive = S.kball.t0 + approach;
@@ -1447,7 +1450,7 @@ export class Game {
         else {
           const hs = cam.project(0.3, 0.55, -2.4), rs = cam.project(to.x, to.y, to.z);
           const want = Math.atan2(rs.y - hs.y, rs.x - hs.x), got = Math.atan2(input.dy, input.dx);
-          dirOk = angDiff(want, got) <= (elastic ? 45 : 30) * Math.PI / 180;
+          dirOk = angDiff(want, got) <= (elastic ? 60 : 45) * Math.PI / 180;
         }
       }
       if (input.isSwipe) S.keeper.pose = POSES.dive(Math.sign(input.dx || to.x || 1));
@@ -1458,18 +1461,21 @@ export class Game {
       else if (result === 'dropped') this.fx.word(err < 0 ? 'TOO EARLY!' : 'TOO LATE!', this.W / 2, this.H * 0.3, { size: 40 });
     }
     await this.until(() => this.realTime >= arrive);
+    S.keeperGhost = false;
     S.kball.done = result !== 'dropped';
     const hs = cam.project(to.x, to.y, to.z) || { x: this.W / 2, y: this.H / 2 };
 
     if (result === 'juggle') {
       sfx.glove();
-      this.fx.word('JUGGLE! TAP!', this.W / 2, this.H * 0.3, { size: 48, dur: F.rejuggleMs + 200 });
+      this.fx.word('JUGGLE! TAP AGAIN!', this.W / 2, this.H * 0.3, { size: 48, dur: F.rejuggleMs + 200 });
+      this.ui.hint('TAP ANYWHERE!');
       let tap = null;
       this.onInput = (type, g) => { if (type === 'down') tap = g; };
       if (this.bot) this.sleepReal(200).then(() => this.botInput('down')).catch(() => {});
       const t0 = this.realTime;
       await this.until(() => tap || this.realTime - t0 > F.rejuggleMs);
       this.onInput = null;
+      this.ui.hint(null);
       result = tap ? 'caught' : 'dropped';
     }
     this.fx.speed = 0;
@@ -1922,7 +1928,9 @@ export class Game {
     // keeper
     if (kind !== 'bat') {
       const k = S.keeper;
-      push(k.z, () => drawFigure3D(ctx, cam, k.x, k.z, k.look || AI_LOOK, k.pose, { back: kind === 'keeper', emblem: k.emblem }, 1.75));
+      // while the ball is coming the keeper is see-through, so the ball and target stay visible
+      const ghost = kind === 'keeper' && S.keeperGhost;
+      push(k.z, () => { if (ghost) ctx.globalAlpha = 0.3; drawFigure3D(ctx, cam, k.x, k.z, k.look || AI_LOOK, k.pose, { back: kind === 'keeper', emblem: k.emblem }, 1.75); ctx.globalAlpha = 1; });
     }
     // ball(s)
     const bp = this.ballPos();
@@ -2042,6 +2050,13 @@ export class Game {
     ctx.beginPath(); ctx.arc(s.x, s.y, 30 * pulse, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(s.x - 12, s.y); ctx.lineTo(s.x + 12, s.y); ctx.moveTo(s.x, s.y - 12); ctx.lineTo(s.x, s.y + 12); ctx.stroke();
+    // closing ring: act when it meets the target
+    const p = (this.realTime - R.t0) / R.dur;
+    if (p < 1.15) {
+      const near = Math.abs(1 - p) * R.dur <= F.keeperClean;
+      ctx.strokeStyle = near ? '#5dff8a' : '#ffd23f'; ctx.lineWidth = near ? 5 : 4;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 30 + Math.max(0, 1 - p) * 110, 0, Math.PI * 2); ctx.stroke();
+    }
     if (R.needSwipe) {
       const h = cam.project(0.3, 0.55, -2.4);
       if (h) {

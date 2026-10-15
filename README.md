@@ -23,7 +23,7 @@ Open it on a phone on the same network, or use desktop Chrome's device toolbar. 
 | Their field | While batting, the map in the top right shows the opposition's fielders. Tap it before the ball to see it full size with position names. |
 | Coin toss | Quick Match starts with a toss: call heads or tails; win it and choose to bat or bowl first. |
 | Banter | After a good ball, **Talk smack** or **Leave it**. Smack talk can rattle a batter (more mistakes) or fire him up (more aggressive, better timing). Leaving it earns Composure, sometimes Respect. When the opposition sledges you, answer with a dot/wicket (bowling) or a boundary (batting) for +10 REVENGE. |
-| Keeper Mode | Tap when the ball reaches the gloves, or swipe toward it to dive. A juggle needs a second tap. Stumpings need a swipe up. |
+| Keeper Mode | A yellow ring closes on the target (it turns green at the perfect moment): tap as it closes, or if an arrow shows, swipe along the arrow to dive. If you juggle it, tap again quickly. Stumpings need a swipe up. |
 | Outfield Mode | Catch: tap as the ring closes (swipe to dive if it's out of reach). Run-out: tap to pick up, then swipe at the stumps you want to hit. Rope save: swipe to dive. |
 | Powers | Tap a hero button when you have the Charge. Batting powers lock when the ball is bowled; bowling powers lock when you press BOWL. |
 
