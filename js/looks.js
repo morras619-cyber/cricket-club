@@ -281,7 +281,18 @@ function sheetMasks(key, p, w, h) {
   // only on the upper part of each figure: dark studs on the shoes can pass for hair too
   const upper = upperBody(p, w, h, 0.42);
   for (let q = 0; q < n; q++) if (byHair[q] && upper[q] && skin[q] && !hr[q] && !bat[q]) sk[q] = 1;
-  const careful = spread(sk, looseSkin, hr, 8);
+  let careful = spread(sk, looseSkin, hr, 8);
+  // fingertips and knuckles the fill didn't reach: small skin-toned pieces touching the skin
+  // (kit trim can be the same colours, but comes in long strips, and yellower)
+  if (!orangeSheet) {
+    const rest = new Uint8Array(n);
+    let batZone = bat;
+    for (let k = 0; k < 4; k++) batZone = morph(batZone, w, h, true); // not the bat handle either
+    for (let q = 0; q < n; q++) rest[q] = looseSkin[q] & (careful[q] ^ 1) & (hr[q] ^ 1) & (batZone[q] ^ 1);
+    const tips = smallTouching(rest, morph(careful, w, h, true), w, h, 120);
+    const ok = filterParts(tips, w, h, H, V, (area, hue) => hue <= 28);
+    for (let q = 0; q < n; q++) careful[q] |= ok[q];
+  }
   // vivid orange shading on the skin (the Phoenix sheet): small orange patches touching the skin
   // are part of it; big ones are the shirt and trousers
   // (reaching across a thin outline: the throat in the collar is cut off from the face by the chin line)
