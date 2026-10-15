@@ -1411,7 +1411,6 @@ export class Game {
     S.kball = { from, to, t0: this.realTime, dur: approach, done: false };
     S.reticle = { ...to, needSwipe, elastic, t0: this.realTime, dur: approach };
     S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1], emblem: this.team.field.id === 'rani' ? this.team.field.emblem : null };
-    S.keeperGhost = true;
     // clear leftover delivery text so nothing covers the target
     this.fx.words = []; this.fx.bubbles = []; this.ui.clearBanner();
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
@@ -1461,7 +1460,6 @@ export class Game {
       else if (result === 'dropped') this.fx.word(err < 0 ? 'TOO EARLY!' : 'TOO LATE!', this.W / 2, this.H * 0.3, { size: 40 });
     }
     await this.until(() => this.realTime >= arrive);
-    S.keeperGhost = false;
     S.kball.done = result !== 'dropped';
     const hs = cam.project(to.x, to.y, to.z) || { x: this.W / 2, y: this.H / 2 };
 
@@ -1928,9 +1926,7 @@ export class Game {
     // keeper
     if (kind !== 'bat') {
       const k = S.keeper;
-      // while the ball is coming the keeper is see-through, so the ball and target stay visible
-      const ghost = kind === 'keeper' && S.keeperGhost;
-      push(k.z, () => { if (ghost) ctx.globalAlpha = 0.3; drawFigure3D(ctx, cam, k.x, k.z, k.look || AI_LOOK, k.pose, { back: kind === 'keeper', emblem: k.emblem }, 1.75); ctx.globalAlpha = 1; });
+      push(k.z, () => drawFigure3D(ctx, cam, k.x, k.z, k.look || AI_LOOK, k.pose, { back: kind === 'keeper', emblem: k.emblem }, 1.75));
     }
     // ball(s)
     const bp = this.ballPos();

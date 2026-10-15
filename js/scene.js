@@ -17,7 +17,8 @@ export class Cam3D {
     } else if (this.kind === 'bowl') {
       Object.assign(this, { cx: 0.2, cy: 2.6, cz: 34, dir: -1, f: Math.min(H * 1.9, W * 4), hy: H * (portrait ? 0.36 : 0.3) });
     } else {
-      Object.assign(this, { cx: 0.55, cy: 1.7, cz: -7.6, dir: 1, f: Math.min(H * 0.85, W * 1.7), hy: H * (portrait ? 0.38 : 0.32) });
+      // high over-the-shoulder view so the keeper never hides the ball's path
+      Object.assign(this, { cx: 0.55, cy: 4.6, cz: -9, dir: 1, f: Math.min(H * 0.85, W * 1.7), hy: H * (portrait ? 0.28 : 0.22) });
     }
     this.bg = null;
   }
