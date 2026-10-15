@@ -209,7 +209,7 @@ export class Game {
     this.oppSide = resolveLineup(this.oppTeam.id, { bat: this.rival.bat, bowl: this.rival.bowl, field: null }, null);
     this.aiPlan = overPlan(this.oppSide.attack, CFG.balls / 6);
     loadBatSprites(this.myTeam.id, this.oppTeam.id);
-    loadBowlSprites(this.myTeam.id);
+    loadBowlSprites(this.myTeam.id, this.oppTeam.id);
     this.charge = new Charge(0);
     this.charge.on(ev => this.onCharge(ev));
     this.ui.charge(0);

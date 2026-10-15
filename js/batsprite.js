@@ -55,11 +55,22 @@ const atlases = new Map(); // team id -> { img, ready }
 export function loadBatSprites(...teamIds) {
   for (const id of teamIds) {
     if (!id || atlases.has(id)) continue;
-    const a = { img: new Image(), ready: false };
-    a.img.onload = () => { a.ready = true; };
-    a.img.src = `img/batter-${id}.webp`;
+    const a = { img: null, ready: false };
+    // retried a few times if the download fails, instead of cartoon batters all session
+    const load = (tries = 0) => {
+      a.img = new Image();
+      a.img.onload = () => { a.ready = true; a.failed = false; };
+      a.img.onerror = () => { a.failed = true; if (tries < 4) setTimeout(() => load(tries + 1), 800 * 2 ** tries); };
+      a.img.src = `img/batter-${id}.webp`;
+    };
+    load();
     atlases.set(id, a);
   }
+}
+
+// batter sheets not (yet) usable, for the pause screen
+export function batSpriteMissing() {
+  return [...atlases].filter(([, a]) => !a.ready).map(([id, a]) => `batter-${id}${a.failed ? ' (failed)' : ' (loading)'}`);
 }
 
 // a thumbnail of a team's batter in his ready stance, for the team picker

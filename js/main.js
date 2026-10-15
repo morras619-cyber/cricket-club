@@ -2,7 +2,8 @@ import { UI } from './ui.js';
 import { Game, pickRivals } from './game.js';
 import { SPARKS, heroById, heroesFor } from './heroes.js';
 import { TEAMS } from './teams.js';
-import { loadBowlSprites } from './bowlsprite.js';
+import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
+import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE } from './squads.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
@@ -295,7 +296,12 @@ async function startMatch(opts) {
   showResult(summary);
 }
 
-$('btnPause').addEventListener('pointerdown', e => { e.stopPropagation(); game.paused = true; ui.show('pause'); });
+$('btnPause').addEventListener('pointerdown', e => {
+  e.stopPropagation(); game.paused = true; ui.show('pause');
+  // which hand-drawn sheets are in use: helps tell a slow download from a phone out of memory
+  const st = spriteStatus(), miss = [...st.missing, ...batSpriteMissing()];
+  $('pauseInfo').textContent = miss.length ? `Drawings missing: ${miss.join(', ')}` : `All ${st.total} drawing sheets loaded`;
+});
 $('resumeBtn').addEventListener('click', () => { game.paused = false; $('pause').hidden = true; });
 $('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
 

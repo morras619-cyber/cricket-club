@@ -305,15 +305,41 @@ const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3
 
 const tinted = new Map();
 
-// the front sheet plus the back sheets of the teams in this match
+// Load one sheet. A failed download (a flaky connection, or a phone short of memory) is
+// retried a few times rather than leaving the plain cartoon figures for the whole session.
+function loadView(v, tries = 0) {
+  v.img = new Image();
+  v.failed = false;
+  v.img.onload = () => { v.ready = true; v.failed = false; };
+  v.img.onerror = () => {
+    v.failed = true;
+    if (tries < 4) setTimeout(() => { if (!v.ready) loadView(v, tries + 1); }, 800 * 2 ** tries);
+  };
+  v.img.src = v.src;
+}
+
+// the front sheets plus the back sheets of the teams in this match. Repainted copies for
+// teams that aren't playing are thrown away, so memory doesn't pile up match after match.
 export function loadBowlSprites(...teamIds) {
   for (const key of ['front', 'spin-front', 'spin-back', 'batfront', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.map(id => 'back-' + id)]) {
     const v = VIEWS[key];
-    if (!v || v.img) continue;
-    v.img = new Image();
-    v.img.onload = () => { v.ready = true; };
-    v.img.src = v.src;
+    if (!v || v.ready || (v.img && !v.failed)) continue;
+    loadView(v);
   }
+  if (teamIds.length >= 2) {
+    for (const [key, c] of tinted) {
+      if (teamIds.some(id => key.endsWith(id))) continue;
+      if (c instanceof HTMLCanvasElement) { c.width = 0; c.height = 0; } // frees the memory now on iOS
+      tinted.delete(key);
+    }
+  }
+}
+
+// What the sprite sheets are doing, for the pause screen: { ready, total, missing: [names] }
+export function spriteStatus() {
+  const used = Object.entries(VIEWS).filter(([, v]) => v.img);
+  const missing = used.filter(([, v]) => !v.ready).map(([k, v]) => `${k}${v.failed ? ' (failed)' : ' (loading)'}`);
+  return { ready: used.length - missing.length, total: used.length, missing, tinted: tinted.size };
 }
 
 // Which frame the bowler shows. spr: { anim: 'start'|'run'|'deliver'|'react'|'celebrate', p, t0 }
@@ -360,7 +386,9 @@ function sheetFor(view, team) {
   const c = document.createElement('canvas');
   c.width = atlas.naturalWidth; c.height = atlas.naturalHeight;
   const g = c.getContext('2d', { willReadFrequently: true });
-  g.drawImage(atlas, 0, 0);
+  // out of canvas memory (iPhones cap it): draw the sheet in its own colours rather than nothing
+  if (!g) { c.width = 0; c.height = 0; tinted.set(key, atlas); return atlas; }
+  try { g.drawImage(atlas, 0, 0); } catch { tinted.set(key, atlas); return atlas; }
   const img = g.getImageData(0, 0, c.width, c.height), p = img.data;
   const suit = hexHsv(team.suit), trim = hexHsv(team.trim), rs = hexHsv(SHEET.suit), rt = hexHsv(SHEET.trim);
   for (let i = 0; i < p.length; i += 4) {
