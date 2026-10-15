@@ -14,6 +14,7 @@ import { FX, INK } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { CutIn } from './cutin.js';
+import { loadBatSprites, drawBatSprite, shotAnim } from './batsprite.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -60,6 +61,7 @@ export class Game {
     this.of = new OutfieldView();
     this.fx = new FX();
     this.cutin = new CutIn();
+    loadBatSprites();
     this.timers = []; this.waiters = [];
     this.gameTime = 0; this.realTime = 0; this.lastNow = performance.now();
     this.powerFxUntil = 0; this.mapBig = false;
@@ -182,7 +184,7 @@ export class Game {
   freshScene() {
     return {
       ball: null, trail: [], maya: null, ring: null, delivery: null, ballT0: 0, flight: null, kball: null,
-      batter: { x: -0.5, z: 0.95, angle: -0.4, swingT0: null, look: null, emblem: null, glow: null },
+      batter: { x: -0.5, z: 0.95, angle: -0.4, swingT0: null, shot: null, look: null, emblem: null, glow: null },
       bowler: { x: 0.6, z: 27.5, pose: POSES.stand(), look: null },
       keeper: { x: 0, z: -2.4, pose: POSES.keeper(), look: AI_LOOK },
       stumps: { 0: null, 20: null }, stumpGlow: false, reticle: null, stance: null,
@@ -515,6 +517,7 @@ export class Game {
         if (tg < S.ballT0 + 0.15) { S.batter.angle = -0.4; return; }
         swing = { t: tg, dx: g.dx, dy: g.dy };
         S.batter.swingT0 = this.realTime;
+        S.batter.shot = { anim: shotAnim(swipeToShot(g.dx, g.dy, this.loftPx)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
     if (this.bot) this.botBat(d, S, fx, rng);
@@ -523,6 +526,8 @@ export class Game {
     await this.until(() => {
       const tb = this.gameTime - S.ballT0;
       if (fx.meteor && tb > d.tContact - 0.45) { this.timeScale = 0.35; this.fx.speed = 1; }
+      // no shot offered: shoulder arms as the ball arrives
+      if (!fx.meteor && !swing && !S.batter.shot && S.batter.angle > -2 && tb > d.tContact - 0.12) S.batter.shot = { anim: 'leave', t0: this.realTime, from: 'ready' };
       if (S.maya && this.bot && !S.maya.picked && tb > (d.bounceT ?? 0.3)) S.maya.picked = rng.chance(0.6) ? S.maya.real : -S.maya.real;
       return fx.meteor ? tap || tb > d.tContact + 0.25 : swing || tb > deadline;
     });
@@ -542,6 +547,7 @@ export class Game {
       grade = e <= 60 ? 'perfect' : e <= 130 ? 'good' : 'late';
       res = { outcome: 'hit', grade, meteorRuns: runs, angle: rng.range(-0.3, 0.3), loft: true, launchDeg: 36, v: 40, forced: { six: true } };
       S.batter.swingT0 = this.realTime;
+      S.batter.shot = { anim: 'drive', t0: this.realTime };
     } else if (S.maya && S.maya.picked !== S.maya.real) {
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
@@ -993,6 +999,7 @@ export class Game {
 
     await this.until(() => this.gameTime - S.ballT0 >= d.tContact);
     if (ai.res.outcome !== 'leave') S.batter.swingT0 = this.realTime;
+    S.batter.shot = { anim: ai.res.outcome === 'leave' ? 'leave' : shotAnim({ kind: 'drive', angle: ai.res.angle ?? 0 }), t0: this.realTime, from: 'ready' };
     const res = ai.res;
     const contact = d.pos(d.tContact);
     const cs = this.cams.bowl.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 3 };
@@ -1921,8 +1928,13 @@ export class Game {
       angle = lerp(-2.5, 2.4, p);
     }
     const batterBack = kind !== 'bowl';
-    if (b.anim === 'celebrate') push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.celebrate(), { back: batterBack, emblem: b.emblem, helmet: true }));
-    else push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow, helmet: true }));
+    if (b.anim === 'celebrate' && !batterBack) push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.celebrate(), { back: batterBack, emblem: b.emblem, helmet: true }));
+    else push(b.z, () => {
+      // seen from behind, the batter is the hand-drawn sprite; from the front (bowling view) the drawn figure
+      const p = batterBack && cam.project(b.x, 0, b.z);
+      if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) return;
+      drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow, helmet: true });
+    });
     // keeper
     if (kind !== 'bat') {
       const k = S.keeper;

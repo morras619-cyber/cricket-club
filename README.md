@@ -58,6 +58,7 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/banter.js` | Sledges, comebacks and compliments |
 | `js/game.js` | Match flow, ball sequences, fielding events, tutorial, rendering |
 | `js/scene.js`, `js/figure.js`, `js/fx.js` | Cameras, night stadium, cel-shaded figures, onomatopoeia and impact effects |
+| `js/batsprite.js`, `img/batter-raja.webp` | Hand-drawn batter frames seen from behind: one shot animation per swipe (drive, pull, cut, block, leave), recoloured for each hero |
 | `js/cutin.js` | The comic cut-in panel for signature powers |
 | `js/quality.js` | High/low graphics setting, picked from the device |
 | `js/ui.js`, `js/main.js` | HUD, menus, squad picker, results and sharing |
