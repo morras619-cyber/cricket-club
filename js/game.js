@@ -11,6 +11,7 @@ import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBou
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
 import { powerDiscount } from './progress.js';
+import { lookOf, faceCanvas } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName } from './squads.js';
@@ -187,7 +188,8 @@ export class Game {
   freshScene() {
     return {
       ball: null, trail: [], maya: null, ring: null, delivery: null, ballT0: 0, flight: null, kball: null,
-      batter: { x: -0.5, z: 0.95, angle: -0.4, swingT0: null, shot: null, look: null, emblem: null, glow: null },
+      // between balls (banners, the pitch report) the scene still shows your team's drawn batter
+      batter: { x: -0.5, z: 0.95, angle: -0.4, swingT0: null, shot: null, look: this.myTeam ? teamLook(this.myTeam) : null, team: this.myTeam?.id, emblem: null, glow: null },
       bowler: { x: 0.6, z: 27.5, pose: POSES.stand(), look: null },
       keeper: { x: 0, z: -2.4, pose: POSES.keeper(), look: AI_LOOK },
       stumps: { 0: null, 20: null }, stumpGlow: false, reticle: null, stance: null,
@@ -365,7 +367,7 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
-    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500);
+    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500, p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.oppTeam : this.myTeam, 64));
     await this.sleepReal(this.bot ? 60 : 1100);
   }
 
@@ -373,7 +375,7 @@ export class Game {
   async newBatter(inn) {
     const p = this.batterOf(inn);
     inn.setBatter(p);
-    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700);
+    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700, p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.myTeam : this.oppTeam, 64));
     await this.sleepReal(this.bot ? 60 : 1200);
   }
 
@@ -585,6 +587,7 @@ export class Game {
     const striker = this.batterOf(inn), bowler = this.bowlerOf(inn), btype = bowlType(bowler.bowl);
     S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = striker.hero?.emblem || null;
     S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
+    S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler); // their own skin and hair on the drawn sprites
     if (btype.left) S.bowler.x = -0.6;
     const rng = this.ballRng(ballNo);
     const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
@@ -1074,6 +1077,7 @@ export class Game {
     S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.myTeam); S.bowler.emblem = bowler.hero?.emblem || null;
     // right-arm over, a little wide of the stumps so the ball leaves his hand; left-armers from the other side
     S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
+    S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler);
     S.keeper.look = this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
     const kind = bowler.bowl || 'swing';
     const profile = striker.ai;
@@ -2191,9 +2195,9 @@ export class Game {
       push(bz, () => {
         const view = (S.bowler.spin ? 'spin-' : '') + (kind === 'bat' ? 'front' : 'back'), p = cam.project(bx, 0, bz);
         const team = kind === 'bat' ? this.oppTeam : this.myTeam, plain = kind === 'bat' ? 'front' : 'back';
-        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), team, !!S.bowler.left, view)) return;
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), team, !!S.bowler.left, view, S.bowler.people)) return;
         // never the plain cartoon while a hand-drawn bowler can be shown
-        if (p && view !== plain && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, plain), team, !!S.bowler.left, plain)) return;
+        if (p && view !== plain && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, plain), team, !!S.bowler.left, plain, S.bowler.people)) return;
         drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem });
       });
     }
@@ -2212,7 +2216,7 @@ export class Game {
       if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) return;
       // from the bowling camera, the opposing batter's hand-drawn front view
       const q = !batterBack && cam.project(b.x, 0, b.z);
-      if (q && drawBowlSprite(ctx, q.x, q.y, q.k, batFrame(b, this.realTime).f, this.oppTeam, false, 'batfront')) return;
+      if (q && drawBowlSprite(ctx, q.x, q.y, q.k, batFrame(b, this.realTime).f, this.oppTeam, false, 'batfront', b.people)) return;
       drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow, helmet: true });
     });
     // keeper

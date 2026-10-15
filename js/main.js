@@ -6,6 +6,7 @@ import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
 import { flag, nationName } from './nations.js';
+import { faceEl } from './looks.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
@@ -164,6 +165,17 @@ function heroStatLine(hero) {
   return hero.slot === 'field' ? null : 'No matches yet';
 }
 
+// a player's face (heroes keep their full portrait) beside his details
+const kitOf = p => (p.team ? teamById(p.team) : { suit: '#f3efe2', trim: '#3a3a4a' });
+function withFace(p, size, ...parts) {
+  const row = el('div', 'facerow'), txt = el('div');
+  const pic = p.heroId || (p.hero && typeof p.hero === 'object') ? portrait(heroById(p.heroId || p.hero.id), size, 'celebrate') : faceEl(p, kitOf(p), size);
+  pic.classList.add('face'); pic.style.width = pic.style.height = `${size}px`;
+  txt.append(...parts);
+  row.append(pic, txt);
+  return row;
+}
+
 // ---------- My Team: the team, its star, signings and the team sheet ----------
 const SLOTS = [['bat', 'Batting hero'], ['bowl', 'Bowling hero'], ['field', 'Fielding hero']];
 function heroCard(hero, { on, locked, note, onTap }) {
@@ -285,7 +297,7 @@ function teamSheet() {
   squadList.append(el('h3', '', 'The squad'));
   for (const p of roster(L.id)) {
     const r = el('div', 'squadrow');
-    r.append(el('b', '', flagName(p)), el('span', '', `${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · ${p.trait}`));
+    r.append(withFace(p, 44, el('b', '', flagName(p)), el('span', '', `${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · ${p.trait}`)));
     squadList.append(r);
   }
   wrap.append(
@@ -599,7 +611,7 @@ function careerAuction(c, body) {
     const card = el('div', 'panel paper lotcard');
     const shown = Math.min(A.lots.length, 16);
     card.append(el('div', 'eyebrow', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
-    if (p.heroId) card.append(portrait(heroById(p.heroId), 96, 'celebrate'));
+    card.append(p.heroId ? portrait(heroById(p.heroId), 96, 'celebrate') : faceEl(p, kitOf(p), 96));
     card.append(el('h3', '', pname(p)),
       el('p', 'lotmeta', `${flag(p)} ${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).name}` : ''} · age ${p.age} (${ageNote(p)})`),
       el('div', 'lotnums', ''));
@@ -695,9 +707,9 @@ function careerSquad(c, body) {
   for (const p of [...pool].sort((a, b) => ovr(b) - ovr(a))) {
     const r = el('div', 'squadrow');
     const s = p.stats.season;
-    r.append(el('b', '', `${pname(p)} · ${ovr(p)}`),
+    r.append(withFace(p, 48, el('b', '', `${pname(p)} · ${ovr(p)}`),
       el('span', '', `${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · age ${p.age} · potential ${stars(potentialStars(p))} · ${p.contract} season${p.contract === 1 ? '' : 's'} left`),
-      el('span', '', `${p.ability ? `⭐ ${ABILITIES[p.ability].name} · ` : ''}This season: ${s.runs} runs, ${s.wkts} wkts · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`));
+      el('span', '', `${p.ability ? `⭐ ${ABILITIES[p.ability].name} · ` : ''}This season: ${s.runs} runs, ${s.wkts} wkts · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`)));
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
       rel.addEventListener('click', () => {
@@ -744,10 +756,17 @@ function renderRecords() {
     const b = el('div', 'panel paper statcard');
     b.append(el('h3', '', title));
     if (!rows.length) b.append(el('p', 'sheetnote', 'Nothing yet: play a season.'));
-    rows.forEach((r, i) => { const d = el('div', 'kotie'); d.append(el('b', '', `${i + 1}.`), el('span', '', r)); b.append(d); });
+    rows.forEach((r, i) => {
+      const d = el('div', 'kotie');
+      d.append(el('b', '', `${i + 1}.`));
+      if (r && typeof r === 'object') { if (r.p) d.append(r.p.heroId ? portrait(heroById(r.p.heroId), 28, 'celebrate') : faceEl(r.p, kitOf(r.p), 28)); d.append(el('span', '', r.text)); }
+      else d.append(el('span', '', r));
+      const pic = d.querySelector('canvas'); if (pic) { pic.classList.add('face'); pic.style.width = pic.style.height = '28px'; }
+      b.append(d);
+    });
     return b;
   };
-  const top = (scope, key, fmtRow, n = 5) => leaders(c, scope, key, n).filter(p => p.stats[scope][key === 'hs' ? 'hs' : key] > 0).map(fmtRow);
+  const top = (scope, key, fmtRow, n = 5) => leaders(c, scope, key, n).filter(p => p.stats[scope][key === 'hs' ? 'hs' : key] > 0).map(p => ({ p, text: fmtRow(p) }));
   if (c.phase === 'season' || c.phase === 'done') {
     body.append(board(`Season ${c.season} · most runs`, top('season', 'runs', p => `${fname(p)} (${team(p)}) · ${p.stats.season.runs}`)));
     body.append(board(`Season ${c.season} · most wickets`, top('season', 'wkts', p => `${fname(p)} (${team(p)}) · ${p.stats.season.wkts}`)));
@@ -755,8 +774,8 @@ function renderRecords() {
   body.append(board('All-time most runs', top('all', 'runs', p => `${fname(p)} (${team(p)}) · ${p.stats.all.runs} in ${p.stats.all.m} matches`, 10)));
   body.append(board('All-time most wickets', top('all', 'wkts', p => `${fname(p)} (${team(p)}) · ${p.stats.all.wkts}${p.stats.all.bb ? ` · best ${p.stats.all.bb.w}/${p.stats.all.bb.r}` : ''}`, 10)));
   body.append(board('Most sixes', top('all', 'sixes', p => `${fname(p)} (${team(p)}) · ${p.stats.all.sixes}`)));
-  body.append(board('Highest scores', c.records.hs.slice(0, 10).map(r => `${fname(c.players[r.pid])} · ${r.runs}${r.out ? '' : '*'} (${r.balls}) · ${teamById(r.team || 'thunder').name} · S${r.season}`)));
-  body.append(board('Best bowling', c.records.bb.slice(0, 10).map(r => `${fname(c.players[r.pid])} · ${r.w}/${r.r} · ${teamById(r.team || 'thunder').name} · S${r.season}`)));
+  body.append(board('Highest scores', c.records.hs.slice(0, 10).map(r => ({ p: c.players[r.pid], text: `${fname(c.players[r.pid])} · ${r.runs}${r.out ? '' : '*'} (${r.balls}) · ${teamById(r.team || 'thunder').name} · S${r.season}` }))));
+  body.append(board('Best bowling', c.records.bb.slice(0, 10).map(r => ({ p: c.players[r.pid], text: `${fname(c.players[r.pid])} · ${r.w}/${r.r} · ${teamById(r.team || 'thunder').name} · S${r.season}` }))));
   const clubs = TEAMS.map(t => ({ t, titles: c.titles[t.id] || 0, finals: c.history.filter(h => h.runnerUp === t.id).length })).sort((a, b) => b.titles - a.titles || b.finals - a.finals);
   body.append(board('Most Super League titles', clubs.filter(x => x.titles || x.finals).map(x => `${x.t.name} · ${x.titles} title${x.titles === 1 ? '' : 's'}${x.finals ? `, ${x.finals} runner-up` : ''}`)));
   body.append(board('Season by season', c.history.map(h => `S${h.season}: ${teamById(h.champion).name} champions · you: ${teamById(h.club).name} (${ordinal(h.pos)})${h.orange ? ` · most runs ${playerName(c, h.orange.pid)} ${h.orange.runs}` : ''}`)));

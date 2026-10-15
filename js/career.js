@@ -11,6 +11,7 @@ import { HEROES, heroById } from './heroes.js';
 import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating, WEAK, BOWL_TYPES } from './squads.js';
 import { newLeague, advance, playerResult, table, finish } from './tournament.js';
 import { NATIONS, pickNation } from './nations.js';
+import { randomLook } from './looks.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -109,7 +110,7 @@ export function youthIntake(c, rng, n) {
     const p = newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), role, label, bat, bowl, bowlSkill,
       trait: pot >= 86 ? 'Academy wonderkid' : 'Academy graduate', hero: false,
       ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
-    { age: rng.int(17, 20), pot, team: null, contract: 0, youth: true });
+    { age: rng.int(17, 20), pot, team: null, contract: 0, youth: true, app: randomLook(nation, rng) });
     c.players[id] = p;
     out.push(p);
   }

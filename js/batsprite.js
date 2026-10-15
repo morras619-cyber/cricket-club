@@ -1,3 +1,4 @@
+import { peopleSheet } from './looks.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
 // tools/build_batter_sprites.py, so a single frame table serves every team.
@@ -111,7 +112,7 @@ function drawOne(ctx, img, name, px, py, k, alpha) {
 export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   const atlas = atlases.get(b.team);
   if (!atlas || !atlas.ready) return false;
-  const img = atlas.img;
+  const img = peopleSheet(atlas.img, `bat-${b.team}`, b.people); // the batter's own skin and hair
   const k = kPerM * REF_HEIGHT_M / REF_HEIGHT_PX;
   const { f, prev, a = 1 } = batFrame(b, now);
   ctx.save();

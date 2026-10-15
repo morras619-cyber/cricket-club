@@ -128,3 +128,18 @@ test('every club has its own home ground and pitch, and pitches change how the b
   const f = nextFixture(s);
   assert.ok([s.team, f.opp].includes(f.home));
 });
+
+test('every squad player has his own look; youngsters get one that fits their country', async () => {
+  const { hasOwnLook, lookOf, randomLook, SKIN, HAIR, BEARDS } = await import('../js/looks.js');
+  for (const t of TEAMS) for (const p of roster(t.id)) {
+    assert.ok(hasOwnLook(p.id), p.id);
+    const l = lookOf(p);
+    assert.ok(SKIN[l.skin] && HAIR[l.hair] && BEARDS.includes(l.beard), p.id);
+  }
+  const looks = new Set(TEAMS.flatMap(t => roster(t.id).map(p => JSON.stringify(lookOf(p)))));
+  assert.ok(looks.size > 50, 'plenty of different looks');
+  assert.deepEqual(lookOf({ id: 'y3-9', nation: 'ZA' }), lookOf({ id: 'y3-9', nation: 'ZA' }));
+  const { makeRng } = await import('../js/rng.js');
+  const r = makeRng(1);
+  for (let i = 0; i < 50; i++) assert.notEqual(randomLook('EN', r).style, 'bald');
+});

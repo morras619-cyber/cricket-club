@@ -303,6 +303,7 @@ const SPIN_CYCLE = ['run1', 'run2'];
 // after release (ms of game time): release, follow-through, then he stands and watches
 const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3', 170], ['finish', Infinity]];
 
+import { peopleSheet } from './looks.js';
 const tinted = new Map();
 
 // Load one sheet. A failed download (a flaky connection, or a phone short of memory) is
@@ -407,7 +408,8 @@ function sheetFor(view, team) {
 }
 
 // Draw a frame with its feet at (px, py); kPerM is pixels per metre at that depth. False until loaded.
-export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, view = 'front') {
+// look: the player's skin and hair (looks.js), repainted onto the drawn sheet
+export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, view = 'front', look = null) {
   // a spinner frame the spin sheets don't have, or a spin sheet still loading, comes from the
   // pace bowler's sheet (mapping the spinner's frame names onto his)
   if (view.startsWith('spin') && (!VIEWS[view]?.ready || !VIEWS[view].frames[frame])) {
@@ -417,7 +419,7 @@ export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, vi
   if (view === 'back') view = 'back-' + (team?.id || 'thunder');
   const v = VIEWS[view];
   if (!v || !v.ready || !v.frames[frame]) return false;
-  const img = sheetFor(view, team);
+  const img = peopleSheet(sheetFor(view, team), `${view}-${team?.id}`, look);
   const [sx, sy, w, h, ax, ay, s] = v.frames[frame];
   const k = kPerM * REF_HEIGHT_M / v.refPx * s;
   ctx.save();

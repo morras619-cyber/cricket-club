@@ -360,3 +360,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .bigbtn:disabled { opacity: .45; box-shadow: none; }
 .squadrow .chipbtn { align-self: flex-start; margin-top: 4px; }
 .venue { font-weight: 800 !important; color: #6a22c4; }
+
+/* player faces */
+.banner-face { display: flex; justify-content: center; margin-bottom: 6px; }
+.banner-face[hidden] { display: none; }
+.banner-face canvas { width: 64px; height: 64px; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 3px 3px 0 var(--ink); }
+canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
+.lotcard canvas.face { width: 96px; height: 96px; border-radius: 16px; box-shadow: 3px 3px 0 var(--ink); }
+.facerow { display: flex; gap: 10px; align-items: center; }
+.facerow > div { display: flex; flex-direction: column; min-width: 0; }
+.kotie canvas.face { width: 28px !important; height: 28px !important; border-width: 2px; border-radius: 8px; align-self: center; }
