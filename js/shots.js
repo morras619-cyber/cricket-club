@@ -10,13 +10,13 @@ export function gradeTiming(errMs, w, offSideBall = true) {
 }
 
 // Screen swipe (px, y down) → shot. angle: 0 = straight back past the bowler,
-// +π/2 = square on the off side, −π/2 = square on the leg side.
+// +π/2 = square on the off side, −π/2 = square on the leg side, ±π = straight behind
+// (over the keeper). Every direction is a shot: swiping down plays behind the wicket.
 export function swipeToShot(dx, dy, loftPx = 110) {
   const len = Math.hypot(dx, dy);
   if (len < 28) return { kind: 'block', angle: 0, loft: false, len };
   const angle = Math.atan2(dx, -dy);
-  if (Math.abs(angle) > 2.65) return { kind: 'leave', angle, loft: false, len };
-  return { kind: 'drive', angle: Math.max(-2.5, Math.min(2.5, angle)), loft: len > loftPx, len };
+  return { kind: 'drive', angle, loft: len > loftPx, len };
 }
 
 const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };
@@ -61,6 +61,23 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng }) {
   let label = '';
 
   if (d.length === 'yorker' && grade !== 'perfect') power *= 0.6;
+
+  // behind the wicket: glances and late cuts use the bowler's pace; the scoop over the
+  // keeper needs good timing or it's gloved through or skied
+  const timed = grade === 'perfect' || grade === 'good';
+  if (Math.abs(shot.angle) > Math.PI / 2) {
+    power *= 0.9;
+    if (Math.abs(shot.angle) > 2.7) {
+      label = 'SCOOP';
+      if (!timed) {
+        if (rng.chance(0.5)) return { outcome: 'edge', grade: 'edge', label: 'GLOVED IT', offset: { x: rng.range(-0.4, 0.6), y: rng.range(0.5, 1.2) } };
+        loft = true; power = 0.4; launchDeg = 58 + rng.range(0, 14); label = 'TOP EDGE';
+      } else { loft = true; launchDeg = 24 + rng.range(0, 8); power = grade === 'perfect' ? 0.78 : 0.68; } // usually four, sometimes six
+    } else {
+      label = shot.angle < 0 ? (loft ? 'OVER FINE LEG' : 'LEG GLANCE') : (loft ? 'OVER THIRD MAN' : 'LATE CUT');
+      if (loft) power *= 0.93; // the rope is closer behind square
+    }
+  }
   if (isAgainstLine(shot.angle, d)) {
     power *= 0.7;
     label = 'AGAINST THE LINE';

@@ -576,6 +576,7 @@ export class Game {
     const cs = this.cams.bat.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 2 };
     if (res.outcome === 'hit' || res.outcome === 'edge') {
       this.contactFeedback(grade, cs, err);
+      if (res.label) this.fx.word(res.label, this.W / 2, this.H * 0.4, { size: 30, color: '#fff4da', stroke: INK, rot: 0, dur: 1100 });
       if (res.outcome === 'hit') this.hitBlast(cs, fx.meteor ? 'meteor' : fx.thunder ? 'thunder' : fx.mirror ? 'mirror' : null, grade);
       if (res.outcome === 'hit' && (grade === 'perfect' || grade === 'good')) {
         this.charge.award(grade === 'perfect' ? 'perfectBat' : 'goodBat', grade.toUpperCase());

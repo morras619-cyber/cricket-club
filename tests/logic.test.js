@@ -59,7 +59,10 @@ test('swipe mapping', () => {
   assert.ok(Math.abs(drive.angle) < 0.01);
   assert.equal(drive.loft, true);
   assert.ok(swipeToShot(80, 0).angle > 1.5); // swipe right = off side
-  assert.equal(swipeToShot(0, 100).kind, 'leave');
+  // swiping down plays behind the wicket: down-left fine leg, down-right third man, straight down a scoop
+  assert.equal(swipeToShot(0, 100).kind, 'drive');
+  assert.ok(Math.abs(swipeToShot(0, 100).angle) > 3);
+  assert.ok(swipeToShot(-70, 70).angle < -2 && swipeToShot(70, 70).angle > 2);
 });
 
 test('deliveries arrive on time and stumps detection works', () => {
