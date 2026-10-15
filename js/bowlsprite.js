@@ -193,7 +193,35 @@ const BAT_FRONT = {
   cut3: [637, 599, 254, 265, 151.0, 264, 1.053],
   bowled: [0, 873, 170, 256, 88.5, 255, 1.1],
 };
+// wicket-keeper (tools/build_keeper_sprites.py): back view for keeper mode, front view seen
+// from the bowling camera. name: [x, y, w, h, anchorX, anchorY, helmet width px]
+const KEEPER_BACK = {
+  ready: [0, 0, 246, 238, 122.5, 237, 49],
+  rise: [248, 0, 244, 296, 121.5, 295, 49],
+  waist: [494, 0, 251, 277, 125.0, 276, 49],
+  high: [0, 298, 284, 327, 141.5, 326, 44],
+  diveL: [286, 298, 577, 186, 288.5, 185, 51],
+  diveR: [0, 627, 538, 191, 269.0, 190, 48],
+  juggle: [540, 627, 301, 280, 150.0, 279, 49],
+  stump: [0, 909, 394, 272, 147.5, 271, 51],
+  celebrate: [396, 909, 329, 328, 146.5, 327, 47],
+};
+const KEEPER_FRONT = {
+  ready: [0, 0, 276, 238, 137.5, 237, 48],
+  rise: [278, 0, 269, 301, 134.0, 300, 49],
+  waist: [549, 0, 269, 296, 134.0, 295, 47],
+  high: [0, 303, 295, 326, 147.0, 325, 43],
+  diveL: [297, 303, 583, 185, 291.5, 184, 49],
+  diveR: [0, 631, 577, 184, 288.5, 183, 50],
+  juggle: [579, 631, 320, 289, 159.5, 288, 50],
+  stump: [0, 922, 399, 282, 159.5, 281, 52],
+  celebrate: [401, 922, 357, 308, 178.5, 307, 52],
+};
+const HELMET_M = 0.24;  // helmet width in metres sets each keeper frame's scale
+
 const VIEWS = {
+  'keeper-back': { src: 'img/keeper-back.webp', frames: KEEPER_BACK },
+  'keeper-front': { src: 'img/keeper-front.webp', frames: KEEPER_FRONT },
   front: { src: 'img/bowler.webp', frames: FRONT, refPx: 323 },
   // the ready stance is 1.72 m tall, as for the back-view batter
   batfront: { src: 'img/batter-front.webp', frames: BAT_FRONT, refPx: Math.round(291 * 1.081 * 1.85 / 1.72) },
@@ -209,7 +237,7 @@ const tinted = new Map();
 
 // the front sheet plus the back sheets of the teams in this match
 export function loadBowlSprites(...teamIds) {
-  for (const key of ['front', 'batfront', ...teamIds.map(id => 'back-' + id)]) {
+  for (const key of ['front', 'batfront', 'keeper-back', 'keeper-front', ...teamIds.map(id => 'back-' + id)]) {
     const v = VIEWS[key];
     if (!v || v.img) continue;
     v.img = new Image();
@@ -290,6 +318,24 @@ export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, vi
   ctx.fillStyle = 'rgba(10,8,20,0.26)';
   ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
   ctx.translate(px, py);
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(img, sx, sy, w, h, -ax * k, -ay * k, w * k, h * k);
+  ctx.restore();
+  return true;
+}
+
+// The keeper, feet (or the lowest point of a dive) at (px, py). lift raises a dive off the
+// ground, in metres. False until the sheet has loaded.
+export function drawKeeperSprite(ctx, px, py, kPerM, frame, team, view, { flip = false, lift = 0 } = {}) {
+  const key = 'keeper-' + view, v = VIEWS[key];
+  if (!v || !v.ready) return false;
+  const img = sheetFor(key, team);
+  const [sx, sy, w, h, ax, ay, hw] = v.frames[frame];
+  const k = kPerM * HELMET_M / hw;
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,8,20,0.26)';
+  ctx.beginPath(); ctx.ellipse(px, py, (frame.startsWith('dive') ? 1.1 : 0.55) * kPerM, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.translate(px, py - lift * kPerM);
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(img, sx, sy, w, h, -ax * k, -ay * k, w * k, h * k);
   ctx.restore();

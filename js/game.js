@@ -16,7 +16,7 @@ import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D,
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
-import { loadBowlSprites, drawBowlSprite, bowlFrame } from './bowlsprite.js';
+import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite } from './bowlsprite.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -1027,6 +1027,7 @@ export class Game {
     } else {
       await this.until(() => this.gameTime - S.ballT0 >= (res.outcome === 'bowled' ? d.tStumps : d.tKeeper - 0.05));
       S.delivery = null;
+      if (res.outcome !== 'bowled') S.keeper.frame = (d.pos(d.tKeeper)?.y ?? 0.6) > 1.25 ? 'high' : 'waist';
     }
 
     const wicket = (text, kind2, hero, extra = {}) => {
@@ -1035,6 +1036,7 @@ export class Game {
       this.charge.award('wicket', 'WICKET');
       this.wicketFx(text, cs);
       S.bowler.spr = { anim: 'celebrate', t0: this.realTime };
+      S.keeper.frame = 'celebrate'; S.keeper.dx = 0; S.keeper.lift = 0;
       this.addMoment(kind2, text, extra.word || text, hero, { ballNo, ...extra });
     };
 
@@ -1470,8 +1472,17 @@ export class Game {
           dirOk = angDiff(want, got) <= (elastic ? 60 : 45) * Math.PI / 180;
         }
       }
-      if (input.isSwipe) S.keeper.pose = POSES.dive(Math.sign(input.dx || to.x || 1));
-      else S.keeper.pose = POSES.keeper([to.x * 30, -to.y * 20]);
+      if (input.isSwipe) {
+        S.keeper.pose = POSES.dive(Math.sign(input.dx || to.x || 1));
+        // launch towards the ball: the dive frame is drawn centred on the body, gloves out front
+        const left = input.dx < 0;
+        S.keeper.frame = left ? 'diveL' : 'diveR';
+        S.keeper.dx = left ? Math.min(0, to.x + 1.15 - S.keeper.x) : Math.max(0, to.x - 1.15 - S.keeper.x);
+        S.keeper.lift = Math.max(0, to.y - 0.45);
+      } else {
+        S.keeper.pose = POSES.keeper([to.x * 30, -to.y * 20]);
+        S.keeper.frame = to.y > 1.0 ? 'high' : 'waist';
+      }
       if (dirOk && Math.abs(err) <= F.keeperClean) result = 'caught';
       else if (dirOk && Math.abs(err) <= windowMs / 2) result = 'juggle';
       if (!dirOk) this.fx.word('WRONG WAY!', this.W / 2, this.H * 0.3, { size: 40 });
@@ -1483,6 +1494,7 @@ export class Game {
 
     if (result === 'juggle') {
       sfx.glove();
+      S.keeper.frame = 'juggle'; S.keeper.dx = 0; S.keeper.lift = 0;
       this.fx.word('JUGGLE! TAP AGAIN!', this.W / 2, this.H * 0.3, { size: 48, dur: F.rejuggleMs + 200 });
       this.ui.hint('TAP ANYWHERE!');
       let tap = null;
@@ -1493,6 +1505,7 @@ export class Game {
       this.onInput = null;
       this.ui.hint(null);
       result = tap ? 'caught' : 'dropped';
+      if (tap) S.keeper.frame = 'waist';
     }
     this.fx.speed = 0;
     if (result === 'caught') {
@@ -1509,7 +1522,12 @@ export class Game {
       return 'dropped';
     }
 
-    if (kind !== 'stumping') { await this.sleepReal(this.bot ? 100 : 800); this.phase = 'bowl'; return 'caught'; }
+    if (kind !== 'stumping') {
+      await this.sleepReal(this.bot ? 100 : 300);
+      S.keeper.frame = 'celebrate'; S.keeper.dx = 0; S.keeper.lift = 0;
+      await this.sleepReal(this.bot ? 0 : 500);
+      this.phase = 'bowl'; return 'caught';
+    }
 
     // stumping: swipe up toward the stumps
     S.stumpGlow = true;
@@ -1526,6 +1544,8 @@ export class Game {
     if (ok) {
       const fast = sw.t - t0 < 200;
       S.stumps[0] = { dir: 0.3 };
+      S.keeper.frame = 'stump'; S.keeper.dx = 0; S.keeper.lift = 0;
+      this.sleepReal(this.bot ? 0 : 450).then(() => { S.keeper.frame = 'celebrate'; }).catch(() => {});
       sfx.stumps(); this.hitStop(fast ? 160 : 80);
       this.fx.word('STUMPED!', this.W / 2, this.H * 0.3, { size: fast ? 80 : 66, color: '#fff4da', stroke: '#e8343b' });
       await this.sleepReal(this.bot ? 100 : 1000);
@@ -1962,7 +1982,20 @@ export class Game {
     // keeper
     if (kind !== 'bat') {
       const k = S.keeper;
-      push(k.z, () => drawFigure3D(ctx, cam, k.x, k.z, k.look || AI_LOOK, k.pose, { back: kind === 'keeper', emblem: k.emblem }, 1.75));
+      let frame = k.frame;
+      if (!frame) {
+        // crouched, rising as the ball gets near
+        const near = kind === 'keeper' ? S.kball && (this.realTime - S.kball.t0) / S.kball.dur > 0.45
+          : S.delivery && this.gameTime - S.ballT0 > S.delivery.tKeeper - 0.4;
+        frame = near ? 'rise' : 'ready';
+      }
+      const kx = k.x + (k.dx || 0);
+      push(k.z, () => {
+        const p = cam.project(kx, 0, k.z);
+        // the stumping reach is drawn to his right; from behind, the stumps are on his left
+        if (p && drawKeeperSprite(ctx, p.x, p.y, p.k, frame, this.myTeam, kind === 'keeper' ? 'back' : 'front', { flip: kind === 'keeper' && frame === 'stump', lift: k.lift || 0 })) return;
+        drawFigure3D(ctx, cam, k.x, k.z, k.look || AI_LOOK, k.pose, { back: kind === 'keeper', emblem: k.emblem }, 1.75);
+      });
     }
     // ball(s)
     const bp = this.ballPos();
