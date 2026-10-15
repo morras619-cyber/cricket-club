@@ -832,7 +832,10 @@ export class Game {
       dStop = { x: miss.point.x - dx / L * s, y: miss.point.y - dy / L * s };
     }
     let missSaid = false;
-    const dur = Math.max(0.8, end + 0.6, miss ? miss.t + 1.5 : 0);
+    // the replay lasts until the batters have made their ground (for a boundary they cross once)
+    const legs = runs >= 4 ? 1 : runs;
+    const runTime = legs ? CFG.running.first + CFG.running.next * (legs - 1) + 0.3 : 0;
+    const dur = Math.max(0.8, end + 0.6, miss ? miss.t + 1.5 : 0, runTime);
     this.timeScale = 1.6;
     const t0 = this.gameTime;
     let said = false;
@@ -858,7 +861,9 @@ export class Game {
       }
       if (t >= end && A && (o.caught || sim.intercept)) { b.x = A.x; b.y = A.y; b.h = o.caught ? 1.6 : 0.3; }
       this.O.ball = b;
-      this.runBatters(t, runs);
+      this.runBatters(t, legs);
+      // once the ball is dealt with, hurry through the rest of the running
+      this.timeScale = t > end + 0.6 ? 2.6 : 1.6;
       this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : [])]);
       if (!said && t >= end && (!D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read
         said = true;
