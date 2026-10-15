@@ -167,6 +167,30 @@ function fillHoles(m, w, h, maxArea) {
     if (!open && pix.length < maxArea) for (const j of pix) m[j] = 1;
   }
 }
+// 1 where a pixel lies in the top `share` of its figure (each separate drawing on the sheet)
+function upperBody(p, w, h, share) {
+  const n = w * h, seen = new Int32Array(n).fill(-1), out = new Uint8Array(n), stack = [], pix = [];
+  for (let i = 0; i < n; i++) {
+    if (p[i * 4 + 3] < 70 || seen[i] >= 0) continue;
+    pix.length = 0; let top = h, bot = 0;
+    stack.push(i); seen[i] = i;
+    while (stack.length) {
+      const j = stack.pop(); pix.push(j);
+      const y = (j / w) | 0, x = j - y * w;
+      if (y < top) top = y; if (y > bot) bot = y;
+      // 2-pixel reach, so a figure split by a thin gap stays one figure
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const yy = y + dy, xx = x + dx;
+        if (yy < 0 || yy >= h || xx < 0 || xx >= w) continue;
+        const k = yy * w + xx;
+        if (seen[k] < 0 && p[k * 4 + 3] >= 70) { seen[k] = i; stack.push(k); }
+      }
+    }
+    const lim = top + (bot - top) * share;
+    for (const j of pix) if ((j / w | 0) <= lim) out[j] = 1;
+  }
+  return out;
+}
 function sheetMasks(key, p, w, h) {
   if (masks.has(key)) return masks.get(key);
   const n = w * h, skin = new Uint8Array(n), hair = new Uint8Array(n), H = new Float32Array(n), V = new Float32Array(n);
@@ -182,7 +206,7 @@ function sheetMasks(key, p, w, h) {
     if (mx < 64) ink[q] = 1; // the black outlines
     // skin is outlined and shaded with dark red-brown strokes, not pure black
     if (d && mx < 105 && d / mx > 0.45) { const h0 = ((mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360; if (h0 <= 45 || h0 >= 340) darkWarm[q] = 1; }
-    if (d && mx >= 8 && mx < 80 && d / mx > 0.4) { const h0 = ((mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360; if (h0 >= 8 && h0 <= 40) darkBrown[q] = 1; }
+    if (d && mx >= 8 && mx < 80 && d / mx > 0.4) { const h0 = ((mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360; if (h0 <= 40 || h0 >= 345) darkBrown[q] = 1; } // dark brown and reddish-black hair
     if (!d || mx < 30) continue;
     const s = d / mx, v = mx / 255;
     let hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
@@ -253,8 +277,10 @@ function sheetMasks(key, p, w, h) {
   let byHair = hr.slice();
   if (!orangeSheet) for (let q = 0; q < n; q++) if (darkBrown[q]) byHair[q] = 1;
   byHair = open(byHair, w, h, 2); // solid dark areas only, not the thin warm strokes along arms
-  for (let k = 0; k < 6; k++) byHair = morph(byHair, w, h, true);
-  for (let q = 0; q < n; q++) if (byHair[q] && skin[q] && !hr[q] && !bat[q]) sk[q] = 1;
+  for (let k = 0; k < 10; k++) byHair = morph(byHair, w, h, true); // a turned head's cheek sits a few pixels below
+  // only on the upper part of each figure: dark studs on the shoes can pass for hair too
+  const upper = upperBody(p, w, h, 0.42);
+  for (let q = 0; q < n; q++) if (byHair[q] && upper[q] && skin[q] && !hr[q] && !bat[q]) sk[q] = 1;
   const careful = spread(sk, looseSkin, hr, 8);
   // vivid orange shading on the skin (the Phoenix sheet): small orange patches touching the skin
   // are part of it; big ones are the shirt and trousers
