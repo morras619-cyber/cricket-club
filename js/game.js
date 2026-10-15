@@ -31,6 +31,25 @@ export function pickRivals(seed, team) {
   };
 }
 
+const FISH = 0.65;
+function fisheyeTo(L, x, y) {
+  const dy = y - CFG.ground.centerY, r = Math.hypot(x, dy);
+  if (r < 1e-6) return { x: L.cx, y: L.cy };
+  const s = L.R * Math.pow(Math.min(r / CFG.ground.boundaryR, 1.2), FISH);
+  return { x: L.cx + (x / r) * s, y: L.cy - (dy / r) * s };
+}
+function fisheyeFrom(L, sx, sy) {
+  const dx = sx - L.cx, dy = L.cy - sy, d = Math.hypot(dx, dy);
+  if (d < 1e-6) return { x: 0, y: CFG.ground.centerY };
+  const r = Math.pow(d / L.R, 1 / FISH) * CFG.ground.boundaryR;
+  return { x: (dx / d) * r, y: CFG.ground.centerY + (dy / d) * r };
+}
+const fishRadius = (L, r) => L.R * Math.pow(r / CFG.ground.boundaryR, FISH);
+
+// Short labels for fielder tokens.
+const ABBR = { 'Slip': 'SL', 'Leg slip': 'LS', 'Gully': 'GU', 'Leg gully': 'LG', 'Point': 'PT', 'Deep point': 'DP', 'Backward point': 'BP', 'Cover': 'CV', 'Deep cover': 'DC', 'Mid-off': 'MO', 'Long-off': 'LO', 'Mid-on': 'MN', 'Long-on': 'LN', 'Mid-wicket': 'MW', 'Deep mid-wicket': 'DM', 'Square leg': 'SQ', 'Deep square leg': 'DS', 'Backward square': 'BS', 'Fine leg': 'FL', 'Third man': 'TM' };
+const abbrev = name => ABBR[name] || name.split(/[ -]/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
 export class Game {
   constructor(ui) {
     this.ui = ui;
@@ -234,7 +253,7 @@ export class Game {
   }
 
   quit() { this.cancelAll(); this.ui.hud(false); this.clearBowlUI(); this.view = 'idle'; this.paused = false; }
-  clearBowlUI() { this.ui.fieldButton(false); this.ui.fieldEditor(false); this.ui.banter(false); }
+  clearBowlUI() { this.ui.fieldButton(false); this.ui.fieldEditor(false); this.ui.editing(false); this.ui.banter(false); }
 
   async introBanner(head, sub) {
     this.view = 'bat';
@@ -365,7 +384,11 @@ export class Game {
         ? (n > 0 ? `Need ${n} off ${inn.ballsLeft}` : 'Target reached!')
         : (n > 0 ? `They need ${n} off ${inn.ballsLeft}` : 'They got there');
     } else need = inn.side === 'player' ? 'Set a target' : 'They\'re setting a target';
-    this.ui.score(inn, { label: inn.side === 'player' ? 'YOU BAT' : 'YOU BOWL', need, phase: phaseFor(ball).name });
+    const short = h => h.name.split(' ').slice(-1)[0];
+    let heroLine;
+    if (inn.side === 'player') heroLine = `${short(this.team.bat)} ${inn.cur.runs}* (${inn.cur.balls})`;
+    else { const b = inn.bowler; heroLine = `${short(this.team.bowl)} ${b.wkts}/${b.runs} · ${Math.floor(b.balls / 6)}.${b.balls % 6} ov`; }
+    this.ui.score(inn, { label: inn.side === 'player' ? 'YOU BAT' : 'YOU BOWL', need, phase: phaseFor(ball).name, heroLine });
   }
 
   phaseBanner(ballNo) {
@@ -1119,56 +1142,63 @@ export class Game {
     // start from the field as it will actually stand (Power Burst limits already applied)
     const asPlayed = list => buildFieldFrom(list, pp).filter(f => !f.keeper && f.id !== 'bowler').map(f => ({ id: f.id, name: f.name, x: f.x, y: f.y }));
     const start = this.bowlChoice.custom || presetPositions(this.bowlChoice.field);
-    const E = this.E = { draft: asPlayed(start), pp, drag: null, selected: null, done: false, preset: this.bowlChoice.custom ? null : this.bowlChoice.field, moved: false, touched: false, t0: this.realTime };
+    const E = this.E = { draft: asPlayed(start), pp, drag: null, selected: null, done: false, preset: this.bowlChoice.custom ? null : this.bowlChoice.field, moved: false, touched: false, t0: this.realTime, lift: 0 };
     this.view = 'fieldedit';
-    this.fx.bubbles = [];
-    const V = this.of;
-    V.cx = V.tcx = 0; V.cy = V.tcy = CFG.ground.centerY + 4;
-    V.k = V.tk = Math.min((this.W - 16) / (2 * (CFG.ground.boundaryR + 4)), (this.H * 0.62) / (2 * (CFG.ground.boundaryR + 4) * 0.78));
+    this.fx.bubbles = []; this.fx.words = [];
     this.phase = 'edit';
     this.refreshPowers();
     this.ui.hint(null);
+    this.ui.editing(true);
     this.ui.fieldEditor(true, {
       presets: [['attack', 'Attack'], ['balanced', 'Balanced'], ['defend', 'Defend']],
       current: this.bowlChoice.custom ? null : this.bowlChoice.field,
       onPreset: id => { E.draft = asPlayed(presetPositions(id)); E.preset = id; E.moved = false; E.selected = null; sfx.click(); },
       onDone: () => { E.done = true; },
     });
-    // Drag a fielder, or tap one and then tap where they should stand.
     const place = (f, sx, sy) => {
-      const w = this.of.from(sx, sy);
-      const c = { x: w.x, y: w.y };
-      const r = Math.hypot(c.x, c.y - CFG.ground.centerY), max = CFG.ground.boundaryR - 3;
+      const c = this.edFrom(sx, sy);
+      const r = Math.hypot(c.x, c.y - CFG.ground.centerY), max = CFG.ground.boundaryR - 2;
       if (r > max) { c.x *= max / r; c.y = CFG.ground.centerY + (c.y - CFG.ground.centerY) * max / r; }
-      if (Math.abs(c.x) < 2.4 && c.y > -4.5 && c.y < 23) c.x = c.x < 0 ? -2.4 : 2.4; // keep off the pitch
+      if (Math.abs(c.x) < 3 && c.y > -5 && c.y < 23.5) c.x = c.x < 0 ? -3 : 3; // keep off the pitch
       f.x = c.x; f.y = c.y; f.name = positionName(c.x, c.y);
       E.moved = true; E.preset = null; E.touched = true;
       this.ui.fieldPreset(null);
     };
+    // Drag a token (it lifts above your thumb), or tap one and then tap where it should go.
     this.onInput = (type, g) => {
+      const L = this.edLayout();
       if (type === 'down') {
-        let best = null, bd = 44;
+        let best = null, bd = L.tok + 20;
         for (const f of E.draft) {
-          const p = this.of.to(f.x, f.y);
-          const dd = Math.hypot(p.x - g.x, p.y - 14 - g.y);
+          const p = this.edTo(f.x, f.y);
+          const dd = Math.hypot(p.x - g.x, p.y - g.y);
           if (dd < bd) { bd = dd; best = f; }
         }
-        if (best) { E.drag = best; E.dragMoved = false; E.touched = true; sfx.click(); }
-        else if (E.selected) { place(E.selected, g.x, g.y + 12); E.selected = null; sfx.click(); }
+        if (best) {
+          const p = this.edTo(best.x, best.y);
+          E.drag = best; E.dragMoved = false; E.touched = true;
+          E.grab = { dx: p.x - g.x, dy: p.y - g.y, x0: g.x, y0: g.y };
+          sfx.click();
+        } else if (E.selected && this.edInside(g.x, g.y)) {
+          place(E.selected, g.x, g.y); E.selected = null; sfx.click();
+        } else E.selected = null;
       } else if (type === 'move' && E.drag) {
-        if (Math.hypot(g.x - g.x0, g.y - g.y0) > 8) E.dragMoved = true;
-        if (E.dragMoved) place(E.drag, g.x, g.y + 12);
+        if (!E.dragMoved && Math.hypot(g.x - E.grab.x0, g.y - E.grab.y0) > 6) { E.dragMoved = true; E.liftT = this.realTime; }
+        if (E.dragMoved) {
+          E.lift = Math.min(1, (this.realTime - E.liftT) / 120) * (L.tok + 22);
+          place(E.drag, g.x + E.grab.dx, g.y + E.grab.dy - E.lift);
+        }
       } else if (type === 'up' && E.drag) {
         E.selected = E.dragMoved ? null : (E.selected === E.drag ? null : E.drag);
-        E.drag = null;
+        E.drag = null; E.lift = 0;
       }
     };
     if (this.bot) this.sleepReal(400).then(() => { E.done = true; }).catch(() => {});
     await this.until(() => {
       const out = E.draft.filter(outsideRing).length;
       if (E.pp && out > 2) this.ui.fieldNote(`${out} outside the circle — Power Burst allows 2. Extras move in when you're done.`, true);
-      else if (E.selected) this.ui.fieldNote(`Now tap where ${E.selected.name} should stand.`, false);
-      else this.ui.fieldNote(`Drag a fielder, or tap one then tap a spot.${E.pp ? ` Power Burst: ${out}/2 outside the circle.` : ''}`, false);
+      else if (E.selected) this.ui.fieldNote(`Tap where ${E.selected.name} should go.`, false);
+      else this.ui.fieldNote(`Drag a fielder, or tap one then tap a spot.${E.pp ? ` ${out}/2 outside the circle.` : ''}`, false);
       return E.done;
     });
     this.onInput = null;
@@ -1178,10 +1208,25 @@ export class Game {
     else this.ui.toast('Field set');
     this.onFieldSaved?.(this.bowlChoice);
     this.ui.fieldEditor(false);
+    this.ui.editing(false);
     this.E = null;
     this.phase = 'bowl';
     this.refreshPowers();
   }
+
+  // Field editor board: a flat top-down circle filling the space above the bottom bar.
+  edLayout() {
+    const sheet = document.getElementById('fieldSheet');
+    const bottom = sheet && !sheet.hidden ? sheet.getBoundingClientRect().top - 10 : this.H - 140;
+    const top = 80;
+    const R = Math.max(80, Math.min((this.W - 24) / 2, (bottom - top - 30) / 2));
+    const k = R / CFG.ground.boundaryR;
+    return { cx: this.W / 2, cy: top + (bottom - top - 30) / 2, k, R, tok: Math.max(15, Math.min(21, k * 2.4)) };
+  }
+  // A gentle fisheye (radius^0.65) gives the crowded infield more room on a small screen.
+  edTo(x, y) { return fisheyeTo(this.edLayout(), x, y); }
+  edFrom(sx, sy) { return fisheyeFrom(this.edLayout(), sx, sy); }
+  edInside(sx, sy) { const L = this.edLayout(); return Math.hypot(sx - L.cx, sy - L.cy) <= L.R + 10; }
 
   // ---------- banter ----------
   async banterChoice() {
@@ -1301,7 +1346,7 @@ export class Game {
         r = { out, runs: out ? sim.runOut.attempt - 1 : sim.runOut.attempt };
       }
       if (r.out) {
-        inn.ball({ runs: r.runs, wicket: true });
+        inn.ball({ runs: r.runs, wicket: true, runOut: true });
         this.charge.award('directHit', 'DIRECT HIT');
         if (r.long) this.charge.award('longThrowBonus', 'LONG THROW');
         this.charge.award('wicket', 'WICKET');
@@ -1715,6 +1760,7 @@ export class Game {
       for (let attempt = 0; attempt < 2; attempt++) {
         const before = inn.balls;
         const runsBefore = inn.runs;
+        const curBefore = { ...inn.cur }, stintsBefore = [...inn.stints];
         const out = { v: false };
         await this.batBall(inn, inn.balls + 1, straight, {
           slow, extra, assist: assistHit, onOut: () => { out.v = true; },
@@ -1723,6 +1769,7 @@ export class Game {
         if (inn.runs > runsBefore || attempt === 1) break;
         // can't be lost: undo the miss and replay once
         inn.balls = before; inn.runs = runsBefore; inn.log.pop(); if (out.v) inn.wkts--;
+        inn.cur = curBefore; inn.stints = stintsBefore;
         this.ui.banner(`${this.team.bat.name.toUpperCase()} GOT LUCKY!`, 'Try that one again', 1400);
         await this.sleepReal(this.bot ? 100 : 1400);
       }
@@ -1913,14 +1960,15 @@ export class Game {
     const big = w > 150;
     const R0 = CFG.ground.boundaryR, k = (w / 2 - 6) / R0;
     const cx = x + w / 2, cy = y + h / 2;
-    const P = (fx, fy) => ({ x: cx + fx * k, y: cy - (fy - CFG.ground.centerY) * k });
+    const ML = { cx, cy, R: R0 * k };
+    const P = (fx, fy) => fisheyeTo(ML, fx, fy);
     ctx.save();
     ctx.fillStyle = 'rgba(16,22,50,0.9)'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#23853f'; ctx.strokeStyle = '#fff4da'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, R0 * k, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.beginPath(); ctx.arc(cx, cy, 27 * k, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(cx, cy, fishRadius(ML, 27), 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     const a = P(-1.5, 21), b = P(1.5, -1);
     ctx.fillStyle = '#d8b878'; ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
     const color = kind === 'bat' ? '#e8343b' : '#3ec6ff';
@@ -2095,30 +2143,73 @@ export class Game {
   }
 
   renderFieldEditor() {
-    const ctx = this.ctx, V = this.of, E = this.E;
-    V.drawGround(ctx);
+    const ctx = this.ctx, E = this.E, L = this.edLayout();
+    const { cx, cy, R, k, tok } = L;
+    ctx.fillStyle = '#101632'; ctx.fillRect(0, 0, this.W, this.H);
+    // ground
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(cx, cy, R + 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#23853f'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    for (let x = cx - R; x < cx + R; x += 9 * k * 2) ctx.fillRect(x, cy - R, 9 * k, 2 * R);
+    ctx.restore();
+    ctx.strokeStyle = '#fff4da'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, fishRadius(L, 27), 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    const pt = this.edTo(0, 21), pb = this.edTo(0, -1);
+    ctx.fillStyle = '#d8b878'; ctx.fillRect(cx - tok * 0.45, pt.y, tok * 0.9, pb.y - pt.y);
+    // side labels, outside the circle
+    ctx.font = `15px "Bangers", Impact, sans-serif`; ctx.fillStyle = 'rgba(255,244,218,0.8)'; ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left'; ctx.fillText('← LEG SIDE', Math.max(8, cx - R), cy + R + 20);
+    ctx.textAlign = 'right'; ctx.fillText('OFF SIDE →', Math.min(this.W - 8, cx + R), cy + R + 20);
+    ctx.textAlign = 'center'; ctx.fillText('BOWLER\'S END', cx, cy - R - 16);
+    const token = (x, y, fill, text, r, opts = {}) => {
+      if (opts.ring) { ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, r + 6 + Math.sin(this.realTime / 120) * 2, 0, Math.PI * 2); ctx.stroke(); }
+      if (opts.shadow) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y + r + 8, r, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = fill; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = INK; ctx.font = `${Math.round(r * 0.85)}px "Bangers", Impact, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y + 1);
+    };
+    // fixed players
+    const wk = this.edTo(0, -3), bat = this.edTo(0, 0.6), bw = this.edTo(1.2, 22.5);
+    token(bat.x, bat.y, '#fff4da', 'BAT', tok * 0.7);
+    token(wk.x, wk.y + tok * 0.4, '#b9b3d6', 'WK', tok * 0.7);
+    token(bw.x, bw.y, '#b9b3d6', 'BWL', tok * 0.7);
+    // fielders, the one in your hand drawn last
     const out = E.draft.filter(outsideRing).length;
-    const figs = [...E.draft].sort((a, b) => b.y - a.y);
-    for (const f of figs) {
+    const list = [...E.draft].sort((p, q) => (p === E.drag) - (q === E.drag));
+    for (const f of list) {
+      const p = this.edTo(f.x, f.y);
       const warn = E.pp && out > 2 && outsideRing(f);
       const hot = E.drag === f || E.selected === f;
-      V.figure(ctx, f.x, f.y, SIDEKICK_LOOKS[0], hot ? POSES.celebrate() : POSES.crouch(), { glow: hot ? '#ffd23f' : warn ? '#e8343b' : null });
-      V.label(ctx, f.x, f.y, f.name || positionName(f.x, f.y), warn ? '#ff8a8a' : hot ? '#ffd23f' : '#fff4da', 10);
+      token(p.x, p.y, warn ? '#ff8a8a' : hot ? '#ffd23f' : '#3ec6ff', abbrev(f.name), tok, { ring: E.selected === f, shadow: E.drag === f && E.lift > 0 });
     }
-    V.figure(ctx, 0, -3, this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1], POSES.keeper(), { emblem: this.team.field.id === 'rani' ? 'R' : null });
-    V.figure(ctx, -0.6, 1.2, this.rival.bat.look, POSES.bat(-0.4));
+    // name of the fielder you're moving, clear of your thumb
+    const focus = E.drag || E.selected;
+    if (focus) {
+      const txt = `${focus.name}${E.pp && outsideRing(focus) ? ' · outside the circle' : ''}`;
+      ctx.font = `20px "Bangers", Impact, sans-serif`;
+      const w = ctx.measureText(txt).width + 28;
+      ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.roundRect(cx - w / 2, 14, w, 34, 17); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, cx, 32);
+    } else {
+      ctx.font = `22px "Bangers", Impact, sans-serif`; ctx.fillStyle = '#ffd23f'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('SET YOUR FIELD', cx, 32);
+    }
     if (!E.touched) {
-      // a hand showing the drag, until the player touches a fielder
+      // a hand showing the drag until the player touches a fielder
       const f = E.draft.find(q => q.id === 'cover') || E.draft[0];
-      const p = V.to(f.x, f.y);
+      const p = this.edTo(f.x, f.y);
       const t = ((this.realTime - E.t0) % 1600) / 1600;
-      const k = t < 0.2 ? 0 : t > 0.8 ? 1 : (t - 0.2) / 0.6;
-      const hx = p.x + 10 + k * 50, hy = p.y - 6 - k * 40;
+      const m = t < 0.2 ? 0 : t > 0.8 ? 1 : (t - 0.2) / 0.6;
+      const hx = p.x + 6 + m * 46, hy = p.y + 10 - m * 40;
       ctx.save();
       ctx.globalAlpha = t > 0.9 ? (1 - t) * 10 : 1;
       ctx.fillStyle = '#fff4da'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.roundRect(hx - 7, hy - 4, 14, 22, 6); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.roundRect(hx - 4, hy - 18, 8, 18, 4); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(hx - 8, hy + 4, 16, 24, 7); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(hx - 4.5, hy - 12, 9, 20, 4.5); ctx.fill(); ctx.stroke();
       ctx.restore();
     }
   }

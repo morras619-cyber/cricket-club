@@ -5,7 +5,7 @@ import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
-import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY } from './profile.js';
+import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt } from './profile.js';
 import { sound, unlockAudio, sfx } from './audio.js';
 
 const $ = id => document.getElementById(id);
@@ -66,6 +66,54 @@ $('setField').addEventListener('click', () => {
 $('btnQuick').addEventListener('click', () => { unlockAudio(); pending = { mode: 'quick' }; renderSquad(); });
 $('btnChallengeMode').addEventListener('click', () => { unlockAudio(); pending = { mode: 'challenge', challenge }; renderSquad(); });
 $('btnTutorial').addEventListener('click', () => { unlockAudio(); showCover(); });
+$('btnStats').addEventListener('click', () => { unlockAudio(); renderStats(); });
+$('statsBack').addEventListener('click', () => renderHome());
+
+// ---------- career stats ----------
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+function statGrid(items) {
+  const g = el('div', 'statgrid');
+  for (const [label, value] of items) { const d = el('div'); d.append(el('b', '', value), el('span', '', label)); g.append(d); }
+  return g;
+}
+const batItems = t => [['Innings', t.inns], ['Runs', t.runs], ['Balls', t.balls], ['Highest', fmt.hs(t)], ['Average', fmt.avg(t.runs, t.inns - t.notOuts)], ['Strike rate', fmt.sr(t.runs, t.balls)], ['4s / 6s', `${t.fours}/${t.sixes}`], ['Ducks', t.ducks]];
+const bowlItems = t => [['Overs', fmt.overs(t.balls)], ['Wickets', t.wkts], ['Runs against', t.runs], ['Best', fmt.best(t)], ['Economy', fmt.econ(t.runs, t.balls)], ['Average', fmt.avg(t.runs, t.wkts)], ['Dot balls', t.dots], ['Maidens', t.maidens]];
+
+function renderStats() {
+  ui.show('stats');
+  const s = careerStats(profile);
+  const body = $('statsBody');
+  body.innerHTML = '';
+  body.className = 'statsbody';
+  const card = (title, grid) => { const c = el('div', 'panel paper statcard'); c.append(el('h3', '', title), grid); return c; };
+  body.append(card('Batting', statGrid(batItems(s.bat))), card('Bowling', statGrid(bowlItems(s.bowl))));
+  const table = (title, slot, kind, cols) => {
+    const c = el('div', 'panel paper statcard');
+    c.append(el('h3', '', title));
+    const wrap = el('div', 'tablewrap'), t = el('table', 'herotable'), head = el('tr');
+    for (const h of ['Hero', ...cols.map(x => x[0])]) head.append(el('th', '', h));
+    t.append(head);
+    for (const hero of heroesFor(slot)) {
+      const st = s.heroes[hero.id]?.[kind];
+      const tr = el('tr');
+      tr.append(el('td', '', hero.name));
+      for (const [, f] of cols) tr.append(el('td', '', st && st.inns ? f(st) : '—'));
+      t.append(tr);
+    }
+    wrap.append(t); c.append(wrap);
+    return c;
+  };
+  body.append(
+    table('Batting heroes', 'bat', 'bat', [['Runs', t => t.runs], ['HS', fmt.hs], ['Avg', t => fmt.avg(t.runs, t.inns - t.notOuts)], ['SR', t => fmt.sr(t.runs, t.balls)], ['Ducks', t => t.ducks]]),
+    table('Bowling heroes', 'bowl', 'bowl', [['Wkts', t => t.wkts], ['Best', fmt.best], ['Overs', t => fmt.overs(t.balls)], ['Runs', t => t.runs], ['Econ', t => fmt.econ(t.runs, t.balls)]]),
+  );
+}
+function heroStatLine(hero) {
+  const s = careerStats(profile).heroes[hero.id];
+  if (hero.slot === 'bat' && s?.bat?.inns) return `${s.bat.runs} runs · HS ${fmt.hs(s.bat)} · Avg ${fmt.avg(s.bat.runs, s.bat.inns - s.bat.notOuts)}`;
+  if (hero.slot === 'bowl' && s?.bowl?.inns) return `${s.bowl.wkts} wkts · Best ${fmt.best(s.bowl)} · Econ ${fmt.econ(s.bowl.runs, s.bowl.balls)}`;
+  return hero.slot === 'field' ? null : 'No matches yet';
+}
 
 // ---------- squad ----------
 const SLOTS = [['bat', 'Batting hero'], ['bowl', 'Bowling hero'], ['field', 'Fielding hero']];
@@ -101,6 +149,8 @@ function renderSquad() {
         u.textContent = `Ultimate · ${hero.ultimate.name} (${hero.ultimate.cost}⚡): ${hero.ultimate.desc}`;
         b.append(u);
       }
+      const statLine = heroStatLine(hero);
+      if (statLine) b.append(el('div', 'herostat', statLine));
       const q = document.createElement('div'); q.className = 'quote'; q.textContent = `“${hero.quote}”`;
       b.append(q);
       b.addEventListener('click', () => {
@@ -202,6 +252,7 @@ function shareBase() {
 function showResult(summary) {
   lastSummary = summary;
   const rewards = matchRewards(profile, summary);
+  const rec = summary.mode === 'tutorial' ? null : recordStats(profile, summary);
   saveProfile(profile);
   ui.show('result');
   const win = summary.result.outcome === 'win';
@@ -220,6 +271,31 @@ function showResult(summary) {
     cards.append(c);
   }
   $('resRewards').textContent = `+${rewards.xp} XP · +${rewards.coins} coins · Level ${level(profile.xp).lv}`;
+  // this match's scorecard for your heroes
+  const ms = $('resStats');
+  ms.innerHTML = '';
+  ms.hidden = !rec || (!rec.batting && !rec.bowling);
+  if (rec?.batting) {
+    const r = el('div', 'row');
+    const runs = rec.batting.reduce((a, b) => a + b.runs, 0), balls = rec.batting.reduce((a, b) => a + b.balls, 0);
+    r.append(el('b', '', `${summary.team.bat.name}`), el('span', '', rec.batting.map(fmt.stint).join(' · ')));
+    ms.append(r);
+    const r2 = el('div', 'row');
+    r2.append(el('span', '', `${runs} runs off ${balls} · SR ${fmt.sr(runs, balls)} · ${rec.batting.reduce((a, b) => a + b.fours, 0)}×4 ${rec.batting.reduce((a, b) => a + b.sixes, 0)}×6`));
+    if (rec.batting.some(st => st.out && st.runs === 0)) r2.append(el('span', 'badge', 'DUCK!'));
+    if (rec.newHS) r2.append(el('span', 'badge', 'NEW HIGH SCORE'));
+    ms.append(r2);
+  }
+  if (rec?.bowling) {
+    const f = rec.bowling;
+    const r = el('div', 'row');
+    r.append(el('b', '', `${summary.team.bowl.name}`), el('span', '', fmt.figures(f)));
+    ms.append(r);
+    const r2 = el('div', 'row');
+    r2.append(el('span', '', `Econ ${fmt.econ(f.runs, f.balls)} · ${f.dots} dots${f.maidens ? ` · ${f.maidens} maiden${f.maidens > 1 ? 's' : ''}` : ''}`));
+    if (rec.newBest) r2.append(el('span', 'badge', 'BEST FIGURES'));
+    ms.append(r2);
+  }
 
   const name = profile.name || 'A friend';
   const card = renderShareCard(summary, profile.name);

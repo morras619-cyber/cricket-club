@@ -169,3 +169,21 @@ test('innings and match result', () => {
   assert.ok(b.done());
   assert.equal(matchResult(a, b).outcome, 'win');
 });
+
+test('innings tracks batting stints and bowling figures', () => {
+  const i = new Innings('player');
+  i.ball({ runs: 4 }); i.ball({ runs: 0 }); i.ball({ wicket: true });
+  i.ball({ wicket: true });
+  i.ball({ runs: 6 }); i.ball({ runs: 1 });
+  const card = i.battingCard();
+  assert.deepEqual(card.map(c => [c.runs, c.balls, c.out]), [[4, 3, true], [0, 1, true], [7, 2, false]]);
+  assert.equal(card[0].fours, 1); assert.equal(card[2].sixes, 1);
+  const b = new Innings('ai');
+  for (let k = 0; k < 6; k++) b.ball({ runs: 0 });
+  b.ball({ runs: 2, wicket: true, runOut: true });
+  b.ball({ wicket: true });
+  b.extra(1);
+  const f = b.bowlingFigures();
+  assert.equal(f.wkts, 1); // the run-out isn't the bowler's
+  assert.equal(f.runs, 3); assert.equal(f.balls, 8); assert.equal(f.maidens, 1); assert.equal(f.dots, 7);
+});

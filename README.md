@@ -19,7 +19,7 @@ Open it on a phone on the same network, or use desktop Chrome's device toolbar. 
 | Batting | Touch and hold as the ball comes, swipe in the shot direction, **lift your finger when the shrinking ring meets the target ring**. Short swipe = along the ground, long swipe = lofted. Don't touch = leave. |
 | Bowling | **One swipe from your bowler up the pitch.** How far you swipe sets the length (short swipe = bouncer, long = yorker), sideways sets the line, a curve in the swipe adds swing or spin, and flick speed sets pace (green zone = perfect; too slow = slower ball; too fast sprays it or oversteps for a no-ball). While the ball is in the air, **drag sideways to bend it late**. |
 | Reading the batter | Before each ball the batter shows what length he expects (some bluff). Surprise him, hit his weak spot (scouted after the first over), or chain setups: bouncer → yorker, inswinger ↔ outswinger, or a slower ball after two quick ones. Repeat yourself and he reads you. |
-| Field | Before a delivery, tap **SET FIELD** or the field map (top right) to move your nine fielders: drag one, or tap one and then tap where they should stand. Presets are starting points; the Power Burst still allows only 2 outside the circle. Your field is remembered. |
+| Field | Before a delivery, tap **SET FIELD** or the field map (top right) to open a top-down board. Drag a fielder token (it lifts above your thumb), or tap one and then tap where it should stand. Presets are starting points; the Power Burst still allows only 2 outside the circle. Your field is remembered. |
 | Their field | While batting, the map in the top right shows the opposition's fielders. Tap it before the ball to see it full size with position names. |
 | Coin toss | Quick Match starts with a toss: call heads or tails; win it and choose to bat or bowl first. |
 | Banter | After a good ball, **Talk smack** or **Leave it**. Smack talk can rattle a batter (more mistakes) or fire him up (more aggressive, better timing). Leaving it earns Composure, sometimes Respect. When the opposition sledges you, answer with a dot/wicket (bowling) or a boundary (batting) for +10 REVENGE. |
@@ -38,6 +38,7 @@ Fielding control triggers only on chances you can swing (5–90% success), at mo
 - **8 heroes** with signature powers: Thunderclap Six, Mirror Gap, Meteor Six (ultimate), Tornado Yorker, Maya Ball, Shatter Seam, Elastic Grab + Time-Freeze Stumping (ultimate), Lightning Relay. Plus three Sparks (Focus, Pinpoint, Speed Burst).
 - **Share card**: a 1080×1350 comic panel of your biggest moment, generated on the device.
 - **Light progression**: XP and levels, coins, a 7-day login calendar that pauses rather than resets. Saved in the browser.
+- **Stats**: a live hero line during play, a scorecard after each match, and Career stats (runs, balls, highest score, average, strike rate, ducks; overs, wickets, runs against, best figures, economy, maidens), overall and per hero. Each dismissal ends a batting innings; run-outs aren't bowler wickets.
 
 Not built yet: real-money store and cosmetics, online accounts and group leaderboards (they need a server), Hindi/Urdu text, licensed audio. Sound effects are synthesised in the browser.
 

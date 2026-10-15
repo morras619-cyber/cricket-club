@@ -63,8 +63,15 @@ const link = await page.inputValue('#shareLink').catch(() => '');
 console.log('challenge link:', link);
 const resText = await page.textContent('#resText').catch(() => '');
 console.log('result:', resText);
+console.log('match stats:', (await page.textContent('#resStats').catch(() => '')).trim());
+await page.click('#resHome');
+await page.click('#btnStats');
+await page.screenshot({ path: join(shots, '06b-stats.png'), fullPage: true });
+console.log('career batting runs shown:', await page.evaluate(() => document.querySelector('#statsBody .statgrid b:nth-of-type(1)') && [...document.querySelectorAll('#statsBody .statcard')][0].textContent.slice(0, 80)));
+await page.click('#statsBack');
 
 // challenge round-trip
+await page.screenshot({ path: join(shots, '06c-home.png') });
 if (link.includes('#c')) {
   await page.goto(url + link.slice(link.indexOf('#')));
   await page.waitForTimeout(500);

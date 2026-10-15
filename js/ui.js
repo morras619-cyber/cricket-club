@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 
 export class UI {
   constructor() {
-    this.screens = ['home', 'squad', 'toss', 'cover', 'pause', 'result'];
+    this.screens = ['home', 'squad', 'stats', 'toss', 'cover', 'pause', 'result'];
     this.portraits = new Map();
     this.bannerTimer = 0;
     this.powerKeys = '';
@@ -19,7 +19,8 @@ export class UI {
   }
   hud(on) { $('hud').hidden = !on; }
 
-  score(inn, { label, need, phase }) {
+  score(inn, { label, need, phase, heroLine = '' }) {
+    $('hudLine').textContent = heroLine;
     $('hudTeam').textContent = label;
     $('hudRuns').textContent = inn.runs;
     $('hudWkts').textContent = inn.wkts;
@@ -122,6 +123,7 @@ export class UI {
     }
     this.fieldNote('Drag a fielder to move them.', false);
   }
+  editing(on) { $('hud').classList.toggle('editing', on); }
   fieldPreset(id) { for (const x of $('fieldPresets').children) x.classList.toggle('on', x.dataset.preset === id); }
   fieldNote(text, warn) {
     const n = $('fieldNote');

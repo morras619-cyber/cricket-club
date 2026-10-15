@@ -23,6 +23,7 @@
         <div class="eyebrow" id="hudTeam">YOU BAT</div>
         <div class="score"><span id="hudRuns">0</span><small>/</small><span id="hudWkts">0</span></div>
         <div class="sub" id="hudOvers">0.0 ov · 30 left</div>
+        <div class="heroline" id="hudLine"></div>
       </div>
       <div class="panel chasebox">
         <div class="eyebrow phase" id="hudPhase">POWER BURST</div>
@@ -44,9 +45,11 @@
         <div class="banter-timer"><i id="banterBar"></i></div>
       </div>
       <div id="fieldSheet" class="panel fieldsheet" hidden>
-        <div class="fs-head"><b>Set your field</b><span id="fieldNote">Drag a fielder, or tap one then tap a spot.</span></div>
-        <div class="chips" id="fieldPresets"></div>
-        <button id="fieldDone" class="bigbtn primary">Done</button>
+        <span id="fieldNote" class="fs-note">Drag a fielder, or tap one then tap a spot.</span>
+        <div class="fs-row">
+          <div class="chips" id="fieldPresets"></div>
+          <button id="fieldDone" class="fs-done">Done</button>
+        </div>
       </div>
       <div class="chargerow">
         <div id="charge" class="charge" role="meter" aria-label="Charge" aria-valuemin="0" aria-valuemax="100">
@@ -77,6 +80,7 @@
       <div class="menu">
         <button class="bigbtn primary" id="btnQuick">Quick Match <small>30 balls each · vs AI</small></button>
         <button class="bigbtn" id="btnChallengeMode" hidden>Accept Challenge</button>
+        <button class="bigbtn" id="btnStats">Career stats <small>Runs, wickets, best figures</small></button>
         <button class="bigbtn ghost" id="btnTutorial">Issue #1 <small>The tutorial over</small></button>
       </div>
       <div class="settings">
@@ -97,6 +101,15 @@
         <button class="bigbtn ghost" id="squadBack">Back</button>
         <button class="bigbtn primary" id="squadGo">Start match</button>
       </div>
+    </div>
+  </section>
+
+  <section id="stats" class="screen" hidden>
+    <div class="screen-inner wide">
+      <h2 class="title">Career stats</h2>
+      <p class="lede">Each dismissal ends a batting innings. Run-outs don't count as bowler wickets.</p>
+      <div id="statsBody"></div>
+      <button class="bigbtn ghost" id="statsBack">Back</button>
     </div>
   </section>
 
@@ -139,6 +152,7 @@
       <h2 class="title" id="resTitle">You won!</h2>
       <p class="lede" id="resText"></p>
       <div class="cards" id="resCards"></div>
+      <div class="panel paper matchstats" id="resStats"></div>
       <figure class="sharefig">
         <img id="shareImg" alt="Comic share card of your biggest moment">
         <figcaption id="shareCaption">Long-press the card to save it.</figcaption>
