@@ -1954,6 +1954,9 @@ export class Game {
       // seen from behind, the batter is the hand-drawn sprite; from the front (bowling view) the drawn figure
       const p = batterBack && cam.project(b.x, 0, b.z);
       if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) return;
+      // from the bowling camera, the opposing batter's hand-drawn front view
+      const q = !batterBack && cam.project(b.x, 0, b.z);
+      if (q && drawBowlSprite(ctx, q.x, q.y, q.k, batFrame(b, this.realTime).f, this.oppTeam, false, 'batfront')) return;
       drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow, helmet: true });
     });
     // keeper
