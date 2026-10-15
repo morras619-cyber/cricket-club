@@ -36,6 +36,7 @@ Fielding control triggers only on chances you can swing (5–90% success), at mo
 - **Issue #1 tutorial**: a scripted final over that can't be lost — a timed shot, a hero power, and a keeper catch in about 90 seconds. Shown automatically on first launch.
 - **Charge Meter** per the GDD: tiers at 30/60/100, overheat above 60, −20 on losing a wicket, 25% carry-over between innings, 20% discount in the last 6 balls, perfect-timing streaks.
 - **8 heroes** with signature powers: Thunderclap Six, Mirror Gap, Meteor Six (ultimate), Tornado Yorker, Maya Ball, Shatter Seam, Elastic Grab + Time-Freeze Stumping (ultimate), Lightning Relay. Plus three Sparks (Focus, Pinpoint, Speed Burst).
+- **Night-stadium look**: floodlit ground with a skyline, two crowd tiers, flags, a scrolling LED board that reacts to sixes, fours and wickets, a textured pitch with footmarks, and cel-shaded heroes (each with their own hair, emblem and helmet) drawn to true scale against the stumps. Signature powers fire a full-screen comic cut-in panel for you and the AI. Budget phones (≤2 GB RAM or ≤2 cores) get a lighter mode automatically.
 - **Share card**: a 1080×1350 comic panel of your biggest moment, generated on the device.
 - **Light progression**: XP and levels, coins, a 7-day login calendar that pauses rather than resets. Saved in the browser.
 - **Stats**: a live hero line during play, a scorecard after each match, and Career stats (runs, balls, highest score, average, strike rate, ducks; overs, wickets, runs against, best figures, economy, maidens), overall and per hero. Each dismissal ends a batting innings; run-outs aren't bowler wickets.
@@ -56,7 +57,9 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/tactics.js` | The bowling swipe, batter expectations, weak spots, setup combos, fielding position names |
 | `js/banter.js` | Sledges, comebacks and compliments |
 | `js/game.js` | Match flow, ball sequences, fielding events, tutorial, rendering |
-| `js/scene.js`, `js/figure.js`, `js/fx.js` | Cameras, comic figures, onomatopoeia and impact effects |
+| `js/scene.js`, `js/figure.js`, `js/fx.js` | Cameras, night stadium, cel-shaded figures, onomatopoeia and impact effects |
+| `js/cutin.js` | The comic cut-in panel for signature powers |
+| `js/quality.js` | High/low graphics setting, picked from the device |
 | `js/ui.js`, `js/main.js` | HUD, menus, squad picker, results and sharing |
 | `js/sharecard.js`, `js/codec.js`, `js/profile.js` | Share card, challenge links, local progression |
 

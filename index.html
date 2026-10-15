@@ -19,18 +19,25 @@
 
   <div id="hud" hidden>
     <div class="hud-top">
-      <div class="panel scorebox">
-        <div class="eyebrow" id="hudTeam">YOU BAT</div>
-        <div class="score"><span id="hudRuns">0</span><small>/</small><span id="hudWkts">0</span></div>
-        <div class="sub" id="hudOvers">0.0 ov · 30 left</div>
-        <div class="heroline" id="hudLine"></div>
+      <div class="scorecard">
+        <div class="sc-head fit" id="hudTeam">YOU BAT</div>
+        <div class="sc-body">
+          <div class="score"><span id="hudRuns">0</span><small>/</small><span id="hudWkts">0</span></div>
+          <div class="sc-col">
+            <span class="fit" id="hudOvers">0.0 overs</span>
+            <span class="fit" id="hudLeft">30 balls left</span>
+            <span class="fit heroline" id="hudLine"></span>
+          </div>
+        </div>
+        <div class="sc-need fit" id="hudNeed">Set a target</div>
       </div>
-      <div class="panel chasebox">
-        <div class="eyebrow phase" id="hudPhase">POWER BURST</div>
-        <div class="need" id="hudNeed">Set a target</div>
+      <div class="hud-right">
+        <div class="hr-row">
+          <div class="ribbon fit" id="hudPhase">POWER BURST</div>
+          <button class="iconbtn" id="btnPause" aria-label="Pause">❚❚</button>
+        </div>
         <div class="overballs" id="hudOver"></div>
       </div>
-      <button class="iconbtn" id="btnPause" aria-label="Pause">❚❚</button>
     </div>
 
     <div id="banner" class="banner"><strong id="bannerHead"></strong><span id="bannerSub"></span></div>
@@ -55,6 +62,7 @@
         <div id="charge" class="charge" role="meter" aria-label="Charge" aria-valuemin="0" aria-valuemax="100">
           <div class="charge-fill" id="chargeFill"></div>
           <i style="left:30%"></i><i style="left:60%"></i>
+          <b class="charge-spark" id="chargeSpark" aria-hidden="true"></b>
           <span class="charge-val" id="chargeVal">0</span>
         </div>
       </div>

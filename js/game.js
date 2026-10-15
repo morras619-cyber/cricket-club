@@ -11,8 +11,9 @@ import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK } from './fx.js';
-import { Cam3D, OutfieldView, drawBackground, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
+import { CutIn } from './cutin.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -58,6 +59,7 @@ export class Game {
     this.cams = { bat: new Cam3D('bat'), bowl: new Cam3D('bowl'), keeper: new Cam3D('keeper') };
     this.of = new OutfieldView();
     this.fx = new FX();
+    this.cutin = new CutIn();
     this.timers = []; this.waiters = [];
     this.gameTime = 0; this.realTime = 0; this.lastNow = performance.now();
     this.powerFxUntil = 0; this.mapBig = false;
@@ -138,6 +140,9 @@ export class Game {
     this.onInput = null;
   }
   hitStop(ms) { this.hitStopUntil = this.realTime + ms; }
+  board(msg, ms = 4000) { this.boardMsg = msg; this.boardUntil = this.realTime + ms; }
+  // full-screen comic panel; render() hides DOM banners and hints while it plays
+  showCutIn(hero, def) { this.cutin.start(hero, def, this.realTime); }
   powerPause() { return this.until(() => this.realTime >= this.powerFxUntil); }
 
   bindInput() {
@@ -358,12 +363,17 @@ export class Game {
     else if (kind === 'elastic') A.elastic = 2;
     else A[kind] = true;
     this.stats.powers++;
-    this.fx.flash(color, 0.45);
-    this.fx.burst(this.W / 2, this.H * 0.42, { color, r: Math.max(this.W, this.H) * 0.6 });
-    this.fx.word(def.word, this.W / 2, this.H * 0.42, { size: def.ultimate ? 76 : 60, color, stroke: INK, dur: 1300 });
-    this.fx.bubble(hero.quote, this.W * 0.5, this.H * 0.56, { dur: 1300 });
-    this.ui.banner(def.name.toUpperCase(), def.desc, 1300);
-    this.powerFxUntil = this.realTime + (this.bot ? 0 : 1350);
+    if (def.cost >= 60 && !this.bot) {
+      // signature powers get a full comic cut-in panel
+      this.showCutIn(hero, def);
+    } else {
+      this.fx.flash(color, 0.45);
+      this.fx.burst(this.W / 2, this.H * 0.42, { color, r: Math.max(this.W, this.H) * 0.6 });
+      this.fx.word(def.word, this.W / 2, this.H * 0.42, { size: def.ultimate ? 76 : 60, color, stroke: INK, dur: 1300 });
+      this.fx.bubble(hero.quote, this.W * 0.5, this.H * 0.56, { dur: 1300 });
+      this.ui.banner(def.name.toUpperCase(), def.desc, 1300);
+    }
+    this.powerFxUntil = this.realTime + (this.bot ? 0 : 1400);
     if (def.ultimate || def.cost >= 100) sfx.boom(); else sfx.full();
     buzz([40, 30, 80]);
     if (this.phase === 'bowl' && this.aiBatPower && (key === 'bowlpower' || key === 'pinpoint')) {
@@ -388,7 +398,7 @@ export class Game {
     let heroLine;
     if (inn.side === 'player') heroLine = `${short(this.team.bat)} ${inn.cur.runs}* (${inn.cur.balls})`;
     else { const b = inn.bowler; heroLine = `${short(this.team.bowl)} ${b.wkts}/${b.runs} · ${Math.floor(b.balls / 6)}.${b.balls % 6} ov`; }
-    this.ui.score(inn, { label: inn.side === 'player' ? 'YOU BAT' : 'YOU BOWL', need, phase: phaseFor(ball).name, heroLine });
+    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${this.team.bat.name.toUpperCase()}` : `YOU BOWL · ${this.team.bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine });
   }
 
   phaseBanner(ballNo) {
@@ -451,8 +461,8 @@ export class Game {
 
     if (aiPower) {
       const pw = this.rival.bowl.power;
-      this.ui.banner(`${pw.name.toUpperCase()}!`, `${this.rival.bowl.name} powers up`, 1600);
-      this.fx.word(pw.word, this.W / 2, this.H * 0.35, { size: 52, color: this.rival.bowl.look.trim, stroke: INK });
+      if (this.bot) this.ui.banner(`${pw.name.toUpperCase()}!`, `${this.rival.bowl.name} powers up`, 1600);
+      else { this.showCutIn(this.rival.bowl, pw); this.powerFxUntil = this.realTime + 1400; }
       sfx.whoosh();
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
@@ -655,6 +665,7 @@ export class Game {
   }
 
   wicketFx(text, at) {
+    this.board(text.replace('!', '') + '!');
     this.fx.flash('#e8343b', 0.4); this.fx.shake(12);
     this.fx.word(text, this.W / 2, this.H * 0.36, { size: 62, color: '#fff4da', stroke: '#e8343b', dur: 1500 });
     this.fx.sparks(at.x, at.y, 20, ['#fff4da', '#e8343b', '#f0c27a'], 9);
@@ -691,12 +702,14 @@ export class Game {
     if (saved) this.fx.word('SAVED!', this.W / 2, this.H * 0.35, { size: 48, color: '#fff4da', stroke: '#3ec6ff' });
     inn.ball({ runs });
     if (runs === 6) {
+      this.board('SIX!');
       this.charge.award('six', 'SIX');
       sfx.crowd(1.2);
       const powered = fx.thunder;
       if (powered) this.fx.word('KRAKOOOM!', this.W / 2, this.H * 0.3, { size: 76, color: '#5fc8ff', stroke: INK });
       this.addMoment(powered ? 'powerSix' : 'six', powered ? 'THUNDERCLAP SIX!' : `${Math.round(sim.path.carry || 80)}m SIX!`, powered ? 'KRAKOOOM!' : 'SIX!', this.team.bat, { ballNo, detail: 'into the stands' });
     } else if (runs === 4) {
+      this.board('FOUR!');
       this.charge.award('four', 'FOUR');
       sfx.crowd(0.8);
       this.addMoment('four', 'FOUR!', 'FOUR!', this.team.bat, { ballNo });
@@ -713,7 +726,7 @@ export class Game {
       look: side === 'ai'
         ? (f.id === 'bowler' ? this.rival.bowl.look : AI_LOOK)
         : (f.keeper && this.team.field.id === 'rani' ? this.team.field.look : f.id === 'bowler' ? this.team.bowl.look : SIDEKICK_LOOKS[i % 2]),
-      emblem: side === 'ai' ? (f.id === 'bowler' ? this.rival.bowl.emblem : null) : (f.keeper && this.team.field.id === 'rani' ? 'R' : f.id === 'bowler' ? this.team.bowl.emblem : null),
+      emblem: side === 'ai' ? (f.id === 'bowler' ? this.rival.bowl.emblem : null) : (f.keeper && this.team.field.id === 'rani' ? this.team.field.emblem : f.id === 'bowler' ? this.team.bowl.emblem : null),
       pose: f.keeper ? POSES.keeper() : POSES.crouch(),
     }));
   }
@@ -847,8 +860,8 @@ export class Game {
       const k = this.rival.bat.power.kind;
       this.aiBatPower = k === 'meteor' ? 'thunder' : k;
       const pw = this.rival.bat.power;
+      if (!this.bot) { this.showCutIn(this.rival.bat, pw); this.powerFxUntil = this.realTime + 1400; }
       this.ui.banner(`${this.rival.bat.name.toUpperCase()}: ${pw.name.toUpperCase()}!`, 'Answer with a power of your own', 2000);
-      this.fx.word(pw.word, this.W / 2, this.H * 0.32, { size: 54, color: this.rival.bat.look.trim, stroke: INK });
       if (this.aiBatPower === 'mirror') this.aiMirror = 3;
       sfx.whoosh();
     }
@@ -1397,7 +1410,7 @@ export class Game {
     S.delivery = null; S.ball = null; S.flight = null;
     S.kball = { from, to, t0: this.realTime, dur: approach, done: false };
     S.reticle = { ...to, needSwipe, elastic };
-    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1], emblem: this.team.field.id === 'rani' ? 'R' : null };
+    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1], emblem: this.team.field.id === 'rani' ? this.team.field.emblem : null };
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
     this.fx.speed = 1;
     if (elastic) this.fx.word('BOING!', this.W * 0.5, this.H * 0.3, { size: 40, color: '#ffe14d', stroke: INK });
@@ -1509,7 +1522,7 @@ export class Game {
   startEvent(field, fielderId) {
     const fs = this.setupOutfield(field, 'player');
     const me = fs.find(f => f.id === fielderId);
-    me.look = this.controlledLook(); me.emblem = this.team.field.id === 'bilal' ? 'B' : null; me.ctrl = true;
+    me.look = this.controlledLook(); me.emblem = this.team.field.id === 'bilal' ? this.team.field.emblem : null; me.ctrl = true;
     this.phase = 'event';
     this.powerLock = false;
     this.eventAllowsBurst = true;
@@ -1841,11 +1854,14 @@ export class Game {
     else this.renderIdle();
     ctx.restore();
     this.fx.draw(ctx, W, H);
+    this.cutin.draw(ctx, W, H, this.realTime);
+    if (this.cutin.busy !== this.cutinShown) { this.cutinShown = this.cutin.busy; document.getElementById('hud').classList.toggle('cutin-on', this.cutinShown); }
   }
 
   renderIdle() {
     const cam = this.cams.bat;
     drawBackground(this.ctx, cam);
+    drawBoard(this.ctx, cam, this.realTime);
   }
 
   ballPos() {
@@ -1874,6 +1890,7 @@ export class Game {
   render3D(kind) {
     const ctx = this.ctx, S = this.S, cam = this.cams[kind];
     drawBackground(ctx, cam);
+    drawBoard(ctx, cam, this.realTime, this.realTime < this.boardUntil ? this.boardMsg : null);
     const items = [];
     const push = (z, fn) => items.push({ d: cam.depth(z), fn });
 
@@ -1900,7 +1917,8 @@ export class Game {
       angle = lerp(-2.5, 2.4, p);
     }
     const batterBack = kind !== 'bowl';
-    push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow }));
+    if (b.anim === 'celebrate') push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.celebrate(), { back: batterBack, emblem: b.emblem, helmet: true }));
+    else push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow, helmet: true }));
     // keeper
     if (kind !== 'bat') {
       const k = S.keeper;
@@ -2229,7 +2247,7 @@ export class Game {
     }
     const figs = [
       ...O.fielders.map(f => ({ y: f.y, draw: () => { V.figure(ctx, f.x, f.y, f.look, f.pose, { emblem: f.emblem, glow: f.ctrl ? '#ffd23f' : null, scale: f.ctrl ? 1.25 : 1 }); } })),
-      ...O.batters.map(b => ({ y: b.y, draw: () => V.figure(ctx, b.x, b.y, b.look, O.running ? POSES.run(this.gameTime * 12) : POSES.bat(-0.4)) })),
+      ...O.batters.map(b => ({ y: b.y, draw: () => V.figure(ctx, b.x, b.y, b.look, O.running ? POSES.run(this.gameTime * 12) : POSES.bat(-0.4), { helmet: true, pads: true }) })),
     ].sort((a, b) => b.y - a.y);
     for (const f of figs) f.draw();
     const me = O.fielders.find(f => f.ctrl);

@@ -2,6 +2,15 @@ import { portrait } from './figure.js';
 
 const $ = id => document.getElementById(id);
 
+// Sets text and shrinks the font until it fits its box, so nothing gets cut off.
+function setFit(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+  el.style.fontSize = '';
+  if (!el.clientWidth) return;
+  let size = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 0.5 && size > 8) { size -= 0.5; el.style.fontSize = `${size}px`; }
+}
+
 export class UI {
   constructor() {
     this.screens = ['home', 'squad', 'stats', 'toss', 'cover', 'pause', 'result'];
@@ -20,16 +29,24 @@ export class UI {
   hud(on) { $('hud').hidden = !on; }
 
   score(inn, { label, need, phase, heroLine = '' }) {
-    $('hudLine').textContent = heroLine;
-    $('hudTeam').textContent = label;
+    setFit($('hudTeam'), label);
     $('hudRuns').textContent = inn.runs;
     $('hudWkts').textContent = inn.wkts;
-    $('hudOvers').textContent = `${inn.overs} ov · ${inn.ballsLeft} left`;
-    $('hudNeed').textContent = need;
-    $('hudPhase').textContent = phase.toUpperCase();
-    const start = Math.floor(Math.max(0, inn.log.length - 1) / 6) * 6;
-    const over = inn.log.length && inn.log.length % 6 === 0 ? inn.log.slice(-6) : inn.log.slice(start);
-    $('hudOver').innerHTML = over.map(r => `<b class="r${r}">${r === '0' ? '•' : r}</b>`).join('');
+    setFit($('hudOvers'), `${inn.overs} overs`);
+    setFit($('hudLeft'), `${inn.ballsLeft} ball${inn.ballsLeft === 1 ? '' : 's'} left`);
+    setFit($('hudLine'), heroLine);
+    setFit($('hudNeed'), need);
+    setFit($('hudPhase'), phase.toUpperCase());
+    // this over, with empty slots for the balls still to come
+    const done = inn.log.length;
+    const start = done && done % 6 === 0 ? done - 6 : Math.floor(done / 6) * 6;
+    const over = inn.log.slice(start, start + 6);
+    const cells = [];
+    for (let i = 0; i < 6; i++) {
+      const r = over[i];
+      cells.push(r == null ? '<b class="empty"></b>' : `<b class="r${r}">${r}</b>`);
+    }
+    $('hudOver').innerHTML = cells.join('');
   }
 
   banner(head, sub = '', ms = 1300) {
@@ -50,7 +67,10 @@ export class UI {
   charge(value) {
     const c = $('charge');
     $('chargeFill').style.width = `${value}%`;
-    $('chargeVal').textContent = Math.round(value);
+    $('chargeVal').textContent = `${Math.round(value)} ⚡`;
+    const sp = $('chargeSpark');
+    sp.hidden = value < 2;
+    sp.style.left = `${value}%`;
     c.setAttribute('aria-valuenow', Math.round(value));
     c.classList.toggle('t2', value >= 60 && value < 100);
     c.classList.toggle('t3', value >= 100);
@@ -69,6 +89,7 @@ export class UI {
     if (keys !== this.powerKeys) {
       this.powerKeys = keys;
       box.innerHTML = '';
+      box.classList.toggle('n3', list.length >= 3);
       for (const p of list) {
         const b = document.createElement('button');
         b.className = 'power';
@@ -85,7 +106,10 @@ export class UI {
     }
     for (const p of list) {
       const b = box.querySelector(`[data-key="${p.key}"]`);
-      b.querySelector('.pname').textContent = p.name;
+      const pn = b.querySelector('.pname');
+      // refit when the name or the card width changes (the SET FIELD button narrows the row)
+      const fitKey = `${p.name}|${pn.clientWidth}`;
+      if (pn.dataset.fit !== fitKey) { setFit(pn, p.name); pn.dataset.fit = `${p.name}|${pn.clientWidth}`; }
       b.querySelector('.pcost').textContent = p.state === 'armed' ? 'ARMED' : `${p.cost} ⚡`;
       b.disabled = p.state === 'off';
       b.classList.toggle('armed', p.state === 'armed');
@@ -103,7 +127,11 @@ export class UI {
   }
 
   // ---------- bowling ----------
-  fieldButton(on, onTap) { $('fieldBtn').hidden = !on; this.onFieldBtn = on ? onTap : null; }
+  fieldButton(on, onTap) {
+    const b = $('fieldBtn'), changed = b.hidden === on;
+    b.hidden = !on; this.onFieldBtn = on ? onTap : null;
+    if (changed) for (const pn of document.querySelectorAll('#powers .pname')) { setFit(pn, pn.textContent); pn.dataset.fit = `${pn.textContent}|${pn.clientWidth}`; }
+  }
 
   // presets: [[id, name]]; onPreset(id); onDone()
   fieldEditor(on, opts = {}) {

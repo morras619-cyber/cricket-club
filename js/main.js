@@ -351,6 +351,7 @@ document.addEventListener('visibilitychange', () => {
 // ---------- boot ----------
 (async () => {
   try { await Promise.race([document.fonts.load('40px Bangers'), new Promise(r => setTimeout(r, 1500))]); } catch { /* fallback fonts */ }
+  game.resize(); // redraw the cached stadium now the comic font is ready
   if (!profile.tutorialDone && !challenge && !window.__SIXCHARGE_BOT) showCover();
   else renderHome();
 })();
