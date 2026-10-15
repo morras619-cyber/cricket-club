@@ -33,9 +33,10 @@ export function renderShareCard(summary, playerName) {
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d');
-  const best = summary.moments[0] || { title: 'MATCH DAY!', word: 'SIXCHARGE!', heroId: summary.team.bat.id };
+  const lead = summary.captain || Object.values(summary.team || {}).find(Boolean);
+  const best = summary.moments[0] || { title: 'MATCH DAY!', word: 'SIXCHARGE!', heroId: lead?.id };
   const second = summary.moments.find(m => m !== best && m.kind !== best.kind) || summary.moments[1];
-  const hero = heroById(best.heroId) || summary.team.bat;
+  const hero = heroById(best.heroId) || lead;
 
   // page
   g.fillStyle = '#101632'; g.fillRect(0, 0, W, H);
@@ -118,7 +119,7 @@ export function renderShareCard(summary, playerName) {
 
   // footer
   g.fillStyle = '#fff4da'; g.textAlign = 'left'; g.font = `700 34px ${FONT_BODY}`;
-  g.fillText(`${playerName || 'A Sixcharge hero'} · ${summary.team.bat.name}, ${summary.team.bowl.name}, ${summary.team.field.name}`.slice(0, 60), 50, 1275);
+  g.fillText(`${playerName || 'A Sixcharge hero'} · ${summary.myTeam?.name || Object.values(summary.team || {}).filter(Boolean).map(h => h.name).join(', ')}`.slice(0, 60), 50, 1275);
   comicText(g, 'CAN YOU BEAT THIS?', 790, 1300, 52, '#ffd23f', '#e8343b', 500, -0.03);
   return c;
 }

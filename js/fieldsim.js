@@ -128,6 +128,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
   const path = makePath(res);
   const out = { path, kind: 'field', runs: 0, catch: null, intercept: null, save: null, runOut: null, duration: 2 };
   const outfield = fielders.filter(f => !f.keeper);
+  const sp = opts.speed || 1; // a sharper fielding side gets there quicker
 
   if (res.forced?.six) {
     out.kind = 'six'; out.runs = 6; out.duration = path.T * 0.8; return out;
@@ -139,7 +140,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     let best = null;
     for (const f of outfield) {
       // fielders dive for catches: a metre more than a standing reach
-      const margin = F.catchRun * Math.max(0, path.T - F.catchReact) + F.reach + F.catchDive - dist(f, L);
+      const margin = F.catchRun * sp * Math.max(0, path.T - F.catchReact) + F.reach + F.catchDive - dist(f, L);
       const p = sigmoid(margin);
       if (!best || p > best.p) best = { fielder: f, p, margin, t: path.T, point: L };
     }
@@ -156,7 +157,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
       out.kind = 'four'; out.runs = res.forced?.cap != null ? Math.min(2, res.forced.cap) : 4; out.duration = Math.min(t, 3.2);
       let best = null;
       for (const f of outfield) {
-        const m = F.runSpeed * Math.max(0, t - F.react) + F.reach + F.diveReach - dist(f, p);
+        const m = F.runSpeed * sp * Math.max(0, t - F.react) + F.reach + F.diveReach - dist(f, p);
         const pr = sigmoid(m);
         if (!best || pr > best.p) best = { fielder: f, p: pr, t, point: p };
       }
@@ -167,7 +168,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     let hit = null;
     for (const f of outfield) {
       const need = dist(f, p) - F.reach;
-      if (need <= F.runSpeed * Math.max(0, t - F.react)) { hit = f; break; }
+      if (need <= F.runSpeed * sp * Math.max(0, t - F.react)) { hit = f; break; }
     }
     if (hit) {
       out.intercept = { fielder: hit, t, point: p };

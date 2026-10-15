@@ -75,35 +75,77 @@
 
   <section id="home" class="screen">
     <div class="screen-inner">
-      <div class="logo" aria-label="Sixcharge: Superhero Cricket">
+      <div class="logo small" aria-label="Sixcharge: Superhero Cricket">
         <span class="logo-six">SIX</span><span class="logo-charge">CHARGE!</span>
-        <span class="logo-sub">Superhero Cricket</span>
       </div>
       <div class="panel paper profile">
+        <div class="hubtop">
+          <button id="teamBadge" class="teambadge" aria-label="My team"><img id="badgeLogo" alt=""><span><b id="badgeName">Thunder Strikers</b><small id="badgeStyle">Big hitters</small></span></button>
+          <span id="coins" class="coinpill">0</span>
+        </div>
         <label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label>
-        <div class="levelrow"><b id="lvl">Lv 1</b><div class="xpbar"><div id="xpFill"></div></div><span id="coins">0 coins</span></div>
+        <div class="levelrow"><b id="lvl">Lv 1</b><div class="xpbar"><div id="xpFill"></div></div></div>
         <button id="dailyBtn" class="chipbtn" hidden></button>
       </div>
       <div id="challengeCard" class="panel paper challenge" hidden></div>
-      <div class="menu">
-        <button class="bigbtn primary" id="btnQuick">Quick Match <small>30 balls each · vs AI</small></button>
-        <button class="bigbtn" id="btnChallengeMode" hidden>Accept Challenge</button>
-        <button class="bigbtn" id="btnStats">Career stats <small>Runs, wickets, best figures</small></button>
-        <button class="bigbtn ghost" id="btnTutorial">Issue #1 <small>The tutorial over</small></button>
+      <button class="bigbtn" id="btnChallengeMode" hidden>Accept Challenge</button>
+      <div class="hubgrid">
+        <button class="tile tile-quick" id="btnQuick"><b>Quick Match</b><small id="quickSub">30 balls each · vs a random team</small></button>
+        <button class="tile tile-league" id="btnLeague"><b>Super League</b><small id="leagueSub">8 teams · semis · final</small></button>
+        <button class="tile tile-cup" id="btnCup"><b>Knockout Cup</b><small id="cupSub">3 wins to lift the cup</small></button>
+        <button class="tile tile-daily" id="btnDaily"><b>Daily Challenge</b><small id="dailySub">A new scenario every day</small></button>
+      </div>
+      <div class="hubrow">
+        <button class="chipbig" id="btnTeam">My Team</button>
+        <button class="chipbig" id="btnTrophies">Trophies</button>
+        <button class="chipbig" id="btnStats">Stats</button>
+        <button class="chipbig" id="btnTutorial">Tutorial</button>
       </div>
       <div class="settings">
         <button class="chipbtn" id="setSound">Sound: on</button>
         <button class="chipbtn" id="setHaptics">Haptics: on</button>
         <button class="chipbtn" id="setField">Fielding: key moments</button>
       </div>
-      <p class="fineprint">Playtest build · v0.1</p>
+      <p class="fineprint">Playtest build · v0.2</p>
+    </div>
+  </section>
+
+  <section id="league" class="screen" hidden>
+    <div class="screen-inner wide">
+      <h2 class="title" id="leagueTitle">Super League</h2>
+      <p class="lede" id="leagueLede"></p>
+      <div id="leagueBody" class="leaguebody"></div>
+      <div class="menu row">
+        <button class="bigbtn ghost" id="leagueBack">Home</button>
+        <button class="bigbtn primary" id="leagueGo">Play</button>
+      </div>
+      <button class="chipbtn ghostchip" id="leagueQuit">Abandon this tournament</button>
+    </div>
+  </section>
+
+  <section id="daily" class="screen" hidden>
+    <div class="screen-inner">
+      <h2 class="title" id="dailyTitle">Daily Challenge</h2>
+      <div class="panel paper dailycard" id="dailyCard"></div>
+      <div class="menu row">
+        <button class="bigbtn ghost" id="dailyBack">Home</button>
+        <button class="bigbtn primary" id="dailyGo">Play</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="trophies" class="screen" hidden>
+    <div class="screen-inner wide">
+      <h2 class="title">Trophies</h2>
+      <div id="trophyBody" class="statsbody"></div>
+      <button class="bigbtn ghost" id="trophiesBack">Back</button>
     </div>
   </section>
 
   <section id="squad" class="screen" hidden>
     <div class="screen-inner wide">
-      <h2 class="title">Pick your squad</h2>
-      <p class="lede">Your stars lead a full team. Pick a star batter, bowler and fielder (unlock more with coins), then set your batting order and bowling attack. <b id="squadCoins"></b></p>
+      <h2 class="title">My Team</h2>
+      <p class="lede">Your team's star always plays. Sign stars from other teams for the other hero slots, then set your batting order and bowling attack. <b id="squadCoins"></b></p>
       <div id="squadRows"></div>
       <div class="menu row">
         <button class="bigbtn ghost" id="squadBack">Back</button>

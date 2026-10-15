@@ -10,9 +10,10 @@ function hash(str) {
 const b64url = s => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64url = s => atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4));
 
-// c: { seed, target (runs to beat), wkts, balls, name, squad: [bat, bowl, field], moment }
+// c: { seed, target (runs to beat), wkts, balls, name, squad: [bat, bowl, field], moment, team, opp }
+// (team and opp were added later: older links decode without them)
 export function encodeChallenge(c) {
-  const body = [c.seed >>> 0, c.target, c.wkts, c.balls, (c.name || 'A friend').slice(0, 14), c.squad.join('.'), c.moment || ''].join('~');
+  const body = [c.seed >>> 0, c.target, c.wkts, c.balls, (c.name || 'A friend').slice(0, 14), c.squad.join('.'), c.moment || '', c.team || '', c.opp || ''].join('~');
   const raw = encodeURIComponent(body);
   return 'c' + b64url(raw + '~' + hash(raw));
 }
@@ -24,8 +25,8 @@ export function decodeChallenge(token) {
     const cut = raw.lastIndexOf('~');
     const body = raw.slice(0, cut);
     if (hash(body) !== raw.slice(cut + 1)) return null;
-    const [seed, target, wkts, balls, name, squad, moment] = decodeURIComponent(body).split('~');
-    const c = { seed: Number(seed) >>> 0, target: Number(target), wkts: Number(wkts), balls: Number(balls), name, squad: squad.split('.'), moment };
+    const [seed, target, wkts, balls, name, squad, moment, team, opp] = decodeURIComponent(body).split('~');
+    const c = { seed: Number(seed) >>> 0, target: Number(target), wkts: Number(wkts), balls: Number(balls), name, squad: squad.split('.'), moment, team: team || null, opp: opp || null };
     if (!Number.isFinite(c.target) || c.squad.length !== 3) return null;
     return c;
   } catch {

@@ -4,10 +4,12 @@ export const DAILY = [50, 60, 70, 80, 90, 100, 250];
 
 const fresh = () => ({
   name: '', xp: 0, coins: 0, matches: 0, wins: 0, best: 0, tutorialDone: false,
-  squad: { bat: 'raja', bowl: 'zara', field: 'rani' },
   team: 'thunder',
-  unlocked: ['raja', 'zara', 'rani'],
+  unlocked: [], // signed heroes (your own team's star is always yours)
   lineups: {}, // per team id: { order: [player ids], attack: [player ids] }
+  squad: { bat: null, bowl: null, field: null }, // signings by slot
+  tournament: null, trophies: [], heroXp: {}, achievements: {}, beaten: [],
+  dailyChallenge: null, dailyStreak: { last: '', count: 0, best: 0 },
   daily: { day: 0, last: '' },
   settings: { sound: true, haptics: true, fielding: 'key' },
 });
@@ -46,9 +48,12 @@ export function claimDaily(p) {
 
 export function matchRewards(p, summary) {
   const win = summary.result.outcome === 'win';
-  const xp = (win ? 100 : 50) + 10 * (summary.stats.fieldingWins || 0);
-  const coins = win ? 40 : 20;
-  p.xp += xp; p.coins += coins; p.matches++;
+  const daily = summary.mode === 'daily';
+  const xp = (daily ? (win ? 60 : 30) : win ? 100 : 50) + 10 * (summary.stats.fieldingWins || 0);
+  const coins = daily ? (win ? 60 : 20) : win ? 40 : 20;
+  p.xp += xp; p.coins += coins;
+  if (daily) return { xp, coins };
+  p.matches++;
   if (win) p.wins++;
   const inn = summary.innings.find(i => i.side === 'player');
   if (inn) p.best = Math.max(p.best, inn.runs);
@@ -114,9 +119,9 @@ export function recordStats(p, summary) {
     const prevHS = stats.bat.inns ? stats.bat.hs : -1;
     addBatting(stats.bat, card);
     // the hero's own stints (older records had no ids: the hero batted throughout)
-    const heroId = summary.team.bat.id;
-    const mine = card.filter(c => !c.id || c.id === heroId);
-    if (mine.length) addBatting(heroStats(stats, heroId, 'bat'), mine);
+    const heroId = summary.team.bat?.id;
+    const mine = card.filter(c => heroId && (!c.id || c.id === heroId));
+    if (heroId && mine.length) addBatting(heroStats(stats, heroId, 'bat'), mine);
     out.batting = card;
     out.newHS = Math.max(...card.map(c => c.runs)) > prevHS && prevHS >= 0;
   }
@@ -125,8 +130,8 @@ export function recordStats(p, summary) {
     const f = bowlInn.bowlingFigures();
     const prevBest = stats.bowl.best;
     addBowling(stats.bowl, f);
-    const heroId = summary.team.bowl.id;
-    const hf = bowlInn.figs && Object.keys(bowlInn.figs).length ? bowlInn.figs[heroId] : f;
+    const heroId = summary.team.bowl?.id;
+    const hf = !heroId ? null : bowlInn.figs && Object.keys(bowlInn.figs).length ? bowlInn.figs[heroId] : f;
     if (hf && hf.balls > 0) addBowling(heroStats(stats, heroId, 'bowl'), { maidens: 0, ...hf });
     out.bowling = f;
     out.bowlingCard = bowlInn.bowlingCard ? bowlInn.bowlingCard() : [];

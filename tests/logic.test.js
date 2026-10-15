@@ -144,7 +144,7 @@ test('AI batter scores at an arcade rate', () => {
 });
 
 test('challenge codec round-trips and rejects tampering', () => {
-  const c = { seed: 123456789, target: 52, wkts: 2, balls: 30, name: 'Ayaan', squad: ['raja', 'zara', 'rani'], moment: 'six' };
+  const c = { seed: 123456789, target: 52, wkts: 2, balls: 30, name: 'Ayaan', squad: ['raja', 'zara', 'rani'], moment: 'six', team: 'thunder', opp: 'vipers' };
   const token = encodeChallenge(c);
   assert.match(token, /^c[A-Za-z0-9_-]+$/);
   assert.deepEqual(decodeChallenge(token), c);

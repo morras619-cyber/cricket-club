@@ -1,7 +1,7 @@
 import { CFG, phaseFor } from './config.js';
 import { makeRng } from './rng.js';
 import { Charge } from './charge.js';
-import { SPARKS, heroesFor, AI_LOOK } from './heroes.js';
+import { SPARKS, heroById, AI_LOOK } from './heroes.js';
 import { teamById, rivalTeam, teamLook } from './teams.js';
 import { makeDelivery } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
@@ -10,7 +10,9 @@ import { aiBowlingScript, aiBat, aiStance } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
-import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS } from './squads.js';
+import { powerDiscount } from './progress.js';
+import { dailyOutcome } from './daily.js';
+import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, fullName } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
@@ -27,14 +29,8 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 const SHOT_WORDS = ['THWACK!', 'DHOOM!', 'KRAK!', 'BLAM!', 'SMASH!'];
 
-// The rival XI's star batter and bowler, fixed by the seed so a challenge faces the same opponents.
-export function pickRivals(seed, team) {
-  const r = makeRng(seed ^ 0x5eed);
-  return {
-    bat: r.pick(heroesFor('bat').filter(h => h !== team.bat)),
-    bowl: r.pick(heroesFor('bowl').filter(h => h !== team.bowl)),
-  };
-}
+// The opposing side's heroes: their own team's star, in his slot.
+export const pickRivals = oppId => starSquad(oppId);
 
 const FISH = 0.65;
 function fisheyeTo(L, x, y) {
@@ -199,14 +195,20 @@ export class Game {
     const mode = opts.mode;
     this.mode = mode;
     this.seed = opts.seed;
-    this.team = opts.squad; // { bat, bowl, field } heroes
-    this.rival = pickRivals(this.seed, this.team);
-    // kits: the heroes play for the player's chosen team against a seeded rival team
+    // the player's team against a fixed opponent (a fixture), or one picked by the seed
     this.myTeam = teamById(opts.team);
-    this.oppTeam = rivalTeam(this.seed, this.myTeam.id);
+    this.oppTeam = opts.opp ? teamById(opts.opp) : rivalTeam(this.seed, this.myTeam.id);
+    // heroes by slot ({ bat, bowl, field }, empty slots null): the team's star plus any signings
+    this.team = opts.squad;
+    this.rival = pickRivals(this.oppTeam.id);
+    // the captain's face goes on the Spark buttons when a slot has no hero
+    this.captain = heroById(this.myTeam.star) || Object.values(this.team).find(Boolean);
+    this.oppStyle = this.oppTeam.style || {};
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
-    this.mySide = resolveLineup(this.myTeam.id, this.team, opts.lineup);
-    this.oppSide = resolveLineup(this.oppTeam.id, { bat: this.rival.bat, bowl: this.rival.bowl, field: null }, null);
+    // hero levels: stronger heroes and cheaper signature powers
+    this.levels = opts.levels || {};
+    this.mySide = resolveLineup(this.myTeam.id, this.team, opts.lineup, this.levels);
+    this.oppSide = resolveLineup(this.oppTeam.id, this.rival, null);
     this.aiPlan = overPlan(this.oppSide.attack, CFG.balls / 6);
     loadBatSprites(this.myTeam.id, this.oppTeam.id);
     loadBowlSprites(this.myTeam.id, this.oppTeam.id);
@@ -228,8 +230,18 @@ export class Game {
     this.innings = [];
     try {
       if (mode === 'tutorial') return await this.runTutorial();
-      const script = aiBowlingScript(this.seed, this.aiPlan, this.rival.bowl.power.kind);
-      if (mode === 'challenge') {
+      const script = aiBowlingScript(this.seed, this.aiPlan, this.rival.bowl?.power.kind);
+      if (mode === 'daily') {
+        // join the match late: the scoreboard, the over and the batter are already set
+        const sc = this.scenario = opts.scenario;
+        const inn = new Innings(sc.kind === 'chase' ? 'player' : 'ai', sc.target);
+        inn.balls = CFG.balls - sc.ballsLeft; inn.wkts = sc.wktsDown; inn.runs = sc.runsSoFar;
+        this.innings.push(inn);
+        this.newCharge(60);
+        await this.introBanner(`DAILY #${sc.no}`, sc.title.toUpperCase());
+        if (sc.kind === 'chase') await this.battingInnings(inn, script);
+        else await this.bowlingInnings(inn);
+      } else if (mode === 'challenge') {
         const inn = new Innings('player', opts.challenge.target + 1);
         this.innings.push(inn);
         await this.introBanner('CHALLENGE!', `Beat ${opts.challenge.name}'s ${opts.challenge.target} off the same 30 balls`);
@@ -285,8 +297,15 @@ export class Game {
     const inn = this.innings[this.innings.length - 1];
     if (!inn) return true;
     const p = slot === 'bat' ? this.batterOf(inn) : this.bowlerOf(inn);
-    return !!p && p.id === this.team[slot].id;
+    return !!p && p.id === this.team[slot]?.id;
   }
+  // a signature power's charge cost, cheaper as its hero levels up (Sparks cost the same for all)
+  price(def, hero) {
+    const spark = Object.values(SPARKS).includes(def);
+    return spark || !hero ? def.cost : def.cost - powerDiscount(this.levels?.[hero.id] || 1);
+  }
+  // the hero whose face and colours a slot's buttons use: its hero, else the captain
+  heroFor(slot) { return this.team[slot] || this.captain; }
   typeLine(p) { const T = bowlType(p.bowl); return `${T.name} · ${T.kmh[0]}-${T.kmh[1]} km/h`; }
 
   // a new over: the AI follows its plan; you pick from your attack
@@ -314,7 +333,7 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
-    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${this.typeLine(p)}`, 1500);
+    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500);
     await this.sleepReal(this.bot ? 60 : 1100);
   }
 
@@ -322,7 +341,7 @@ export class Game {
   async newBatter(inn) {
     const p = this.batterOf(inn);
     inn.setBatter(p);
-    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${p.name} · ${p.label}`, 1500);
+    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${fullName(p)} · ${p.trait || p.label}`, 1700);
     await this.sleepReal(this.bot ? 60 : 1200);
   }
 
@@ -352,9 +371,12 @@ export class Game {
       const won = a.runs >= a.target;
       const short = a.target - a.runs;
       result = { outcome: won ? 'win' : short === 1 ? 'tie' : 'loss', text: won ? `Challenge beaten with ${a.ballsLeft} balls to spare` : short === 1 ? `Level on ${a.runs}. One more run would have won it!` : `Fell ${short - 1} short of their ${a.target - 1}` };
+    } else if (this.mode === 'daily') {
+      const o = dailyOutcome(this.scenario, a);
+      result = { outcome: o.won ? 'win' : o.tied ? 'tie' : 'loss', text: o.line, daily: o };
     } else result = matchResult(a, b);
     const sorted = [...this.moments].sort((x, y) => y.score - x.score);
-    return { mode: this.mode, innings: this.innings, result, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats, myTeam: this.myTeam, oppTeam: this.oppTeam };
+    return { mode: this.mode, innings: this.innings, result, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats, myTeam: this.myTeam, oppTeam: this.oppTeam, captain: this.captain, scenario: this.scenario || null, levels: this.levels };
   }
 
   addMoment(kind, title, word, hero, opts = {}) {
@@ -370,7 +392,7 @@ export class Game {
       if (ev.crossed) {
         sfx[ev.crossed === 100 ? 'full' : 'dhol']();
         buzz(ev.crossed === 100 ? 120 : [30, 40, 30]);
-        if (ev.crossed === 100) this.fx.bubble(`${this.team.bat.quote}`, this.W * 0.3, this.H * 0.55, { dur: 1400 });
+        if (ev.crossed === 100) this.fx.bubble(`${this.heroFor('bat').quote}`, this.W * 0.3, this.H * 0.55, { dur: 1400 });
       }
     } else if (ev.type === 'loss') {
       if (ev.label === 'OVERHEAT') sfx.sizzle();
@@ -383,25 +405,25 @@ export class Game {
   powerList() {
     const ball = this.ballNo();
     const mk = (key, def, hero, pose, armed, extraOk = true) => {
-      const cost = this.charge.cost(def.cost, ball);
+      const cost = this.charge.cost(this.price(def, hero), ball);
       const state = armed ? 'armed' : this.powerLock || !extraOk || this.charge.value < cost ? 'off' : 'ready';
       return { key, name: def.name, cost, hero, pose, state, onTap: () => this.activate(key) };
     };
     const A = this.armed;
     if (this.phase === 'bat') {
-      const list = [mk('focus', SPARKS.bat, this.team.bat, 'bat', A.focus)];
-      if (this.heroIn('bat') || A.thunder || A.meteor || A.mirror > 0) list.push(mk('bat', this.team.bat.power, this.team.bat, 'bat', A.thunder || A.meteor || A.mirror > 0));
+      const list = [mk('focus', SPARKS.bat, this.heroFor('bat'), 'bat', A.focus)];
+      if (this.team.bat && (this.heroIn('bat') || A.thunder || A.meteor || A.mirror > 0)) list.push(mk('bat', this.team.bat.power, this.team.bat, 'bat', A.thunder || A.meteor || A.mirror > 0));
       return list;
     }
     if (this.phase === 'bowl') {
-      const list = [mk('pinpoint', SPARKS.bowl, this.team.bowl, 'bowl', A.pinpoint)];
-      if (this.heroIn('bowl') || A.tornado || A.maya || A.shatter) list.push(mk('bowlpower', this.team.bowl.power, this.team.bowl, 'bowl', A.tornado || A.maya || A.shatter));
-      list.push(mk('fieldpower', this.team.field.power, this.team.field, 'keeper', A.elastic > 0 || A.relay));
-      const ult = this.team.field.ultimate;
+      const list = [mk('pinpoint', SPARKS.bowl, this.heroFor('bowl'), 'bowl', A.pinpoint)];
+      if (this.team.bowl && (this.heroIn('bowl') || A.tornado || A.maya || A.shatter)) list.push(mk('bowlpower', this.team.bowl.power, this.team.bowl, 'bowl', A.tornado || A.maya || A.shatter));
+      if (this.team.field) list.push(mk('fieldpower', this.team.field.power, this.team.field, 'keeper', A.elastic > 0 || A.relay));
+      const ult = this.team.field?.ultimate;
       if (ult && (A.freeze || this.charge.value >= this.charge.cost(ult.cost, ball))) list.push(mk('fieldult', ult, this.team.field, 'keeper', A.freeze));
       return list;
     }
-    if (this.phase === 'event') return [mk('burst', SPARKS.field, this.team.field, 'keeper', A.burst, this.eventAllowsBurst)];
+    if (this.phase === 'event') return [mk('burst', SPARKS.field, this.heroFor('field'), 'keeper', A.burst, this.eventAllowsBurst)];
     return [];
   }
 
@@ -412,18 +434,19 @@ export class Game {
     const A = this.armed;
     let def, hero, color;
     switch (key) {
-      case 'focus': def = SPARKS.bat; hero = this.team.bat; break;
-      case 'bat': def = this.team.bat.power; hero = this.team.bat; break;
-      case 'pinpoint': def = SPARKS.bowl; hero = this.team.bowl; break;
-      case 'bowlpower': def = this.team.bowl.power; hero = this.team.bowl; break;
-      case 'fieldpower': def = this.team.field.power; hero = this.team.field; break;
-      case 'fieldult': def = this.team.field.ultimate; hero = this.team.field; break;
-      case 'burst': def = SPARKS.field; hero = this.team.field; break;
+      case 'focus': def = SPARKS.bat; hero = this.heroFor('bat'); break;
+      case 'bat': def = this.team.bat?.power; hero = this.team.bat; break;
+      case 'pinpoint': def = SPARKS.bowl; hero = this.heroFor('bowl'); break;
+      case 'bowlpower': def = this.team.bowl?.power; hero = this.team.bowl; break;
+      case 'fieldpower': def = this.team.field?.power; hero = this.team.field; break;
+      case 'fieldult': def = this.team.field?.ultimate; hero = this.team.field; break;
+      case 'burst': def = SPARKS.field; hero = this.heroFor('field'); break;
       default: return;
     }
+    if (!def || !hero) return;
     if (this.powerLock && key !== 'burst') return;
     if ((key === 'bat' && !this.heroIn('bat')) || (key === 'bowlpower' && !this.heroIn('bowl'))) return;
-    if (!this.charge.spend(def.cost, ball, def.name)) return;
+    if (!this.charge.spend(this.price(def, hero), ball, def.name)) return;
     color = hero.look.trim;
     const kindMap = { focus: 'focus', pinpoint: 'pinpoint', burst: 'burst' };
     const kind = kindMap[key] || def.kind;
@@ -539,9 +562,9 @@ export class Game {
     this.refreshPowers();
 
     if (aiPower) {
-      const pw = this.rival.bowl.power;
-      if (this.bot) this.ui.banner(`${pw.name.toUpperCase()}!`, `${this.rival.bowl.name} powers up`, 1600);
-      else { this.showCutIn(this.rival.bowl, pw); this.powerFxUntil = this.realTime + 1400; }
+      const star = this.rival.bowl, pw = star.power;
+      if (this.bot) this.ui.banner(`${pw.name.toUpperCase()}!`, `${star.name} powers up`, 1600);
+      else { this.showCutIn(star, pw); this.powerFxUntil = this.realTime + 1400; }
       sfx.whoosh();
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
@@ -711,16 +734,16 @@ export class Game {
       if (runs >= 4) {
         this.charge.add(10, 'REVENGE');
         this.fx.word('REVENGE!', this.W / 2, this.H * 0.28, { size: 60, color: '#ffd23f', stroke: '#e8343b' });
-        this.fx.bubble(line('batterRevenge', this.team.bat.id, rng), me.x, me.y, { dur: 1800 });
+        this.fx.bubble(line('batterRevenge', this.batterOf(inn).hero?.id, rng), me.x, me.y, { dur: 1800 });
         await this.sleepReal(this.bot ? 50 : 900);
         return;
       }
     }
     if (runs >= 4 && rng.chance(0.4)) {
-      this.fx.bubble(line(rng.chance(0.5) ? 'bowlerCompliment' : 'bowlerAfterBoundary', this.rival.bowl.id, rng), bowl.x, bowl.y, { dur: 1700 });
+      this.fx.bubble(line(rng.chance(0.5) ? 'bowlerCompliment' : 'bowlerAfterBoundary', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1700 });
       await this.sleepReal(this.bot ? 50 : 700);
     } else if ((beaten || wicketFell) && rng.chance(0.45)) {
-      this.fx.bubble(line('bowlerSledge', this.rival.bowl.id, rng), bowl.x, bowl.y, { dur: 1800 });
+      this.fx.bubble(line('bowlerSledge', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1800 });
       if (!wicketFell || inn.wkts < CFG.wickets) {
         this.playerRevenge = true;
         this.ui.banner('HE\'S TALKING', 'Hit a boundary next ball for +10 REVENGE', 1700);
@@ -791,10 +814,10 @@ export class Game {
       await this.showAutoPlay(simulateHit({ ...res }, aiField, rng), aiField, { side: 'ai' });
       inn.ball({ runs });
       this.charge.award('six', `${runs} RUNS`);
-      this.addMoment('ultimate', `METEOR ${runs}!`, 'BOOOOM!', this.team.bat, { ballNo, perfect: runs === 8, detail: `${runs} runs off one ball` });
+      this.addMoment('ultimate', `METEOR ${runs}!`, 'BOOOOM!', this.heroFor('bat'), { ballNo, perfect: runs === 8, detail: `${runs} runs off one ball` });
       return;
     }
-    const sim = simulateHit(res, aiField, rng, { aiBatting: false });
+    const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: this.oppStyle.field || 1 });
     let caught = false, saved = false, dropped = false;
     if (sim.catch) {
       caught = rng.chance(sim.catch.p * 0.92);
@@ -829,15 +852,15 @@ export class Game {
       sfx.crowd(1.2);
       const powered = fx.thunder;
       if (powered) this.fx.word('KRAKOOOM!', this.W / 2, this.H * 0.3, { size: 76, color: '#5fc8ff', stroke: INK });
-      this.addMoment(powered ? 'powerSix' : 'six', powered ? `${this.sixDistance(sim)}m THUNDERCLAP SIX!` : `${this.sixDistance(sim)}m SIX!`, powered ? 'KRAKOOOM!' : 'SIX!', this.team.bat, { ballNo, detail: 'into the stands' });
+      this.addMoment(powered ? 'powerSix' : 'six', powered ? `${this.sixDistance(sim)}m THUNDERCLAP SIX!` : `${this.sixDistance(sim)}m SIX!`, powered ? 'KRAKOOOM!' : 'SIX!', this.heroFor('bat'), { ballNo, detail: 'into the stands' });
     } else if (runs === 4) {
       this.board('FOUR!');
       this.charge.award('four', 'FOUR');
       sfx.crowd(0.8);
-      this.addMoment('four', 'FOUR!', 'FOUR!', this.team.bat, { ballNo });
+      this.addMoment('four', 'FOUR!', 'FOUR!', this.heroFor('bat'), { ballNo });
     } else if (runs === 0) this.charge.dot();
     if (inn.target != null && inn.runs >= inn.target) {
-      this.addMoment('lastBallWin', 'WINNING HIT!', runs >= 4 ? 'DHOOM!' : 'YES!', this.team.bat, { ballNo, detail: `chased it with ${inn.ballsLeft} balls left` });
+      this.addMoment('lastBallWin', 'WINNING HIT!', runs >= 4 ? 'DHOOM!' : 'YES!', this.heroFor('bat'), { ballNo, detail: `chased it with ${inn.ballsLeft} balls left` });
     }
   }
 
@@ -846,9 +869,9 @@ export class Game {
     return list.map((f, i) => ({
       ...f,
       look: side === 'ai'
-        ? (f.id === 'bowler' ? this.rival.bowl.look : teamLook(this.oppTeam, i))
-        : (f.keeper && this.team.field.id === 'rani' ? this.team.field.look : f.id === 'bowler' ? this.team.bowl.look : teamLook(this.myTeam, i)),
-      emblem: side === 'ai' ? (f.id === 'bowler' ? this.rival.bowl.emblem : null) : (f.keeper && this.team.field.id === 'rani' ? this.team.field.emblem : f.id === 'bowler' ? this.team.bowl.emblem : null),
+        ? teamLook(this.oppTeam, i)
+        : (f.keeper && this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, i)),
+      emblem: side === 'ai' ? null : (f.keeper && this.team.field?.id === 'rani' ? this.team.field.emblem : null),
       pose: f.keeper ? POSES.keeper() : POSES.crouch(),
     }));
   }
@@ -1012,8 +1035,8 @@ export class Game {
     S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.myTeam); S.bowler.emblem = bowler.hero?.emblem || null;
     // right-arm over, a little wide of the stumps so the ball leaves his hand; left-armers from the other side
     S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
-    S.keeper.look = this.team.field.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
-    const kind = bowler.bowl || this.team.bowl.bowls;
+    S.keeper.look = this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
+    const kind = bowler.bowl || 'swing';
     const profile = striker.ai;
     let field = this.currentField(ballNo);
     S.field3d = field.filter(f => !f.keeper && f.id !== 'bowler');
@@ -1023,7 +1046,7 @@ export class Game {
     // the AI batter may power up
     this.aiBatPower = null; this.clash = false;
     const need = inn.target != null ? inn.target - inn.runs : Math.max(12, 48 - inn.runs); // batting first, the AI paces itself to a par score
-    if (!opt.scripted && this.aiPowerBalls.has(ballNo) && striker.id === this.rival.bat.id && need / Math.max(1, inn.ballsLeft) > 1.0) {
+    if (!opt.scripted && this.aiPowerBalls.has(ballNo) && striker.id === this.rival.bat?.id && need / Math.max(1, inn.ballsLeft) > 1.0) {
       this.aiPowerBalls.delete(ballNo);
       const k = this.rival.bat.power.kind;
       this.aiBatPower = k === 'meteor' ? 'thunder' : k;
@@ -1156,7 +1179,7 @@ export class Game {
     }
     if (mood.balls > 0 && --mood.balls === 0) mood.state = 'calm';
 
-    let ai = aiBat(d, { skill: striker.bat, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
+    let ai = aiBat(d, { skill: striker.bat, style: this.oppStyle, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
@@ -1169,7 +1192,7 @@ export class Game {
     const cs = this.cams.bowl.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 3 };
     const outFree = () => { this.fx.word('FREE HIT · NOT OUT', this.W / 2, this.H * 0.4, { size: 40 }); };
     const freeHit = this.freeHit; this.freeHit = false;
-    const bowlerHero = bowler.hero || this.team.bowl;
+    const bowlerHero = bowler.hero || this.heroFor('bowl');
     const before = { runs: inn.runs, wkts: inn.wkts };
 
     if (res.outcome === 'hit' || res.outcome === 'edge') {
@@ -1220,7 +1243,7 @@ export class Game {
       this.view = 'bowl';
       if (r === 'stumped') {
         this.charge.award('keeperDismissal', 'STUMPING');
-        wicket('STUMPED!', 'keeper', this.team.field, { fielding: true, word: 'STUMPED!', detail: 'lightning-fast stumping' });
+        wicket('STUMPED!', 'keeper', this.heroFor('field'), { fielding: true, word: 'STUMPED!', detail: 'lightning-fast stumping' });
       } else { inn.ball({ runs: 0 }); this.charge.dot(); }
     } else if (res.outcome === 'edge') {
       const chance = { kind: 'edge', p: keeperEdgeP(res.offset) };
@@ -1232,7 +1255,7 @@ export class Game {
       this.view = 'bowl';
       if (r === 'caught') {
         this.charge.award('keeperDismissal', 'KEEPER');
-        wicket('CAUGHT BEHIND!', 'keeper', this.team.field, { fielding: true, word: 'SNAFFLED!', detail: 'edge taken behind the stumps' });
+        wicket('CAUGHT BEHIND!', 'keeper', this.heroFor('field'), { fielding: true, word: 'SNAFFLED!', detail: 'edge taken behind the stumps' });
       } else {
         const four = res.offset.x > 1.0 && rng.chance(0.5);
         inn.ball({ runs: four ? 4 : rng.chance(0.4) ? 1 : 0 });
@@ -1437,7 +1460,9 @@ export class Game {
 
   async bowlingBanter({ runs, wicketFell, goodBall, rng, inn }) {
     if (inn.done() && !wicketFell) return;
-    const me = this.team.bowl, them = this.rival.bat;
+    // banter lines are keyed by hero (regulars use the generic lines); how a sledge lands
+    // depends on the batter's own temperament
+    const me = this.bowlerOf(inn).hero || { id: null }, batter = this.batterOf(inn), them = { id: batter.hero?.id || null, ai: batter.ai };
     const bat = () => this.batterHead(), bowl = () => this.bowlerSpot();
     if (this.revenge) {
       if (wicketFell || runs === 0) {
@@ -1520,7 +1545,7 @@ export class Game {
         if (freeHit) { inn.ball({ runs: 0 }); this.fx.word('FREE HIT · NOT OUT', this.W / 2, this.H * 0.4, { size: 40 }); return; }
         inn.ball({ wicket: true });
         this.charge.award('wicket', 'WICKET');
-        this.addMoment('catch', r === 'dive' ? 'DIVING CATCH!' : 'CAUGHT!', r === 'dive' ? 'GOTCHA!' : 'CAUGHT!', this.team.field, { ballNo, fielding: true, detail: `held at ${sim.catch.fielder.name.toLowerCase()}` });
+        this.addMoment('catch', r === 'dive' ? 'DIVING CATCH!' : 'CAUGHT!', r === 'dive' ? 'GOTCHA!' : 'CAUGHT!', this.heroFor('field'), { ballNo, fielding: true, detail: `held at ${sim.catch.fielder.name.toLowerCase()}` });
         this.stats.fieldingWins++;
         sfx.crowd(1);
         return;
@@ -1546,7 +1571,7 @@ export class Game {
         this.charge.award('directHit', 'DIRECT HIT');
         if (r.long) this.charge.award('longThrowBonus', 'LONG THROW');
         this.charge.award('wicket', 'WICKET');
-        this.addMoment('runout', 'RUN OUT!', 'ZZZAP!', this.team.field, { ballNo, fielding: true, longThrow: r.long, detail: r.margin != null ? `out by ${Math.abs(r.margin).toFixed(2)}s` : 'direct hit' });
+        this.addMoment('runout', 'RUN OUT!', 'ZZZAP!', this.heroFor('field'), { ballNo, fielding: true, longThrow: r.long, detail: r.margin != null ? `out by ${Math.abs(r.margin).toFixed(2)}s` : 'direct hit' });
         this.stats.fieldingWins++;
       } else inn.ball({ runs: r.runs });
       return;
@@ -1560,7 +1585,7 @@ export class Game {
       if (saved) {
         inn.ball({ runs: 2 });
         this.charge.award('boundarySave', 'SAVE');
-        this.addMoment('save', 'BOUNDARY SAVE!', 'SAVED!', this.team.field, { ballNo, fielding: true });
+        this.addMoment('save', 'BOUNDARY SAVE!', 'SAVED!', this.heroFor('field'), { ballNo, fielding: true });
         this.stats.fieldingWins++;
       } else { inn.ball({ runs: sim.runs }); this.fx.word('FOUR!', this.W / 2, this.H * 0.35, { size: 60, color: '#3ec6ff', stroke: INK }); }
       return;
@@ -1593,7 +1618,7 @@ export class Game {
     S.delivery = null; S.ball = null; S.flight = null;
     S.kball = { from, to, t0: this.realTime, dur: approach, done: false };
     S.reticle = { ...to, needSwipe, elastic, t0: this.realTime, dur: approach };
-    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1), emblem: this.team.field.id === 'rani' ? this.team.field.emblem : null };
+    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1), emblem: this.team.field?.id === 'rani' ? this.team.field.emblem : null };
     // clear leftover delivery text so nothing covers the target
     this.fx.words = []; this.fx.bubbles = []; this.ui.clearBanner();
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
@@ -1666,7 +1691,7 @@ export class Game {
       this.hitStop(120); sfx.glove(); buzz(60);
       this.fx.burst(hs.x, hs.y, { color: '#ffe14d', r: 220 });
       this.fx.word('SNAFFLED!', hs.x, hs.y - 40, { size: 60 });
-      this.fx.bubble(this.team.field.id === 'rani' ? 'Arre, try harder!' : 'Got it!', this.W * 0.55, this.H * 0.55);
+      this.fx.bubble(this.team.field?.id === 'rani' ? 'Arre, try harder!' : 'Got it!', this.W * 0.55, this.H * 0.55);
     } else {
       S.kball.done = false; S.kball.miss = true;
       this.fx.word('BUTTERFINGERS!', this.W / 2, this.H * 0.32, { size: 52 });
@@ -1713,12 +1738,12 @@ export class Game {
   }
 
   // ---------- Outfield Mode ----------
-  controlledLook() { return this.team.field.id === 'bilal' ? this.team.field.look : teamLook(this.myTeam); }
+  controlledLook() { return this.team.field?.id === 'bilal' ? this.team.field.look : teamLook(this.myTeam); }
 
   startEvent(field, fielderId) {
     const fs = this.setupOutfield(field, 'player');
     const me = fs.find(f => f.id === fielderId);
-    me.look = this.controlledLook(); me.emblem = this.team.field.id === 'bilal' ? this.team.field.emblem : null; me.ctrl = true;
+    me.look = this.controlledLook(); me.emblem = this.team.field?.id === 'bilal' ? this.team.field.emblem : null; me.ctrl = true;
     this.phase = 'event';
     this.powerLock = false;
     this.eventAllowsBurst = true;
@@ -2028,7 +2053,7 @@ export class Game {
       if (r?.rebowl) continue;
       if (def.wkts > before.wkts) break;
       Object.assign(def, before); def.log = [];
-      this.ui.banner(attempt ? 'ONE LAST CHANCE' : `${this.team.field.id === 'rani' ? 'RANI' : 'THE KEEPER'} GETS ANOTHER GO!`, 'Same ball again', 1500);
+      this.ui.banner(attempt ? 'ONE LAST CHANCE' : `${this.team.field?.id === 'rani' ? 'RANI' : 'THE KEEPER'} GETS ANOTHER GO!`, 'Same ball again', 1500);
       await this.sleepReal(this.bot ? 100 : 1500);
     }
     this.tutorialKeeper = null;

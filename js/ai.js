@@ -96,6 +96,9 @@ function chooseShot(d, ctx, rng) {
   angle += rng.range(-0.15, 0.15);
 
   let loftP = ctx.ballNo <= 12 ? 0.35 : ctx.ballNo >= 25 ? 0.55 : 0.25;
+  // the batting team's style: Thunder slog, Titans block, Phoenix wait for the death
+  const st = ctx.style || {};
+  loftP += (st.loft || 0) + (ctx.ballNo >= 19 ? st.late || 0 : 0);
   const rate = ctx.need / Math.max(1, ctx.ballsLeft);
   if (rate > 1.8) loftP += 0.25;
   if (ctx.wicketsLeft <= 1) loftP -= 0.2;
@@ -108,6 +111,7 @@ export function aiBat(d, ctx, rng) {
   let sigma = 78;
   // the batter's own skill (a squads.js rating, 75 = a solid regular)
   if (ctx.skill != null) sigma *= 1 + (75 - ctx.skill) / 100;
+  sigma *= ctx.style?.sigma || 1;
   if (ctx.release === 'perfect') sigma *= 1.2;
   if (ctx.release === 'loose') sigma *= 0.8;
   if (ctx.repeats >= 3) sigma *= 0.8;

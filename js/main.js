@@ -1,10 +1,13 @@
 import { UI } from './ui.js';
-import { Game, pickRivals } from './game.js';
-import { SPARKS, heroById, heroesFor } from './heroes.js';
-import { TEAMS } from './teams.js';
+import { Game } from './game.js';
+import { SPARKS, HEROES, heroById, heroesFor } from './heroes.js';
+import { TEAMS, teamById, rivalTeam, teamOfHero } from './teams.js';
 import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
-import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE } from './squads.js';
+import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, starSquad, playerSquad } from './squads.js';
+import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
+import { dailyScenario, updateStreak } from './daily.js';
+import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
@@ -19,7 +22,7 @@ const $ = id => document.getElementById(id);
 const ui = new UI();
 const game = new Game(ui);
 const profile = loadProfile();
-// heroes already picked before unlocks existed stay unlocked
+// heroes already picked before unlocks existed stay unlocked (signed)
 for (const id of Object.values(profile.squad || {})) if (id && !profile.unlocked.includes(id)) profile.unlocked.push(id);
 // start downloading the bowler sheets (pace and spin) while the menus are up
 loadBowlSprites(profile.team || 'thunder');
@@ -32,10 +35,12 @@ game.onFieldSaved = choice => { profile.field = { preset: choice.field, custom: 
 let challenge = decodeChallenge(location.hash.slice(1));
 let pending = null; // { mode, challenge }
 let lastSummary = null;
+let tourNotes = []; // what happened in the tournament after the last match
 
 const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance', off: 'Fielding: auto' };
 
-// ---------- home ----------
+// ---------- home: the hub ----------
+const myTeam = () => teamById(profile.team || 'thunder');
 function renderHome() {
   ui.show('home');
   $('playerName').value = profile.name;
@@ -43,18 +48,35 @@ function renderHome() {
   $('lvl').textContent = `Lv ${lv}`;
   $('xpFill').style.width = `${Math.round(progress * 100)}%`;
   $('coins').textContent = `${profile.coins} coins`;
+  const t = myTeam();
+  $('badgeLogo').src = `img/logo-${t.id}.webp`;
+  $('badgeName').textContent = t.name;
+  $('badgeStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
   const daily = $('dailyBtn');
   daily.hidden = !dailyAvailable(profile);
   daily.textContent = `Day ${(profile.daily.day % 7) + 1} reward: +${DAILY[profile.daily.day % 7]} coins — claim`;
   $('setSound').textContent = `Sound: ${sound.on ? 'on' : 'off'}`;
   $('setHaptics').textContent = `Haptics: ${sound.haptics ? 'on' : 'off'}`;
   $('setField').textContent = FIELD_LABEL[game.settings.fielding];
+  // what each mode is doing right now
+  const tour = profile.tournament;
+  const status = kind => {
+    if (tour?.kind !== kind) return null;
+    const f = nextFixture(tour);
+    return f ? `${teamById(tour.team).name} · ${f.label} v ${teamById(f.opp).name}` : 'Finished — see the results';
+  };
+  $('leagueSub').textContent = status('league') || '8 teams · table · semis · final';
+  $('cupSub').textContent = status('cup') || 'Quarter, semi, final: 3 wins for the cup';
+  const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key;
+  $('dailySub').textContent = done ? `Done today: ${profile.dailyChallenge.line} ${profile.dailyChallenge.won ? '✅' : '❌'}` : `#${sc.no} · ${sc.title}`;
+  $('btnDaily').classList.toggle('done', done);
+  $('btnTrophies').textContent = `Trophies ${Object.keys(profile.achievements || {}).length}/${ACHIEVEMENTS.length}`;
   const card = $('challengeCard');
   if (challenge) {
     card.hidden = false;
     card.innerHTML = '';
     const h = document.createElement('h3'); h.textContent = `${challenge.name} challenged you!`;
-    const p = document.createElement('p'); p.textContent = `Beat ${challenge.target} off the same 30 balls they faced (${challenge.wkts} down).`;
+    const p = document.createElement('p'); p.textContent = `Beat ${challenge.target} off the same 30 balls they faced (${challenge.wkts} down)${challenge.opp ? ` against ${teamById(challenge.opp).name}` : ''}.`;
     card.append(h, p);
     $('btnChallengeMode').hidden = false;
   } else { card.hidden = true; $('btnChallengeMode').hidden = true; }
@@ -76,6 +98,12 @@ $('setField').addEventListener('click', () => {
 
 $('btnQuick').addEventListener('click', () => { unlockAudio(); pending = { mode: 'quick' }; renderSquad(); });
 $('btnChallengeMode').addEventListener('click', () => { unlockAudio(); pending = { mode: 'challenge', challenge }; renderSquad(); });
+$('btnLeague').addEventListener('click', () => { unlockAudio(); openTournament('league'); });
+$('btnCup').addEventListener('click', () => { unlockAudio(); openTournament('cup'); });
+$('btnDaily').addEventListener('click', () => { unlockAudio(); renderDaily(); });
+$('btnTeam').addEventListener('click', () => { unlockAudio(); pending = null; renderSquad(); });
+$('teamBadge').addEventListener('click', () => { unlockAudio(); pending = null; renderSquad(); });
+$('btnTrophies').addEventListener('click', () => { unlockAudio(); renderTrophies(); });
 $('btnTutorial').addEventListener('click', () => { unlockAudio(); showCover(); });
 $('btnStats').addEventListener('click', () => { unlockAudio(); renderStats(); });
 $('statsBack').addEventListener('click', () => renderHome());
@@ -126,62 +154,71 @@ function heroStatLine(hero) {
   return hero.slot === 'field' ? null : 'No matches yet';
 }
 
-// ---------- squad ----------
+// ---------- My Team: the team, its star, signings and the team sheet ----------
 const SLOTS = [['bat', 'Batting hero'], ['bowl', 'Bowling hero'], ['field', 'Fielding hero']];
+function heroCard(hero, { on, locked, note, onTap }) {
+  const b = document.createElement('button');
+  b.className = 'hero' + (on ? ' on' : '') + (locked ? ' locked' : '');
+  b.setAttribute('aria-pressed', !!on);
+  const top = el('div', 'htop');
+  top.append(portrait(hero, 72, hero.slot === 'bat' ? 'bat' : hero.slot === 'bowl' ? 'bowl' : 'celebrate'));
+  const nm = el('div');
+  nm.append(el('b', '', hero.name), el('span', 'role', `${hero.role} · ${teamOfHero(hero.id)?.name || ''}`));
+  top.append(nm);
+  const lv = levelProgress(profile.heroXp?.[hero.id] || 0);
+  const pw = el('div', 'pw', hero.power.name);
+  pw.append(el('em', '', `${hero.power.cost - powerDiscount(lv.lv)}⚡`));
+  b.append(top, el('div', 'herolv', `Level ${lv.lv}${lv.next ? ` · ${lv.next} XP to next` : ' · max'} · ${levelPerks(lv.lv)}`), pw, el('div', 'desc', hero.power.desc));
+  if (hero.ultimate) b.append(el('div', 'desc', `Ultimate · ${hero.ultimate.name} (${hero.ultimate.cost}⚡): ${hero.ultimate.desc}`));
+  const statLine = heroStatLine(hero);
+  if (statLine) b.append(el('div', 'herostat', statLine));
+  if (note) b.append(el('div', 'herostat', note));
+  if (locked) b.append(el('div', 'unlock', `🔒 Sign · ${UNLOCK_COST} coins`));
+  if (onTap) b.addEventListener('click', onTap);
+  return b;
+}
 function renderSquad() {
   ui.show('squad');
+  $('squadGo').textContent = pending ? 'Start match' : 'Done';
   const rows = $('squadRows');
   rows.innerHTML = '';
   rows.append(teamPicker());
+  const t = myTeam(), star = heroById(t.star);
+  // the team's own star always plays
+  const starWrap = el('div', 'slot');
+  starWrap.append(el('h3', '', `${t.name} · ${t.style.tag}`), el('p', 'sheetnote', t.style.desc));
+  const starRow = el('div', 'slot-row');
+  starRow.append(heroCard(star, { on: true, note: `★ Your star · plays every match` }));
+  starWrap.append(starRow);
+  rows.append(starWrap);
   for (const [slot, label] of SLOTS) {
-    const wrap = document.createElement('div');
-    wrap.className = 'slot';
-    const h = document.createElement('h3');
-    h.textContent = `${label} · Spark: ${SPARKS[slot].name}`;
-    const row = document.createElement('div');
-    row.className = 'slot-row';
+    if (slot === star.slot) continue;
+    const wrap = el('div', 'slot');
+    wrap.append(el('h3', '', `${label} · signing (optional)`));
+    const row = el('div', 'slot-row');
     for (const hero of heroesFor(slot)) {
-      const b = document.createElement('button');
+      if (hero === star) continue;
       const locked = !isUnlocked(profile, hero.id);
-      b.className = 'hero' + (profile.squad[slot] === hero.id ? ' on' : '') + (locked ? ' locked' : '');
-      b.setAttribute('aria-pressed', profile.squad[slot] === hero.id);
-      const top = document.createElement('div'); top.className = 'htop';
-      top.append(portrait(hero, 72, slot === 'bat' ? 'bat' : slot === 'bowl' ? 'bowl' : 'celebrate'));
-      const nm = document.createElement('div');
-      nm.innerHTML = '<b></b><span class="role"></span>';
-      nm.querySelector('b').textContent = hero.name;
-      nm.querySelector('.role').textContent = hero.role;
-      top.append(nm);
-      const pw = document.createElement('div'); pw.className = 'pw';
-      pw.textContent = hero.power.name;
-      const em = document.createElement('em'); em.textContent = `${hero.power.cost}⚡`; pw.append(em);
-      const desc = document.createElement('div'); desc.className = 'desc'; desc.textContent = hero.power.desc;
-      b.append(top, pw, desc);
-      if (hero.ultimate) {
-        const u = document.createElement('div'); u.className = 'desc';
-        u.textContent = `Ultimate · ${hero.ultimate.name} (${hero.ultimate.cost}⚡): ${hero.ultimate.desc}`;
-        b.append(u);
-      }
-      const statLine = heroStatLine(hero);
-      if (statLine) b.append(el('div', 'herostat', statLine));
-      const q = document.createElement('div'); q.className = 'quote'; q.textContent = `“${hero.quote}”`;
-      b.append(q);
-      if (locked) b.append(el('div', 'unlock', `🔒 Unlock · ${UNLOCK_COST} coins`));
-      b.addEventListener('click', () => {
-        if (!isUnlocked(profile, hero.id)) {
-          if (!unlockHero(profile, hero.id, UNLOCK_COST)) { ui.toast(`You need ${UNLOCK_COST - profile.coins} more coins to unlock ${hero.name}`); return; }
-          ui.toast(`${hero.name} unlocked!`); sfx.full();
-        } else sfx.click();
-        profile.squad[slot] = hero.id; saveProfile(profile);
-        renderSquad();
-      });
-      row.append(b);
+      const on = profile.squad[slot] === hero.id && !locked;
+      row.append(heroCard(hero, {
+        on, locked, note: on ? 'Signed · plays for you (not against his own team)' : null,
+        onTap: () => {
+          if (!isUnlocked(profile, hero.id)) {
+            if (!unlockHero(profile, hero.id, UNLOCK_COST)) { ui.toast(`You need ${UNLOCK_COST - profile.coins} more coins to sign ${hero.name}`); return; }
+            ui.toast(`${hero.name} signed!`); sfx.full();
+            awardAchievements({ events: ['sign'] });
+          } else sfx.click();
+          profile.squad[slot] = on ? null : hero.id; // tap your signing again to leave the slot empty
+          saveProfile(profile);
+          renderSquad();
+        },
+      }));
     }
-    wrap.append(h, row);
+    wrap.append(row);
+    if (!profile.squad[slot] || !isUnlocked(profile, profile.squad[slot])) wrap.append(el('p', 'sheetnote', `No ${label.toLowerCase()} signed: your ${SPARKS[slot].name} still works.`));
     rows.append(wrap);
-    // keep the chosen star in view after a re-render
-    const on = row.querySelector('.on');
-    if (on) requestAnimationFrame(() => { row.scrollLeft = on.offsetLeft - 8; });
+    const onCard = row.querySelector('.on');
+    if (onCard) requestAnimationFrame(() => { row.scrollLeft = onCard.offsetLeft - 8; });
   }
   rows.append(teamSheet());
   $('squadCoins').textContent = `${profile.coins} coins`;
@@ -190,8 +227,9 @@ function renderSquad() {
 // ---------- team sheet: batting order and bowling attack ----------
 function currentLineup() {
   const id = profile.team || 'thunder', heroes = squad();
-  const r = resolveLineup(id, heroes, profile.lineups?.[id]);
-  return { id, heroes, pool: squadPool(id, heroes), order: r.order, attack: r.attack };
+  const levels = heroLevels(profile);
+  const r = resolveLineup(id, heroes, profile.lineups?.[id], levels);
+  return { id, heroes, pool: squadPool(id, heroes, levels), order: r.order, attack: r.attack };
 }
 function saveLineup(order, attack) {
   const id = profile.team || 'thunder';
@@ -212,7 +250,7 @@ function teamSheet() {
       sel.setAttribute('aria-label', `${title} ${i + 1}`);
       for (const p of cands) {
         const o = document.createElement('option');
-        o.value = p.id; o.textContent = `${p.hero ? '★ ' : ''}${p.name} · ${label(p)}`;
+        o.value = p.id; o.textContent = `${p.hero ? '★ ' : ''}${fullName(p)} · ${label(p)}`;
         sel.append(o);
       }
       sel.value = list[i]?.id || '';
@@ -230,16 +268,25 @@ function teamSheet() {
     return box;
   };
   const roleTxt = p => `${p.label} · bat ${p.bat}`;
+  // the whole squad, with what each player is known for
+  const squadList = el('div', 'panel paper sheetbox');
+  squadList.append(el('h3', '', 'The squad'));
+  for (const p of roster(L.id)) {
+    const r = el('div', 'squadrow');
+    r.append(el('b', '', fullName(p)), el('span', '', `${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · ${p.trait}`));
+    squadList.append(r);
+  }
   wrap.append(
     el('h3', '', `${TEAMS.find(t => t.id === L.id)?.name || 'Your'} team sheet`),
     el('p', 'sheetnote', 'Bat in this order: when a batter is out, the next one walks in. Your three bowlers share the five overs (two each at most), and you pick who bowls each over.'),
     pick('Batting order', L.order, batCandidates(L.pool), ORDER_SIZE, roleTxt, next => saveLineup(next, L.attack)),
     pick('Bowling attack', L.attack, bowlCandidates(L.pool), ATTACK_SIZE, p => `${bowlType(p.bowl).name}${p.bowlSkill ? ` · ${p.bowlSkill}` : ''}`, next => saveLineup(L.order, next)),
+    squadList,
   );
   return wrap;
 }
 $('squadBack').addEventListener('click', renderHome);
-$('squadGo').addEventListener('click', () => startMatch(pending || { mode: 'quick' }));
+$('squadGo').addEventListener('click', () => (pending ? startMatch(pending) : renderHome()));
 
 // your team: its kit is what your batter, keeper and fielders wear
 function teamPicker() {
@@ -253,19 +300,23 @@ function teamPicker() {
     b.setAttribute('aria-pressed', on);
     b.style.setProperty('--suit', t.suit); b.style.setProperty('--trim', t.trim);
     const logo = document.createElement('img'); logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
-    b.append(logo, el('b', '', t.name));
+    b.append(logo, el('b', '', t.name), el('small', '', t.style.tag));
     b.addEventListener('click', () => {
       profile.team = t.id; saveProfile(profile); sfx.click();
+      loadBowlSprites(t.id);
       renderSquad();
     });
     row.append(b);
   }
   wrap.append(h, row);
+  const on = row.querySelector('.on');
+  if (on) requestAnimationFrame(() => { row.scrollLeft = on.offsetLeft - 8; });
   return wrap;
 }
 
-function squad() {
-  return { bat: heroById(profile.squad.bat), bowl: heroById(profile.squad.bowl), field: heroById(profile.squad.field) };
+// your side for a match: your team's star plus your signings (who sit out against their own team)
+function squad(teamId = profile.team || 'thunder', oppId = null) {
+  return playerSquad(teamId, profile.squad, profile.unlocked || [], oppId);
 }
 
 // ---------- tutorial cover ----------
@@ -281,18 +332,37 @@ function showCover() {
 $('coverGo').addEventListener('click', () => startMatch({ mode: 'tutorial' }));
 
 // ---------- match ----------
+// opts.mode: 'quick' | 'challenge' | 'tutorial' | 'league' | 'cup' | 'daily'
 async function startMatch(opts) {
   unlockAudio();
   ui.show(null);
   for (const s of ui.screens) $(s).hidden = true;
-  const sq = opts.mode === 'tutorial' ? { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') } : squad();
-  const seed = opts.mode === 'challenge' ? opts.challenge.seed : randomSeed();
-  const order = opts.mode === 'quick' ? await coinToss(pickRivals(seed, sq)) : 'bat';
+  const mode = opts.mode;
+  const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
+  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile);
+  if (mode === 'tutorial') {
+    team = 'thunder'; sq = { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') }; levels = {};
+  } else if (mode === 'daily') {
+    // the same for everyone: the day's two teams, their own stars, default line-ups, no levels
+    team = opts.scenario.team; opp = opts.scenario.opp; sq = starSquad(team); levels = {};
+  } else {
+    if (mode === 'league' || mode === 'cup') { team = profile.tournament.team; opp = nextFixture(profile.tournament).opp; }
+    if (mode === 'challenge') {
+      opp = opts.challenge.opp || null;
+      if (opp === team) team = opts.challenge.team || TEAMS.find(t => t.id !== opp).id;
+    }
+    if (!opp) opp = rivalTeam(seed, team).id;
+    sq = squad(team, opp);
+    lineup = profile.lineups?.[team] || null;
+  }
+  const order = mode === 'quick' || mode === 'league' || mode === 'cup' ? await coinToss(teamById(opp)) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
-  const lineup = opts.mode === 'tutorial' ? null : profile.lineups?.[profile.team || 'thunder'] || null;
-  const summary = await game.runMatch({ lineup, mode: opts.mode, records: { longestSix: careerStats(profile).bat.longestSix || 0 }, squad: sq, team: opts.mode === 'tutorial' ? 'thunder' : profile.team, seed, order, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
+  const summary = await game.runMatch({
+    mode, seed, order, team, opp, squad: sq, lineup, levels, scenario: opts.scenario, challenge: opts.challenge,
+    records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
+  });
   if (!summary) return; // quit mid-match
-  if (opts.mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
+  if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
 }
 
@@ -305,14 +375,202 @@ $('btnPause').addEventListener('pointerdown', e => {
 $('resumeBtn').addEventListener('click', () => { game.paused = false; $('pause').hidden = true; });
 $('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
 
+// ---------- tournaments ----------
+function openTournament(kind) {
+  const t = profile.tournament;
+  if (t && t.kind !== kind && t.stage !== 'done') {
+    ui.toast(`Finish (or abandon) your ${t.kind === 'league' ? 'Super League' : 'Knockout Cup'} first`);
+    renderTournament();
+    return;
+  }
+  if (!t || t.kind !== kind || t.stage === 'done') {
+    profile.tournament = kind === 'league' ? newLeague(profile.team || 'thunder', randomSeed()) : newCup(profile.team || 'thunder', randomSeed());
+    saveProfile(profile);
+  }
+  renderTournament();
+}
+function renderTournament(notes = []) {
+  const t = profile.tournament;
+  if (!t) return renderHome();
+  ui.show('league');
+  const league = t.kind === 'league';
+  $('leagueTitle').textContent = league ? 'Super League' : 'Knockout Cup';
+  const f = nextFixture(t);
+  const me = teamById(t.team);
+  const place = finish(t);
+  $('leagueLede').textContent = f ? `${me.name} · ${f.label}: v ${teamById(f.opp).name}`
+    : place === 'champion' ? `${me.name} are CHAMPIONS!` : `Over: ${teamById(t.champion).name} won it.`;
+  const body = $('leagueBody');
+  body.innerHTML = '';
+  for (const n of notes) body.append(el('div', 'panel paper notecard', n));
+  if (f) {
+    const o = teamById(f.opp), card = el('div', 'panel paper fixture');
+    const logos = el('div', 'fixlogos');
+    const la = document.createElement('img'); la.src = `img/logo-${me.id}.webp`; la.alt = me.name;
+    const lb = document.createElement('img'); lb.src = `img/logo-${o.id}.webp`; lb.alt = o.name;
+    logos.append(la, el('b', '', 'V'), lb);
+    card.append(el('div', 'eyebrow', f.label.toUpperCase()), logos,
+      el('p', '', `${o.name} · ${o.style.tag}: ${o.style.desc} Their star: ${heroById(o.star).name}.`));
+    body.append(card);
+  } else if (place) {
+    const prize = (league ? LEAGUE_PRIZE : CUP_PRIZE)[place];
+    body.append(el('div', 'panel paper notecard big', place === 'champion' ? `🏆 Champions! +${prize} coins` : place === 'runnerUp' ? `🥈 Runners-up · +${prize} coins` : place === 'semi' ? `Semi-finalists · +${prize} coins` : 'Better luck next time'));
+  }
+  if (league) {
+    const tb = el('div', 'panel paper statcard');
+    tb.append(el('h3', '', t.stage === 'group' ? `Table · after ${t.round} of ${t.rounds.length}` : 'Final table'));
+    const wrap = el('div', 'tablewrap'), tab = el('table', 'herotable leaguetable'), head = el('tr');
+    for (const h of ['#', 'Team', 'P', 'W', 'L', 'Pts', 'NRR']) head.append(el('th', '', h));
+    tab.append(head);
+    table(t).forEach((r, i) => {
+      const tr = el('tr', r.id === t.team ? 'mine' : i < 4 ? 'top4' : '');
+      const team = teamById(r.id);
+      for (const v of [i + 1, team.name, r.p, r.w, r.l, r.pts, (r.nrr >= 0 ? '+' : '') + r.nrr.toFixed(2)]) tr.append(el('td', '', String(v)));
+      tab.append(tr);
+    });
+    wrap.append(tab); tb.append(wrap, el('p', 'sheetnote', 'Top four go through: 1st v 4th and 2nd v 3rd in the semi-finals. Win 2 points, tie 1.'));
+    body.append(tb);
+  }
+  // the knockout bracket so far
+  if (t.ko.length) {
+    const kb = el('div', 'panel paper statcard');
+    kb.append(el('h3', '', 'Knockouts'));
+    for (const k of t.ko) {
+      const label = { qf: 'Quarter-finals', semi: 'Semi-finals', final: 'Final' }[k.stage];
+      kb.append(el('b', 'kostage', label));
+      k.ties.forEach(([a, b2], i) => {
+        const w = k.winners?.[i];
+        const row = el('div', 'kotie' + (a === t.team || b2 === t.team ? ' mine' : ''));
+        row.append(el('span', w === a ? 'won' : '', teamById(a).name), el('i', '', 'v'), el('span', w === b2 ? 'won' : '', teamById(b2).name));
+        kb.append(row);
+      });
+    }
+    body.append(kb);
+  }
+  // your results
+  const mine = t.results.filter(r => r.player);
+  if (mine.length) {
+    const rb = el('div', 'panel paper statcard');
+    rb.append(el('h3', '', 'Your results'));
+    for (const r of mine) {
+      const o = r.a === t.team ? r.b : r.a;
+      rb.append(el('div', 'kotie', `${r.winner === t.team ? 'W' : r.winner ? 'L' : 'T'} · v ${teamById(o).name} · ${r.mine.runs}/${r.mine.wkts} v ${r.theirs.runs}/${r.theirs.wkts}`));
+    }
+    body.append(rb);
+  }
+  $('leagueGo').hidden = !f;
+  $('leagueGo').textContent = f ? `Play ${f.label.split(' ')[0] === 'Matchday' ? 'match' : f.label.toLowerCase()}` : 'Play';
+  $('leagueQuit').hidden = !f;
+}
+$('leagueBack').addEventListener('click', renderHome);
+$('leagueGo').addEventListener('click', () => { const t = profile.tournament; if (t) startMatch({ mode: t.kind }); });
+$('leagueQuit').addEventListener('click', () => {
+  if (!confirm('Abandon this tournament? Your progress in it will be lost.')) return;
+  profile.tournament = null; saveProfile(profile); renderHome();
+});
+
+// After a tournament match: record it, play the rest of the round, pay out at the end.
+function tournamentAfterMatch(summary) {
+  const t = profile.tournament;
+  const notes = advance(t, playerResult(t, summary));
+  const events = [];
+  const place = finish(t);
+  if (place) {
+    const prize = (t.kind === 'league' ? LEAGUE_PRIZE : CUP_PRIZE)[place] || 0;
+    profile.coins += prize;
+    if (place === 'champion') {
+      profile.trophies = [...(profile.trophies || []), { kind: t.kind, team: t.team, date: new Date().toISOString().slice(0, 10), unbeaten: unbeaten(t) }];
+      events.push(t.kind);
+      if (t.kind === 'league' && unbeaten(t)) events.push('unbeaten');
+      notes.push(`🏆 ${teamById(t.team).name} win the ${t.kind === 'league' ? 'Super League' : 'Knockout Cup'}! +${prize} coins`);
+    } else if (prize) notes.push(`${place === 'runnerUp' ? 'Runners-up' : 'Semi-finalists'}: +${prize} coins`);
+  }
+  return { notes, events };
+}
+
+// ---------- the daily challenge ----------
+function renderDaily() {
+  ui.show('daily');
+  const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key ? profile.dailyChallenge : null;
+  $('dailyTitle').textContent = `Daily #${sc.no}`;
+  const c = $('dailyCard');
+  c.innerHTML = '';
+  const logos = el('div', 'fixlogos');
+  const la = document.createElement('img'); la.src = `img/logo-${sc.team}.webp`; la.alt = '';
+  const lb = document.createElement('img'); lb.src = `img/logo-${sc.opp}.webp`; lb.alt = '';
+  logos.append(la, el('b', '', 'V'), lb);
+  c.append(el('div', 'eyebrow', sc.kind === 'chase' ? 'THE CHASE' : 'THE DEFENCE'), el('h3', '', sc.title), logos, el('p', '', sc.text),
+    el('p', 'sheetnote', `Everyone plays the same scenario today, with the same teams and their own stars. One attempt. You start with 60 charge. Streak: ${profile.dailyStreak?.count || 0} day${profile.dailyStreak?.count === 1 ? '' : 's'}.`));
+  if (done) {
+    c.append(el('div', 'notecard big', `${done.won ? '✅' : '❌'} ${done.line}`), el('div', 'dailyballs', done.balls));
+    const share = el('button', 'bigbtn whatsapp', 'Share your result');
+    share.addEventListener('click', () => { location.href = `https://wa.me/?text=${encodeURIComponent(dailyShareText(sc, done))}`; });
+    c.append(share, el('p', 'sheetnote', 'A new challenge arrives at midnight (UTC).'));
+  }
+  $('dailyGo').hidden = !!done;
+}
+const dailyShareText = (sc, d) => `Sixcharge Daily #${sc.no}: ${sc.title} ${d.won ? '✅' : '❌'}\n${d.line}\n${d.balls}\n${shareBase()}`;
+$('dailyBack').addEventListener('click', renderHome);
+$('dailyGo').addEventListener('click', () => {
+  const sc = dailyScenario();
+  if (profile.dailyChallenge?.key === sc.key) return renderDaily();
+  // the attempt counts as soon as it starts: quitting doesn't give a second go
+  profile.dailyChallenge = { key: sc.key, won: false, line: 'Gave up', balls: '' };
+  updateStreak(profile, sc.key);
+  saveProfile(profile);
+  startMatch({ mode: 'daily', scenario: sc });
+});
+
+// ---------- trophies: cabinet, hero levels, achievements ----------
+function renderTrophies() {
+  ui.show('trophies');
+  const body = $('trophyBody');
+  body.innerHTML = '';
+  const cab = el('div', 'panel paper statcard');
+  cab.append(el('h3', '', 'Trophy cabinet'));
+  const tr = profile.trophies || [];
+  if (!tr.length) cab.append(el('p', 'sheetnote', 'Empty for now. Win the Super League or the Knockout Cup to fill it.'));
+  const shelf = el('div', 'shelf');
+  for (const x of tr) shelf.append(el('div', 'cup' + (x.kind === 'league' ? ' gold' : ''), `🏆 ${x.kind === 'league' ? 'Super League' : 'Knockout Cup'}${x.unbeaten ? ' · unbeaten' : ''} · ${teamById(x.team).name} · ${x.date}`));
+  cab.append(shelf);
+  const heroes = el('div', 'panel paper statcard');
+  heroes.append(el('h3', '', 'Hero levels'));
+  heroes.append(el('p', 'sheetnote', 'Heroes earn XP when they play: runs, wickets, catches and wins. Each level makes their signature power 2 charge cheaper and their batting or bowling a point better.'));
+  for (const h of HEROES) {
+    const p = levelProgress(profile.heroXp?.[h.id] || 0);
+    const row = el('div', 'lvrow');
+    const bar = el('div', 'xpbar'); const fill = el('div'); fill.style.width = `${Math.round(p.progress * 100)}%`; bar.append(fill);
+    row.append(el('b', '', `${h.name}`), el('span', '', `Lv ${p.lv}`), bar);
+    heroes.append(row);
+  }
+  const ach = el('div', 'panel paper statcard');
+  const got = profile.achievements || {};
+  ach.append(el('h3', '', `Achievements · ${Object.keys(got).length}/${ACHIEVEMENTS.length}`));
+  for (const a of ACHIEVEMENTS) {
+    const row = el('div', 'achrow' + (got[a.id] ? ' got' : ''));
+    row.append(el('b', '', `${got[a.id] ? '★' : '☆'} ${a.name}`), el('span', '', `${a.desc} · ${a.coins} coins${got[a.id] ? ` · ${got[a.id]}` : ''}`));
+    ach.append(row);
+  }
+  body.append(cab, heroes, ach);
+}
+$('trophiesBack').addEventListener('click', renderHome);
+
+// unlock achievements and tell the player
+function awardAchievements(ctx) {
+  const got = checkAchievements(profile, ctx);
+  saveProfile(profile);
+  for (const a of got) ui.toast(`🏅 ${a.name}! +${a.coins} coins`, 2600);
+  return got;
+}
+
 // ---------- coin toss ----------
-function coinToss(rival) {
+function coinToss(opp) {
   return new Promise(resolve => {
     ui.show('toss');
     const coin = $('coin'), text = $('tossText');
     coin.className = 'coin';
     $('tossCall').hidden = false; $('tossChoose').hidden = true; $('tossGo').hidden = true;
-    text.textContent = `Your captain vs ${rival.bat.name}. Call it in the air!`;
+    text.textContent = `You v ${opp.name}. Call it in the air!`;
     const call = side => {
       $('tossCall').hidden = true;
       const result = Math.random() < 0.5 ? 'heads' : 'tails';
@@ -334,7 +592,7 @@ function coinToss(rival) {
           if (window.__SIXCHARGE_BOT) setTimeout(() => resolve(Math.random() < 0.5 ? 'bat' : 'bowl'), 100);
         } else {
           const aiBats = Math.random() < 0.4;
-          text.textContent = `${result.toUpperCase()}. ${rival.bat.name} won the toss and will ${aiBats ? 'bat' : 'bowl'} first — you ${aiBats ? 'bowl' : 'bat'} first.`;
+          text.textContent = `${result.toUpperCase()}. ${opp.name} won the toss and will ${aiBats ? 'bat' : 'bowl'} first — you ${aiBats ? 'bowl' : 'bat'} first.`;
           $('tossGo').hidden = false;
           $('tossGo').onclick = () => resolve(aiBats ? 'bowl' : 'bat');
           if (window.__SIXCHARGE_BOT) setTimeout(() => resolve(aiBats ? 'bowl' : 'bat'), 100);
@@ -355,35 +613,52 @@ function shareBase() {
 
 function showResult(summary) {
   lastSummary = summary;
+  const mode = summary.mode;
   const rewards = matchRewards(profile, summary);
-  const rec = summary.mode === 'tutorial' ? null : recordStats(profile, summary);
+  const counts = mode !== 'tutorial' && mode !== 'daily'; // full matches go in the career record
+  const rec = counts ? recordStats(profile, summary) : null;
+  const win = summary.result.outcome === 'win';
+  // heroes level up by playing
+  const ups = counts ? addHeroXp(profile, heroXpFromMatch(summary)) : [];
+  if (counts && win) profile.beaten = [...new Set([...(profile.beaten || []), summary.oppTeam.id])];
+  const events = [];
+  let notes = [];
+  if (mode === 'league' || mode === 'cup') { const r = tournamentAfterMatch(summary); notes = r.notes; tourNotes = notes; events.push(...r.events); }
+  if (mode === 'daily') {
+    const o = summary.result.daily;
+    profile.dailyChallenge = { key: summary.scenario.key, won: o.won, line: o.line, balls: o.balls };
+    events.push('daily');
+  }
+  const got = mode === 'tutorial' ? [] : checkAchievements(profile, { summary, rec, events });
   saveProfile(profile);
   ui.show('result');
-  const win = summary.result.outcome === 'win';
   $('resTitle').textContent = win ? 'YOU WON!' : summary.result.outcome === 'tie' ? 'TIED!' : 'SO CLOSE!';
   $('resText').textContent = summary.result.text;
   const cards = $('resCards');
   cards.innerHTML = '';
   for (const inn of summary.innings) {
-    const c = document.createElement('div');
-    c.className = 'panel card';
-    const who = inn.side === 'player' ? `You · ${summary.myTeam?.name || summary.team.bat.name}` : `${summary.oppTeam?.name || `${summary.rival.bat.name}'s XI`}`;
-    c.innerHTML = '<div class="eyebrow"></div><div class="score"></div><div class="sub"></div>';
-    c.querySelector('.eyebrow').textContent = who.toUpperCase();
-    c.querySelector('.score').textContent = `${inn.runs}/${inn.wkts}`;
-    c.querySelector('.sub').textContent = `${inn.overs} overs`;
+    const c = el('div', 'panel card');
+    const who = inn.side === 'player' ? `You · ${summary.myTeam?.name || ''}` : `${summary.oppTeam?.name || 'Opponents'}`;
+    c.append(el('div', 'eyebrow', who.toUpperCase()), el('div', 'score', `${inn.runs}/${inn.wkts}`), el('div', 'sub', `${inn.overs} overs`));
     cards.append(c);
   }
-  $('resRewards').textContent = `+${rewards.xp} XP · +${rewards.coins} coins · Level ${level(profile.xp).lv}`;
-  // this match's scorecard for your heroes
+  const extra = [];
+  if (got.length) extra.push(...got.map(a => `🏅 ${a.name} +${a.coins}`));
+  if (ups.length) extra.push(...ups.map(u => `⬆ ${heroById(u.id).name} level ${u.to}`));
+  $('resRewards').textContent = [`+${rewards.xp} XP · +${rewards.coins} coins · Level ${level(profile.xp).lv}`, ...extra].join(' · ');
+  // this match's scorecard
   const ms = $('resStats');
   ms.innerHTML = '';
-  ms.hidden = !rec || (!rec.batting && !rec.bowling);
+  for (const n of notes) ms.append(el('div', 'row notes', n));
+  for (const a of got) { const r = el('div', 'row'); r.append(el('span', 'badge', 'ACHIEVEMENT'), el('b', '', a.name), el('span', '', `${a.desc} · +${a.coins} coins`)); ms.append(r); }
+  for (const u of ups) { const r = el('div', 'row'); r.append(el('span', 'badge', 'LEVEL UP'), el('b', '', heroById(u.id).name), el('span', '', `Level ${u.to} · ${levelPerks(u.to)}`)); ms.append(r); }
+  ms.hidden = !rec?.batting && !rec?.bowling && !notes.length && !got.length && !ups.length;
+  const isHero = (id, slot) => id && id === summary.team?.[slot]?.id;
   if (rec?.batting) {
     const runs = rec.batting.reduce((a, b) => a + b.runs, 0), balls = rec.batting.reduce((a, b) => a + b.balls, 0);
     for (const st of rec.batting) {
       const r = el('div', 'row');
-      r.append(el('b', '', `${st.id === summary.team.bat.id ? '★ ' : ''}${st.name || summary.team.bat.name}`), el('span', '', `${fmt.stint(st)}${st.out && st.how ? ` · ${st.how}` : ''}`));
+      r.append(el('b', '', `${heroById(st.id) ? '★ ' : ''}${st.name || ''}`), el('span', '', `${fmt.stint(st)}${st.out && st.how ? ` · ${st.how}` : ''}`));
       ms.append(r);
     }
     const r2 = el('div', 'row');
@@ -395,9 +670,9 @@ function showResult(summary) {
   }
   if (rec?.bowling) {
     const f = rec.bowling;
-    for (const b of rec.bowlingCard?.length ? rec.bowlingCard : [{ ...f, name: summary.team.bowl.name, id: summary.team.bowl.id }]) {
+    for (const b of rec.bowlingCard || []) {
       const r = el('div', 'row');
-      r.append(el('b', '', `${b.id === summary.team.bowl.id ? '★ ' : ''}${b.name}`), el('span', '', `${fmt.figures(b)}${b.type ? ` · ${bowlType(b.type).short}` : ''}`));
+      r.append(el('b', '', `${isHero(b.id, 'bowl') || heroById(b.id) ? '★ ' : ''}${b.name}`), el('span', '', `${fmt.figures(b)}${b.type ? ` · ${bowlType(b.type).short}` : ''}`));
       ms.append(r);
     }
     const r2 = el('div', 'row');
@@ -408,16 +683,18 @@ function showResult(summary) {
 
   const name = profile.name || 'A friend';
   const card = renderShareCard(summary, profile.name);
-  const img = $('shareImg');
-  img.src = card.toDataURL('image/jpeg', 0.86);
+  $('shareImg').src = card.toDataURL('image/jpeg', 0.86);
   const playerInn = summary.innings.find(i => i.side === 'player');
   let link = shareBase();
   let text;
   const best = summary.moments[0];
-  if (summary.mode !== 'tutorial' && playerInn) {
-    const token = encodeChallenge({ seed: summary.seed, target: playerInn.runs, wkts: playerInn.wkts, balls: playerInn.balls, name, squad: [summary.team.bat.id, summary.team.bowl.id, summary.team.field.id], moment: best?.kind || '' });
+  if (mode === 'daily') {
+    text = dailyShareText(summary.scenario, profile.dailyChallenge);
+  } else if (mode !== 'tutorial' && playerInn) {
+    const sq = summary.team || {};
+    const token = encodeChallenge({ seed: summary.seed, target: playerInn.runs, wkts: playerInn.wkts, balls: playerInn.balls, name, squad: [sq.bat?.id || '', sq.bowl?.id || '', sq.field?.id || ''], moment: best?.kind || '', team: summary.myTeam.id, opp: summary.oppTeam.id });
     link = `${link}#${token}`;
-    text = `I scored ${playerInn.runs}/${playerInn.wkts} in Sixcharge${best ? ` with a ${best.title.replace(/!$/, '')}` : ''}! Beat my score off the same 30 balls: ${link}`;
+    text = `I scored ${playerInn.runs}/${playerInn.wkts} for ${summary.myTeam.name} v ${summary.oppTeam.name} in Sixcharge${best ? ` with a ${best.title.replace(/!$/, '')}` : ''}! Beat my score off the same 30 balls: ${link}`;
   } else {
     text = `I just won Issue #1 of Sixcharge: Superhero Cricket${best ? ` with a ${best.title.replace(/!$/, '')}` : ''}! Play it here: ${link}`;
   }
@@ -435,7 +712,7 @@ function showResult(summary) {
       };
     }
   }, 'image/jpeg', 0.86);
-  $('resAgain').textContent = summary.mode === 'tutorial' ? 'Play Quick Match' : 'Play again';
+  $('resAgain').textContent = { tutorial: 'Play Quick Match', league: 'Back to the league', cup: 'Back to the cup', daily: 'Daily results' }[mode] || 'Play again';
 }
 
 $('copyLink').addEventListener('click', async () => {
@@ -445,7 +722,10 @@ $('copyLink').addEventListener('click', async () => {
 });
 $('resHome').addEventListener('click', renderHome);
 $('resAgain').addEventListener('click', () => {
-  if (lastSummary?.mode === 'challenge') { pending = { mode: 'challenge', challenge }; startMatch(pending); }
+  const m = lastSummary?.mode;
+  if (m === 'challenge') { pending = { mode: 'challenge', challenge }; startMatch(pending); }
+  else if (m === 'league' || m === 'cup') renderTournament(tourNotes);
+  else if (m === 'daily') renderDaily();
   else { pending = { mode: 'quick' }; renderSquad(); }
 });
 
