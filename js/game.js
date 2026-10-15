@@ -568,6 +568,7 @@ export class Game {
     const cs = this.cams.bat.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 2 };
     if (res.outcome === 'hit' || res.outcome === 'edge') {
       this.contactFeedback(grade, cs, err);
+      if (res.outcome === 'hit') this.hitBlast(cs, fx.meteor ? 'meteor' : fx.thunder ? 'thunder' : fx.mirror ? 'mirror' : null, grade);
       if (res.outcome === 'hit' && (grade === 'perfect' || grade === 'good')) {
         this.charge.award(grade === 'perfect' ? 'perfectBat' : 'goodBat', grade.toUpperCase());
         if (grade === 'perfect') this.stats.perfects++;
@@ -657,6 +658,16 @@ export class Game {
       const a = rng.range(-1.2, 1.2), len = rng.chance(0.4) ? 160 : 70;
       this.botInput('up', { dx: Math.sin(a) * len, dy: -Math.cos(a) * len });
     }).catch(() => {});
+  }
+
+  // the hand-drawn burst on the bat: big and tinted for a powered hit, smaller for a perfect one
+  hitBlast(at, power, grade) {
+    const big = Math.min(this.W * 0.95, 420);
+    if (power) {
+      const hue = { thunder: 0, meteor: -38, mirror: 230 }[power] || 0;
+      this.fx.blast(at.x, at.y, { size: big, hue, dur: 460 });
+      this.fx.shake(16);
+    } else if (grade === 'perfect') this.fx.blast(at.x, at.y, { size: big * 0.55, dur: 360 });
   }
 
   contactFeedback(grade, at, err) {
@@ -1020,6 +1031,12 @@ export class Game {
 
     if (res.outcome === 'hit' || res.outcome === 'edge') {
       if (ai.grade === 'perfect') { sfx.bat('perfect'); this.fx.burst(cs.x, cs.y, { r: 140 }); } else sfx.bat('good');
+      // far end of the pitch: a smaller burst, still big enough to read
+      if (res.outcome === 'hit' && (aiPower === 'thunder' || aiPower === 'mirror' || ai.grade === 'perfect')) {
+        const hue = { thunder: 0, mirror: 230 }[aiPower] || 0;
+        this.fx.blast(cs.x, cs.y, { size: aiPower ? 240 : 140, hue, dur: aiPower ? 460 : 360 });
+        if (aiPower) this.fx.shake(10);
+      }
       S.delivery = null; S.ball = { ...contact };
       const v = res.v || 25, ang = res.outcome === 'edge' ? Math.PI - 0.3 : res.angle, vl = (res.launchDeg || 4) * Math.PI / 180;
       S.flight = { p0: contact, t0: this.gameTime, vx: Math.sin(ang) * v * Math.cos(vl), vz: Math.cos(ang) * v * Math.cos(vl), vy: v * Math.sin(vl) };

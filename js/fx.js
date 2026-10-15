@@ -3,10 +3,45 @@ export const INK = '#141018';
 export const FONT_DISPLAY = '"Bangers", "Impact", "Arial Black", sans-serif';
 export const FONT_BODY = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
 
+// Hand-drawn 8-frame impact burst (img/burst.webp, tools/build_burst.py): [x, y, w, h, centreX, centreY]
+const BURST = [[0, 0, 139, 137, 69.9, 68.3], [141, 0, 151, 149, 74.2, 77.5], [294, 0, 217, 212, 107.4, 109.6], [513, 0, 307, 274, 157.1, 143.8], [0, 276, 322, 294, 164.0, 165.5], [324, 276, 275, 244, 134.5, 133.9], [601, 276, 222, 228, 107.9, 127.4], [825, 276, 154, 174, 79.9, 102.9]];
+const BURST_REF = 322; // widest frame, the full blast
+let burstImg = null, burstReady = false;
+const burstTints = new Map();
+function loadBurst() {
+  if (burstImg) return;
+  burstImg = new Image();
+  burstImg.onload = () => { burstReady = true; };
+  burstImg.src = 'img/burst.webp';
+}
+// the gold sheet with its hue turned by `deg` (shading and the white-hot core kept)
+function burstSheet(deg) {
+  if (!deg) return burstImg;
+  if (burstTints.has(deg)) return burstTints.get(deg);
+  const c = document.createElement('canvas');
+  c.width = burstImg.naturalWidth; c.height = burstImg.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(burstImg, 0, 0);
+  const img = g.getImageData(0, 0, c.width, c.height), p = img.data;
+  const a = deg * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
+  // standard hue-rotation matrix
+  const m = [0.213 + cos * 0.787 - sin * 0.213, 0.715 - cos * 0.715 - sin * 0.715, 0.072 - cos * 0.072 + sin * 0.928,
+    0.213 - cos * 0.213 + sin * 0.143, 0.715 + cos * 0.285 + sin * 0.140, 0.072 - cos * 0.072 - sin * 0.283,
+    0.213 - cos * 0.213 - sin * 0.787, 0.715 - cos * 0.715 + sin * 0.715, 0.072 + cos * 0.928 + sin * 0.072];
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] < 4) continue;
+    const r = p[i], gg = p[i + 1], b = p[i + 2];
+    p[i] = r * m[0] + gg * m[1] + b * m[2]; p[i + 1] = r * m[3] + gg * m[4] + b * m[5]; p[i + 2] = r * m[6] + gg * m[7] + b * m[8];
+  }
+  g.putImageData(img, 0, 0);
+  burstTints.set(deg, c);
+  return c;
+}
+
 export class FX {
-  constructor() { this.reset(); }
+  constructor() { this.reset(); loadBurst(); }
   reset() {
-    this.words = []; this.bubbles = []; this.parts = []; this.bursts = [];
+    this.words = []; this.bubbles = []; this.parts = []; this.bursts = []; this.blasts = [];
     this.flashA = 0; this.flashColor = '#fff'; this.shakeA = 0; this.speed = 0; this.vignette = null;
   }
 
@@ -17,6 +52,8 @@ export class FX {
     this.bubbles = this.bubbles.filter(b => b.text !== text);
     this.bubbles.push({ text, x, y, dur, side, t: 0 });
   }
+  // the hand-drawn impact burst at (x, y), `size` px across at full blast; hue turns the gold
+  blast(x, y, { size = 260, hue = 0, dur = 420 } = {}) { this.blasts.push({ x, y, size, hue, dur, t: 0 }); }
   flash(color = '#fff', a = 0.9) { this.flashColor = color; this.flashA = a; }
   shake(a = 10) { this.shakeA = Math.max(this.shakeA, a); }
   burst(x, y, { color = '#ffd23f', dur = 260, rays = 18, r = 300 } = {}) { this.bursts.push({ x, y, color, dur, rays, r, t: 0 }); }
@@ -32,6 +69,8 @@ export class FX {
     for (const w of this.words) w.t += dtMs;
     for (const b of this.bubbles) b.t += dtMs;
     for (const b of this.bursts) b.t += dtMs;
+    for (const b of this.blasts) b.t += dtMs;
+    this.blasts = this.blasts.filter(b => b.t < b.dur);
     this.words = this.words.filter(w => w.t < w.dur);
     this.bubbles = this.bubbles.filter(b => b.t < b.dur);
     this.bursts = this.bursts.filter(b => b.t < b.dur);
@@ -48,6 +87,11 @@ export class FX {
 
   draw(ctx, W, H) {
     for (const b of this.bursts) drawBurst(ctx, b, W, H);
+    if (burstReady) for (const b of this.blasts) {
+      const [sx, sy, w, h, cx, cy] = BURST[Math.min(7, Math.floor((b.t / b.dur) * 8))];
+      const k = b.size / BURST_REF;
+      ctx.drawImage(burstSheet(b.hue), sx, sy, w, h, b.x - cx * k, b.y - cy * k, w * k, h * k);
+    }
     for (const p of this.parts) {
       ctx.globalAlpha = Math.min(1, p.life / 20);
       ctx.fillStyle = p.color;
