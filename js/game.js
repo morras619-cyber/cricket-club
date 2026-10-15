@@ -16,6 +16,7 @@ import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D,
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
+import { loadBowlSprites, drawBowlSprite, bowlFrame } from './bowlsprite.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -203,6 +204,7 @@ export class Game {
     this.myTeam = teamById(opts.team);
     this.oppTeam = rivalTeam(this.seed, this.myTeam.id);
     loadBatSprites(this.myTeam.id, this.oppTeam.id);
+    loadBowlSprites();
     this.charge = new Charge(0);
     this.charge.on(ev => this.onCharge(ev));
     this.ui.charge(0);
@@ -485,7 +487,7 @@ export class Game {
       const dt = this.gameTime - last; last = this.gameTime;
       if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / 850;
       const p = Math.min(1, prog);
-      S.bowler.z = 27.5 - 6.9 * p; S.bowler.pose = POSES.run(p * 13);
+      S.bowler.z = 27.5 - 6.9 * p; S.bowler.pose = POSES.run(p * 13); S.bowler.spr = { anim: 'run', p };
       return p >= 1;
     });
     this.onInput = null;
@@ -501,7 +503,7 @@ export class Game {
 
     const d = makeDelivery(spec);
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
-    S.bowler.pose = POSES.bowl(1);
+    S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
     if (aiPower === 'maya') S.maya = { real: rng.chance(0.5) ? 1 : -1, picked: 0 };
     sfx.whoosh();
 
@@ -585,6 +587,7 @@ export class Game {
       S.delivery = null;
       // beaten or bowled: he turns to look back at the stumps
       if (res.outcome === 'bowled' || res.outcome === 'beaten') S.batter.shot = { anim: 'bowled', t0: this.realTime, from: batFrame(S.batter, this.realTime).f };
+      S.bowler.spr = { anim: res.outcome === 'bowled' ? 'celebrate' : 'react', t0: this.realTime };
     }
 
     // ----- outcomes -----
@@ -602,6 +605,7 @@ export class Game {
       const caught = rng.chance(keeperEdgeP(res.offset));
       if (caught) {
         sfx.glove(); this.wicketFx('CAUGHT BEHIND!', cs);
+        S.bowler.spr = { anim: 'celebrate', t0: this.realTime };
         inn.ball({ wicket: true }); this.charge.wicketLost();
       } else {
         const four = res.offset.x > 1.0 && rng.chance(0.5);
@@ -1912,7 +1916,11 @@ export class Game {
     const push = (z, fn) => items.push({ d: cam.depth(z), fn });
 
     for (const f of S.field3d || []) {
-      push(f.y, () => drawFigure3D(ctx, cam, f.x, f.y, teamLook(kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0 ? 1 : 0), POSES.crouch(), { noShadow: false }));
+      push(f.y, () => {
+        const p = kind === 'bat' && cam.project(f.x, 0, f.y);
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, 'field', this.oppTeam, f.x > 0)) return;
+        drawFigure3D(ctx, cam, f.x, f.y, teamLook(kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0 ? 1 : 0), POSES.crouch(), { noShadow: false });
+      });
     }
     push(20, () => drawStumps(ctx, cam, 20, S.stumps[20]));
     push(0, () => drawStumps(ctx, cam, 0, S.stumps[0], S.stumpGlow ? '#e8343b' : null));
@@ -1924,7 +1932,13 @@ export class Game {
         const p = clamp((this.realTime - S.bowler.followT0) / 600, 0, 1);
         bx -= 1.4 * p; bz -= 1.2 * p;
       }
-      push(bz, () => drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem }));
+      // facing the batting camera the bowler is the hand-drawn sprite, carrying on a stride after release
+      if (kind === 'bat' && S.bowler.spr?.anim === 'deliver') bz -= 0.9 * clamp((this.gameTime - S.bowler.spr.t0) / 0.6, 0, 1);
+      push(bz, () => {
+        const p = kind === 'bat' && cam.project(bx, 0, bz);
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime), this.oppTeam)) return;
+        drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem });
+      });
     }
     // batter with swing animation
     const b = S.batter;
