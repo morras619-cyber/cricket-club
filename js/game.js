@@ -2324,42 +2324,42 @@ export class Game {
     return { p, face: o.face ?? -Math.PI / 2, moving: Math.hypot(dx, dy) > 0.02 };
   }
   topFielder(f, i) {
-    const V = this.of, O = this.O, pose = f.pose?.name;
+    const V = this.of, O = this.O, pose = f.pose?.name, ctx = this.ctx;
     const { p, face, moving } = this.topFace(f, O.ball);
-    // side 'ai': the AI's team is in the field
-    const team = O.side === 'ai' ? this.oppTeam : this.myTeam;
-    const size = Math.max(30, 1.85 * V.k * 1.3) * (f.ctrl ? 1.25 : 1);
-    if (f.ctrl) {
-      this.ctx.fillStyle = 'rgba(255,210,63,0.35)';
-      this.ctx.beginPath(); this.ctx.arc(p.x, p.y, size * 0.62, 0, Math.PI * 2); this.ctx.fill();
-    }
-    if (pose === 'dive') {
-      // drawn diving to the left; mirrored for a dive to the right
-      const right = (f.pose.arg || 1) > 0;
-      return drawTopSprite(this.ctx, p.x, p.y, size * 1.1, 'dive', team, 145 * Math.PI / 180, right);
-    }
-    // everyone watches the pitch; only a fielder running away from it (back towards the rope) turns to face his run
-    const c = V.to(0, 10), toPitch = Math.atan2(c.y - p.y, c.x - p.x);
-    let frame = 'ready', ang = toPitch;
-    if (pose === 'celebrate') frame = 'catch2';
+    const team = O.side === 'ai' ? this.oppTeam : this.myTeam; // side 'ai': the AI's team fields
+    const size = Math.max(22, 1.85 * V.k) * (f.ctrl ? 1.15 : 1);
+    // everyone watches the pitch: beyond it on screen they face down (front sheet), in front of it up (back sheet)
+    const c = V.to(0, 10);
+    let view = p.y < c.y ? 'front' : 'top';
+    let frame = 'ready', flip = false;
+    if (pose === 'dive') { frame = 'dive'; flip = (f.pose.arg || 1) > 0; }      // drawn diving to the left
+    else if (pose === 'celebrate') frame = 'catch2';
     else if (pose === 'run' || moving) {
       frame = ['run1', 'run2', 'run3', 'run2'][Math.floor(this.gameTime * 9 + i) % 4];
-      const away = Math.cos(face - toPitch) < -0.3;
-      ang = away ? face : toPitch;
+      // running away from the pitch: he turns his back on it
+      const toPitch = Math.atan2(c.y - p.y, c.x - p.x);
+      if (moving && Math.cos(face - toPitch) < -0.3) view = Math.sin(face) > 0 ? 'front' : 'top';
     }
     if (f.throwT0 != null && this.realTime - f.throwT0 < 450) {
       const t = this.realTime - f.throwT0;
-      frame = t < 150 ? 'throw1' : t < 300 ? 'throw2' : 'throw3'; ang = f.throwFace ?? face;
+      frame = t < 150 ? 'throw1' : t < 300 ? 'throw2' : 'throw3';
+      flip = Math.cos(f.throwFace ?? 0) > 0;
     }
-    return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, ang);
+    if (f.ctrl) {
+      ctx.fillStyle = 'rgba(255,210,63,0.35)';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y + size * 0.4, size * 0.55, size * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    return drawTopSprite(ctx, p.x, p.y, frame === 'dive' ? size * 1.1 : size, frame, team, view, flip);
   }
   topBatter(b, i) {
     const V = this.of, O = this.O;
     const { p, face } = this.topFace(b, null);
     const team = O.side === 'ai' ? this.myTeam : this.oppTeam;
-    const size = Math.max(22, 1.85 * V.k * 0.95);
+    const size = Math.max(18, 1.85 * V.k * 0.8);
     const frame = (i ? 'batB' : 'batA') + (O.running ? 1 + (Math.floor(this.gameTime * 8) % 2) : 1);
-    return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, O.running ? face : (i ? Math.PI / 2 : -Math.PI / 2));
+    // running up the screen shows his back, down the screen his face
+    const view = O.running ? (Math.sin(face) > 0 ? 'front' : 'top') : (i ? 'front' : 'top');
+    return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, view);
   }
 
   renderOutfield() {

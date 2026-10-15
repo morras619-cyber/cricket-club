@@ -237,9 +237,27 @@ const FIELD_TOP = {
   batB1: [0, 814, 179, 202, 89.5, 101.0, -90],
   batB2: [181, 814, 249, 275, 124.5, 137.5, -90],
 };
+// the same poses drawn facing the camera (faces visible), for players looking down the screen
+const FIELD_FRONT = {
+  ready: [0, 0, 225, 234, 112.5, 117.0, -90],
+  run1: [227, 0, 168, 246, 84.0, 123.0, -90],
+  run2: [397, 0, 151, 271, 75.5, 135.5, -90],
+  run3: [550, 0, 170, 267, 85.0, 133.5, -90],
+  dive: [0, 273, 368, 268, 184.0, 134.0, 145],
+  catch1: [370, 273, 181, 241, 90.5, 120.5, -90],
+  catch2: [553, 273, 190, 250, 95.0, 125.0, -90],
+  throw1: [745, 273, 185, 228, 92.5, 114.0, -90],
+  throw2: [0, 543, 232, 226, 116.0, 113.0, -90],
+  throw3: [234, 543, 277, 249, 138.5, 124.5, -90],
+  batA1: [513, 543, 213, 239, 106.5, 119.5, -90],
+  batA2: [728, 543, 170, 250, 85.0, 125.0, -90],
+  batB1: [0, 795, 167, 192, 83.5, 96.0, -90],
+  batB2: [169, 795, 246, 222, 123.0, 111.0, -90],
+};
 
 const VIEWS = {
   'field-top': { src: 'img/field-top.webp', frames: FIELD_TOP },
+  'field-front': { src: 'img/field-front.webp', frames: FIELD_FRONT },
   'keeper-back': { src: 'img/keeper-back.webp', frames: KEEPER_BACK },
   'keeper-front': { src: 'img/keeper-front.webp', frames: KEEPER_FRONT },
   front: { src: 'img/bowler.webp', frames: FRONT, refPx: 323 },
@@ -257,7 +275,7 @@ const tinted = new Map();
 
 // the front sheet plus the back sheets of the teams in this match
 export function loadBowlSprites(...teamIds) {
-  for (const key of ['front', 'batfront', 'keeper-back', 'keeper-front', 'field-top', ...teamIds.map(id => 'back-' + id)]) {
+  for (const key of ['front', 'batfront', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.map(id => 'back-' + id)]) {
     const v = VIEWS[key];
     if (!v || v.img) continue;
     v.img = new Image();
@@ -362,19 +380,18 @@ export function drawKeeperSprite(ctx, px, py, kPerM, frame, team, view, { flip =
   return true;
 }
 
-// A top-down player centred at (px, py), sizePx tall (head to toe as drawn), turned to face
-// screen angle `face` (radians, 0 = right, -pi/2 = up). False until the sheet has loaded.
-export function drawTopSprite(ctx, px, py, sizePx, frame, team, face = -Math.PI / 2, flip = false) {
-  const v = VIEWS['field-top'];
-  if (!v.ready) return false;
-  const img = sheetFor('field-top', team);
-  const [sx, sy, w, h, cx, cy, deg] = v.frames[frame];
+// An Outfield Mode player centred at (px, py), sizePx tall, drawn upright as on the sheet.
+// view 'top' looks up the screen (back to the camera), 'front' looks down it (face visible).
+export function drawTopSprite(ctx, px, py, sizePx, frame, team, view = 'top', flip = false) {
+  const key = 'field-' + view, v = VIEWS[key];
+  if (!v || !v.ready) return false;
+  const img = sheetFor(key, team);
+  const [sx, sy, w, h, cx, cy] = v.frames[frame];
   const k = sizePx / 240;
   ctx.save();
   ctx.translate(px, py);
   ctx.fillStyle = 'rgba(10,8,20,0.28)';
-  ctx.beginPath(); ctx.ellipse(3, 4, sizePx * 0.32, sizePx * 0.24, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.rotate(face - deg * Math.PI / 180);
+  ctx.beginPath(); ctx.ellipse(2, h * k * 0.42, sizePx * 0.3, sizePx * 0.1, 0, 0, Math.PI * 2); ctx.fill();
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(img, sx, sy, w, h, -cx * k, -cy * k, w * k, h * k);
   ctx.restore();

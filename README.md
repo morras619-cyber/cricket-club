@@ -64,7 +64,7 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `tools/build_bowler_sprites.py` | Cuts a labelled bowler sheet into an atlas (`--back` mirrors the back-view sheet into a right-arm action) |
 | `img/batter-front.webp`, `tools/build_front_batter.py` | The opposing batter seen from the bowling camera, same shots as the back view, repainted in his team's kit |
 | `img/keeper-back.webp`, `img/keeper-front.webp`, `tools/build_keeper_sprites.py` | Hand-drawn wicket-keeper: back view in Keeper Mode (crouch, rise, takes, dives, juggle, stumping, celebration), front view behind the batter when bowling; in the fielding team's kit |
-| `img/field-top.webp`, `tools/build_field_sprites.py` | Outfield Mode players seen from above (ready, run, dive, catch, throw, batters running), turned to face where they move, in team kit |
+| `img/field-top.webp`, `img/field-front.webp`, `tools/build_field_sprites.py` | Outfield Mode players seen from above, drawn upright: back view for players looking up the screen, face view for those looking down it, so everyone watches the pitch |
 | `js/teams.js` | The eight teams and their kit colours |
 | `tools/build_batter_sprites.py` | Cuts labelled batting sprite sheets into the per-team images |
 | `js/cutin.js` | The comic cut-in panel for signature powers |
