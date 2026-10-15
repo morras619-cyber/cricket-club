@@ -190,7 +190,8 @@ function sheetMasks(key, p, w, h) {
     for (let q = 0; q < n; q++) grown[q] &= raw[q];
     return grown;
   };
-  const sk = fix(skin, (area, hue, v) => area >= 30 && !(hue > 30.5 && v > 0.92)); // the bat is yellower and brighter
+  // the bat is yellower and brighter than skin (only the batting sheets have one)
+  const sk = fix(skin, (area, hue, v) => area >= 30 && !(hasBat && hue > 30.5 && v > 0.92));
   const hr = fix(hair, area => area >= 40);
   // spread each area over its own shading until the outlines stop it, so the whole arm or face is repainted
   const spread = (core, loose, other, steps) => {
