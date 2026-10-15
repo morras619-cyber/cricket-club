@@ -29,17 +29,28 @@ def main():
     # A raised fist can touch a label's border, so skin-coloured pixels are kept.
     r, g, b = (a[..., i].astype(int) for i in range(3))
     skin = (r > 150) & (r > b + 40) & (g > 90) & (g < r - 25) & (b > 80)  # not the yellow border
+    boxes = []
     for y0, y1 in [(0, int(H * 0.07)), (int(H * 0.49), int(H * 0.56))]:
         lab, _ = ndimage.label(al[y0:y1])
         for i, s in enumerate(ndimage.find_objects(lab), 1):
             if s[1].stop - s[1].start <= 120:
                 continue
             rows = [y for y in range(s[0].start, s[0].stop) if (lab[y, s[1]] == i).sum() > 100]
-            if len(rows) < 20:
+            hgt = s[0].stop - s[0].start
+            if len(rows) >= 20:
+                ys, ye = y0 + rows[0] - 2, y0 + rows[-1] + 3
+            elif 30 <= hgt <= 80 and len(rows) >= 2:  # a hollow box: only its top and bottom edges are full rows
+                ys, ye = y0 + s[0].start - 2, y0 + s[0].stop + 3
+            else:
                 continue
-            ys, ye = y0 + rows[0] - 2, y0 + rows[-1] + 3
             xs, xe = s[1].start - 3, s[1].stop + 3
             mask[ys:ye, xs:xe] &= skin[ys:ye, xs:xe]
+            boxes.append((ys, ye, xs, xe))
+    # drop what's left of a label (a gold border reads as skin): pieces wholly inside a label box
+    lab, n = ndimage.label(mask)
+    for i, sl in enumerate(ndimage.find_objects(lab), 1):
+        if any(sl[0].start >= b[0] and sl[0].stop <= b[1] and sl[1].start >= b[2] and sl[1].stop <= b[3] for b in boxes):
+            mask[sl][lab[sl] == i] = False
     # drop any specks the labels left behind
     lab, n = ndimage.label(mask)
     sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
