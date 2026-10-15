@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="theme-color" content="#101632">
+<title>Sixcharge — Character Lab</title>
+<style>
+:root{--night:#101632;--night2:#1b1838;--ink:#141018;--paper:#fff4da;--bolt:#ffd23f;--sky:#3ec6ff;--hot:#e8343b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 20%,#303c78 0,#171b3b 45%,#090e20 100%);color:var(--paper);font-family:system-ui,sans-serif;min-height:100vh}
+header{padding:16px 18px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:2px solid #ffd23f55}h1{font-size:clamp(22px,5vw,34px);margin:0;letter-spacing:1px;text-transform:uppercase}h1 span{color:var(--bolt)}.tag{font-size:11px;font-weight:900;letter-spacing:1px;color:var(--bolt);border:1px solid var(--bolt);padding:6px 9px;border-radius:3px}
+main{max-width:900px;margin:auto;padding:14px}.stage{position:relative;height:min(64vh,570px);min-height:380px;overflow:hidden;border:2px solid #6079b5;border-radius:8px;background:linear-gradient(#11193800 0 52%,#263d3b 52% 100%),radial-gradient(ellipse at 50% 100%,#c2a35c 0,#867442 35%,#34443c 70%);box-shadow:0 12px 35px #0007}
+.skyglow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 7%,#fff5c955 0,transparent 14%),linear-gradient(#12183355,#10163200 50%)}.crowd{position:absolute;top:22%;height:28%;width:100%;background:repeating-linear-gradient(0deg,#171b36 0 10px,#35456a 11px 16px,#171b36 17px 25px);border-top:4px solid #e8c65b;border-bottom:5px solid #101632}.crowd:after{content:"";position:absolute;inset:0;background-image:radial-gradient(#ffdc78 1px,transparent 1.5px),radial-gradient(#e6e8ff 1px,transparent 1.5px),radial-gradient(#ed6e70 1px,transparent 1.5px);background-size:17px 15px,23px 19px,31px 17px;opacity:.7}.board{position:absolute;right:4%;top:34%;background:#101632;border:2px solid var(--bolt);color:var(--bolt);font-weight:1000;font-style:italic;padding:5px 11px;transform:skew(-7deg);text-shadow:2px 2px #e8343b}
+.light{position:absolute;top:5%;width:68px;height:42px;background:repeating-linear-gradient(90deg,#fff4ca 0 6px,transparent 7px 12px),repeating-linear-gradient(0deg,#fff4ca 0 6px,transparent 7px 12px);filter:drop-shadow(0 0 14px #fff0ad);opacity:.95}.light.l{left:9%}.light.r{right:9%}.pitch{position:absolute;left:35%;right:35%;top:48%;bottom:-8%;background:linear-gradient(90deg,#9b824d,#d5b86f 50%,#9b824d);clip-path:polygon(28% 0,72% 0,100% 100%,0 100%);border-top:3px solid #f5e5b5}.crease{position:absolute;left:38%;right:38%;bottom:15%;height:3px;background:#fff4da;box-shadow:0 -36px #fff4da}.shadow{position:absolute;left:50%;bottom:7%;width:180px;height:28px;transform:translateX(-50%);background:#080b15a8;border-radius:50%;filter:blur(5px)}
+.character{position:absolute;height:88%;width:auto;max-width:76%;left:50%;bottom:3%;transform:translateX(-50%);overflow:visible;filter:drop-shadow(0 4px 1px #10101888)}
+.character *{vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}.outline{stroke:#11101b;stroke-width:3}.blue{fill:#1458d4}.blue2{fill:#237bf2}.gold{fill:#ffd23f}.shade{fill:#10338a}.skin{fill:#e7a36d}.white{fill:#f8f4e8}.dark{fill:#101632}.metal{fill:#8cbae9}.limb{transform-box:fill-box;transform-origin:center}
+#bat{transform-box:fill-box;transform-origin:14% 85%;transition:transform .24s ease}
+#leftArm,#rightArm,#torso,#head,#leftLeg,#rightLeg{transform-box:fill-box;transform-origin:center;transition:transform .22s ease}
+#character[data-pose="ready"] #bat{transform:rotate(-4deg)}
+#character[data-pose="backlift"] #bat{transform:rotate(-44deg) translate(-5px,-4px)}
+#character[data-pose="contact"] #bat{transform:rotate(47deg) translate(5px,2px)}
+#character[data-pose="follow"] #bat{transform:rotate(75deg) translate(5px,-5px)}
+#character[data-pose="recovery"] #bat{transform:rotate(12deg)}
+#character[data-pose="backlift"] #torso{transform:rotate(-5deg) translateX(-3px)}
+#character[data-pose="contact"] #torso{transform:rotate(10deg) translateX(4px)}
+#character[data-pose="follow"] #torso{transform:rotate(17deg) translateX(6px)}
+#character[data-pose="backlift"] #leftArm{transform:rotate(-15deg) translate(-3px,-5px)}
+#character[data-pose="backlift"] #rightArm{transform:rotate(-24deg) translate(2px,-7px)}
+#character[data-pose="contact"] #leftArm{transform:rotate(28deg) translate(4px,1px)}
+#character[data-pose="contact"] #rightArm{transform:rotate(36deg) translate(7px,1px)}
+#character[data-pose="follow"] #leftArm{transform:rotate(48deg) translate(6px,-4px)}
+#character[data-pose="follow"] #rightArm{transform:rotate(52deg) translate(9px,-6px)}
+#character[data-pose="contact"] #leftLeg{transform:rotate(-8deg) translate(-5px,0)}
+#character[data-pose="follow"] #rightLeg{transform:rotate(10deg) translate(5px,-3px)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.controls button,.toggle{font:800 13px system-ui;letter-spacing:.3px;color:var(--paper);background:#202747;border:1px solid #6577ad;border-radius:5px;padding:11px 13px;cursor:pointer}.controls button.active{background:var(--bolt);border-color:var(--bolt);color:#15152a}.controls .play{background:var(--hot);border-color:var(--hot)}.info{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:#101632cc;border:1px solid #53659a;border-radius:7px;padding:12px 14px}.info strong{color:var(--bolt)}.small{font-size:12px;color:#c1c8e2;line-height:1.5}.footnote{margin:14px 2px 4px;color:#c1c8e2;font-size:12px;line-height:1.55}.ball{position:absolute;width:15px;height:15px;border-radius:50%;background:#e8343b;border:2px solid #fff4da;box-shadow:0 0 15px #ff5b5b;left:50%;top:58%;opacity:0;transition:all .2s}
+@media(max-width:520px){main{padding:9px}.stage{height:55vh;min-height:350px}.character{height:83%;max-width:88%}.controls button{flex:1 1 28%;padding:10px 6px;font-size:12px}.tag{font-size:9px}.info{grid-template-columns:1fr}.light{transform:scale(.75)}}
+</style>
+</head>
+<body>
+<header><h1><span>SIXCHARGE</span> / Character Lab</h1><div class="tag">PRIVATE TEST</div></header>
+<main>
+<div class="stage" id="stage" aria-label="Animated superhero cricket character test">
+ <div class="skyglow"></div><div class="light l"></div><div class="light r"></div><div class="crowd"></div><div class="board">SIXCHARGE</div><div class="pitch"></div><div class="crease"></div><div class="shadow"></div>
+ <svg id="character" class="character" data-pose="ready" viewBox="0 0 260 440" role="img" aria-label="Blue and yellow superhero cricket batsman, rear three-quarter view">
+  <defs><linearGradient id="batwood" x2="1" y2="0"><stop stop-color="#b77b39"/><stop offset=".48" stop-color="#ffe0a0"/><stop offset="1" stop-color="#b87b3b"/></linearGradient><linearGradient id="shine" x2="1" y2="1"><stop stop-color="#4cb7ff"/><stop offset="1" stop-color="#1045bb"/></linearGradient></defs>
+  <!-- bat and grip are independent animated parts -->
+  <g id="bat" class="outline"><path d="M187 211 L211 42 Q214 28 222 35 L235 42 L213 219 Z" fill="url(#batwood)"/><path d="M214 45 L222 39 L229 43 L208 208" fill="none" stroke="#fff0c4" stroke-width="2"/><path d="M187 210 L211 214 L207 232 L183 227 Z" fill="#152039"/><path d="M186 215 L205 220 M185 220 L204 225" stroke="#f8f4e8" stroke-width="2"/></g>
+  <!-- legs -->
+  <g id="leftLeg" class="outline"><path d="M91 267 Q112 265 126 276 L119 329 L111 371 L84 371 L91 322 Z" class="blue"/><path d="M84 307 Q103 300 121 309 L116 356 Q99 365 81 354 Z" class="white"/><path d="M86 315 L117 310 M83 339 L118 335" fill="none" stroke="#9baed0" stroke-width="4"/><path d="M85 367 L111 367 L115 389 L78 389 Q69 385 77 377 Z" class="white"/><path d="M78 385 L112 385" fill="none" stroke="#152039" stroke-width="4"/></g>
+  <g id="rightLeg" class="outline"><path d="M130 273 Q151 264 168 275 L167 322 L178 368 L151 376 L137 329 Z" class="blue"/><path d="M137 307 Q153 301 169 307 L175 354 L151 363 Z" class="white"/><path d="M138 316 L171 313 M145 341 L173 338" fill="none" stroke="#9baed0" stroke-width="4"/><path d="M151 368 L177 363 L190 382 Q190 389 180 390 L151 385 Z" class="white"/><path d="M154 384 L185 386" fill="none" stroke="#152039" stroke-width="4"/></g>
+  <!-- torso, cape and shirt -->
+  <g id="torso">
+   <path class="outline shade" d="M93 126 L69 151 L52 213 L81 226 L97 185 L95 268 Q129 283 169 265 L163 183 L185 218 L207 202 L185 148 L158 128 Z"/>
+   <path class="outline blue" d="M95 127 L119 119 L145 120 L159 132 L164 179 L155 247 L132 261 L100 246 L91 178 Z"/>
+   <path class="outline gold" d="M96 130 L112 142 L130 163 L147 140 L158 132 L149 164 L131 184 L112 164 Z"/>
+   <path d="M102 181 L110 231 L128 245 L129 188 L118 173 Z" fill="url(#shine)" stroke="#11101b" stroke-width="2"/>
+   <path class="outline gold" d="M97 241 Q128 251 158 239 L162 260 Q130 276 96 260 Z"/>
+   <path d="M104 252 L151 252" stroke="#fff0a2" stroke-width="3"/>
+   <path class="outline blue2" d="M77 151 L91 135 L102 143 L91 177 L81 207 L64 204 Z"/>
+   <path class="outline gold" d="M78 150 L91 139 L98 147 L89 165 L74 165 Z"/>
+   <path class="outline blue2" d="M159 138 L177 151 L197 198 L180 208 L162 178 Z"/>
+   <path class="outline gold" d="M165 145 L177 153 L185 171 L173 177 L162 160 Z"/>
+   <!-- back emblem -->
+   <path d="M129 183 L143 201 L132 218 L138 235 L119 213 L128 200 L119 193 Z" fill="#ffd23f" stroke="#11101b" stroke-width="2"/>
+  </g>
+  <!-- arms with separate animated groups -->
+  <g id="leftArm" class="outline"><path d="M77 155 Q64 168 69 193 L80 218 L96 211 L87 186 L97 165 Z" class="blue2"/><path d="M75 187 L89 183 L99 211 L82 220 Z" class="white"/><path d="M79 192 L91 189 M83 202 L95 199" stroke="#a3b6d7" stroke-width="3"/><path d="M80 214 L97 208 L108 224 L100 239 L85 235 L76 224 Z" class="white"/><path d="M84 218 L99 214 L104 224 L91 230 Z" class="metal"/></g>
+  <g id="rightArm" class="outline"><path d="M170 153 Q183 167 184 186 L199 205 L184 218 L164 194 L157 170 Z" class="blue2"/><path d="M183 194 L198 203 L188 221 L174 213 Z" class="white"/><path d="M181 201 L193 209" stroke="#9eb4dc" stroke-width="3"/><path d="M181 215 L197 209 L207 223 L197 239 L181 236 L175 225 Z" class="white"/><path d="M184 218 L199 214 L203 224 L190 231 Z" class="metal"/></g>
+  <!-- helmet and grille -->
+  <g id="head" class="outline"><path d="M97 76 Q96 48 124 43 Q154 42 164 67 L159 103 L143 121 L112 116 L99 100 Z" class="dark"/><path d="M98 73 Q98 46 126 41 Q153 42 164 67 L151 77 L111 76 Z" class="blue"/><path d="M101 71 Q126 78 163 66 L168 76 Q130 88 99 80 Z" class="gold"/><path d="M111 81 L153 81 L154 103 L140 117 L119 112 L109 99 Z" fill="#0b142d"/><path d="M108 83 L158 85 M109 91 L155 93 M112 100 L150 102 M119 82 L120 112 M132 82 L132 116 M145 83 L144 111" fill="none" stroke="#b9d9f4" stroke-width="2.2"/><path d="M121 52 L133 48 L127 62 L139 58 L124 75 L128 62 L117 66 Z" fill="#ffd23f" stroke="#11101b" stroke-width="1.5"/></g>
+ </svg>
+ <div class="ball" id="ball"></div>
+</div>
+<div class="controls" id="controls">
+ <button class="active" data-pose="ready">01 Ready</button><button data-pose="backlift">02 Backlift</button><button data-pose="contact">03 Contact</button><button data-pose="follow">04 Follow-through</button><button data-pose="recovery">05 Recovery</button><button class="play" id="play">▶ Play sequence</button>
+</div>
+<div class="info"><div><strong id="poseTitle">READY STANCE</strong><div class="small" id="poseText">Balanced stance, watching the bowler. Tap a pose or play the full sequence.</div></div><div class="tag">TEST BUILD 01</div></div>
+<p class="footnote"><strong>Important:</strong> this is an isolated visual prototype. It does not replace the live game character yet and does not change your batting physics, scoring, or main branch. This lets us review the illustrated style and pose transitions before integrating it into the actual game renderer.</p>
+</main>
+<script>
+const character=document.querySelector('#character'),buttons=[...document.querySelectorAll('[data-pose]')],title=document.querySelector('#poseTitle'),desc=document.querySelector('#poseText'),ball=document.querySelector('#ball');
+const poses={ready:['READY STANCE','Balanced stance, watching the bowler.'],backlift:['BACKLIFT','Hands rise and the bat loads behind the shoulder.'],contact:['CONTACT','The body rotates through the shot as the bat drives forward.'],follow:['FOLLOW-THROUGH','The swing finishes high with the torso rotated.'],recovery:['RECOVERY','The player settles back into a ready position.']};
+let timer=null;
+function setPose(p){character.dataset.pose=p;buttons.forEach(b=>b.classList.toggle('active',b.dataset.pose===p));title.textContent=poses[p][0];desc.textContent=poses[p][1];ball.style.opacity=p==='contact'?'1':'0';ball.style.left=p==='contact'?'56%':p==='follow'?'69%':'50%';ball.style.top=p==='contact'?'55%':'58%';}
+buttons.forEach(b=>b.addEventListener('click',()=>{if(timer){clearInterval(timer);timer=null;document.querySelector('#play').textContent='▶ Play sequence'}setPose(b.dataset.pose)}));
+document.querySelector('#play').addEventListener('click',()=>{if(timer){clearInterval(timer);timer=null;document.querySelector('#play').textContent='▶ Play sequence';return}const seq=['ready','backlift','contact','follow','recovery'];let i=0;setPose(seq[i]);document.querySelector('#play').textContent='Ⅱ Pause sequence';timer=setInterval(()=>{i++;if(i>=seq.length){clearInterval(timer);timer=null;document.querySelector('#play').textContent='▶ Play sequence';return}setPose(seq[i])},700)});
+</script>
+</body>
+</html>
