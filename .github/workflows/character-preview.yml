@@ -2,12 +2,6 @@ name: Character redesign preview
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - character-redesign-test
-    paths:
-      - 'character-test.html'
-      - '.github/workflows/character-preview.yml'
 
 permissions:
   contents: read
