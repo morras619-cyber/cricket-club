@@ -91,7 +91,7 @@
       <button class="bigbtn" id="btnChallengeMode" hidden>Accept Challenge</button>
       <div class="hubgrid">
         <button class="tile tile-quick" id="btnQuick"><b>Quick Match</b><small id="quickSub">30 balls each · vs a random team</small></button>
-        <button class="tile tile-league" id="btnLeague"><b>Super League</b><small id="leagueSub">8 teams · semis · final</small></button>
+        <button class="tile tile-league" id="btnLeague"><b>Super League</b><small id="leagueSub">Career: seasons, auctions, records</small></button>
         <button class="tile tile-cup" id="btnCup"><b>Knockout Cup</b><small id="cupSub">3 wins to lift the cup</small></button>
         <button class="tile tile-daily" id="btnDaily"><b>Daily Challenge</b><small id="dailySub">A new scenario every day</small></button>
       </div>
@@ -120,6 +120,28 @@
         <button class="bigbtn primary" id="leagueGo">Play</button>
       </div>
       <button class="chipbtn ghostchip" id="leagueQuit">Abandon this tournament</button>
+    </div>
+  </section>
+
+  <section id="career" class="screen" hidden>
+    <div class="screen-inner wide">
+      <h2 class="title" id="careerTitle">Super League</h2>
+      <p class="lede" id="careerLede"></p>
+      <div id="careerBody" class="leaguebody"></div>
+      <div class="menu row" id="careerNav">
+        <button class="bigbtn ghost" id="careerHome">Home</button>
+        <button class="bigbtn" id="careerSquad">Squad</button>
+        <button class="bigbtn" id="careerRecords">Records</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="records" class="screen" hidden>
+    <div class="screen-inner wide">
+      <h2 class="title">League records</h2>
+      <p class="lede">Every run and wicket since season 1. These never reset.</p>
+      <div id="recordsBody" class="statsbody"></div>
+      <button class="bigbtn ghost" id="recordsBack">Back</button>
     </div>
   </section>
 

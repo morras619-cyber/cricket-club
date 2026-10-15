@@ -151,7 +151,7 @@ const SQUADS = {
   ],
 };
 // batting weak spots for the AI's regular batters, as the scouting report describes them
-const WEAK = [
+export const WEAK = [
   { weak: { lengths: ['yorker'], lanes: null }, label: 'can\'t dig out yorkers' },
   { weak: { lengths: ['short', 'bouncer'], lanes: null }, label: 'hates the short ball' },
   { weak: { lengths: ['good', 'full'], lanes: ['wideoff'] }, label: 'chases wide ones outside off' },
@@ -161,13 +161,17 @@ const WEAK = [
 
 function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
 
+const TIER_OFFSET = { 1: -5, 2: -2, 3: 1, 4: 4 };
 const rosterCache = new Map();
 // A team's ten regulars, in squad order. Ids are stable (`<team>-<index>`) so saved line-ups keep.
 export function roster(teamId) {
   if (rosterCache.has(teamId)) return rosterCache.get(teamId);
   const rng = makeRng(hashStr(teamId));
+  // the giants have better players than the underdogs
+  const off = TIER_OFFSET[teamById(teamId).tier] || 0;
   const list = (SQUADS[teamId] || SQUADS.thunder).map(([name, nick, role, label, bat, bowl, bowlSkill, trait, w], i) => ({
-    id: `${teamId}-${i}`, name, nick, short: name.split(' ').slice(-1)[0], role, label, bat, bowl, bowlSkill, trait, hero: false, team: teamId,
+    id: `${teamId}-${i}`, name, nick, short: name.split(' ').slice(-1)[0], role, label, team: teamId, trait, hero: false, bowl,
+    bat: role === 'bowl' ? bat : Math.min(95, bat + off), bowlSkill: bowl ? Math.min(95, bowlSkill + off) : 0,
     ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.25, 0.5) },
   }));
   rosterCache.set(teamId, list);
@@ -193,6 +197,22 @@ export function heroPlayer(hero, lv = 1) {
     ai: h.ai ? { ...h.ai } : { weak: { lengths: ['good'], lanes: ['off'] }, label: 'pokes at good length outside off', honesty: 0.7, fire: 0.3, rattle: 0.3 },
   };
 }
+
+// ---------- team ratings ----------
+// A player's overall: batters by batting, bowlers by bowling, all-rounders a bit of both.
+export function ovr(p) {
+  if (p.role === 'bowl') return p.bowlSkill;
+  if (p.role === 'all') return Math.round((p.bat + p.bowlSkill) / 2 + 6);
+  if (p.role === 'wk') return Math.min(99, p.bat + 3);
+  return p.bat;
+}
+// A squad's rating out of 100: its best four batters and best three bowlers.
+export function teamRating(pool) {
+  const top = (xs, n) => { const s = xs.sort((a, b) => b - a).slice(0, n); return s.reduce((a, b) => a + b, 0) / Math.max(1, s.length); };
+  const bat = top(pool.map(p => p.bat), 4), bowl = top(pool.filter(p => p.bowl).map(p => p.bowlSkill), 3);
+  return Math.round(bat * 0.5 + bowl * 0.5);
+}
+export const ratingStars = r => Math.max(1, Math.min(5, Math.round((r - 60) / 4.5)));
 
 // ---------- whose heroes play ----------
 // A team's own star, in his slot: { bat, bowl, field } with the other slots empty.
@@ -223,18 +243,20 @@ export const ATTACK_SIZE = 3; // bowlers who share the 5 overs
 export const MAX_OVERS = 2;   // overs any one bowler may bowl
 
 // Everyone available to a side: the team's regulars plus its three chosen heroes.
-export function squadPool(teamId, heroes, levels = {}) {
+// pool: an explicit list of players (the career mode's squads) instead of the team's regulars
+export function squadPool(teamId, heroes, levels = {}, pool = null) {
+  if (pool) return pool;
   return [...[heroes.bat, heroes.field, heroes.bowl].filter(Boolean).map(h => heroPlayer(h, levels[h.id])), ...roster(teamId)];
 }
 export const batCandidates = pool => pool.filter(p => p.role !== 'bowl' || p.hero).sort((a, b) => b.bat - a.bat);
 export const bowlCandidates = pool => pool.filter(p => p.bowl).sort((a, b) => b.bowlSkill - a.bowlSkill);
 
 // The default batting order (star batter opens) and a balanced three-man attack.
-export function defaultLineup(teamId, heroes, levels = {}) {
-  const pool = squadPool(teamId, heroes, levels);
-  const star = heroes.bat && pool.find(p => p.id === heroes.bat.id);
+export function defaultLineup(teamId, heroes, levels = {}, given = null) {
+  const pool = squadPool(teamId, heroes, levels, given);
+  const star = (heroes.bat && pool.find(p => p.id === heroes.bat.id)) || null;
   const order = [star, ...batCandidates(pool).filter(p => p !== star)].filter(Boolean).slice(0, ORDER_SIZE);
-  const bowlStar = heroes.bowl && pool.find(p => p.id === heroes.bowl.id);
+  const bowlStar = (heroes.bowl && pool.find(p => p.id === heroes.bowl.id)) || null;
   const others = bowlCandidates(pool).filter(p => p !== bowlStar);
   const attack = [bowlStar].filter(Boolean);
   const want = bowlStar && bowlType(bowlStar.bowl).spin ? [false, null] : [false, true]; // pace partner, then a spinner
@@ -247,9 +269,9 @@ export function defaultLineup(teamId, heroes, levels = {}) {
 }
 
 // Resolve saved ids against the pool, filling any gaps from the defaults.
-export function resolveLineup(teamId, heroes, saved, levels = {}) {
-  const pool = squadPool(teamId, heroes, levels), byId = id => pool.find(p => p.id === id);
-  const def = defaultLineup(teamId, heroes, levels);
+export function resolveLineup(teamId, heroes, saved, levels = {}, given = null) {
+  const pool = squadPool(teamId, heroes, levels, given), byId = id => pool.find(p => p.id === id);
+  const def = defaultLineup(teamId, heroes, levels, pool);
   const fill = (ids, defIds, n, ok) => {
     const out = [];
     for (const id of [...(ids || []), ...defIds]) { const p = byId(id); if (p && ok(p) && !out.includes(p)) out.push(p); }

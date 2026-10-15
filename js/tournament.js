@@ -123,14 +123,15 @@ export function nextFixture(state) {
 
 // Record the player's result, simulate everyone else's matches of that round, and move on.
 // Returns notes for the UI ("Through to the semi-finals!", "Knocked out", ...).
-export function advance(state, result) {
+// sim: plays a match between two other teams (the career passes one that uses its own squads)
+export function advance(state, result, sim = simMatch) {
   const rng = makeRng((state.seed ^ (state.results.length * 7919)) >>> 0);
   const notes = [];
   if (state.stage === 'group') {
     state.results.push({ ...result, stage: 'group', round: state.round });
     for (const [a, b] of state.rounds[state.round]) {
       if (a === state.team || b === state.team) continue;
-      state.results.push({ ...simMatch(a, b, rng), stage: 'group', round: state.round });
+      state.results.push({ ...sim(a, b, rng), stage: 'group', round: state.round });
     }
     state.round++;
     if (state.round >= state.rounds.length) {
@@ -139,7 +140,7 @@ export function advance(state, result) {
       state.stage = 'semi';
       const pos = t.indexOf(state.team) + 1;
       notes.push(pos <= 4 ? `You finished ${ordinal(pos)}: into the semi-finals!` : `You finished ${ordinal(pos)}. The top four play on.`);
-      if (pos > 4) finishWithoutPlayer(state, rng, notes);
+      if (pos > 4) finishWithoutPlayer(state, rng, notes, sim);
     }
     return notes;
   }
@@ -147,7 +148,7 @@ export function advance(state, result) {
   const ko = state.ko[state.ko.length - 1];
   ko.winners = ko.ties.map(([a, b]) => {
     if (a === state.team || b === state.team) { state.results.push({ ...result, stage: ko.stage }); return result.winner; }
-    const m = simMatch(a, b, rng);
+    const m = sim(a, b, rng);
     m.winner = m.winner || (rng.chance(0.5) ? a : b);
     state.results.push({ ...m, stage: ko.stage });
     return m.winner;
@@ -156,7 +157,7 @@ export function advance(state, result) {
   nextStage(state, notes);
   if (!won) {
     notes.unshift(`Knocked out in the ${{ qf: 'quarter-final', semi: 'semi-final', final: 'final' }[ko.stage]}.`);
-    finishWithoutPlayer(state, rng, notes);
+    finishWithoutPlayer(state, rng, notes, sim);
   }
   return notes;
 }
@@ -176,12 +177,12 @@ function nextStage(state, notes) {
 }
 
 // The player is out: play the rest of the tournament through to a champion.
-function finishWithoutPlayer(state, rng, notes) {
+function finishWithoutPlayer(state, rng, notes, sim = simMatch) {
   while (state.stage !== 'done') {
     const ko = state.ko[state.ko.length - 1];
     if (ko.winners) { nextStage(state, notes); continue; }
     ko.winners = ko.ties.map(([a, b]) => {
-      const m = simMatch(a, b, rng);
+      const m = sim(a, b, rng);
       m.winner = m.winner || (rng.chance(0.5) ? a : b);
       state.results.push({ ...m, stage: ko.stage });
       return m.winner;

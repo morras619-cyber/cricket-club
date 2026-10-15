@@ -200,15 +200,16 @@ export class Game {
     this.oppTeam = opts.opp ? teamById(opts.opp) : rivalTeam(this.seed, this.myTeam.id);
     // heroes by slot ({ bat, bowl, field }, empty slots null): the team's star plus any signings
     this.team = opts.squad;
-    this.rival = pickRivals(this.oppTeam.id);
+    // career squads: whichever heroes each club owns ({ bat, bowl, field }), else the team's own star
+    this.rival = opts.rival || pickRivals(this.oppTeam.id);
     // the captain's face goes on the Spark buttons when a slot has no hero
     this.captain = heroById(this.myTeam.star) || Object.values(this.team).find(Boolean);
     this.oppStyle = this.oppTeam.style || {};
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
     // hero levels: stronger heroes and cheaper signature powers
     this.levels = opts.levels || {};
-    this.mySide = resolveLineup(this.myTeam.id, this.team, opts.lineup, this.levels);
-    this.oppSide = resolveLineup(this.oppTeam.id, this.rival, null);
+    this.mySide = resolveLineup(this.myTeam.id, this.team, opts.lineup, this.levels, opts.pools?.mine);
+    this.oppSide = resolveLineup(this.oppTeam.id, this.rival, null, {}, opts.pools?.opp);
     this.aiPlan = overPlan(this.oppSide.attack, CFG.balls / 6);
     loadBatSprites(this.myTeam.id, this.oppTeam.id);
     loadBowlSprites(this.myTeam.id, this.oppTeam.id);
@@ -536,7 +537,7 @@ export class Game {
   // skill: the batter's rating. Stars get a little more room, tail-enders a lot less.
   windowsFor(fx, extra = 0, tornado = false, skill = 75) {
     const w = { ...CFG.timing };
-    const f = clamp(0.75 + skill / 300, 0.8, 1.06);
+    const f = clamp(0.75 + skill / 300, 0.72, 1.12);
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? 40 : 0);
     if (fx.focus) w.perfect += 30;
     if (tornado) w.perfect /= 2;
@@ -640,7 +641,12 @@ export class Game {
     this.fx.speed = 0;
 
     // ----- resolve -----
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado', striker.bat);
+    // star abilities: an Eagle Eye or Finisher batter times it better; a Mystery bowler is harder to read
+    let skill = striker.bat;
+    if (striker.ability === 'eagleEye') skill += 30;
+    if (striker.ability === 'finisher' && ballNo >= 25) skill += 60;
+    if (bowler.ability === 'mystery') skill -= 25;
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado', skill);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
     // defending is forgiving: anywhere in the wide window keeps the ball out
@@ -1093,6 +1099,7 @@ export class Game {
 
     let rg = G.hesitated ? 'loose' : G.grade;
     if (this.armed.pinpoint) { rg = 'perfect'; this.armed.pinpoint = false; }
+    if (bowler.ability === 'deathKing' && ballNo >= 25 && (rg === 'loose' || rg === 'bad')) rg = 'good'; // never sprays it at the death
     if (opt.forceRelease) rg = opt.forceRelease(rg);
     // finish the run-up
     const left = Math.max(0, 700 - (this.realTime - S.runStart));
@@ -1125,6 +1132,7 @@ export class Game {
       if (spec.bounce != null) { spec.bounce = clamp(spec.bounce + rng.range(-1.2, 1.2), 0.7, 11.5); spec.length = lengthForBounce(spec.bounce); spec.h = heightForBounce(spec.bounce); }
     }
     if (rg === 'perfect') { spec.swing *= 1.15; spec.move *= 1.15; }
+    if (bowler.ability === 'swingMaster') { spec.swing *= 1.3; spec.move *= 1.3; }
     const fxFlags = {};
     const A = this.armed;
     let usedPower = null;
@@ -1179,7 +1187,9 @@ export class Game {
     }
     if (mood.balls > 0 && --mood.balls === 0) mood.state = 'calm';
 
-    let ai = aiBat(d, { skill: striker.bat, style: this.oppStyle, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
+    // the AI batter's ability, and how hard my bowler is to read
+    const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
+    let ai = aiBat(d, { skill: aiSkill, style: this.oppStyle, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;

@@ -4,8 +4,10 @@ import { SPARKS, HEROES, heroById, heroesFor } from './heroes.js';
 import { TEAMS, teamById, rivalTeam, teamOfHero } from './teams.js';
 import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
-import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, starSquad, playerSquad } from './squads.js';
-import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
+import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
+import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
+import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
+  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -65,7 +67,12 @@ function renderHome() {
     const f = nextFixture(tour);
     return f ? `${teamById(tour.team).name} · ${f.label} v ${teamById(f.opp).name}` : 'Finished — see the results';
   };
-  $('leagueSub').textContent = status('league') || '8 teams · table · semis · final';
+  const c = profile.career;
+  $('leagueSub').textContent = !c ? 'Career: pick a club, win the auction, build a dynasty'
+    : c.phase === 'pick' ? `Season ${c.season} · pick your club`
+      : c.phase === 'auction' ? `Season ${c.season} · ${teamById(c.club).name} · auction`
+        : c.phase === 'done' ? `Season ${c.season} over · ${money(c.money)}`
+          : `S${c.season} · ${teamById(c.club).name} · ${nextFixture(c.league)?.label || ''}`;
   $('cupSub').textContent = status('cup') || 'Quarter, semi, final: 3 wins for the cup';
   const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key;
   $('dailySub').textContent = done ? `Done today: ${profile.dailyChallenge.line} ${profile.dailyChallenge.won ? '✅' : '❌'}` : `#${sc.no} · ${sc.title}`;
@@ -98,7 +105,6 @@ $('setField').addEventListener('click', () => {
 
 $('btnQuick').addEventListener('click', () => { unlockAudio(); pending = { mode: 'quick' }; renderSquad(); });
 $('btnChallengeMode').addEventListener('click', () => { unlockAudio(); pending = { mode: 'challenge', challenge }; renderSquad(); });
-$('btnLeague').addEventListener('click', () => { unlockAudio(); openTournament('league'); });
 $('btnCup').addEventListener('click', () => { unlockAudio(); openTournament('cup'); });
 $('btnDaily').addEventListener('click', () => { unlockAudio(); renderDaily(); });
 $('btnTeam').addEventListener('click', () => { unlockAudio(); pending = null; renderSquad(); });
@@ -339,7 +345,7 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   const mode = opts.mode;
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
-  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile);
+  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null;
   if (mode === 'tutorial') {
     team = 'thunder'; sq = { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') }; levels = {};
   } else if (mode === 'daily') {
@@ -347,18 +353,27 @@ async function startMatch(opts) {
     team = opts.scenario.team; opp = opts.scenario.opp; sq = starSquad(team); levels = {};
   } else {
     if (mode === 'league' || mode === 'cup') { team = profile.tournament.team; opp = nextFixture(profile.tournament).opp; }
+    if (mode === 'career') {
+      // the club's own squad from the career: heroes it bought at the auction give it its powers
+      const c = profile.career;
+      team = c.club; opp = nextFixture(c.league).opp;
+      pools = { mine: clubPool(c, team), opp: clubPool(c, opp) };
+      lineup = c.lineup;
+    }
     if (mode === 'challenge') {
       opp = opts.challenge.opp || null;
       if (opp === team) team = opts.challenge.team || TEAMS.find(t => t.id !== opp).id;
     }
     if (!opp) opp = rivalTeam(seed, team).id;
-    sq = squad(team, opp);
-    lineup = profile.lineups?.[team] || null;
+    if (pools) { sq = clubHeroes(pools.mine); rival = clubHeroes(pools.opp); } else {
+      sq = squad(team, opp);
+      lineup = profile.lineups?.[team] || null;
+    }
   }
-  const order = mode === 'quick' || mode === 'league' || mode === 'cup' ? await coinToss(teamById(opp)) : 'bat';
+  const order = mode === 'quick' || mode === 'league' || mode === 'cup' || mode === 'career' ? await coinToss(teamById(opp)) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
   const summary = await game.runMatch({
-    mode, seed, order, team, opp, squad: sq, lineup, levels, scenario: opts.scenario, challenge: opts.challenge,
+    mode, seed, order, team, opp, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
     records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
   });
   if (!summary) return; // quit mid-match
@@ -416,6 +431,15 @@ function renderTournament(notes = []) {
     const prize = (league ? LEAGUE_PRIZE : CUP_PRIZE)[place];
     body.append(el('div', 'panel paper notecard big', place === 'champion' ? `🏆 Champions! +${prize} coins` : place === 'runnerUp' ? `🥈 Runners-up · +${prize} coins` : place === 'semi' ? `Semi-finalists · +${prize} coins` : 'Better luck next time'));
   }
+  body.append(...leaguePanels(t));
+  $('leagueGo').hidden = !f;
+  $('leagueGo').textContent = f ? `Play ${f.label.split(' ')[0] === 'Matchday' ? 'match' : f.label.toLowerCase()}` : 'Play';
+  $('leagueQuit').hidden = !f;
+}
+// The table, the knockout bracket and your results: shared by the cup and the career league.
+function leaguePanels(t) {
+  const out = [];
+  const league = t.kind === 'league';
   if (league) {
     const tb = el('div', 'panel paper statcard');
     tb.append(el('h3', '', t.stage === 'group' ? `Table · after ${t.round} of ${t.rounds.length}` : 'Final table'));
@@ -429,7 +453,7 @@ function renderTournament(notes = []) {
       tab.append(tr);
     });
     wrap.append(tab); tb.append(wrap, el('p', 'sheetnote', 'Top four go through: 1st v 4th and 2nd v 3rd in the semi-finals. Win 2 points, tie 1.'));
-    body.append(tb);
+    out.push(tb);
   }
   // the knockout bracket so far
   if (t.ko.length) {
@@ -445,7 +469,7 @@ function renderTournament(notes = []) {
         kb.append(row);
       });
     }
-    body.append(kb);
+    out.push(kb);
   }
   // your results
   const mine = t.results.filter(r => r.player);
@@ -456,12 +480,11 @@ function renderTournament(notes = []) {
       const o = r.a === t.team ? r.b : r.a;
       rb.append(el('div', 'kotie', `${r.winner === t.team ? 'W' : r.winner ? 'L' : 'T'} · v ${teamById(o).name} · ${r.mine.runs}/${r.mine.wkts} v ${r.theirs.runs}/${r.theirs.wkts}`));
     }
-    body.append(rb);
+    out.push(rb);
   }
-  $('leagueGo').hidden = !f;
-  $('leagueGo').textContent = f ? `Play ${f.label.split(' ')[0] === 'Matchday' ? 'match' : f.label.toLowerCase()}` : 'Play';
-  $('leagueQuit').hidden = !f;
+  return out;
 }
+
 $('leagueBack').addEventListener('click', renderHome);
 $('leagueGo').addEventListener('click', () => { const t = profile.tournament; if (t) startMatch({ mode: t.kind }); });
 $('leagueQuit').addEventListener('click', () => {
@@ -487,6 +510,250 @@ function tournamentAfterMatch(summary) {
   }
   return { notes, events };
 }
+
+// ---------- career: the Super League ----------
+let careerView = 'hub'; // 'hub' | 'squad'
+let careerNotes = [];
+function career() {
+  if (!profile.career) { profile.career = newCareer(randomSeed()); saveProfile(profile); }
+  return profile.career;
+}
+const stars = n => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+const pname = p => `${p.heroId ? '★ ' : p.ability ? '⭐ ' : ''}${fullName(p)}`;
+function renderCareer(notes = careerNotes) {
+  const c = career();
+  careerNotes = [];
+  ui.show('career');
+  $('careerTitle').textContent = `Season ${c.season}`;
+  const club = c.club ? teamById(c.club) : null;
+  $('careerLede').textContent = club
+    ? `${club.name} · ${money(c.money)} to spend · rating ${clubRating(c, c.club)}`
+    : `Super League career · ${money(c.money)} to spend`;
+  $('careerSquad').hidden = !club || c.phase === 'pick';
+  const body = $('careerBody');
+  body.innerHTML = '';
+  for (const n of notes) body.append(el('div', 'panel paper notecard', n));
+  if (careerView === 'squad' && club) return careerSquad(c, body);
+  careerView = 'hub';
+  ({ pick: careerPick, auction: careerAuction, season: careerSeason, done: careerDone })[c.phase](c, body);
+  saveProfile(profile);
+}
+$('btnLeague').addEventListener('click', () => { unlockAudio(); careerView = 'hub'; renderCareer(); });
+$('careerHome').addEventListener('click', () => { if (careerView === 'squad') { careerView = 'hub'; renderCareer(); } else renderHome(); });
+$('careerSquad').addEventListener('click', () => { careerView = careerView === 'squad' ? 'hub' : 'squad'; renderCareer(); });
+$('careerRecords').addEventListener('click', () => renderRecords());
+
+// pick (or keep) a club for the season
+function careerPick(c, body) {
+  const intro = el('div', 'panel paper notecard');
+  intro.textContent = c.season === 1
+    ? 'Pick your club. The giants unlock in later seasons: earn prize money, buy players at the auction and build your way up.'
+    : `Season ${c.season}: stay with ${teamById(c.club).name} or move to another club. Your money comes with you.`;
+  body.append(intro);
+  if (c.news.length) { const n = el('div', 'panel paper statcard'); n.append(el('h3', '', 'Off-season news')); for (const x of c.news) n.append(el('div', 'kotie', x)); body.append(n); }
+  const grid = el('div', 'clubgrid');
+  for (const t of [...TEAMS].sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name))) {
+    const open = careerUnlocked(t, c.season), r = clubRating(c, t.id), pool = clubPlayers(c, t.id);
+    const b = el('button', 'clubcard' + (open ? '' : ' locked') + (c.club === t.id ? ' on' : ''));
+    b.style.setProperty('--suit', t.suit);
+    const logo = document.createElement('img'); logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
+    const heroes = pool.filter(p => p.heroId).map(p => heroById(p.heroId).name.split(' ').slice(-1)[0]);
+    b.append(logo, el('b', '', t.name), el('span', 'rate', `${stars(ratingStars(r))} ${r}`),
+      el('small', '', open ? `${t.style.tag}${heroes.length ? ` · ★ ${heroes.join(', ')}` : ''}` : `🔒 Unlocks in season ${unlockSeason(t)}`));
+    if (c.club === t.id) b.append(el('em', '', 'Your club'));
+    b.disabled = !open;
+    b.addEventListener('click', () => { if (chooseClub(c, t.id)) { sfx.dhol(); saveProfile(profile); renderCareer(); } });
+    grid.append(b);
+  }
+  body.append(grid);
+}
+
+// the pre-season auction
+function careerAuction(c, body) {
+  const lot = currentLot(c);
+  const mine = clubPlayers(c, c.club);
+  const status = el('div', 'panel paper notecard', `${teamById(c.club).name} · squad ${mine.length}/${MAX_SQUAD} · ${money(c.money)} to spend`);
+  body.append(status);
+  if (!lot) {
+    const done = el('div', 'panel paper fixture');
+    done.append(el('h3', '', 'The auction is over'), el('p', '', 'Every club needs at least 10 players: any gaps are filled with free agents and academy graduates.'));
+    const go = el('button', 'bigbtn primary', `Start season ${c.season}`);
+    go.addEventListener('click', () => { finishAuction(c); sfx.crowd?.(0.8); saveProfile(profile); renderCareer(); });
+    done.append(go);
+    body.append(done);
+  } else {
+    const p = c.players[lot.pid], A = c.auction;
+    const card = el('div', 'panel paper lotcard');
+    const shown = Math.min(A.lots.length, 16);
+    card.append(el('div', 'eyebrow', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
+    if (p.heroId) card.append(portrait(heroById(p.heroId), 96, 'celebrate'));
+    card.append(el('h3', '', pname(p)),
+      el('p', 'lotmeta', `${p.label}${p.bowl ? ` · ${bowlType(p.bowl).name}` : ''} · age ${p.age} (${ageNote(p)})`),
+      el('div', 'lotnums', ''));
+    const nums = card.querySelector('.lotnums');
+    for (const [k, v] of [['OVR', ovr(p)], ['Potential', stars(potentialStars(p))], ['Bat', p.bat], ['Bowl', p.bowlSkill || '—'], ['Value', money(value(p))]]) {
+      const d = el('div'); d.append(el('b', '', String(v)), el('span', '', k)); nums.append(d);
+    }
+    if (p.ability) card.append(el('div', 'herostat', `⭐ ${ABILITIES[p.ability].name}: ${ABILITIES[p.ability].desc}`));
+    if (p.heroId) card.append(el('div', 'herostat', `Hero power: ${heroById(p.heroId).power.name}. ${heroById(p.heroId).power.desc}`));
+    card.append(el('p', 'sheetnote', `${p.trait || ''}${p.stats.all.m ? ` · League: ${p.stats.all.runs} runs, ${p.stats.all.wkts} wickets in ${p.stats.all.m} matches` : ''}`));
+    const price = el('div', 'lotprice');
+    price.append(el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'Opening price'));
+    card.append(price);
+    const row = el('div', 'menu row');
+    const pass = el('button', 'bigbtn', 'Pass');
+    const bidBtn = el('button', 'bigbtn primary', `Bid ${money(nextBid(lot))}`);
+    bidBtn.disabled = c.money < nextBid(lot) || mine.length >= MAX_SQUAD;
+    bidBtn.addEventListener('click', () => {
+      const r = bid(c);
+      if (r === 'won') { ui.toast(`${p.name} signed for ${money(c.auction.results.at(-1).price)}!`); sfx.full(); }
+      else if (r === 'outbid') { ui.toast(`${teamById(c.auction.lot.leader).name} bid ${money(c.auction.lot.price)}`); sfx.click(); }
+      else if (r === 'broke') ui.toast('Not enough money');
+      else if (r === 'full') ui.toast(`Your squad is full (${MAX_SQUAD})`);
+      saveProfile(profile); renderCareer();
+    });
+    pass.addEventListener('click', () => {
+      const w = passLot(c);
+      ui.toast(w ? `${p.name} → ${teamById(w).name} for ${money(c.auction.results.at(-1).price)}` : `${p.name} goes unsold`);
+      saveProfile(profile); renderCareer();
+    });
+    row.append(pass, bidBtn);
+    card.append(row);
+    const skip = el('button', 'chipbtn ghostchip', 'Skip the rest of the auction');
+    skip.addEventListener('click', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
+    card.append(skip);
+    body.append(card);
+  }
+  const res = c.auction.results.slice(-8).reverse();
+  if (res.length) {
+    const rb = el('div', 'panel paper statcard');
+    rb.append(el('h3', '', 'Sold'));
+    for (const r of res) rb.append(el('div', 'kotie' + (r.team === c.club ? ' mine' : ''), `${c.players[r.pid].name} → ${r.team ? `${teamById(r.team).name} · ${money(r.price)}` : 'unsold'}`));
+    body.append(rb);
+  }
+}
+
+// the season: the next fixture, the table and the bracket
+function careerSeason(c, body) {
+  const f = nextFixture(c.league);
+  const me = teamById(c.club);
+  if (f) {
+    const o = teamById(f.opp), card = el('div', 'panel paper fixture');
+    const logos = el('div', 'fixlogos');
+    const la = document.createElement('img'); la.src = `img/logo-${me.id}.webp`; la.alt = me.name;
+    const lb = document.createElement('img'); lb.src = `img/logo-${o.id}.webp`; lb.alt = o.name;
+    logos.append(la, el('b', '', 'V'), lb);
+    const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
+    const best = [...theirs].sort((a, b) => ovr(b) - ovr(a))[0];
+    card.append(el('div', 'eyebrow', f.label.toUpperCase()), logos,
+      el('p', '', `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${fullName(best)} (${ovr(best)}).`));
+    const go = el('button', 'bigbtn primary', `Play ${f.label.startsWith('Matchday') ? 'match' : f.label.toLowerCase()}`);
+    go.addEventListener('click', () => startMatch({ mode: 'career' }));
+    card.append(go);
+    body.append(card);
+  }
+  body.append(...leaguePanels(c.league));
+}
+
+// the season is over
+function careerDone(c, body) {
+  const h = c.history.at(-1);
+  const card = el('div', 'panel paper fixture');
+  card.append(el('div', 'eyebrow', `SEASON ${h.season} · FINAL STANDINGS`),
+    el('h3', '', h.champion === c.club ? '🏆 CHAMPIONS!' : `You finished ${ordinal(h.pos)}`),
+    el('p', '', `Champions: ${teamById(h.champion).name} · Runners-up: ${teamById(h.runnerUp).name}`));
+  if (h.orange) card.append(el('p', '', `🟠 Most runs: ${playerName(c, h.orange.pid)} (${h.orange.runs})`));
+  if (h.purple) card.append(el('p', '', `🟣 Most wickets: ${playerName(c, h.purple.pid)} (${h.purple.wkts})`));
+  const next = TEAMS.filter(t => t.tier === c.season + 1);
+  if (next.length) card.append(el('p', 'sheetnote', `Unlocking next season: ${next.map(t => t.name).join(', ')}`));
+  const go = el('button', 'bigbtn primary', `On to season ${c.season + 1}`);
+  go.addEventListener('click', () => { nextSeason(c); saveProfile(profile); renderCareer(); });
+  card.append(go);
+  body.append(card, ...leaguePanels(c.league));
+}
+
+// your squad: who you've got, how good they could be, and the line-up
+function careerSquad(c, body) {
+  const pool = clubPool(c, c.club);
+  const list = el('div', 'panel paper sheetbox');
+  list.append(el('h3', '', `${teamById(c.club).name} · ${pool.length}/${MAX_SQUAD}`));
+  list.append(el('p', 'sheetnote', `Players improve when they play well, up to their potential, until they turn ${PEAK_AGE}. A regular who reaches ${STAR_OVR} becomes a star with an ability.`));
+  for (const p of [...pool].sort((a, b) => ovr(b) - ovr(a))) {
+    const r = el('div', 'squadrow');
+    const s = p.stats.season;
+    r.append(el('b', '', `${pname(p)} · ${ovr(p)}`),
+      el('span', '', `${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · age ${p.age} · potential ${stars(potentialStars(p))} · ${p.contract} season${p.contract === 1 ? '' : 's'} left`),
+      el('span', '', `${p.ability ? `⭐ ${ABILITIES[p.ability].name} · ` : ''}This season: ${s.runs} runs, ${s.wkts} wkts · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`));
+    if (pool.length > MIN_SQUAD && !p.heroId) {
+      const rel = el('button', 'chipbtn', 'Release');
+      rel.addEventListener('click', () => {
+        if (!confirm(`Release ${p.name}? He goes into next season's auction.`)) return;
+        c.players[p.id].team = null; c.players[p.id].contract = 0; saveProfile(profile); renderCareer();
+      });
+      r.append(rel);
+    }
+    list.append(r);
+  }
+  // line-up for league matches
+  const L = resolveLineup(c.club, clubHeroes(pool), c.lineup, {}, pool);
+  const sheet = el('div', 'panel paper sheetbox');
+  sheet.append(el('h3', '', 'Line-up'));
+  const pick = (title, chosen, cands, n, label, save) => {
+    sheet.append(el('b', 'kostage', title));
+    for (let i = 0; i < n; i++) {
+      const row = el('label', 'sheetrow');
+      row.append(el('span', 'sheetno', String(i + 1)));
+      const sel = document.createElement('select');
+      for (const p of cands) { const o = document.createElement('option'); o.value = p.id; o.textContent = `${pname(p)} · ${label(p)}`; sel.append(o); }
+      sel.value = chosen[i]?.id || '';
+      sel.addEventListener('change', () => {
+        const p = cands.find(x => x.id === sel.value), j = chosen.indexOf(p), next = [...chosen];
+        if (j >= 0) next[j] = chosen[i];
+        next[i] = p; save(next); saveProfile(profile); renderCareer();
+      });
+      row.append(sel); sheet.append(row);
+    }
+  };
+  pick('Batting order', L.order, batCandidates(pool), ORDER_SIZE, p => `bat ${p.bat}`, next => { c.lineup = { order: next.map(p => p.id), attack: L.attack.map(p => p.id) }; });
+  pick('Bowling attack', L.attack, bowlCandidates(pool), ATTACK_SIZE, p => `${bowlType(p.bowl).short} ${p.bowlSkill}`, next => { c.lineup = { order: L.order.map(p => p.id), attack: next.map(p => p.id) }; });
+  body.append(list, sheet);
+}
+
+// records that never go away
+function renderRecords() {
+  const c = career();
+  ui.show('records');
+  const body = $('recordsBody');
+  body.innerHTML = '';
+  const team = p => (p.retired ? 'retired' : p.team ? teamById(p.team).name : 'free agent');
+  const board = (title, rows) => {
+    const b = el('div', 'panel paper statcard');
+    b.append(el('h3', '', title));
+    if (!rows.length) b.append(el('p', 'sheetnote', 'Nothing yet: play a season.'));
+    rows.forEach((r, i) => { const d = el('div', 'kotie'); d.append(el('b', '', `${i + 1}.`), el('span', '', r)); b.append(d); });
+    return b;
+  };
+  const top = (scope, key, fmtRow, n = 5) => leaders(c, scope, key, n).filter(p => p.stats[scope][key === 'hs' ? 'hs' : key] > 0).map(fmtRow);
+  if (c.phase === 'season' || c.phase === 'done') {
+    body.append(board(`Season ${c.season} · most runs`, top('season', 'runs', p => `${p.name} (${team(p)}) · ${p.stats.season.runs}`)));
+    body.append(board(`Season ${c.season} · most wickets`, top('season', 'wkts', p => `${p.name} (${team(p)}) · ${p.stats.season.wkts}`)));
+  }
+  body.append(board('All-time most runs', top('all', 'runs', p => `${p.name} (${team(p)}) · ${p.stats.all.runs} in ${p.stats.all.m} matches`, 10)));
+  body.append(board('All-time most wickets', top('all', 'wkts', p => `${p.name} (${team(p)}) · ${p.stats.all.wkts}${p.stats.all.bb ? ` · best ${p.stats.all.bb.w}/${p.stats.all.bb.r}` : ''}`, 10)));
+  body.append(board('Most sixes', top('all', 'sixes', p => `${p.name} (${team(p)}) · ${p.stats.all.sixes}`)));
+  body.append(board('Highest scores', c.records.hs.slice(0, 10).map(r => `${playerName(c, r.pid)} · ${r.runs}${r.out ? '' : '*'} (${r.balls}) · ${teamById(r.team || 'thunder').name} · S${r.season}`)));
+  body.append(board('Best bowling', c.records.bb.slice(0, 10).map(r => `${playerName(c, r.pid)} · ${r.w}/${r.r} · ${teamById(r.team || 'thunder').name} · S${r.season}`)));
+  const clubs = TEAMS.map(t => ({ t, titles: c.titles[t.id] || 0, finals: c.history.filter(h => h.runnerUp === t.id).length })).sort((a, b) => b.titles - a.titles || b.finals - a.finals);
+  body.append(board('Most Super League titles', clubs.filter(x => x.titles || x.finals).map(x => `${x.t.name} · ${x.titles} title${x.titles === 1 ? '' : 's'}${x.finals ? `, ${x.finals} runner-up` : ''}`)));
+  body.append(board('Season by season', c.history.map(h => `S${h.season}: ${teamById(h.champion).name} champions · you: ${teamById(h.club).name} (${ordinal(h.pos)})${h.orange ? ` · most runs ${playerName(c, h.orange.pid)} ${h.orange.runs}` : ''}`)));
+  const reset = el('button', 'chipbtn ghostchip', 'Start a brand-new career');
+  reset.addEventListener('click', () => {
+    if (!confirm('Start again from season 1? Every season, record and player in this career will be lost.')) return;
+    profile.career = null; saveProfile(profile); careerView = 'hub'; renderCareer();
+  });
+  body.append(reset);
+}
+$('recordsBack').addEventListener('click', () => renderCareer());
 
 // ---------- the daily challenge ----------
 function renderDaily() {
@@ -624,6 +891,16 @@ function showResult(summary) {
   const events = [];
   let notes = [];
   if (mode === 'league' || mode === 'cup') { const r = tournamentAfterMatch(summary); notes = r.notes; tourNotes = notes; events.push(...r.events); }
+  if (mode === 'career') {
+    const c = profile.career;
+    notes = afterLeagueMatch(c, summary);
+    careerNotes = notes;
+    if (c.phase === 'done' && c.league.champion === c.club) {
+      profile.trophies = [...(profile.trophies || []), { kind: 'league', team: c.club, season: c.season, date: new Date().toISOString().slice(0, 10), unbeaten: unbeaten(c.league) }];
+      events.push('league');
+      if (unbeaten(c.league)) events.push('unbeaten');
+    }
+  }
   if (mode === 'daily') {
     const o = summary.result.daily;
     profile.dailyChallenge = { key: summary.scenario.key, won: o.won, line: o.line, balls: o.balls };
@@ -712,7 +989,7 @@ function showResult(summary) {
       };
     }
   }, 'image/jpeg', 0.86);
-  $('resAgain').textContent = { tutorial: 'Play Quick Match', league: 'Back to the league', cup: 'Back to the cup', daily: 'Daily results' }[mode] || 'Play again';
+  $('resAgain').textContent = { tutorial: 'Play Quick Match', league: 'Back to the league', cup: 'Back to the cup', daily: 'Daily results', career: 'Back to the season' }[mode] || 'Play again';
 }
 
 $('copyLink').addEventListener('click', async () => {
@@ -726,6 +1003,7 @@ $('resAgain').addEventListener('click', () => {
   if (m === 'challenge') { pending = { mode: 'challenge', challenge }; startMatch(pending); }
   else if (m === 'league' || m === 'cup') renderTournament(tourNotes);
   else if (m === 'daily') renderDaily();
+  else if (m === 'career') { careerView = 'hub'; renderCareer(); }
   else { pending = { mode: 'quick' }; renderSquad(); }
 });
 

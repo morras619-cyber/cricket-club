@@ -76,6 +76,7 @@ function planScript(seed, plan, powerKind) {
     const variation = rng.chance(T.spin ? 0.18 : 0.14);
     const type = variation ? T.variation : rng.pick(T.stock);
     const params = deliveryParams(T.id, type, rng.range(0.2, 1), rng);
+    if (p.ability === 'swingMaster') { params.swing *= 1.3; params.move *= 1.3; } // a career star
     const d = { ball, length, lane, x: LANES.find(l => l.id === lane).x + rng.range(-0.04, 0.04), ...params, bowler: p.id, power: null };
     if (type === 'Slower bouncer') Object.assign(d, { length: 'bouncer', lane: rng.pick(['off', 'stumps']), x: 0.05 });
     // the star's power ball comes once in each of his overs

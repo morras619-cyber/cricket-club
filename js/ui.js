@@ -13,7 +13,7 @@ function setFit(el, text) {
 
 export class UI {
   constructor() {
-    this.screens = ['home', 'squad', 'stats', 'toss', 'cover', 'pause', 'result', 'league', 'daily', 'trophies'];
+    this.screens = ['home', 'squad', 'stats', 'toss', 'cover', 'pause', 'result', 'league', 'daily', 'trophies', 'career', 'records'];
     this.portraits = new Map();
     this.bannerTimer = 0;
     this.powerKeys = '';
