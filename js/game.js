@@ -1436,7 +1436,7 @@ export class Game {
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
     this.fx.speed = 1;
     if (elastic) this.fx.word('BOING!', this.W * 0.5, this.H * 0.3, { size: 40, color: '#ffe14d', stroke: INK });
-    this.ui.hint(needSwipe ? 'SWIPE ALONG THE ARROW AS THE RING CLOSES!' : 'TAP WHEN THE RING CLOSES!');
+    this.ui.hint(needSwipe ? 'START YOUR SWIPE AS THE RING CLOSES!' : 'TAP WHEN THE RING CLOSES!');
     sfx.whoosh();
 
     const arrive = S.kball.t0 + approach;
@@ -1444,8 +1444,9 @@ export class Game {
     this.onInput = (type, g) => {
       if (input || type !== 'up') return;
       const isSwipe = Math.hypot(g.dx, g.dy) > 28;
-      const t = isSwipe ? g.t : g.t0;
-      if (t < arrive - windowMs / 2 - 300) return; // ignore accidental early touches
+      // timed from when the finger touches: a swipe takes time to draw, so its lift is always late
+      const t = g.t0;
+      if (t < arrive - windowMs / 2 - 120) { this.fx.word('WAIT FOR IT…', this.W / 2, this.H * 0.3, { size: 34, dur: 500 }); return; } // early: try again
       input = { t, isSwipe, dx: g.dx, dy: g.dy };
     };
     if (this.bot) {
@@ -1456,7 +1457,7 @@ export class Game {
         this.botInput('up', { dx, dy, t0: this.realTime - 60 });
       }).catch(() => {});
     }
-    await this.until(() => input || this.realTime > arrive + windowMs / 2 + 40);
+    await this.until(() => input || this.realTime > arrive + windowMs / 2 + 350); // a swipe started in time may still be finishing
     this.onInput = null;
     this.ui.hint(null);
 
@@ -1469,7 +1470,9 @@ export class Game {
         else {
           const hs = cam.project(0.3, 0.55, -2.4), rs = cam.project(to.x, to.y, to.z);
           const want = Math.atan2(rs.y - hs.y, rs.x - hs.x), got = Math.atan2(input.dy, input.dx);
-          dirOk = angDiff(want, got) <= (elastic ? 60 : 45) * Math.PI / 180;
+          // the right side is enough: towards the ball within 70 degrees, or simply the correct way left/right
+          const sideOk = Math.abs(rs.x - hs.x) > 30 && Math.sign(input.dx) === Math.sign(rs.x - hs.x) && Math.abs(input.dx) > Math.abs(input.dy) * 0.4;
+          dirOk = sideOk || angDiff(want, got) <= (elastic ? 85 : 70) * Math.PI / 180;
         }
       }
       if (input.isSwipe) {
@@ -1592,7 +1595,10 @@ export class Game {
     this.onInput = (type, g) => {
       if (input || type !== 'up') return;
       const isSwipe = Math.hypot(g.dx, g.dy) > 28;
-      input = { tg: this.realToGame(isSwipe ? g.t : g.t0), isSwipe, dx: g.dx, dy: g.dy };
+      // timed from the touch, for taps and dives alike
+      const tg = this.realToGame(g.t0);
+      if (tg < t0 + T - 0.35) { this.fx.word('WAIT FOR IT…', this.W / 2, this.H * 0.3, { size: 34, dur: 500 }); return; } // early: try again
+      input = { tg, isSwipe, dx: g.dx, dy: g.dy };
     };
     if (this.bot) this.sleep((T + makeRng(T * 1000).normal() * 0.05) * 1000).then(() => this.botInput('up', { dx: 0, dy: 0 })).catch(() => {});
     let gap = 99;
@@ -1610,9 +1616,9 @@ export class Game {
       if (!prompted && t > T - 1.1) {
         prompted = true;
         const predicted = Math.max(0, dist(me, L) - speed * Math.max(0, T - t));
-        this.ui.hint(predicted <= F.reach ? 'TAP AS THE RING CLOSES!' : predicted <= F.reach + F.diveReach ? 'SWIPE TO DIVE!' : 'TOO FAR — DIVE!');
+        this.ui.hint(predicted <= F.reach ? 'TAP AS THE RING CLOSES!' : 'SWIPE TOWARDS THE BALL TO DIVE!');
       }
-      return t >= T && (input || t >= T + 0.2);
+      return t >= T && (input || t >= T + 0.45); // room for a swipe that started in time to finish
     });
     this.onInput = null; this.ui.hint(null);
     gap = dist(me, L);
@@ -1622,12 +1628,14 @@ export class Game {
       let reachOk = gap <= F.reach + (input.isSwipe ? F.diveReach : 0);
       if (input.isSwipe) {
         const ms = this.of.to(me.x, me.y), ls = this.of.to(L.x, L.y);
-        if (gap > 0.6 && angDiff(Math.atan2(ls.y - ms.y, ls.x - ms.x), Math.atan2(input.dy, input.dx)) > 50 * Math.PI / 180) reachOk = false;
+        if (gap > 0.6 && angDiff(Math.atan2(ls.y - ms.y, ls.x - ms.x), Math.atan2(input.dy, input.dx)) > 80 * Math.PI / 180) reachOk = false;
         me.pose = POSES.dive(Math.sign(L.x - me.x) || 1);
       }
+      // a tap that's just out of reach still counts: he stretches for it
+      if (!input.isSwipe && !reachOk && gap <= F.reach + 0.5) reachOk = true;
       if (reachOk && Math.abs(errReal) <= F.catchPerfect) result = input.isSwipe ? 'dive' : 'caught';
       else if (reachOk && Math.abs(errReal) <= F.catchGood) result = 'juggle';
-      else if (!reachOk) this.fx.word('NEEDED A DIVE!', this.W / 2, this.H * 0.3, { size: 40 });
+      else if (!reachOk) this.fx.word(input.isSwipe ? 'WRONG WAY!' : 'NEEDED A DIVE!', this.W / 2, this.H * 0.3, { size: 40 });
       else this.fx.word(errReal < 0 ? 'TOO EARLY!' : 'TOO LATE!', this.W / 2, this.H * 0.3, { size: 40 });
       if (result === 'juggle') {
         sfx.glove();

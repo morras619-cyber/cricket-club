@@ -31,10 +31,10 @@ export const CFG = {
 
   fielding: {
     cap: 6, minP: 0.05, maxP: 0.9,
-    keeperWindow: 520, elasticWindow: 750, keeperClean: 110, slowmo: 0.35,
-    catchPerfect: 60, catchGood: 120, rejuggleMs: 700,
+    keeperWindow: 640, elasticWindow: 850, keeperClean: 160, slowmo: 0.35,
+    catchPerfect: 140, catchGood: 300, rejuggleMs: 700,
     collectWindow: 200, stumpWindow: 400,
-    runSpeed: 7, react: 0.25, catchRun: 4.2, catchReact: 0.7, reach: 1.1, diveReach: 1.5, throwSpeed: 28,
+    runSpeed: 7, react: 0.25, catchRun: 4.2, catchReact: 0.7, reach: 1.3, diveReach: 2.4, throwSpeed: 28,
   },
 
   ground: { boundaryR: 62, centerY: 10, pitch: 20 },
