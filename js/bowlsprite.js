@@ -174,29 +174,29 @@ const BACK = {
 // the opposing batter seen from the bowling camera (tools/build_front_batter.py); same frame
 // names as the back-view batter in batsprite.js, so batFrame() drives both
 const BAT_FRONT = {
-  ready: [0, 0, 177, 274, 92.0, 273, 1.1],
-  leave1: [179, 0, 177, 292, 89.8, 291, 1.1],
-  leave2: [358, 0, 235, 271, 92.2, 270, 1.1],
-  backlift: [595, 0, 194, 301, 103.8, 300, 1.1],
-  drive1: [791, 0, 152, 271, 44.8, 270, 1.1],
-  drive2: [0, 303, 212, 268, 109.0, 267, 1.1],
-  drive3: [214, 303, 172, 302, 74.0, 301, 1.1],
-  pull0: [388, 303, 198, 287, 100.5, 286, 1.1],
-  pull1: [588, 303, 195, 264, 96.2, 263, 1.1],
-  pull2: [0, 607, 245, 267, 109.0, 266, 1.1],
-  pull3: [247, 607, 188, 280, 139.2, 279, 1.053],
-  def1: [437, 607, 178, 274, 91.0, 273, 1.1],
-  def2: [617, 607, 129, 271, 64.8, 270, 1.1],
-  def3: [748, 607, 193, 273, 95.2, 272, 1.1],
-  cut1: [0, 889, 218, 265, 124.0, 264, 1.1],
-  cut2: [220, 889, 273, 260, 121.5, 259, 1.1],
-  cut3: [495, 889, 256, 259, 116.5, 258, 1.1],
-  bowled: [753, 889, 171, 247, 97.5, 246, 1.1],
+  ready: [0, 0, 126, 291, 65.0, 290, 1.081],
+  leave1: [128, 0, 111, 291, 50.5, 290, 1.026],
+  leave2: [241, 0, 113, 284, 52.5, 283, 1.053],
+  backlift: [356, 0, 148, 314, 85.5, 313, 1.0],
+  drive1: [506, 0, 173, 284, 52.5, 283, 1.026],
+  drive2: [681, 0, 133, 282, 71.0, 281, 1.026],
+  drive3: [816, 0, 157, 315, 69.2, 314, 0.909],
+  pull0: [0, 317, 127, 280, 70.5, 279, 1.026],
+  pull1: [129, 317, 175, 275, 61.2, 274, 1.053],
+  pull2: [306, 317, 263, 272, 103.2, 271, 1.053],
+  pull3: [571, 317, 159, 275, 45.2, 274, 0.9],
+  def1: [732, 317, 108, 274, 61.8, 273, 1.081],
+  def2: [842, 317, 133, 273, 65.8, 272, 1.1],
+  def3: [0, 599, 181, 272, 89.0, 271, 1.026],
+  cut1: [183, 599, 182, 268, 79.8, 267, 1.0],
+  cut2: [367, 599, 268, 266, 158.2, 265, 1.026],
+  cut3: [637, 599, 254, 265, 151.0, 264, 1.053],
+  bowled: [0, 873, 170, 256, 88.5, 255, 1.1],
 };
 const VIEWS = {
   front: { src: 'img/bowler.webp', frames: FRONT, refPx: 323 },
   // the ready stance is 1.72 m tall, as for the back-view batter
-  batfront: { src: 'img/batter-front.webp', frames: BAT_FRONT, refPx: Math.round(274 * 1.1 * 1.85 / 1.72) },
+  batfront: { src: 'img/batter-front.webp', frames: BAT_FRONT, refPx: Math.round(291 * 1.081 * 1.85 / 1.72) },
 };
 for (const [id, frames] of Object.entries(BACK)) {
   VIEWS['back-' + id] = { src: `img/bowler-back-${id}.webp`, frames, refPx: frames.start[5], own: true };

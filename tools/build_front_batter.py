@@ -1,6 +1,11 @@
 """Cut the labelled front-view batting sheet (19 poses, transparent background) into an atlas.
 
-usage: python3 tools/build_front_batter.py SHEET.png img/batter-front.webp
+usage: python3 tools/build_front_batter.py SHEET.png img/batter-front.webp [--mirror 15,16,17] [--blade x,y;x,y;... --cut-x N] [--dump DIR]
+
+--mirror flips the listed poses (the cut is often drawn the left-hander's way round).
+--blade gives the bat blade outline in pose 18's frame, kept when its stumps (everything
+from x = --cut-x rightwards) are erased.
+--dump writes each cut pose as a PNG for checking.
 
 Pose 18 (bowled) has stumps drawn in: they are erased, keeping the bat blade that crosses
 them. Pose 19 is the opposing keeper, not a batting pose, and is left out.
@@ -14,13 +19,21 @@ from scipy import ndimage
 USE = {1: 'ready', 2: 'leave1', 3: 'leave2', 4: 'backlift', 5: 'drive1', 6: 'drive2', 7: 'drive3',
        8: 'pull0', 9: 'pull1', 10: 'pull2', 11: 'pull3', 12: 'def1', 13: 'def2', 14: 'def3',
        15: 'cut1', 16: 'cut2', 17: 'cut3', 18: 'bowled'}
-BANDS = [(0, 40), (355, 395), (695, 735)]
-# pose 18 (frame coords): erase everything right of x=134 except the bat blade
+# label rows; these cover both sheets drawn so far
+BANDS = [(0, 40), (355, 396), (690, 735)]
+# pose 18 (frame coords) for the first sheet: everything right of the batter's pad is erased except the bat blade
 BLADE = [(93, 154), (109, 146), (172, 237), (170, 244), (156, 247)]
+
+
+def opt(name, default=None):
+    return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else default
 
 
 def main():
     src, out = sys.argv[1:3]
+    mirror = {int(k) for k in opt('--mirror', '').split(',') if k}
+    blade = [tuple(int(v) for v in p.split(',')) for p in opt('--blade').split(';')] if opt('--blade') else BLADE
+    dump = opt('--dump')
     a = np.array(Image.open(src).convert('RGBA'))
     al = a[..., 3] > 40
     dark = al & (a[..., :3].astype(int).max(-1) < 80)
@@ -43,13 +56,18 @@ def main():
         m = (lab[y0:y1, x0:x1] == li) & mask[y0:y1, x0:x1]
         c = a[y0:y1, x0:x1].copy()
         c[..., 3] = np.where(m, c[..., 3], 0)
+        if dump:
+            Image.fromarray(c).save(f'{dump}/f{k:02d}.png')
         if k == 18:
             keep = Image.new('L', (x1 - x0, y1 - y0), 0)
-            ImageDraw.Draw(keep).polygon(BLADE, fill=255)
+            ImageDraw.Draw(keep).polygon(blade, fill=255)
             xs = np.arange(x1 - x0)[None, :]
-            c[..., 3] = np.where((xs >= 134) & ~(np.array(keep) > 0), 0, c[..., 3])
+            cut_x = int(opt('--cut-x', 134))
+            c[..., 3] = np.where((xs >= cut_x) & ~(np.array(keep) > 0), 0, c[..., 3])
         im = Image.fromarray(c)
         im = im.crop(im.getbbox())
+        if k in mirror:
+            im = im.transpose(Image.FLIP_LEFT_RIGHT)
         arr = np.array(im).astype(int)
         alp = arr[..., 3] > 40
         r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
