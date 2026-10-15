@@ -255,12 +255,43 @@ const FIELD_FRONT = {
   batB2: [169, 795, 246, 222, 123.0, 111.0, -90],
 };
 
+// the spin bowler (tools/build_spinner_sprites.py): front and back views, shorter and more
+// upright than the quick. Frames it lacks (fielding, reactions, celebrations) come from the pace sheets.
+// name: [x, y, w, h, anchorX, anchorY (feet), scale]
+const SPIN_FRONT = {
+  start: [0,  0,  211,  436,  105.0,  435,  1.0],
+  run1: [213,  0,  176,  417,  73.5,  416,  1.0],
+  run2: [391,  0,  194,  427,  91.0,  426,  1.0],
+  gather: [587,  0,  173,  443,  62.0,  442,  1.0],
+  coil: [762,  0,  147,  442,  87.0,  441,  1.0],
+  release: [0,  445,  166,  441,  115.0,  440,  1.0],
+  follow1: [168,  445,  164,  384,  62.5,  383,  1.0],
+  follow2: [334,  445,  192,  384,  62.5,  383,  1.0],
+  follow3: [528,  445,  184,  424,  87.5,  423,  1.0],
+  finish: [714,  445,  187,  426,  93.0,  425,  1.0],
+};
+const SPIN_BACK = {
+  start: [0,  0,  187,  437,  93.0,  436,  1.0],
+  run1: [189,  0,  171,  425,  66.0,  424,  1.0],
+  run2: [362,  0,  192,  429,  86.5,  428,  1.0],
+  gather: [556,  0,  176,  429,  114.0,  428,  1.0],
+  coil: [734,  0,  152,  439,  95.5,  438,  1.0],
+  release: [0,  441,  175,  439,  66.5,  438,  1.0],
+  follow1: [177,  441,  235,  358,  101.5,  357,  1.0],
+  follow2: [414,  441,  271,  350,  141.5,  349,  1.0],
+  follow3: [687,  441,  171,  426,  82.5,  425,  1.0],
+  finish: [0,  882,  181,  420,  90.0,  419,  1.0],
+};
+
 const VIEWS = {
   'field-top': { src: 'img/field-top.webp', frames: FIELD_TOP },
   'field-front': { src: 'img/field-front.webp', frames: FIELD_FRONT },
   'keeper-back': { src: 'img/keeper-back.webp', frames: KEEPER_BACK },
   'keeper-front': { src: 'img/keeper-front.webp', frames: KEEPER_FRONT },
   front: { src: 'img/bowler.webp', frames: FRONT, refPx: 323 },
+  'spin-front': { src: 'img/spinner-front.webp', frames: SPIN_FRONT, refPx: SPIN_FRONT.start[5] },
+  // drawn in the blue kit: other teams get it repainted in theirs
+  'spin-back': { src: 'img/spinner-back-thunder.webp', frames: SPIN_BACK, refPx: SPIN_BACK.start[5] },
   // the ready stance is 1.72 m tall, as for the back-view batter
   batfront: { src: 'img/batter-front.webp', frames: BAT_FRONT, refPx: Math.round(291 * 1.081 * 1.85 / 1.72) },
 };
@@ -268,6 +299,7 @@ for (const [id, frames] of Object.entries(BACK)) {
   VIEWS['back-' + id] = { src: `img/bowler-back-${id}.webp`, frames, refPx: frames.start[5], own: true };
 }
 const RUN_CYCLE = ['run1', 'run2', 'run3', 'run2'];
+const SPIN_CYCLE = ['run1', 'run2'];
 // after release (ms of game time): release, follow-through, then he stands and watches
 const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3', 170], ['finish', Infinity]];
 
@@ -275,7 +307,7 @@ const tinted = new Map();
 
 // the front sheet plus the back sheets of the teams in this match
 export function loadBowlSprites(...teamIds) {
-  for (const key of ['front', 'batfront', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.map(id => 'back-' + id)]) {
+  for (const key of ['front', 'spin-front', 'spin-back', 'batfront', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.map(id => 'back-' + id)]) {
     const v = VIEWS[key];
     if (!v || v.img) continue;
     v.img = new Image();
@@ -286,10 +318,12 @@ export function loadBowlSprites(...teamIds) {
 
 // Which frame the bowler shows. spr: { anim: 'start'|'run'|'deliver'|'react'|'celebrate', p, t0 }
 // The back view has a fuller load-up: gather, coil, then front arm up.
+// Spinners ('spin-front' / 'spin-back') take a few walking strides, then gather and coil.
 export function bowlFrame(spr, gameTime, realTime, view = 'front') {
   if (!spr) return 'start';
   switch (spr.anim) {
     case 'run':
+      if (view.startsWith('spin')) return spr.p < 0.7 ? SPIN_CYCLE[Math.floor(spr.p * 8) % 2] : spr.p < 0.85 ? 'gather' : 'coil';
       if (view === 'back') return spr.p < 0.74 ? RUN_CYCLE[Math.floor(spr.p * 14) % 4] : spr.p < 0.83 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
       return spr.p < 0.8 ? RUN_CYCLE[Math.floor(spr.p * 14) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
     case 'deliver': {
@@ -346,6 +380,8 @@ function sheetFor(view, team) {
 
 // Draw a frame with its feet at (px, py); kPerM is pixels per metre at that depth. False until loaded.
 export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, view = 'front') {
+  // a spinner frame the spin sheets don't have comes from the pace bowler's sheet
+  if (view.startsWith('spin') && !VIEWS[view].frames[frame]) view = view.slice(5);
   if (view === 'back') view = 'back-' + (team?.id || 'thunder');
   const v = VIEWS[view];
   if (!v || !v.ready) return false;

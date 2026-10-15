@@ -529,7 +529,7 @@ export class Game {
     const before = { runs: inn.runs, wkts: inn.wkts };
     const striker = this.batterOf(inn), bowler = this.bowlerOf(inn), btype = bowlType(bowler.bowl);
     S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = striker.hero?.emblem || null;
-    S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.oppTeam); S.bowler.left = !!btype.left;
+    S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     if (btype.left) S.bowler.x = -0.6;
     const rng = this.ballRng(ballNo);
     const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
@@ -1011,7 +1011,7 @@ export class Game {
     const bowler = this.bowlerOf(inn), striker = this.batterOf(inn), btype = bowlType(bowler.bowl);
     S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.myTeam); S.bowler.emblem = bowler.hero?.emblem || null;
     // right-arm over, a little wide of the stumps so the ball leaves his hand; left-armers from the other side
-    S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left;
+    S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.keeper.look = this.team.field.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
     const kind = bowler.bowl || this.team.bowl.bowls;
     const profile = striker.ai;
@@ -2116,7 +2116,7 @@ export class Game {
       // facing the batting camera the bowler is the hand-drawn sprite, carrying on a stride after release
       if (kind === 'bat' && S.bowler.spr?.anim === 'deliver') bz -= 0.9 * clamp((this.gameTime - S.bowler.spr.t0) / 0.6, 0, 1);
       push(bz, () => {
-        const view = kind === 'bat' ? 'front' : 'back', p = cam.project(bx, 0, bz);
+        const view = (S.bowler.spin ? 'spin-' : '') + (kind === 'bat' ? 'front' : 'back'), p = cam.project(bx, 0, bz);
         if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), kind === 'bat' ? this.oppTeam : this.myTeam, !!S.bowler.left, view)) return;
         drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem });
       });

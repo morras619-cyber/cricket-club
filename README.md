@@ -63,6 +63,7 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/scene.js`, `js/figure.js`, `js/fx.js` | Cameras, night stadium, cel-shaded figures, onomatopoeia and impact effects |
 | `js/batsprite.js`, `img/batter-*.webp` | Hand-drawn batter frames seen from behind, one sheet per team: an animation per swipe (drive, pull, cut, block, leave, bowled) |
 | `js/bowlsprite.js`, `img/bowler.webp`, `img/bowler-back-*.webp` | Hand-drawn bowler and fielders: front view for the batting camera, back view (one sheet per team) for the bowling camera (run-up, gather, coil, release, follow-through, celebrations), repainted in the fielding team's kit |
+| `img/spinner-front.webp`, `img/spinner-back-thunder.webp`, `tools/build_spinner_sprites.py` | The spin bowler (off-spin and leg-spin): a short walk-up, gather, coil and high-arm delivery, front view for the batting camera and back view for the bowling camera; other teams get it repainted in their kit |
 | `tools/build_bowler_sprites.py` | Cuts a labelled bowler sheet into an atlas (`--back` mirrors the back-view sheet into a right-arm action) |
 | `img/batter-front.webp`, `tools/build_front_batter.py` | The opposing batter seen from the bowling camera, same shots as the back view, repainted in his team's kit |
 | `img/keeper-back.webp`, `img/keeper-front.webp`, `tools/build_keeper_sprites.py` | Hand-drawn wicket-keeper: back view in Keeper Mode (crouch, rise, takes, dives, juggle, stumping, celebration), front view behind the batter when bowling; in the fielding team's kit |
