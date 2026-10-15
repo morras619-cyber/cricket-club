@@ -204,7 +204,7 @@ export class Game {
     this.myTeam = teamById(opts.team);
     this.oppTeam = rivalTeam(this.seed, this.myTeam.id);
     loadBatSprites(this.myTeam.id, this.oppTeam.id);
-    loadBowlSprites();
+    loadBowlSprites(this.myTeam.id);
     this.charge = new Charge(0);
     this.charge.on(ev => this.onCharge(ev));
     this.ui.charge(0);

@@ -60,7 +60,7 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/game.js` | Match flow, ball sequences, fielding events, tutorial, rendering |
 | `js/scene.js`, `js/figure.js`, `js/fx.js` | Cameras, night stadium, cel-shaded figures, onomatopoeia and impact effects |
 | `js/batsprite.js`, `img/batter-*.webp` | Hand-drawn batter frames seen from behind, one sheet per team: an animation per swipe (drive, pull, cut, block, leave, bowled) |
-| `js/bowlsprite.js`, `img/bowler.webp`, `img/bowler-back.webp` | Hand-drawn bowler and fielders: front view for the batting camera, back view for the bowling camera (run-up, gather, coil, release, follow-through, celebrations), repainted in the fielding team's kit |
+| `js/bowlsprite.js`, `img/bowler.webp`, `img/bowler-back-*.webp` | Hand-drawn bowler and fielders: front view for the batting camera, back view (one sheet per team) for the bowling camera (run-up, gather, coil, release, follow-through, celebrations), repainted in the fielding team's kit |
 | `tools/build_bowler_sprites.py` | Cuts a labelled bowler sheet into an atlas (`--back` mirrors the back-view sheet into a right-arm action) |
 | `js/teams.js` | The eight teams and their kit colours |
 | `tools/build_batter_sprites.py` | Cuts labelled batting sprite sheets into the per-team images |
