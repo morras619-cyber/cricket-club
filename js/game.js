@@ -16,7 +16,8 @@ import { dailyOutcome } from './daily.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK } from './fx.js';
-import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
@@ -141,7 +142,10 @@ export class Game {
     this.onInput = null;
   }
   hitStop(ms) { this.hitStopUntil = this.realTime + ms; }
-  board(msg, ms = 4000) { this.boardMsg = msg; this.boardUntil = this.realTime + ms; }
+  board(msg, ms = 4000) {
+    this.boardMsg = msg; this.boardUntil = this.realTime + ms;
+    if (/SIX/.test(msg)) this.flareUntil = this.realTime + 1600; // the ground celebrates: flames, fireworks
+  }
   // full-screen comic panel; render() hides DOM banners and hints while it plays
   showCutIn(hero, def) { this.cutin.start(hero, def, this.realTime); }
   powerPause() { return this.until(() => this.realTime >= this.powerFxUntil); }
@@ -206,6 +210,11 @@ export class Game {
     // the captain's face goes on the Spark buttons when a slot has no hero
     this.captain = heroById(this.myTeam.star) || Object.values(this.team).find(Boolean);
     this.oppStyle = this.oppTeam.style || {};
+    // the home ground: its look, and how its pitch plays
+    this.home = opts.home || homeFromSeed(this.seed, this.myTeam.id, this.oppTeam.id);
+    this.ground = groundOf(this.home);
+    this.pitch = pitchOf(this.home);
+    setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; });
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
     // hero levels: stronger heroes and cheaper signature powers
     this.levels = opts.levels || {};
@@ -232,6 +241,7 @@ export class Game {
     this.innings = [];
     try {
       if (mode === 'tutorial') return await this.runTutorial();
+      await this.pitchReport();
       const script = aiBowlingScript(this.seed, this.aiPlan, this.rival.bowl?.power.kind);
       if (mode === 'daily') {
         // join the match late: the scoreboard, the over and the batter are already set
@@ -279,6 +289,26 @@ export class Game {
       this.ui.hud(false); this.clearBowlUI(); this.ui.hint(null);
     }
   }
+
+  // before the first ball: where we are, and what the pitch will do
+  async pitchReport() {
+    this.view = 'bat';
+    this.S = this.freshScene();
+    const at = this.home === this.myTeam.id ? 'HOME' : 'AWAY';
+    this.ui.banner(`${this.ground.name.toUpperCase()} · ${at}`, `Pitch report: ${this.pitch.name}. ${this.pitch.report}`, 3000);
+    sfx.crowd(this.home === this.myTeam.id ? 1.3 : 0.7);
+    await this.sleepReal(this.bot ? 150 : 2800);
+  }
+  // a delivery as this pitch makes it behave (spin grips on the turner, the new ball hoops at Cyclone Park...)
+  pitched(spec, type) {
+    const P = this.pitch, dew = P.dew && this.innings.length >= 2;
+    const out = { ...spec };
+    if (type?.spin) out.move = (out.move || 0) * P.turn;
+    else { out.swing = (out.swing || 0) * P.swing * (dew ? 0.8 : 1); out.move = (out.move || 0) * P.seam; out.kmh = (out.kmh || 0) * P.kmh; }
+    return out;
+  }
+  // timing on this pitch: easier on a road or under the dew, harder on a seamer
+  pitchBat() { return this.pitch.bat * (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1); }
 
   newCharge(value) {
     this.charge = new Charge(value);
@@ -538,7 +568,7 @@ export class Game {
   // skill: the batter's rating. Stars get a little more room, tail-enders a lot less.
   windowsFor(fx, extra = 0, tornado = false, skill = 75) {
     const w = { ...CFG.timing };
-    const f = clamp(0.75 + skill / 300, 0.72, 1.12);
+    const f = clamp(0.75 + skill / 300, 0.72, 1.12) * (this.pitchBat?.() || 1);
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? 40 : 0);
     if (fx.focus) w.perfect += 30;
     if (tornado) w.perfect /= 2;
@@ -598,7 +628,7 @@ export class Game {
     this.timeScale = (opt.slow ?? 1) * (fx.focus ? 0.7 : 1);
     if (fx.focus) this.fx.speed = 0.6;
 
-    const d = makeDelivery({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) });
+    const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
     if (!this.bot && !opt.hint) this.fx.word(`${Math.round(spec.kmh)} KM/H · ${String(spec.type || '').toUpperCase()}`, this.W / 2, this.H * 0.2, { size: 24, color: '#fff4da', stroke: INK, rot: 0, dur: 1100 });
     S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
@@ -824,7 +854,7 @@ export class Game {
       this.addMoment('ultimate', `METEOR ${runs}!`, 'BOOOOM!', this.heroFor('bat'), { ballNo, perfect: runs === 8, detail: `${runs} runs off one ball` });
       return;
     }
-    const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: this.oppStyle.field || 1 });
+    const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: (this.oppStyle.field || 1) * this.pitch.field });
     let caught = false, saved = false, dropped = false;
     if (sim.catch) {
       caught = rng.chance(sim.catch.p * 0.92);
@@ -856,14 +886,16 @@ export class Game {
         this.recordSix = m;
       }
       this.charge.award('six', 'SIX');
-      sfx.crowd(1.2);
+      if (this.home === this.myTeam.id) this.charge.add(3, 'HOME CROWD');
+      sfx.crowd(this.home === this.myTeam.id ? 1.5 : 1.2);
       const powered = fx.thunder;
       if (powered) this.fx.word('KRAKOOOM!', this.W / 2, this.H * 0.3, { size: 76, color: '#5fc8ff', stroke: INK });
       this.addMoment(powered ? 'powerSix' : 'six', powered ? `${this.sixDistance(sim)}m THUNDERCLAP SIX!` : `${this.sixDistance(sim)}m SIX!`, powered ? 'KRAKOOOM!' : 'SIX!', this.heroFor('bat'), { ballNo, detail: 'into the stands' });
     } else if (runs === 4) {
       this.board('FOUR!');
       this.charge.award('four', 'FOUR');
-      sfx.crowd(0.8);
+      if (this.home === this.myTeam.id) this.charge.add(2, 'HOME CROWD');
+      sfx.crowd(this.home === this.myTeam.id ? 1 : 0.8);
       this.addMoment('four', 'FOUR!', 'FOUR!', this.heroFor('bat'), { ballNo });
     } else if (runs === 0) this.charge.dot();
     if (inn.target != null && inn.runs >= inn.target) {
@@ -1140,6 +1172,7 @@ export class Game {
     if (A.tornado) { Object.assign(spec, { length: 'yorker', bounce: 0.9, h: 0.12, x: 0, kmh: 160, swing: 0.05, move: 0 }); fxFlags.tornado = true; A.tornado = false; usedPower = 'tornado'; }
     if (A.maya) { fxFlags.maya = true; A.maya = false; usedPower = 'maya'; }
     if (A.shatter) { spec.move = 0.3; fxFlags.shatter = true; A.shatter = false; usedPower = 'shatter'; }
+    if (!usedPower) Object.assign(spec, this.pitched(spec, btype));
     if (opt.spec) Object.assign(spec, opt.spec);
 
     // release, then aftertouch: drag sideways while the ball is in the air to bend it late
@@ -1190,7 +1223,9 @@ export class Game {
 
     // the AI batter's ability, and how hard my bowler is to read
     const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
-    let ai = aiBat(d, { skill: aiSkill, style: this.oppStyle, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
+    const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
+    const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * this.pitch.ai * aiHome / (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1) / this.pitch.bat };
+    let ai = aiBat(d, { skill: aiSkill, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
@@ -1539,7 +1574,7 @@ export class Game {
   noteEvent(ballNo) { this.fieldState.events++; this.fieldState.lastEventBall = ballNo; }
 
   async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit) {
-    const sim = simulateHit(res, field, rng, { aiBatting: true });
+    const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field });
     const ctl = ch => playerControls(ch, this.fieldState, ballNo);
 
     if (sim.catch) {
@@ -2096,6 +2131,7 @@ export class Game {
   renderIdle() {
     const cam = this.cams.bat;
     drawBackground(this.ctx, cam);
+    drawAtmosphere(this.ctx, cam, this.realTime);
     drawBoard(this.ctx, cam, this.realTime);
   }
 
@@ -2125,6 +2161,7 @@ export class Game {
   render3D(kind) {
     const ctx = this.ctx, S = this.S, cam = this.cams[kind];
     drawBackground(ctx, cam);
+    drawAtmosphere(ctx, cam, this.realTime, Math.max(0, ((this.flareUntil || 0) - this.realTime) / 1600));
     drawBoard(ctx, cam, this.realTime, this.realTime < this.boardUntil ? this.boardMsg : null);
     const items = [];
     const push = (z, fn) => items.push({ d: cam.depth(z), fn });

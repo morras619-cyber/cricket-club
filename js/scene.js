@@ -2,6 +2,8 @@ import { CFG } from './config.js';
 import { INK, FONT_DISPLAY, FONT_BODY, halftonePattern } from './fx.js';
 import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
+import { groundOf } from './grounds.js';
+import { teamById } from './teams.js';
 
 const { boundaryR: R, centerY: CY } = CFG.ground;
 
@@ -33,94 +35,144 @@ export class Cam3D {
 
 function seeded(n) { let s = n; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
 
+// ---------- the home ground ----------
+// The match is played at the home side's ground: its sky, crowd, colours, landmark and pitch.
+let HOME = 'thunder';
+let logo = null;
+let groundListener = null;
+export function setGround(teamId, onChange) {
+  HOME = teamId;
+  groundListener = onChange;
+  logo = new Image();
+  logo.onload = () => groundListener?.(); // repaint once the club's crest has loaded
+  logo.src = `img/logo-${teamId}.webp`;
+  onChange?.();
+}
+export const groundTeam = () => HOME;
+const shade = (hex, f) => {
+  const n = parseInt(hex.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f));
+  return `rgb(${c.join(',')})`;
+};
+const NIGHT = { night: 1, storm: 1, dusk: 0.7, evening: 0.6, sunset: 0.3, overcast: 0, day: 0 };
+
 function renderBackground(cam) {
   const { W, H, hy } = cam;
+  const G = groundOf(HOME), T = teamById(HOME);
+  const night = NIGHT[G.time] ?? 1;
   const c = document.createElement('canvas');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
   const g = c.getContext('2d');
   g.scale(dpr, dpr);
   const hi = quality.high;
-  const rnd = seeded(7);
+  const rnd = seeded(7 + HOME.length * 13);
   const boardH = 18;
   const standTop = hy - boardH - Math.min(H * 0.135, 112);
   const roofY = standTop - 26;
+  const spots = {};
 
-  // night sky, stars and a halftone moon
+  // the sky: the ground's own time of day and weather
   let gr = g.createLinearGradient(0, 0, 0, roofY);
-  gr.addColorStop(0, '#07082a'); gr.addColorStop(0.6, '#24145c'); gr.addColorStop(1, '#6e2876');
+  gr.addColorStop(0, G.sky[0]); gr.addColorStop(0.6, G.sky[1]); gr.addColorStop(1, G.sky[2]);
   g.fillStyle = gr; g.fillRect(0, 0, W, roofY + 2);
-  for (let i = 0; i < 80; i++) { g.fillStyle = `rgba(255,255,255,${0.25 + rnd() * 0.6})`; g.fillRect(rnd() * W, rnd() * roofY * 0.7, 1.4, 1.4); }
+  if (night >= 0.6) for (let i = 0; i < 70; i++) { g.fillStyle = `rgba(255,255,255,${(0.2 + rnd() * 0.6) * night})`; g.fillRect(rnd() * W, rnd() * roofY * 0.6, 1.4, 1.4); }
   const mx = W * 0.8, my = Math.max(36, roofY * 0.32), mr = Math.min(30, W * 0.07);
-  g.save(); if (hi) { g.shadowColor = '#ffe9a8'; g.shadowBlur = 36; }
-  g.fillStyle = '#fff1c2'; g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.fill(); g.restore();
-  g.save(); g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.clip();
-  g.fillStyle = 'rgba(214,170,90,0.55)';
-  for (let yy = my - mr; yy < my + mr; yy += 6) for (let xx = mx - mr + ((yy / 6) % 2) * 3; xx < mx + mr; xx += 6) {
-    const r = 2.2 * Math.max(0, Math.min(1, (xx - mx + 10) / (mr * 1.3) + (yy - my) / (mr * 2)));
-    if (r > 0.2) { g.beginPath(); g.arc(xx, yy, r, 0, Math.PI * 2); g.fill(); }
+  if (G.time === 'night' || G.time === 'evening' || G.time === 'dusk') {
+    g.save(); if (hi) { g.shadowColor = '#ffe9a8'; g.shadowBlur = 36; }
+    g.fillStyle = '#fff1c2'; g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.fill(); g.restore();
+    g.strokeStyle = INK; g.lineWidth = 2.5; g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.stroke();
+  } else if (G.time === 'day' || G.time === 'sunset') {
+    const sy = G.time === 'sunset' ? roofY - 30 : my, sr = G.time === 'sunset' ? mr * 1.6 : mr * 1.1;
+    g.save(); if (hi) { g.shadowColor = G.time === 'sunset' ? '#ff7a1a' : '#fff6b0'; g.shadowBlur = 50; }
+    g.fillStyle = G.time === 'sunset' ? '#ffcf5a' : '#fff7c2'; g.beginPath(); g.arc(W * 0.22, sy, sr, 0, Math.PI * 2); g.fill(); g.restore();
   }
-  g.restore();
-  g.strokeStyle = INK; g.lineWidth = 2.5; g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.stroke();
+  // clouds for the grey and stormy grounds, a few puffs on the sunny one
+  const cloud = (x, y, s, col) => { g.fillStyle = col; for (const [dx, dy, r] of [[0, 0, 1], [0.9, 0.2, 0.8], [-0.9, 0.25, 0.75], [0.4, -0.45, 0.7], [-0.4, -0.35, 0.65]]) { g.beginPath(); g.arc(x + dx * s, y + dy * s, r * s, 0, Math.PI * 2); g.fill(); } };
+  if (G.time === 'overcast' || G.time === 'storm') {
+    for (let i = 0; i < 9; i++) cloud(rnd() * W, rnd() * roofY * 0.55, 22 + rnd() * 30, G.time === 'storm' ? `rgba(40,16,80,${0.6 + rnd() * 0.3})` : `rgba(${200 + rnd() * 30},${206 + rnd() * 30},${212 + rnd() * 30},0.85)`);
+  } else if (G.time === 'day') {
+    for (let i = 0; i < 4; i++) cloud(W * (0.35 + i * 0.18), roofY * (0.18 + (i % 2) * 0.12), 14 + rnd() * 8, 'rgba(255,255,255,0.9)');
+  }
 
-  // city skyline with lit windows
-  for (let x = -10; x < W;) {
-    const w = 18 + rnd() * 26, h = 24 + rnd() * Math.min(70, roofY * 0.55);
-    g.fillStyle = '#1b1246'; g.fillRect(x, roofY - h, w, h + 4);
-    for (let wy = roofY - h + 6; wy < roofY - 4; wy += 7) for (let wx = x + 4; wx < x + w - 4; wx += 6) {
-      if (rnd() < 0.33) { g.fillStyle = rnd() < 0.7 ? '#ffd86b' : '#7fd7ff'; g.fillRect(wx, wy, 2.4, 3); }
+  // the skyline behind the ground (mountains at Eagle's Nest)
+  if (G.landmark === 'eagle') {
+    g.fillStyle = G.skyline;
+    g.beginPath(); g.moveTo(0, roofY);
+    for (let x = 0; x <= W; x += W / 7) g.lineTo(x + W / 14, roofY - 40 - rnd() * Math.min(80, roofY * 0.5)), g.lineTo(x + W / 7, roofY - 20 - rnd() * 20);
+    g.lineTo(W, roofY); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.75)';
+  } else {
+    for (let x = -10; x < W;) {
+      const w = 18 + rnd() * 26, h = 24 + rnd() * Math.min(70, roofY * 0.55);
+      g.fillStyle = G.skyline; g.fillRect(x, roofY - h, w, h + 4);
+      if (G.windows.length) for (let wy = roofY - h + 6; wy < roofY - 4; wy += 7) for (let wx = x + 4; wx < x + w - 4; wx += 6) {
+        if (rnd() < 0.33) { g.fillStyle = G.windows[rnd() < 0.7 ? 0 : G.windows.length - 1]; g.fillRect(wx, wy, 2.4, 3); }
+      }
+      x += w + 2;
     }
-    x += w + 2;
   }
+  drawLandmark(g, G.landmark, { W, roofY, standTop, hy, rnd, T, spots, hi });
 
-  // roof canopy with trusses
-  g.fillStyle = '#140f33'; g.fillRect(0, roofY, W, standTop - roofY);
-  g.strokeStyle = '#2e2766'; g.lineWidth = 1.5;
+  // the roof: a fascia in the club's colours with its crest and the ground's name
+  g.fillStyle = shade(T.suit, -0.7); g.fillRect(0, roofY, W, standTop - roofY);
+  g.strokeStyle = shade(T.suit, -0.4); g.lineWidth = 1.5;
   for (let i = -20; i < W + 20; i += 14) { g.beginPath(); g.moveTo(i, roofY); g.lineTo(i + 10, standTop - 2); g.stroke(); }
-  g.fillStyle = '#0d0a24'; g.fillRect(0, standTop - 4, W, 4);
+  g.fillStyle = T.suit; g.fillRect(0, standTop - 9, W, 9);
+  g.fillStyle = T.trim; g.fillRect(0, standTop - 9, W, 2.5);
+  g.fillStyle = '#0d0a24'; g.fillRect(0, standTop - 1, W, 2);
+  const name = G.name.toUpperCase();
+  g.font = `${Math.min(17, (standTop - roofY) * 0.7)}px ${FONT_DISPLAY}`;
+  const tw = g.measureText(name).width, lw = Math.min(30, standTop - roofY + 6);
+  const px = W / 2 - (tw + lw + 10) / 2, py = roofY + (standTop - 9 - roofY) / 2;
+  g.fillStyle = shade(T.suit, -0.55); g.fillRect(px - 8, roofY + 1, tw + lw + 26, standTop - roofY - 10);
+  if (logo?.complete && logo.naturalWidth) g.drawImage(logo, px, py - lw / 2, lw, lw);
+  g.fillStyle = T.trim === '#ffffff' || T.trim === '#1c1c1c' || T.trim === '#1a1a1a' ? '#fff4da' : T.trim;
+  g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillText(name, px + lw + 6, py + 1);
 
-  // two tiers of crowd, brightest in the floodlit middle
+  // two tiers of crowd, mostly in home colours
   const mid = standTop + (hy - boardH - standTop) * 0.5;
-  const cols = ['#ffd23f', '#e8343b', '#3ec6ff', '#fff4da', '#2ecc71', '#ff8ad8', '#ff9f1c', '#7a3fe0'];
-  const tier = (y0, y1, base) => {
-    g.fillStyle = base; g.fillRect(0, y0, W, y1 - y0);
+  const mix = ['#ffd23f', '#e8343b', '#3ec6ff', '#fff4da', '#2ecc71', '#ff8ad8', '#ff9f1c', '#7a3fe0'];
+  const home = [T.suit, T.suit, T.trim, shade(T.suit, 0.3)];
+  const base = night >= 0.6 ? 0 : 0.25;
+  const tier = (y0, y1, col) => {
+    g.fillStyle = col; g.fillRect(0, y0, W, y1 - y0);
     const step = hi ? 4.2 : 6;
     for (let yy = y0 + 3; yy < y1 - 2; yy += step) for (let xx = (yy * 7) % 4; xx < W; xx += step) {
-      const lit = 0.45 + 0.55 * Math.exp(-((xx - W / 2) ** 2) / (W * W * 0.17));
+      const lit = night ? 0.45 + 0.55 * Math.exp(-((xx - W / 2) ** 2) / (W * W * 0.17)) : 0.9;
       g.globalAlpha = lit * (0.55 + rnd() * 0.45);
-      g.fillStyle = cols[Math.floor(rnd() * cols.length)];
+      g.fillStyle = rnd() < 0.68 ? home[Math.floor(rnd() * home.length)] : mix[Math.floor(rnd() * mix.length)];
       g.beginPath(); g.arc(xx + rnd(), yy + rnd(), 1.5, 0, Math.PI * 2); g.fill();
     }
     g.globalAlpha = 1;
     g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, y1 - 3, W, 3);
   };
-  tier(standTop, mid - 2, '#221a4d');
-  tier(mid + 2, hy - boardH, '#2a1f5a');
-  // flags and banners in the crowd
+  tier(standTop, mid - 2, base ? shade(T.suit, -0.55) : shade(T.suit, -0.78));
+  tier(mid + 2, hy - boardH, base ? shade(T.suit, -0.5) : shade(T.suit, -0.72));
   const flag = (fx, fy, col) => {
     g.strokeStyle = '#fff4da'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx, fy - 16); g.stroke();
     g.fillStyle = col; g.strokeStyle = INK; g.lineWidth = 1.2;
     g.beginPath(); g.moveTo(fx, fy - 16); g.lineTo(fx + 13, fy - 12); g.lineTo(fx, fy - 8); g.closePath(); g.fill(); g.stroke();
   };
-  for (let i = 0; i < Math.round(W / 70); i++) flag(20 + rnd() * (W - 40), standTop + 18 + rnd() * (hy - boardH - standTop - 20), cols[i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : 2]);
+  for (let i = 0; i < Math.round(W / 55); i++) flag(20 + rnd() * (W - 40), standTop + 18 + rnd() * (hy - boardH - standTop - 20), i % 2 ? T.suit : T.trim);
   const banner = (bx, by, text, fg, rot) => {
     g.save(); g.translate(bx, by); g.rotate(rot);
     g.font = `15px ${FONT_DISPLAY}`; const w = g.measureText(text).width + 16;
     g.fillStyle = '#fff4da'; g.strokeStyle = INK; g.lineWidth = 2; g.fillRect(-w / 2, -10, w, 20); g.strokeRect(-w / 2, -10, w, 20);
     g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 0, 1); g.restore();
   };
-  banner(W * 0.38, mid + 18, 'SIXCHARGE!', '#1f6fe0', -0.06);
+  const cheer = `GO ${T.name.split(' ').slice(-1)[0].toUpperCase()}!`;
+  banner(W * 0.3, mid + 18, cheer, T.suit === '#ffcf1a' ? '#1a1a1a' : T.suit, -0.06);
   banner(W * 0.78, standTop + 16, '6 6 6', '#e8343b', 0.05);
 
-  // floodlights and their beams
+  // floodlights (lit only after dark) — the Thunderdome's are lightning bolts
   const towers = [W * 0.08, W * 0.92];
   const headY = Math.max(24, roofY - 46);
-  if (hi) {
+  if (hi && night >= 0.6) {
     g.save(); g.globalCompositeOperation = 'lighter';
     for (const lx of towers) {
       const dir = lx < W / 2 ? 1 : -1;
       for (const [spread, a] of [[W * 0.38, 0.06], [W * 0.23, 0.06], [W * 0.1, 0.07]]) {
-        g.fillStyle = `rgba(255,236,190,${a})`;
+        g.fillStyle = `rgba(255,236,190,${a * night})`;
         g.beginPath(); g.moveTo(lx, headY + 12); g.lineTo(W / 2 - dir * 20 - spread, H * 0.64); g.lineTo(W / 2 - dir * 20 + spread, H * 0.64); g.closePath(); g.fill();
       }
     }
@@ -128,18 +180,20 @@ function renderBackground(cam) {
   }
   for (const lx of towers) {
     g.strokeStyle = INK; g.lineWidth = 4; g.beginPath(); g.moveTo(lx, headY + 20); g.lineTo(lx, standTop); g.stroke();
-    g.save(); if (hi) { g.shadowColor = '#fff3c4'; g.shadowBlur = 28; }
-    g.fillStyle = '#fffbe8'; g.strokeStyle = INK; g.lineWidth = 2.5;
-    g.beginPath(); g.moveTo(lx - 24, headY); g.lineTo(lx + 24, headY); g.lineTo(lx + 20, headY + 24); g.lineTo(lx - 20, headY + 24); g.closePath(); g.fill(); g.stroke();
+    g.save(); if (hi && night >= 0.6) { g.shadowColor = '#fff3c4'; g.shadowBlur = 28; }
+    g.fillStyle = night >= 0.6 ? '#fffbe8' : '#c9ccd6'; g.strokeStyle = INK; g.lineWidth = 2.5;
+    if (G.landmark === 'bolts') {
+      g.fillStyle = '#ffd23f';
+      g.beginPath(); g.moveTo(lx + 4, headY - 30); g.lineTo(lx - 16, headY + 4); g.lineTo(lx - 2, headY + 4); g.lineTo(lx - 8, headY + 30); g.lineTo(lx + 16, headY - 6); g.lineTo(lx + 2, headY - 6); g.lineTo(lx + 10, headY - 30); g.closePath(); g.fill(); g.stroke();
+    } else {
+      g.beginPath(); g.moveTo(lx - 24, headY); g.lineTo(lx + 24, headY); g.lineTo(lx + 20, headY + 24); g.lineTo(lx - 20, headY + 24); g.closePath(); g.fill(); g.stroke();
+    }
     g.restore();
-    g.fillStyle = 'rgba(18,13,28,0.5)';
-    for (let i = 0; i < 4; i++) g.fillRect(lx - 19 + i * 10, headY + 4, 1.6, 17);
-    g.fillRect(lx - 21, headY + 12, 42, 1.6);
   }
 
-  // grass, mowing stripes and the floodlight pool on the square
+  // grass in the ground's own green, mowing stripes, and a crest painted on the outfield
   gr = g.createLinearGradient(0, hy, 0, H);
-  gr.addColorStop(0, '#1d7a3c'); gr.addColorStop(0.5, '#2b9b4b'); gr.addColorStop(1, '#1f7d3e');
+  gr.addColorStop(0, G.grass[0]); gr.addColorStop(0.5, G.grass[1]); gr.addColorStop(1, G.grass[0]);
   g.fillStyle = gr; g.fillRect(0, hy, W, H - hy);
   const near = cam.dir > 0 ? cam.cz + 1 : cam.cz - 1;
   const far = cam.dir > 0 ? cam.cz + 90 : cam.cz - 90;
@@ -152,28 +206,48 @@ function renderBackground(cam) {
     g.fillStyle = 'rgba(255,255,255,0.05)';
     g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.lineTo(c2.x, c2.y); g.lineTo(d.x, d.y); g.fill();
   }
+  if (logo?.complete && logo.naturalWidth) {
+    const zc = cam.dir > 0 ? 40 : -16;
+    const front = cam.project(0, 0, zc - 6 * cam.dir), back = cam.project(0, 0, zc + 6 * cam.dir), mid0 = cam.project(0, 0, zc);
+    if (front && back && mid0) {
+      const w = 14 * mid0.k, h = Math.abs(front.y - back.y);
+      g.save(); g.globalAlpha = 0.28; g.drawImage(logo, mid0.x - w / 2, Math.min(front.y, back.y), w, h); g.restore();
+    }
+  }
   const pc = cam.project(0, 0, 10) || { x: W / 2, y: H * 0.6 };
-  if (hi) {
+  if (hi && night >= 0.6) {
     g.save(); g.globalCompositeOperation = 'lighter';
     gr = g.createRadialGradient(pc.x, pc.y + H * 0.1, 20, pc.x, pc.y + H * 0.1, H * 0.4);
     gr.addColorStop(0, 'rgba(255,240,190,0.2)'); gr.addColorStop(1, 'rgba(255,240,190,0)');
     g.fillStyle = gr; g.fillRect(0, hy, W, H - hy); g.restore();
   }
-  // rope and the 30-yard circle
-  ring(g, cam, R, '#fff4da', 3, []);
+  // rope (home colours) and the 30-yard circle
+  ring(g, cam, R, T.trim === '#1c1c1c' || T.trim === '#1a1a1a' ? T.suit : T.trim, 3, []);
   ring(g, cam, 27, 'rgba(255,255,255,0.45)', 1.5, [6, 6]);
 
-  // the pitch: dry-earth texture, a worn strip down the middle, footmarks, creases
-  quad(g, cam, -1.5, 1.5, -1.6, 21.6, '#d9b56f');
+  // the pitch in its own colour: dust and cracks on the turner, a green tinge on the seamer
+  quad(g, cam, -1.5, 1.5, -1.6, 21.6, G.pitchCol);
   const corners = [[-1.5, -1.6], [1.5, -1.6], [1.5, 21.6], [-1.5, 21.6]].map(([x, z]) => cam.project(x, 0, z));
   if (corners.every(Boolean)) {
     g.save(); g.beginPath(); corners.forEach((p, k) => (k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y))); g.closePath(); g.clip();
+    const green = G.pitch.id === 'green';
     for (let n = 0; n < (hi ? 1400 : 500); n++) {
       const x = -1.5 + rnd() * 3, z = -1.6 + rnd() * 23.2, p = cam.project(x, 0, z);
       if (!p) continue;
-      g.fillStyle = rnd() < 0.5 ? 'rgba(120,80,30,0.18)' : 'rgba(255,240,200,0.22)';
+      g.fillStyle = green ? (rnd() < 0.6 ? 'rgba(40,110,40,0.3)' : 'rgba(255,240,200,0.15)') : rnd() < 0.5 ? 'rgba(120,80,30,0.18)' : 'rgba(255,240,200,0.22)';
       const sz = Math.max(1, p.k * 0.035);
       g.fillRect(p.x, p.y, sz * 1.4, sz);
+    }
+    if (G.pitch.id === 'turner') {
+      g.strokeStyle = 'rgba(90,55,20,0.55)'; g.lineWidth = 1;
+      for (let n = 0; n < 26; n++) {
+        let x = -1.3 + rnd() * 2.6, z = rnd() * 21;
+        let p = cam.project(x, 0, z);
+        if (!p) continue;
+        g.beginPath(); g.moveTo(p.x, p.y);
+        for (let s = 0; s < 4; s++) { x += (rnd() - 0.5) * 0.4; z += (rnd() - 0.5) * 0.8; p = cam.project(x, 0, z); if (p) g.lineTo(p.x, p.y); }
+        g.stroke();
+      }
     }
     quad(g, cam, -0.45, 0.45, 0, 20, 'rgba(160,110,50,0.18)');
     g.restore();
@@ -183,12 +257,212 @@ function renderBackground(cam) {
   for (const z of [0, 20]) line(g, cam, -1.4, z, 1.4, z, '#fffbe8', 1.5);
   for (const x of [-1.32, 1.32]) { line(g, cam, x, -1.2, x, 2.4, '#fffbe8', 1.5); line(g, cam, x, 17.6, x, 21.2, '#fffbe8', 1.5); }
 
-  // vignette
+  // vignette, darker after dark
   gr = g.createRadialGradient(W / 2, H * 0.55, H * 0.3, W / 2, H * 0.55, H * 0.78);
-  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(6,4,20,0.5)');
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(6,4,20,${0.2 + 0.3 * night})`);
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
   cam.board = { y: hy - boardH, h: boardH };
+  cam.layout = { roofY, standTop, hy, spots };
   return c;
+}
+
+// The landmark that tells you whose ground it is, painted above the stands.
+function drawLandmark(g, kind, { W, roofY, standTop, rnd, T, spots, hi }) {
+  g.lineJoin = 'round';
+  if (kind === 'turbines') {
+    // wind turbine towers (the blades turn in drawAtmosphere)
+    spots.turbines = [];
+    for (const fx of [0.18, 0.42, 0.7]) {
+      const x = W * fx, top = roofY - Math.min(90, roofY * 0.65) * (0.8 + rnd() * 0.25);
+      g.strokeStyle = '#eef2f4'; g.lineWidth = 4; g.beginPath(); g.moveTo(x, roofY); g.lineTo(x, top); g.stroke();
+      g.strokeStyle = 'rgba(20,16,24,0.5)'; g.lineWidth = 1; g.stroke();
+      spots.turbines.push({ x, y: top, r: Math.min(30, roofY * 0.25) });
+    }
+  } else if (kind === 'snake') {
+    // a huge coiled snake lying along the roof, fangs out, eyes glowing
+    const y0 = roofY - 6;
+    g.strokeStyle = INK; g.lineWidth = 22; g.lineCap = 'round';
+    const end = W * 0.66;
+    const path = () => { g.beginPath(); g.moveTo(-20, y0); for (let x = -20; x <= end; x += 6) g.lineTo(x, y0 - 16 * Math.sin(x / 38) - 8); };
+    g.lineWidth = 26; path(); g.stroke();
+    g.strokeStyle = '#e8262b'; g.lineWidth = 20; path(); g.stroke();
+    g.strokeStyle = '#1f1f26'; g.lineWidth = 8; g.setLineDash([12, 10]); path(); g.stroke(); g.setLineDash([]);
+    const hx = end + 6, hyy = y0 - 16 * Math.sin(end / 38) - 12;
+    g.fillStyle = '#e8262b'; g.strokeStyle = INK; g.lineWidth = 2.5;
+    g.beginPath(); g.ellipse(hx + 12, hyy - 6, 24, 15, -0.3, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#fff4da';
+    g.beginPath(); g.moveTo(hx + 22, hyy + 4); g.lineTo(hx + 25, hyy + 16); g.lineTo(hx + 28, hyy + 3); g.fill();
+    g.beginPath(); g.moveTo(hx + 30, hyy + 1); g.lineTo(hx + 33, hyy + 12); g.lineTo(hx + 35, hyy - 1); g.fill();
+    g.strokeStyle = '#e8262b'; g.lineWidth = 2; g.beginPath(); g.moveTo(hx + 34, hyy - 4); g.lineTo(hx + 46, hyy - 2); g.lineTo(hx + 50, hyy - 7); g.moveTo(hx + 46, hyy - 2); g.lineTo(hx + 51, hyy + 2); g.stroke();
+    spots.eyes = [{ x: hx + 14, y: hyy - 11 }, { x: hx + 24, y: hyy - 14 }];
+    g.lineCap = 'butt';
+  } else if (kind === 'eagle') {
+    // a golden eagle statue, wings spread, on a plinth above the stand
+    const x = W * 0.6, base = roofY, s = Math.min(1.2, roofY / 110);
+    g.fillStyle = '#9a7a3a'; g.strokeStyle = INK; g.lineWidth = 2.5;
+    g.fillRect(x - 16 * s, base - 22 * s, 32 * s, 22 * s); g.strokeRect(x - 16 * s, base - 22 * s, 32 * s, 22 * s);
+    const by = base - 22 * s;
+    g.fillStyle = '#ffcf1a';
+    g.beginPath();
+    g.moveTo(x, by - 40 * s);
+    g.quadraticCurveTo(x - 40 * s, by - 80 * s, x - 78 * s, by - 62 * s);
+    for (let k = 0; k < 5; k++) g.lineTo(x - (70 - k * 11) * s, by - (50 - k * 6) * s + (k % 2 ? 6 * s : 0));
+    g.lineTo(x - 10 * s, by - 18 * s); g.lineTo(x - 6 * s, by);
+    g.lineTo(x + 6 * s, by); g.lineTo(x + 10 * s, by - 18 * s);
+    for (let k = 4; k >= 0; k--) g.lineTo(x + (70 - k * 11) * s, by - (50 - k * 6) * s + (k % 2 ? 6 * s : 0));
+    g.lineTo(x + 78 * s, by - 62 * s);
+    g.quadraticCurveTo(x + 40 * s, by - 80 * s, x, by - 40 * s);
+    g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.ellipse(x, by - 46 * s, 9 * s, 11 * s, 0, 0, Math.PI * 2); g.fillStyle = '#fff4da'; g.fill(); g.stroke();
+    g.fillStyle = '#ff9f1c'; g.beginPath(); g.moveTo(x + 4 * s, by - 46 * s); g.lineTo(x + 16 * s, by - 42 * s); g.lineTo(x + 4 * s, by - 40 * s); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = INK; g.beginPath(); g.arc(x + 2 * s, by - 49 * s, 1.8 * s, 0, Math.PI * 2); g.fill();
+  } else if (kind === 'cauldrons') {
+    // fire cauldrons on the roof (the flames burn in drawAtmosphere)
+    spots.cauldrons = [];
+    for (const fx of [0.2, 0.5, 0.8]) {
+      const x = W * fx, y = roofY - 4;
+      g.fillStyle = '#2a1a14'; g.strokeStyle = INK; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(x - 18, y - 16); g.lineTo(x + 18, y - 16); g.lineTo(x + 11, y); g.lineTo(x - 11, y); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#f2711c'; g.fillRect(x - 18, y - 18, 36, 4); g.strokeRect(x - 18, y - 18, 36, 4);
+      spots.cauldrons.push({ x, y: y - 18 });
+    }
+  } else if (kind === 'foundry') {
+    // steel girders, a crane and smokestacks
+    g.strokeStyle = '#5a6270'; g.lineWidth = 3;
+    for (const fx of [0.12, 0.88]) {
+      const x = W * fx, top = roofY - Math.min(80, roofY * 0.6);
+      g.strokeRect(x - 10, top, 20, roofY - top);
+      for (let y = top; y < roofY; y += 12) { g.beginPath(); g.moveTo(x - 10, y); g.lineTo(x + 10, y + 12); g.moveTo(x + 10, y); g.lineTo(x - 10, y + 12); g.stroke(); }
+    }
+    const cx = W * 0.62, ct = roofY - Math.min(100, roofY * 0.75);
+    g.strokeStyle = '#ffb347'; g.lineWidth = 4; g.beginPath(); g.moveTo(cx, roofY); g.lineTo(cx, ct); g.lineTo(cx - W * 0.22, ct + 8); g.moveTo(cx, ct); g.lineTo(cx + 26, ct + 6); g.stroke();
+    g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx - W * 0.2, ct + 8); g.lineTo(cx - W * 0.2, ct + 34); g.stroke();
+    g.fillStyle = '#ffb347'; g.fillRect(cx - W * 0.2 - 6, ct + 34, 12, 8);
+    spots.stacks = [];
+    for (const fx of [0.3, 0.4]) {
+      const x = W * fx, top = roofY - Math.min(70, roofY * 0.5);
+      g.fillStyle = '#3a3f48'; g.strokeStyle = INK; g.lineWidth = 2; g.fillRect(x - 7, top, 14, roofY - top); g.strokeRect(x - 7, top, 14, roofY - top);
+      g.fillStyle = '#e8343b'; g.fillRect(x - 7, top + 6, 14, 4);
+      spots.stacks.push({ x, y: top });
+    }
+  } else if (kind === 'storm') {
+    // the eye of the storm: a swirling vortex of lit cloud over the ground
+    const x = W * 0.5, y = roofY * 0.42, r = Math.min(W * 0.32, roofY * 0.5);
+    for (let k = 0; k < 5; k++) {
+      g.strokeStyle = ['#b98cff', '#8f5ce0', '#d9c2ff', '#7a3fe0', '#f2b21b'][k]; g.lineWidth = 7 - k; g.globalAlpha = 0.85;
+      g.beginPath();
+      for (let a = 0; a < Math.PI * 3.2; a += 0.08) {
+        const rr = r * (1 - a / (Math.PI * 3.6)) * (1 - k * 0.06), ang = a + k * 1.25;
+        const px = x + Math.cos(ang) * rr * 1.5, py = y + Math.sin(ang) * rr * 0.55;
+        if (a === 0) g.moveTo(px, py); else g.lineTo(px, py);
+      }
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = '#f2b21b'; g.beginPath(); g.ellipse(x, y, 10, 5, 0, 0, Math.PI * 2); g.fill();
+    spots.rain = true; spots.eye = { x, y };
+  } else if (kind === 'palace') {
+    // palace domes and spires, strung with bunting
+    const dome = (x, w, h, col) => {
+      g.fillStyle = col; g.strokeStyle = INK; g.lineWidth = 2.5;
+      g.fillRect(x - w / 2, roofY - h * 0.45, w, h * 0.45); g.strokeRect(x - w / 2, roofY - h * 0.45, w, h * 0.45);
+      g.beginPath(); g.moveTo(x - w / 2, roofY - h * 0.45); g.quadraticCurveTo(x - w / 2, roofY - h, x, roofY - h * 1.15); g.quadraticCurveTo(x + w / 2, roofY - h, x + w / 2, roofY - h * 0.45); g.closePath(); g.fill(); g.stroke();
+      g.strokeStyle = '#ffd23f'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, roofY - h * 1.15); g.lineTo(x, roofY - h * 1.35); g.stroke();
+      g.fillStyle = '#ffd23f'; g.beginPath(); g.arc(x, roofY - h * 1.37, 3, 0, Math.PI * 2); g.fill();
+    };
+    const h = Math.min(80, roofY * 0.55);
+    dome(W * 0.5, 70, h * 1.1, '#ec2f9a'); dome(W * 0.32, 40, h * 0.75, '#f6c6e0'); dome(W * 0.68, 40, h * 0.75, '#f6c6e0');
+    dome(W * 0.15, 26, h * 0.55, '#ec2f9a'); dome(W * 0.85, 26, h * 0.55, '#ec2f9a');
+    g.strokeStyle = '#fff4da'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, roofY - 30); g.quadraticCurveTo(W * 0.25, roofY - 8, W * 0.5, roofY - 30); g.quadraticCurveTo(W * 0.75, roofY - 8, W, roofY - 30); g.stroke();
+    for (let k = 0; k < 24; k++) {
+      const t = k / 24, x = t * W, u = (t * 2) % 1, y = roofY - 30 + 22 * 4 * u * (1 - u) * 0.5 + 0;
+      g.fillStyle = k % 2 ? T.suit : '#ffd23f';
+      g.beginPath(); g.moveTo(x - 4, y); g.lineTo(x + 4, y); g.lineTo(x, y + 8); g.closePath(); g.fill();
+    }
+    spots.fireworks = true;
+  } else if (kind === 'bolts') {
+    spots.lightning = true;
+  }
+  if (!hi) delete spots.rain;
+}
+
+// Moving parts of the ground, drawn every frame over the painted stadium.
+export function drawAtmosphere(ctx, cam, t, flare = 0) {
+  const L = cam.layout;
+  if (!L) return;
+  const { W, H } = cam, s = L.spots, hi = quality.high;
+  ctx.save();
+  if (s.turbines) {
+    ctx.strokeStyle = '#f5f8fa'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    s.turbines.forEach((tb, i) => {
+      const a0 = t * 0.0012 * (1 + i * 0.15) + i;
+      for (let k = 0; k < 3; k++) { const a = a0 + k * 2.094; ctx.beginPath(); ctx.moveTo(tb.x, tb.y); ctx.lineTo(tb.x + Math.cos(a) * tb.r, tb.y + Math.sin(a) * tb.r); ctx.stroke(); }
+      ctx.fillStyle = '#f5f8fa'; ctx.beginPath(); ctx.arc(tb.x, tb.y, 3.5, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+  if (s.cauldrons) {
+    const big = flare > 0 ? 1 + 1.6 * flare : 1;
+    for (const [i, cd] of s.cauldrons.entries()) {
+      for (let k = 0; k < 3; k++) {
+        const fl = (0.75 + 0.25 * Math.sin(t * 0.012 + i * 2 + k * 1.7)) * big;
+        ctx.fillStyle = ['#ff3b1a', '#ff8a1a', '#ffe14d'][k];
+        const w = (14 - k * 4) * Math.min(big, 1.8), h = (24 - k * 6) * fl;
+        ctx.beginPath(); ctx.moveTo(cd.x - w, cd.y); ctx.quadraticCurveTo(cd.x - w * 0.6, cd.y - h * 0.6, cd.x + Math.sin(t * 0.02 + i) * 3, cd.y - h); ctx.quadraticCurveTo(cd.x + w * 0.6, cd.y - h * 0.6, cd.x + w, cd.y); ctx.fill();
+      }
+    }
+  }
+  if (s.stacks && hi) {
+    for (const [i, st] of s.stacks.entries()) for (let k = 0; k < 5; k++) {
+      const p = ((t * 0.0004 + k / 5 + i * 0.3) % 1);
+      ctx.fillStyle = `rgba(160,165,175,${0.45 * (1 - p)})`;
+      ctx.beginPath(); ctx.arc(st.x + p * 26, st.y - p * 50, 6 + p * 14, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (s.eyes) {
+    const glow = 0.6 + 0.4 * Math.sin(t * 0.004);
+    ctx.fillStyle = `rgba(255,${60 + 80 * glow},40,1)`;
+    if (hi) { ctx.shadowColor = '#ff2d1a'; ctx.shadowBlur = 10 * glow; }
+    for (const e of s.eyes) { ctx.beginPath(); ctx.arc(e.x, e.y, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.shadowBlur = 0;
+  }
+  // lightning: the Thunderdome and the Eye of the Storm
+  if (s.lightning || s.rain) {
+    const period = s.rain ? 5200 : 6800, ph = t % period;
+    if (ph < 180 || (ph > 260 && ph < 330)) {
+      const seed = Math.floor(t / period);
+      let x = W * (0.2 + ((seed * 0.37) % 0.6)), y = 0;
+      ctx.strokeStyle = s.rain ? '#e6d3ff' : '#fff9c4'; ctx.lineWidth = 2.5;
+      if (hi) { ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 16; }
+      ctx.beginPath(); ctx.moveTo(x, y);
+      for (let k = 1; k < 8; k++) { x += ((seed * 13 + k * 7) % 11 - 5) * 3; y = (L.roofY * k) / 8; ctx.lineTo(x, y); }
+      ctx.stroke(); ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(0, 0, W, H);
+    }
+  }
+  if (s.rain) {
+    ctx.strokeStyle = 'rgba(200,190,255,0.22)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let k = 0; k < 70; k++) {
+      const x = ((k * 97.3 + t * 0.25) % (W + 40)) - 20, y = ((k * 53.7 + t * 0.9) % H);
+      ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 12);
+    }
+    ctx.stroke();
+  }
+  // fireworks over the palace (and on every six)
+  if (s.fireworks) {
+    const n = flare > 0 ? 3 : 1;
+    for (let f = 0; f < n; f++) {
+      const period = 3200 + f * 700, ph = (t + f * 900) % period;
+      if (ph > 900 && !(flare > 0)) continue;
+      const k = Math.floor((t + f * 900) / period), p = Math.min(1, (ph % 900) / 900);
+      const x = W * (0.2 + ((k * 0.41 + f * 0.3) % 0.6)), y = L.roofY * (0.25 + ((k * 0.23) % 0.3));
+      ctx.strokeStyle = ['#ffd23f', '#ff8ad8', '#3ec6ff', '#fff4da'][(k + f) % 4]; ctx.globalAlpha = 1 - p; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let r = 0; r < 12; r++) { const a = (r / 12) * Math.PI * 2; ctx.moveTo(x + Math.cos(a) * p * 10, y + Math.sin(a) * p * 10); ctx.lineTo(x + Math.cos(a) * p * 30, y + Math.sin(a) * p * 30); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
 }
 
 // The LED boundary board scrolls, so it's drawn every frame over the cached stadium.
@@ -206,7 +480,8 @@ export function drawBoard(ctx, cam, t, message) {
   ctx.beginPath(); ctx.rect(0, b.y, W, b.h); ctx.clip();
   ctx.font = `${Math.round(b.h * 0.82)}px ${FONT_DISPLAY}`; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fffbe8';
   if (quality.high) { ctx.shadowColor = '#fff'; ctx.shadowBlur = 8; }
-  const text = message ? `★ ${message} ★   `.repeat(6) : BOARD_TEXT;
+  const G = groundOf(HOME), T = teamById(HOME);
+  const text = message ? `★ ${message} ★   `.repeat(6) : `★ WELCOME TO ${G.name.toUpperCase()} ★   HOME OF THE ${T.name.toUpperCase()}   ${BOARD_TEXT}`;
   const tw = ctx.measureText(text).width;
   const off = -((t * 0.05) % tw);
   for (let x = off; x < W; x += tw) ctx.fillText(text, x, b.y + b.h / 2 + 1);
@@ -336,7 +611,7 @@ export class OutfieldView {
     ctx.fillStyle = '#1b1838'; ctx.fillRect(0, 0, W, H);
     const c = this.to(0, CY);
     // the stands: a ring of crowd around the rope
-    if (!this.crowd) this.crowd = crowdPattern(ctx);
+    if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(ctx); this.crowdFor = HOME; }
     ctx.save();
     ctx.fillStyle = this.crowd;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 26) * k, (R + 26) * k * 0.78, 0, 0, Math.PI * 2); ctx.fill();
@@ -346,7 +621,7 @@ export class OutfieldView {
     ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 4) * k, (R + 4) * k * 0.78, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#ffd23f'; ctx.fill();
     ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k + 2, R * k * 0.78 + 2, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#23853f'; ctx.fill();
+    ctx.fillStyle = groundOf(HOME).grass[1]; ctx.fill();
     ctx.clip();
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     for (let x = -R; x < R; x += 10) { const a = this.to(x, 0); ctx.fillRect(a.x, 0, 5 * k, H); }
@@ -356,7 +631,7 @@ export class OutfieldView {
     ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, 27 * k, 27 * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);
-    ctx.fillStyle = '#d8b878'; ctx.strokeStyle = 'rgba(20,16,24,0.5)'; ctx.lineWidth = 1.5;
+    ctx.fillStyle = groundOf(HOME).pitchCol; ctx.strokeStyle = 'rgba(20,16,24,0.5)'; ctx.lineWidth = 1.5;
     ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     for (const y of [0, 20]) {
       const s = this.to(0, y);
@@ -395,10 +670,11 @@ function crowdPattern(ctx) {
   const c = document.createElement('canvas');
   c.width = c.height = 48;
   const g = c.getContext('2d');
-  g.fillStyle = '#2a1f5a'; g.fillRect(0, 0, 48, 48);
-  const rnd = seeded(11), cols = ['#ffd23f', '#e8343b', '#3ec6ff', '#fff4da', '#2ecc71', '#ff8ad8', '#ff9f1c'];
+  g.fillStyle = shade(teamById(HOME).suit, -0.72); g.fillRect(0, 0, 48, 48);
+  const T = teamById(HOME);
+  const rnd = seeded(11), cols = ['#ffd23f', '#e8343b', '#3ec6ff', '#fff4da', '#2ecc71', '#ff8ad8', '#ff9f1c'], home = [T.suit, T.suit, T.trim];
   for (let y = 2; y < 48; y += 4) for (let x = 2; x < 48; x += 4) {
-    g.globalAlpha = 0.5 + rnd() * 0.5; g.fillStyle = cols[Math.floor(rnd() * cols.length)];
+    g.globalAlpha = 0.5 + rnd() * 0.5; g.fillStyle = rnd() < 0.65 ? home[Math.floor(rnd() * 3)] : cols[Math.floor(rnd() * cols.length)];
     g.beginPath(); g.arc(x + rnd(), y + rnd(), 1.4, 0, Math.PI * 2); g.fill();
   }
   return ctx.createPattern(c, 'repeat');

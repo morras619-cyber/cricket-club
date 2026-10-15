@@ -112,13 +112,14 @@ export function nextFixture(state) {
   if (state.stage === 'done') return null;
   if (state.stage === 'group') {
     const m = state.rounds[state.round].find(f => f.includes(state.team));
-    return { opp: m[0] === state.team ? m[1] : m[0], stage: 'group', label: `Matchday ${state.round + 1} of ${state.rounds.length}` };
+    // the team named first in a fixture is at home
+    return { opp: m[0] === state.team ? m[1] : m[0], home: m[0], stage: 'group', label: `Matchday ${state.round + 1} of ${state.rounds.length}` };
   }
   const ko = state.ko[state.ko.length - 1];
   const tie = ko.ties.find(t => t.includes(state.team));
   if (!tie) return null;
   const label = { qf: 'Quarter-final', semi: 'Semi-final', final: 'Final' }[ko.stage];
-  return { opp: tie[0] === state.team ? tie[1] : tie[0], stage: ko.stage, label };
+  return { opp: tie[0] === state.team ? tie[1] : tie[0], home: tie[0], stage: ko.stage, label };
 }
 
 // Record the player's result, simulate everyone else's matches of that round, and move on.

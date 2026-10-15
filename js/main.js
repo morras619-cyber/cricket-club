@@ -6,6 +6,7 @@ import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
 import { flag, nationName } from './nations.js';
+import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
   value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason, migrateCareer } from './career.js';
@@ -195,7 +196,9 @@ function renderSquad() {
   const t = myTeam(), star = heroById(t.star);
   // the team's own star always plays
   const starWrap = el('div', 'slot');
-  starWrap.append(el('h3', '', `${t.name} · ${t.style.tag}`), el('p', 'sheetnote', t.style.desc));
+  const G = groundOf(t.id);
+  starWrap.append(el('h3', '', `${t.name} · ${t.style.tag}`), el('p', 'sheetnote', t.style.desc),
+    el('p', 'sheetnote venue', `🏟 Home ground: ${G.name} · Pitch: ${G.pitch.name}. ${G.pitch.report}`));
   const starRow = el('div', 'slot-row');
   starRow.append(heroCard(star, { on: true, note: `★ Your star · plays every match` }));
   starWrap.append(starRow);
@@ -348,18 +351,19 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   const mode = opts.mode;
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
-  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null;
+  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null, home = null;
   if (mode === 'tutorial') {
-    team = 'thunder'; sq = { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') }; levels = {};
+    team = 'thunder'; home = 'thunder'; sq = { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') }; levels = {};
   } else if (mode === 'daily') {
     // the same for everyone: the day's two teams, their own stars, default line-ups, no levels
-    team = opts.scenario.team; opp = opts.scenario.opp; sq = starSquad(team); levels = {};
+    team = opts.scenario.team; opp = opts.scenario.opp; home = team; sq = starSquad(team); levels = {};
   } else {
-    if (mode === 'league' || mode === 'cup') { team = profile.tournament.team; opp = nextFixture(profile.tournament).opp; }
+    if (mode === 'league' || mode === 'cup') { const f = nextFixture(profile.tournament); team = profile.tournament.team; opp = f.opp; home = f.home; }
     if (mode === 'career') {
       // the club's own squad from the career: heroes it bought at the auction give it its powers
       const c = profile.career;
-      team = c.club; opp = nextFixture(c.league).opp;
+      const f = nextFixture(c.league);
+      team = c.club; opp = f.opp; home = f.home;
       pools = { mine: clubPool(c, team), opp: clubPool(c, opp) };
       lineup = c.lineup;
     }
@@ -373,10 +377,11 @@ async function startMatch(opts) {
       lineup = profile.lineups?.[team] || null;
     }
   }
-  const order = mode === 'quick' || mode === 'league' || mode === 'cup' || mode === 'career' ? await coinToss(teamById(opp)) : 'bat';
+  home = home || homeFromSeed(seed, team, opp);
+  const order = mode === 'quick' || mode === 'league' || mode === 'cup' || mode === 'career' ? await coinToss(teamById(opp), home) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
   const summary = await game.runMatch({
-    mode, seed, order, team, opp, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+    mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
     records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
   });
   if (!summary) return; // quit mid-match
@@ -392,6 +397,9 @@ $('btnPause').addEventListener('pointerdown', e => {
 });
 $('resumeBtn').addEventListener('click', () => { game.paused = false; $('pause').hidden = true; });
 $('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
+
+// "🏟 The Snakepit · AWAY · Pitch: Dusty turner"
+const venueLine = (f, me) => { const G = groundOf(f.home || me); return `🏟 ${G.name} · ${f.home === me ? 'HOME' : 'AWAY'} · Pitch: ${G.pitch.name}`; };
 
 // ---------- tournaments ----------
 function openTournament(kind) {
@@ -428,6 +436,7 @@ function renderTournament(notes = []) {
     const lb = document.createElement('img'); lb.src = `img/logo-${o.id}.webp`; lb.alt = o.name;
     logos.append(la, el('b', '', 'V'), lb);
     card.append(el('div', 'eyebrow', f.label.toUpperCase()), logos,
+      el('p', 'venue', venueLine(f, me.id)),
       el('p', '', `${o.name} · ${o.style.tag}: ${o.style.desc} Their star: ${heroById(o.star).name}.`));
     body.append(card);
   } else if (place) {
@@ -563,7 +572,7 @@ function careerPick(c, body) {
     const logo = document.createElement('img'); logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
     const heroes = pool.filter(p => p.heroId).map(p => heroById(p.heroId).name.split(' ').slice(-1)[0]);
     b.append(logo, el('b', '', t.name), el('span', 'rate', `${stars(ratingStars(r))} ${r}`),
-      el('small', '', open ? `${t.style.tag}${heroes.length ? ` · ★ ${heroes.join(', ')}` : ''}` : `🔒 Unlocks in season ${unlockSeason(t)}`));
+      el('small', '', open ? `${t.style.tag} · 🏟 ${groundOf(t.id).name} (${groundOf(t.id).pitch.name.toLowerCase()})${heroes.length ? ` · ★ ${heroes.join(', ')}` : ''}` : `🔒 Unlocks in season ${unlockSeason(t)}`));
     if (c.club === t.id) b.append(el('em', '', 'Your club'));
     b.disabled = !open;
     b.addEventListener('click', () => { if (chooseClub(c, t.id)) { sfx.dhol(); saveProfile(profile); renderCareer(); } });
@@ -650,6 +659,7 @@ function careerSeason(c, body) {
     const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
     const best = [...theirs].sort((a, b) => ovr(b) - ovr(a))[0];
     card.append(el('div', 'eyebrow', f.label.toUpperCase()), logos,
+      el('p', 'venue', venueLine(f, me.id)),
       el('p', '', `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`));
     const go = el('button', 'bigbtn primary', `Play ${f.label.startsWith('Matchday') ? 'match' : f.label.toLowerCase()}`);
     go.addEventListener('click', () => startMatch({ mode: 'career' }));
@@ -771,6 +781,7 @@ function renderDaily() {
   const lb = document.createElement('img'); lb.src = `img/logo-${sc.opp}.webp`; lb.alt = '';
   logos.append(la, el('b', '', 'V'), lb);
   c.append(el('div', 'eyebrow', sc.kind === 'chase' ? 'THE CHASE' : 'THE DEFENCE'), el('h3', '', sc.title), logos, el('p', '', sc.text),
+    el('p', 'venue', `🏟 ${groundOf(sc.team).name} · Pitch: ${groundOf(sc.team).pitch.name}`),
     el('p', 'sheetnote', `Everyone plays the same scenario today, with the same teams and their own stars. One attempt. You start with 60 charge. Streak: ${profile.dailyStreak?.count || 0} day${profile.dailyStreak?.count === 1 ? '' : 's'}.`));
   if (done) {
     c.append(el('div', 'notecard big', `${done.won ? '✅' : '❌'} ${done.line}`), el('div', 'dailyballs', done.balls));
@@ -835,13 +846,14 @@ function awardAchievements(ctx) {
 }
 
 // ---------- coin toss ----------
-function coinToss(opp) {
+function coinToss(opp, home) {
   return new Promise(resolve => {
     ui.show('toss');
     const coin = $('coin'), text = $('tossText');
     coin.className = 'coin';
     $('tossCall').hidden = false; $('tossChoose').hidden = true; $('tossGo').hidden = true;
-    text.textContent = `You v ${opp.name}. Call it in the air!`;
+    const G = groundOf(home);
+    text.textContent = `You v ${opp.name} at ${G.name} (${home === opp.id ? 'away' : 'home'}). Pitch: ${G.pitch.name}. Call it in the air!`;
     const call = side => {
       $('tossCall').hidden = true;
       const result = Math.random() < 0.5 ? 'heads' : 'tails';

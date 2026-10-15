@@ -115,3 +115,16 @@ test('players come from all the cricket nations, and every team is a mix', async
   const c = newCareer(5);
   assert.ok(Object.values(c.players).every(p => NATIONS[p.nation]), 'everyone in the career has a country');
 });
+
+test('every club has its own home ground and pitch, and pitches change how the ball behaves', async () => {
+  const { GROUNDS, pitchOf, homeFromSeed } = await import('../js/grounds.js');
+  const names = new Set(), pitches = new Set();
+  for (const t of TEAMS) { const g = GROUNDS[t.id]; assert.ok(g, t.id); names.add(g.name); pitches.add(g.pitch.id); }
+  assert.equal(names.size, TEAMS.length); assert.equal(pitches.size, TEAMS.length);
+  assert.ok(pitchOf('vipers').turn > 1 && pitchOf('titans').seam > 1 && pitchOf('cyclones').swing > 1 && pitchOf('thunder').bat > 1);
+  assert.equal(pitchOf('royals').swing, 1);
+  assert.ok(['a', 'b'].includes(homeFromSeed(7, 'a', 'b')));
+  const s = newLeague('vipers', 3);
+  const f = nextFixture(s);
+  assert.ok([s.team, f.opp].includes(f.home));
+});
