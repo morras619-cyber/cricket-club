@@ -14,7 +14,7 @@ import { FX, INK } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { CutIn } from './cutin.js';
-import { loadBatSprites, drawBatSprite, shotAnim } from './batsprite.js';
+import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -579,6 +579,8 @@ export class Game {
       // let the ball carry on to the stumps or the keeper
       await this.until(() => this.gameTime - S.ballT0 >= (res.outcome === 'bowled' ? d.tStumps : d.tKeeper));
       S.delivery = null;
+      // beaten or bowled: he turns to look back at the stumps
+      if (res.outcome === 'bowled' || res.outcome === 'beaten') S.batter.shot = { anim: 'bowled', t0: this.realTime, from: batFrame(S.batter, this.realTime).f };
     }
 
     // ----- outcomes -----
