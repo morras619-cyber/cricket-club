@@ -477,7 +477,8 @@ export class Game {
       sfx.whoosh();
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
-    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('HOLD · SWIPE · LIFT ON THE RING');
+    else if (aiPower) this.ui.hint('SPECIAL BALL! TAP TO DEFEND');
+    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('HOLD · SWIPE · LIFT ON THE RING · TAP TO DEFEND');
     // before the delivery a tap on the field map enlarges it
     this.onInput = (type, g) => { if (type === 'down' && this.inMap(g)) this.mapBig = !this.mapBig; };
     if (opt.waitPower) await opt.waitPower();
@@ -522,11 +523,13 @@ export class Game {
         if (fx.meteor) { if (!tap && tb > 0) tap = { t: this.realToGame(g.t) }; return; }
         if (!swing) S.batter.angle = -2.2;
       } else if (type === 'up' && !fx.meteor && !swing) {
-        const tg = this.realToGame(g.t);
+        // a quick tap with no swipe = defend, timed from the touch
+        const tap = Math.hypot(g.dx, g.dy) < 28 && g.t - g.t0 < 320;
+        const tg = this.realToGame(tap ? g.t0 : g.t);
         if (tg < S.ballT0 + 0.15) { S.batter.angle = -0.4; return; }
-        swing = { t: tg, dx: g.dx, dy: g.dy };
+        swing = { t: tg, dx: g.dx, dy: g.dy, defend: tap };
         S.batter.swingT0 = this.realTime;
-        S.batter.shot = { anim: shotAnim(swipeToShot(g.dx, g.dy, this.loftPx)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
+        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.dx, g.dy, this.loftPx)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
     if (this.bot) this.botBat(d, S, fx, rng);
@@ -548,6 +551,8 @@ export class Game {
     const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado');
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
+    // defending is forgiving: anywhere in the wide window keeps the ball out
+    if (swing?.defend) grade = Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
     this.lastTiming = { err, grade };
     let res;
     if (fx.meteor) {
@@ -560,7 +565,7 @@ export class Game {
     } else if (S.maya && S.maya.picked !== S.maya.real) {
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
-      const shot = swing ? swipeToShot(swing.dx, swing.dy, this.loftPx) : null;
+      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx)) : null;
       res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, tornado: aiPower === 'tornado', shatter: aiPower === 'shatter' }, rng });
       if (aiPower === 'tornado' && grade === 'miss') res.outcome = 'bowled';
     }
@@ -682,6 +687,9 @@ export class Game {
       this.fx.word('PERFECT!', this.W / 2, this.H * 0.3, { size: 54 });
       this.fx.word(SHOT_WORDS[Math.floor(Math.random() * SHOT_WORDS.length)], at.x, at.y - 30, { size: 64, color: '#fff4da', stroke: '#e8343b' });
       this.fx.shake(10); sfx.bat('perfect'); buzz(35);
+    } else if (grade === 'defend') {
+      this.fx.word('DEFENDED', this.W / 2, this.H * 0.3, { size: 42, color: '#fff4da', stroke: INK, rot: 0 });
+      sfx.bat('good'); buzz(10);
     } else if (grade === 'good') {
       this.hitStop(40); this.fx.word('NICE!', this.W / 2, this.H * 0.3, { size: 46, color: '#3ec6ff', stroke: INK });
       this.fx.sparks(at.x, at.y, 10); sfx.bat('good'); buzz(15);

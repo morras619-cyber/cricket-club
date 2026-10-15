@@ -187,3 +187,20 @@ test('innings tracks batting stints and bowling figures', () => {
   assert.equal(f.wkts, 1); // the run-out isn't the bowler's
   assert.equal(f.runs, 3); assert.equal(f.balls, 8); assert.equal(f.maidens, 1); assert.equal(f.dots, 7);
 });
+
+test('a tap defends: safe in the window, even against Shatter Seam, and yields at most a single', () => {
+  const rng = makeRng(7);
+  const d = makeDelivery({ x: 0, length: 'good', kmh: 130, swing: 0, move: 0 });
+  const shot = { kind: 'defend', angle: 0, loft: false };
+  for (let i = 0; i < 40; i++) {
+    const res = resolveContact({ grade: 'defend', errMs: 0, shot, d, fx: { shatter: true }, rng });
+    assert.equal(res.outcome, 'hit');
+    assert.equal(res.loft, false);
+    const sim = simulateHit(res, buildField('balanced', false), rng);
+    assert.ok(sim.runs <= 1, `defence went for ${sim.runs}`);
+    assert.ok(!sim.catch, 'a defensive tap cannot be caught');
+  }
+  // badly timed: beaten (or bowled if it's on the stumps)
+  const miss = resolveContact({ grade: 'miss', errMs: 400, shot, d, fx: {}, rng });
+  assert.ok(['bowled', 'beaten'].includes(miss.outcome));
+});

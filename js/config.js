@@ -5,7 +5,7 @@ export const CFG = {
 
   // Batting timing half-windows in ms of ball time (GDD: perfect ±40, good ±80, early/late ±150, edge to 220).
   // touchSlackMs is added to every window to absorb touch-screen latency.
-  timing: { perfect: 40, good: 80, okay: 150, edge: 220 },
+  timing: { perfect: 40, good: 80, okay: 150, edge: 220, defend: 230 },
   touchSlackMs: 20,
 
   // Simulated ball speed = real speed × paceScale, so a 140 km/h ball takes ~1 s to arrive.

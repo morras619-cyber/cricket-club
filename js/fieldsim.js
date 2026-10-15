@@ -150,14 +150,14 @@ export function simulateHit(res, fielders, rng, opts = {}) {
   for (let t = t0; t < 14; t += 0.05) {
     const p = path.ballAt(t);
     if (outside(p)) {
-      out.kind = 'four'; out.runs = res.forced?.cap ? 2 : 4; out.duration = Math.min(t, 3.2);
+      out.kind = 'four'; out.runs = res.forced?.cap != null ? Math.min(2, res.forced.cap) : 4; out.duration = Math.min(t, 3.2);
       let best = null;
       for (const f of outfield) {
         const m = F.runSpeed * Math.max(0, t - F.react) + F.reach + F.diveReach - dist(f, p);
         const pr = sigmoid(m);
         if (!best || pr > best.p) best = { fielder: f, p: pr, t, point: p };
       }
-      if (best && best.p >= F.minP && !res.forced?.uncatchable && !res.forced?.cap) out.save = best;
+      if (best && best.p >= F.minP && !res.forced?.uncatchable && res.forced?.cap == null) out.save = best;
       break;
     }
     if (res.forced?.four) continue; // powered fours beat every fielder
@@ -169,7 +169,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     if (hit) {
       out.intercept = { fielder: hit, t, point: p };
       out.runs = runsAfterCollect(t, p);
-      if (res.forced?.cap) out.runs = Math.min(out.runs, res.forced.cap);
+      if (res.forced?.cap != null) out.runs = Math.min(out.runs, res.forced.cap);
       out.duration = Math.min(t + 0.8, 3.2);
       if (opts.aiBatting && out.runs < 3) {
         const m = runOutMargins(t, p, out.runs);

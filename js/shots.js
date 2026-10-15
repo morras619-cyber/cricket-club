@@ -36,6 +36,12 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng }) {
   }
   if (grade === 'miss') return { outcome: d.onStumps ? 'bowled' : 'beaten', grade };
 
+  // a tap: dead-bat defence. Safe in the window (no edge, even against Shatter Seam),
+  // dropped at the feet for a dot or a quick single
+  if (shot.kind === 'defend') {
+    return { outcome: 'hit', grade: 'defend', angle: rng.range(-0.6, 0.6), loft: false, launchDeg: 0, v: 5 + rng.range(0, 4), forced: { cap: rng.chance(0.25) ? 1 : 0 } }; // mostly a dot, sometimes a nudged single
+  }
+
   if (fx.shatter && grade !== 'perfect') grade = 'edge';
   if (grade === 'edge') {
     return {
