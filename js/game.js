@@ -1436,7 +1436,7 @@ export class Game {
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
     this.fx.speed = 1;
     if (elastic) this.fx.word('BOING!', this.W * 0.5, this.H * 0.3, { size: 40, color: '#ffe14d', stroke: INK });
-    this.ui.hint(needSwipe ? 'START YOUR SWIPE AS THE RING CLOSES!' : 'TAP WHEN THE RING CLOSES!');
+    this.ui.hint('TAP WHEN THE RING TURNS GREEN!');
     sfx.whoosh();
 
     const arrive = S.kball.t0 + approach;
@@ -1461,24 +1461,15 @@ export class Game {
     this.onInput = null;
     this.ui.hint(null);
 
+    // the rule the player sees: touch while the ring is green and it's caught (he dives on his own if he has to)
     let result = 'dropped';
     if (input) {
       const err = input.t - arrive;
-      let dirOk = true;
+      if (Math.abs(err) <= F.keeperClean) result = 'caught';
+      else if (Math.abs(err) <= windowMs / 2) result = 'juggle';
       if (needSwipe) {
-        if (!input.isSwipe) dirOk = false;
-        else {
-          const hs = cam.project(0.3, 0.55, -2.4), rs = cam.project(to.x, to.y, to.z);
-          const want = Math.atan2(rs.y - hs.y, rs.x - hs.x), got = Math.atan2(input.dy, input.dx);
-          // the right side is enough: towards the ball within 70 degrees, or simply the correct way left/right
-          const sideOk = Math.abs(rs.x - hs.x) > 30 && Math.sign(input.dx) === Math.sign(rs.x - hs.x) && Math.abs(input.dx) > Math.abs(input.dy) * 0.4;
-          dirOk = sideOk || angDiff(want, got) <= (elastic ? 85 : 70) * Math.PI / 180;
-        }
-      }
-      if (input.isSwipe) {
-        S.keeper.pose = POSES.dive(Math.sign(input.dx || to.x || 1));
-        // launch towards the ball: the dive frame is drawn centred on the body, gloves out front
-        const left = input.dx < 0;
+        const left = to.x < S.keeper.x;
+        S.keeper.pose = POSES.dive(left ? -1 : 1);
         S.keeper.frame = left ? 'diveL' : 'diveR';
         S.keeper.dx = left ? Math.min(0, to.x + 1.15 - S.keeper.x) : Math.max(0, to.x - 1.15 - S.keeper.x);
         S.keeper.lift = Math.max(0, to.y - 0.45);
@@ -1486,10 +1477,7 @@ export class Game {
         S.keeper.pose = POSES.keeper([to.x * 30, -to.y * 20]);
         S.keeper.frame = to.y > 1.0 ? 'high' : 'waist';
       }
-      if (dirOk && Math.abs(err) <= F.keeperClean) result = 'caught';
-      else if (dirOk && Math.abs(err) <= windowMs / 2) result = 'juggle';
-      if (!dirOk) this.fx.word('WRONG WAY!', this.W / 2, this.H * 0.3, { size: 40 });
-      else if (result === 'dropped') this.fx.word(err < 0 ? 'TOO EARLY!' : 'TOO LATE!', this.W / 2, this.H * 0.3, { size: 40 });
+      if (result === 'dropped') this.fx.word(err < 0 ? 'TOO EARLY!' : 'TOO LATE!', this.W / 2, this.H * 0.3, { size: 40 });
     }
     await this.until(() => this.realTime >= arrive);
     S.kball.done = result !== 'dropped';
@@ -1610,13 +1598,14 @@ export class Game {
       const b = path.ballAt(Math.min(t, T));
       this.O.ball = b;
       const k = clamp((T - t) / T, 0, 1);
-      this.O.ring = { x: L.x, y: L.y, r: 0.5 + 6 * k, color: Math.abs(T - t) < 0.12 ? '#2ecc71' : '#fff4da' };
+      const green = Math.abs(T - t) * 1000 / 0.6 <= F.catchPerfect;
+      this.O.ring = { x: L.x, y: L.y, r: 0.5 + 6 * k, color: green ? '#2ecc71' : '#fff4da', w: green ? 5 : 3 };
       this.O.marks = [{ x: L.x, y: L.y }];
       this.of.focus([b, me, L]);
       if (!prompted && t > T - 1.1) {
         prompted = true;
         const predicted = Math.max(0, dist(me, L) - speed * Math.max(0, T - t));
-        this.ui.hint(predicted <= F.reach ? 'TAP AS THE RING CLOSES!' : 'SWIPE TOWARDS THE BALL TO DIVE!');
+        this.ui.hint('TAP WHEN THE RING TURNS GREEN!');
       }
       return t >= T && (input || t >= T + 0.45); // room for a swipe that started in time to finish
     });
@@ -1625,18 +1614,13 @@ export class Game {
     let result = 'dropped';
     if (input) {
       const errReal = ((input.tg - (t0 + T)) * 1000) / 0.6;
-      let reachOk = gap <= F.reach + (input.isSwipe ? F.diveReach : 0);
-      if (input.isSwipe) {
-        const ms = this.of.to(me.x, me.y), ls = this.of.to(L.x, L.y);
-        if (gap > 0.6 && angDiff(Math.atan2(ls.y - ms.y, ls.x - ms.x), Math.atan2(input.dy, input.dx)) > 80 * Math.PI / 180) reachOk = false;
-        me.pose = POSES.dive(Math.sign(L.x - me.x) || 1);
-      }
-      // a tap that's just out of reach still counts: he stretches for it
-      if (!input.isSwipe && !reachOk && gap <= F.reach + 0.5) reachOk = true;
-      if (reachOk && Math.abs(errReal) <= F.catchPerfect) result = input.isSwipe ? 'dive' : 'caught';
-      else if (reachOk && Math.abs(errReal) <= F.catchGood) result = 'juggle';
-      else if (!reachOk) this.fx.word(input.isSwipe ? 'WRONG WAY!' : 'NEEDED A DIVE!', this.W / 2, this.H * 0.3, { size: 40 });
+      // the rule the player sees: touch while the ring is green and it's caught; out of reach, he dives for it
+      const diving = gap > F.reach;
+      if (diving) me.pose = POSES.dive(Math.sign(L.x - me.x) || 1);
+      if (Math.abs(errReal) <= F.catchPerfect) result = diving ? 'dive' : 'caught';
+      else if (Math.abs(errReal) <= F.catchGood) result = 'juggle';
       else this.fx.word(errReal < 0 ? 'TOO EARLY!' : 'TOO LATE!', this.W / 2, this.H * 0.3, { size: 40 });
+      input.isSwipe = diving;
       if (result === 'juggle') {
         sfx.glove();
         this.fx.word('JUGGLE! TAP!', this.W / 2, this.H * 0.3, { size: 48, dur: 600 });
@@ -2127,12 +2111,12 @@ export class Game {
     ctx.beginPath(); ctx.moveTo(s.x - 12, s.y); ctx.lineTo(s.x + 12, s.y); ctx.moveTo(s.x, s.y - 12); ctx.lineTo(s.x, s.y + 12); ctx.stroke();
     // closing ring: act when it meets the target
     const p = (this.realTime - R.t0) / R.dur;
-    if (p < 1.15) {
+    if ((p - 1) * R.dur <= F.keeperClean) {
       const near = Math.abs(1 - p) * R.dur <= F.keeperClean;
       ctx.strokeStyle = near ? '#5dff8a' : '#ffd23f'; ctx.lineWidth = near ? 5 : 4;
       ctx.beginPath(); ctx.arc(s.x, s.y, 30 + Math.max(0, 1 - p) * 110, 0, Math.PI * 2); ctx.stroke();
     }
-    if (R.needSwipe) {
+    if (false) {
       const h = cam.project(0.3, 0.55, -2.4);
       if (h) {
         ctx.strokeStyle = 'rgba(255,210,63,0.8)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
@@ -2375,7 +2359,7 @@ export class Game {
     V.drawGround(ctx);
     if (O.ring) {
       const p = V.to(O.ring.x, O.ring.y);
-      ctx.strokeStyle = O.ring.color; ctx.lineWidth = 3;
+      ctx.strokeStyle = O.ring.color; ctx.lineWidth = O.ring.w || 3;
       ctx.beginPath(); ctx.ellipse(p.x, p.y, O.ring.r * V.k, O.ring.r * V.k * 0.78, 0, 0, Math.PI * 2); ctx.stroke();
     }
     for (const m of O.marks) {

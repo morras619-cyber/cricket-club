@@ -23,8 +23,8 @@ Open it on a phone on the same network, or use desktop Chrome's device toolbar. 
 | Their field | While batting, the map in the top right shows the opposition's fielders. Tap it before the ball to see it full size with position names. |
 | Coin toss | Quick Match starts with a toss: call heads or tails; win it and choose to bat or bowl first. |
 | Banter | After a good ball, **Talk smack** or **Leave it**. Smack talk can rattle a batter (more mistakes) or fire him up (more aggressive, better timing). Leaving it earns Composure, sometimes Respect. When the opposition sledges you, answer with a dot/wicket (bowling) or a boundary (batting) for +10 REVENGE. |
-| Keeper Mode | A yellow ring closes on the target (green at the perfect moment). Tap as it closes; if an arrow shows, start a swipe towards that side as it closes to dive. Taps and swipes are timed from when your finger touches. Touched too early? You get another go. If you juggle it, tap again. Stumpings need a swipe up. |
-| Outfield Mode | Catch: tap as the ring closes, or if the hint says DIVE, start a swipe towards the ball as it closes. Timed from your touch, so the length of the swipe doesn't matter. Run-out: tap to pick up, then swipe at the stumps you want to hit. Rope save: swipe to dive. |
+| Keeper Mode | A ring closes on the ball. **Tap while it's green and it's caught**; if the ball is wide he dives for it himself. A tap just outside green juggles it (tap again). Stumpings need a swipe up. |
+| Outfield Mode | Catch: **tap while the ring is green and it's caught**; out of reach, your fielder dives for it himself. Run-out: tap to pick up, then swipe at the stumps you want to hit. Rope save: swipe to dive. |
 | Powers | Tap a hero button when you have the Charge. Batting powers lock when the ball is bowled; bowling powers lock when you press BOWL. |
 
 Fielding control triggers only on chances you can swing (5–90% success), at most 6 per innings, never on consecutive balls (edges excepted). Change it under **Fielding** on the home screen.
