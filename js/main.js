@@ -1,6 +1,8 @@
 import { UI } from './ui.js';
 import { Game, pickRivals } from './game.js';
 import { SPARKS, heroById, heroesFor } from './heroes.js';
+import { TEAMS } from './teams.js';
+import { drawTeamThumb } from './batsprite.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
@@ -121,6 +123,7 @@ function renderSquad() {
   ui.show('squad');
   const rows = $('squadRows');
   rows.innerHTML = '';
+  rows.append(teamPicker());
   for (const [slot, label] of SLOTS) {
     const wrap = document.createElement('div');
     wrap.className = 'slot';
@@ -166,6 +169,30 @@ function renderSquad() {
 $('squadBack').addEventListener('click', renderHome);
 $('squadGo').addEventListener('click', () => startMatch(pending || { mode: 'quick' }));
 
+// your team: its kit is what your batter, keeper and fielders wear
+function teamPicker() {
+  const wrap = el('div', 'slot');
+  const h = el('h3', '', 'Your team');
+  const row = el('div', 'slot-row teams');
+  for (const t of TEAMS) {
+    const b = document.createElement('button');
+    const on = (profile.team || 'thunder') === t.id;
+    b.className = 'team' + (on ? ' on' : '');
+    b.setAttribute('aria-pressed', on);
+    b.style.setProperty('--suit', t.suit); b.style.setProperty('--trim', t.trim);
+    const c = document.createElement('canvas'); c.width = 120; c.height = 150;
+    drawTeamThumb(c, t.id);
+    b.append(c, el('b', '', t.name));
+    b.addEventListener('click', () => {
+      profile.team = t.id; saveProfile(profile); sfx.click();
+      for (const x of row.children) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }
+    });
+    row.append(b);
+  }
+  wrap.append(h, row);
+  return wrap;
+}
+
 function squad() {
   return { bat: heroById(profile.squad.bat), bowl: heroById(profile.squad.bowl), field: heroById(profile.squad.field) };
 }
@@ -191,7 +218,7 @@ async function startMatch(opts) {
   const seed = opts.mode === 'challenge' ? opts.challenge.seed : randomSeed();
   const order = opts.mode === 'quick' ? await coinToss(pickRivals(seed, sq)) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
-  const summary = await game.runMatch({ mode: opts.mode, squad: sq, seed, order, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
+  const summary = await game.runMatch({ mode: opts.mode, squad: sq, team: opts.mode === 'tutorial' ? 'thunder' : profile.team, seed, order, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
   if (!summary) return; // quit mid-match
   if (opts.mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);

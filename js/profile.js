@@ -5,6 +5,7 @@ export const DAILY = [50, 60, 70, 80, 90, 100, 250];
 const fresh = () => ({
   name: '', xp: 0, coins: 0, matches: 0, wins: 0, best: 0, tutorialDone: false,
   squad: { bat: 'raja', bowl: 'zara', field: 'rani' },
+  team: 'thunder',
   daily: { day: 0, last: '' },
   settings: { sound: true, haptics: true, fielding: 'key' },
 });

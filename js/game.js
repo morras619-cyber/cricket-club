@@ -1,7 +1,8 @@
 import { CFG, phaseFor } from './config.js';
 import { makeRng } from './rng.js';
 import { Charge } from './charge.js';
-import { SPARKS, heroesFor, SIDEKICK_LOOKS, AI_LOOK } from './heroes.js';
+import { SPARKS, heroesFor, AI_LOOK } from './heroes.js';
+import { teamById, rivalTeam, teamLook } from './teams.js';
 import { makeDelivery } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
 import { simulateHit, buildField, buildFieldFrom, presetPositions, outsideRing, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
@@ -61,7 +62,6 @@ export class Game {
     this.of = new OutfieldView();
     this.fx = new FX();
     this.cutin = new CutIn();
-    loadBatSprites();
     this.timers = []; this.waiters = [];
     this.gameTime = 0; this.realTime = 0; this.lastNow = performance.now();
     this.powerFxUntil = 0; this.mapBig = false;
@@ -199,6 +199,10 @@ export class Game {
     this.seed = opts.seed;
     this.team = opts.squad; // { bat, bowl, field } heroes
     this.rival = pickRivals(this.seed, this.team);
+    // kits: the heroes play for the player's chosen team against a seeded rival team
+    this.myTeam = teamById(opts.team);
+    this.oppTeam = rivalTeam(this.seed, this.myTeam.id);
+    loadBatSprites(this.myTeam.id, this.oppTeam.id);
     this.charge = new Charge(0);
     this.charge.on(ev => this.onCharge(ev));
     this.ui.charge(0);
@@ -235,7 +239,7 @@ export class Game {
       } else {
         const first = new Innings('player');
         this.innings.push(first);
-        await this.introBanner('YOU BAT FIRST', `${this.rival.bowl.name} has the ball`);
+        await this.introBanner('YOU BAT FIRST', `${this.myTeam.name} v ${this.oppTeam.name} · ${this.rival.bowl.name} has the ball`);
         await this.battingInnings(first, script);
         const carry = this.charge.carryOver();
         await this.inningsBreak(first, carry);
@@ -452,7 +456,7 @@ export class Game {
     this.view = 'bat';
     this.timeScale = 1;
     const before = { runs: inn.runs, wkts: inn.wkts };
-    S.batter.look = this.team.bat.look; S.batter.emblem = this.team.bat.emblem;
+    S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = this.team.bat.emblem;
     S.bowler.look = this.rival.bowl.look;
     const rng = this.ballRng(ballNo);
     const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
@@ -732,8 +736,8 @@ export class Game {
     return list.map((f, i) => ({
       ...f,
       look: side === 'ai'
-        ? (f.id === 'bowler' ? this.rival.bowl.look : AI_LOOK)
-        : (f.keeper && this.team.field.id === 'rani' ? this.team.field.look : f.id === 'bowler' ? this.team.bowl.look : SIDEKICK_LOOKS[i % 2]),
+        ? (f.id === 'bowler' ? this.rival.bowl.look : teamLook(this.oppTeam, i))
+        : (f.keeper && this.team.field.id === 'rani' ? this.team.field.look : f.id === 'bowler' ? this.team.bowl.look : teamLook(this.myTeam, i)),
       emblem: side === 'ai' ? (f.id === 'bowler' ? this.rival.bowl.emblem : null) : (f.keeper && this.team.field.id === 'rani' ? this.team.field.emblem : f.id === 'bowler' ? this.team.bowl.emblem : null),
       pose: f.keeper ? POSES.keeper() : POSES.crouch(),
     }));
@@ -743,7 +747,7 @@ export class Game {
     const fs = this.fieldLooks(fielders, side);
     this.O = {
       fielders: fs,
-      batters: [{ x: -0.6, y: 1.2, look: side === 'ai' ? this.team.bat.look : this.rival.bat.look }, { x: 0.8, y: 19, look: side === 'ai' ? SIDEKICK_LOOKS[0] : AI_LOOK }],
+      batters: [{ x: -0.6, y: 1.2, look: teamLook(side === 'ai' ? this.myTeam : this.oppTeam) }, { x: 0.8, y: 19, look: teamLook(side === 'ai' ? this.myTeam : this.oppTeam, 1) }],
       ball: { x: 0, y: 1, h: 1 }, marks: [], ring: null, ends: null, throwLine: null, labels: [],
     };
     this.view = 'outfield';
@@ -812,7 +816,7 @@ export class Game {
     this.freeHit = false;
     this.aiPowerBalls = new Set([16, 26]);
     this.hud(inn);
-    await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `Keep ${this.rival.bat.name} quiet with ${this.team.bowl.name}` : `Defend ${inn.target - 1} with ${this.team.bowl.name}`);
+    await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `${this.myTeam.name} v ${this.oppTeam.name} · keep them quiet with ${this.team.bowl.name}` : `Defend ${inn.target - 1} with ${this.team.bowl.name}`);
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
       this.phaseBanner(ballNo);
@@ -850,9 +854,9 @@ export class Game {
     this.view = 'bowl';
     this.timeScale = 1;
     const rng = this.ballRng(ballNo);
-    S.batter.look = this.rival.bat.look; S.batter.emblem = this.rival.bat.emblem; S.batter.x = -0.5;
+    S.batter.look = teamLook(this.oppTeam); S.batter.team = this.oppTeam.id; S.batter.emblem = null; S.batter.x = -0.5;
     S.bowler.look = this.team.bowl.look; S.bowler.emblem = this.team.bowl.emblem; S.bowler.z = 26; S.bowler.x = -0.55;
-    S.keeper.look = this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1];
+    S.keeper.look = this.team.field.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
     const kind = this.team.bowl.bowls;
     const profile = this.rival.bat.ai;
     let field = this.currentField(ballNo);
@@ -1419,7 +1423,7 @@ export class Game {
     S.delivery = null; S.ball = null; S.flight = null;
     S.kball = { from, to, t0: this.realTime, dur: approach, done: false };
     S.reticle = { ...to, needSwipe, elastic, t0: this.realTime, dur: approach };
-    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field.id === 'rani' ? this.team.field.look : SIDEKICK_LOOKS[1], emblem: this.team.field.id === 'rani' ? this.team.field.emblem : null };
+    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1), emblem: this.team.field.id === 'rani' ? this.team.field.emblem : null };
     // clear leftover delivery text so nothing covers the target
     this.fx.words = []; this.fx.bubbles = []; this.ui.clearBanner();
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
@@ -1530,7 +1534,7 @@ export class Game {
   }
 
   // ---------- Outfield Mode ----------
-  controlledLook() { return this.team.field.id === 'bilal' ? this.team.field.look : SIDEKICK_LOOKS[0]; }
+  controlledLook() { return this.team.field.id === 'bilal' ? this.team.field.look : teamLook(this.myTeam); }
 
   startEvent(field, fielderId) {
     const fs = this.setupOutfield(field, 'player');
@@ -1908,7 +1912,7 @@ export class Game {
     const push = (z, fn) => items.push({ d: cam.depth(z), fn });
 
     for (const f of S.field3d || []) {
-      push(f.y, () => drawFigure3D(ctx, cam, f.x, f.y, kind === 'bat' ? AI_LOOK : SIDEKICK_LOOKS[0], POSES.crouch(), { noShadow: false }));
+      push(f.y, () => drawFigure3D(ctx, cam, f.x, f.y, teamLook(kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0 ? 1 : 0), POSES.crouch(), { noShadow: false }));
     }
     push(20, () => drawStumps(ctx, cam, 20, S.stumps[20]));
     push(0, () => drawStumps(ctx, cam, 0, S.stumps[0], S.stumpGlow ? '#e8343b' : null));

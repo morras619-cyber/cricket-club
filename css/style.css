@@ -224,3 +224,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 /* power cut-in panel covers the play area */
 #hud.cutin-on .banner, #hud.cutin-on .hint { visibility: hidden; }
+
+/* team picker on the squad screen */
+.team { scroll-snap-align: start; flex: 0 0 104px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 8px; border: 2.5px solid var(--ink); border-radius: 14px; color: var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  background: linear-gradient(160deg, var(--suit) 0 58%, var(--trim) 58% 64%, var(--paper) 64%); }
+.team canvas { width: 72px; height: 90px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.35)); }
+.team b { font-family: var(--display); letter-spacing: .5px; font-size: 15px; line-height: 1; text-align: center; background: var(--paper); border: 2px solid var(--ink); border-radius: 8px; padding: 3px 5px; margin-top: -6px; }
+.team.on { outline: 4px solid var(--bolt); outline-offset: 1px; transform: translateY(-2px); }
