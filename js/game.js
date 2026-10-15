@@ -21,8 +21,8 @@ import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGrou
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { CutIn } from './cutin.js';
-import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
-import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
+import { loadBatSprites, batWarmJob, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
+import { loadBowlSprites, bowlWarmJobs, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -296,6 +296,10 @@ export class Game {
   async pitchReport() {
     this.view = 'bat';
     this.S = this.freshScene();
+    // while the report is up, prepare the players' skin-and-hair repaints, one sheet at a time
+    const jobs = [batWarmJob(this.myTeam.id), ...bowlWarmJobs(this.myTeam, this.oppTeam)];
+    const run = () => { const j = jobs.shift(); if (!j) return; try { j(); } catch { /* skip */ } setTimeout(run, 60); };
+    if (!this.bot) setTimeout(run, 300);
     const at = this.home === this.myTeam.id ? 'HOME' : 'AWAY';
     this.ui.banner(`${this.ground.name.toUpperCase()} · ${at}`, `Pitch report: ${this.pitch.name}. ${this.pitch.report}`, 3000);
     sfx.crowd(this.home === this.myTeam.id ? 1.3 : 0.7);

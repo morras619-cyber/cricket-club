@@ -303,7 +303,7 @@ const SPIN_CYCLE = ['run1', 'run2'];
 // after release (ms of game time): release, follow-through, then he stands and watches
 const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3', 170], ['finish', Infinity]];
 
-import { peopleSheet } from './looks.js';
+import { peopleSheet, warmPeople } from './looks.js';
 const tinted = new Map();
 
 // Load one sheet. A failed download (a flaky connection, or a phone short of memory) is
@@ -466,4 +466,14 @@ export function drawTopSprite(ctx, px, py, sizePx, frame, team, view = 'top', fl
   ctx.drawImage(img, sx, sy, w, h, -cx * k, -cy * k, w * k, h * k);
   ctx.restore();
   return true;
+}
+
+// Prepare the skin-and-hair masks of the sheets a match will use (one per call: they're slow-ish).
+export function bowlWarmJobs(myTeam, oppTeam) {
+  const jobs = [];
+  for (const [view, team] of [['front', oppTeam], ['spin-front', oppTeam], ['batfront', oppTeam], ['back', myTeam], ['spin-back', myTeam]]) {
+    const key = view === 'back' ? 'back-' + (myTeam?.id || 'thunder') : view;
+    jobs.push(() => { const v = VIEWS[key]; if (v?.ready) warmPeople(sheetFor(key, team), `${key}-${team?.id}`); });
+  }
+  return jobs;
 }

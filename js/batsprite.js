@@ -1,4 +1,4 @@
-import { peopleSheet } from './looks.js';
+import { peopleSheet, warmPeople } from './looks.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
 // tools/build_batter_sprites.py, so a single frame table serves every team.
@@ -125,4 +125,9 @@ export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   drawOne(ctx, img, f, px, py, k, 1);
   ctx.restore();
   return true;
+}
+
+// Prepare the skin-and-hair masks for a team's batting sheet.
+export function batWarmJob(teamId) {
+  return () => { const a = atlases.get(teamId); if (a?.ready) warmPeople(a.img, `bat-${teamId}`); };
 }

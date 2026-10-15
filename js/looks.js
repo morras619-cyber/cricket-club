@@ -81,10 +81,99 @@ const shade = (hex, f) => {
 };
 
 // ---------- repainting the match sprites ----------
-// The drawn players all have the same light-tan skin and dark-brown hair. Skin pixels are a
-// narrow orange-tan band (kits, pads and the bat sit outside it); hair is the same hue, darker.
+// The drawn players all have the same light-tan skin and dark-brown hair. Skin is a narrow
+// orange-tan band and hair the same hue, darker. Kits can share that colour at their edges
+// (the orange Phoenix kit, shading on pads and shoes), so the masks are cleaned up by shape:
+// thin edges are opened away, tiny specks dropped, and the bat (a brighter, yellower patch)
+// left alone. The masks depend only on the sheet, so they're worked out once per sheet.
 const REF_SKIN = [28, 0.55, 0.95], REF_HAIR = [25, 0.5, 0.32];
 const cache = new Map(); // key -> canvas, newest last
+const masks = new Map(); // sheet key -> Uint8Array (1 skin, 2 hair)
+
+// 3x3 erode (grow = false) or dilate (grow = true), done as a row pass then a column pass
+function morph(m, w, h, grow) {
+  const t = new Uint8Array(m.length), out = new Uint8Array(m.length);
+  for (let y = 0; y < h; y++) {
+    const r = y * w;
+    for (let x = 0; x < w; x++) {
+      const a = x > 0 ? m[r + x - 1] : 0, b = m[r + x], c = x < w - 1 ? m[r + x + 1] : 0;
+      t[r + x] = grow ? a | b | c : a & b & c;
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    const r = y * w;
+    for (let x = 0; x < w; x++) {
+      const a = y > 0 ? t[r - w + x] : 0, b = t[r + x], c = y < h - 1 ? t[r + w + x] : 0;
+      out[r + x] = grow ? a | b | c : a & b & c;
+    }
+  }
+  return out;
+}
+function open(m, w, h, n) { let r = m; for (let i = 0; i < n; i++) r = morph(r, w, h, false); for (let i = 0; i < n; i++) r = morph(r, w, h, true); return r; }
+// keep the connected patches that pass keep(area, meanHue, meanV)
+function filterParts(m, w, h, H, V, keep) {
+  const seen = new Uint8Array(m.length), out = new Uint8Array(m.length), stack = [], pix = [];
+  for (let i = 0; i < m.length; i++) {
+    if (!m[i] || seen[i]) continue;
+    pix.length = 0; let sh = 0, sv = 0;
+    stack.push(i); seen[i] = 1;
+    while (stack.length) {
+      const j = stack.pop(); pix.push(j); sh += H[j]; sv += V[j];
+      const x = j % w;
+      if (x > 0 && m[j - 1] && !seen[j - 1]) { seen[j - 1] = 1; stack.push(j - 1); }
+      if (x < w - 1 && m[j + 1] && !seen[j + 1]) { seen[j + 1] = 1; stack.push(j + 1); }
+      if (j >= w && m[j - w] && !seen[j - w]) { seen[j - w] = 1; stack.push(j - w); }
+      if (j + w < m.length && m[j + w] && !seen[j + w]) { seen[j + w] = 1; stack.push(j + w); }
+    }
+    if (keep(pix.length, sh / pix.length, sv / pix.length)) for (const j of pix) out[j] = 1;
+  }
+  return out;
+}
+function sheetMasks(key, p, w, h) {
+  if (masks.has(key)) return masks.get(key);
+  const n = w * h, skin = new Uint8Array(n), hair = new Uint8Array(n), H = new Float32Array(n), V = new Float32Array(n);
+  for (let i = 0, q = 0; q < n; i += 4, q++) {
+    if (p[i + 3] < 70) continue;
+    // hue, saturation, value inline (no allocation: this runs over a million pixels)
+    const r = p[i], g = p[i + 1], b = p[i + 2], mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b), d = mx - mn;
+    if (!d || mx < 30) continue;
+    const s = d / mx, v = mx / 255;
+    let hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    hh = (hh * 60 + 360) % 360;
+    if (hh > 50) continue;
+    H[q] = hh; V[q] = v;
+    if (hh >= 10 && hh < 35 && s >= 0.28 && s <= 0.8 && v >= 0.5) skin[q] = 1;
+    else if (hh >= 8 && hh < 45 && s >= 0.25 && v >= 0.12 && v < 0.5) hair[q] = 1;
+  }
+  // solid patches only, then grow back one pixel into the original mask to keep clean edges
+  const fix = (raw, keep) => {
+    const core = filterParts(open(raw, w, h, 2), w, h, H, V, keep);
+    const grown = morph(core, w, h, true);
+    for (let q = 0; q < n; q++) grown[q] &= raw[q];
+    return grown;
+  };
+  const sk = fix(skin, (area, hue, v) => area >= 30 && !(hue > 30.5 && v > 0.92)); // the bat is yellower and brighter
+  const hr = fix(hair, area => area >= 40);
+  const m = new Uint8Array(n);
+  for (let q = 0; q < n; q++) m[q] = sk[q] ? 1 : hr[q] ? 2 : 0;
+  masks.set(key, m);
+  while (masks.size > 10) masks.delete(masks.keys().next().value);
+  return m;
+}
+
+// Work out a sheet's masks ahead of time (during the pitch report), so the first repaint is instant.
+export function warmPeople(src, key) {
+  if (masks.has(key)) return;
+  const w = src?.naturalWidth || src?.width, h = src?.naturalHeight || src?.height;
+  if (!w || !h) return;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  if (!g) return;
+  try { g.drawImage(src, 0, 0); sheetMasks(key, g.getImageData(0, 0, w, h).data, w, h); } catch { /* not ready yet */ }
+  c.width = 0; c.height = 0;
+}
+
 export function peopleSheet(src, key, look) {
   if (!look) return src;
   const sk = skinHex(look), hr = hairHex(look);
@@ -98,17 +187,15 @@ export function peopleSheet(src, key, look) {
   if (!g) return src;
   try { g.drawImage(src, 0, 0); } catch { return src; }
   const img = g.getImageData(0, 0, w, h), p = img.data;
-  const S = hexHsv(sk), H = hexHsv(hr);
-  for (let i = 0; i < p.length; i += 4) {
-    if (p[i + 3] < 70) continue;
+  const m = sheetMasks(key, p, w, h);
+  const S = hexHsv(sk), Hh = hexHsv(hr);
+  for (let i = 0, q = 0; i < p.length; i += 4, q++) {
+    if (!m[q]) continue;
     const [hh, s, v] = hsv(p[i], p[i + 1], p[i + 2]);
-    let out = null;
-    if (hh >= 10 && hh < 35 && s >= 0.28 && s <= 0.8 && v >= 0.5) {
-      out = rgb((S[0] + (hh - REF_SKIN[0]) * 0.5 + 360) % 360, Math.min(1, S[1] * (s / REF_SKIN[1])), Math.min(1, S[2] * (v / REF_SKIN[2])));
-    } else if (hh >= 8 && hh < 45 && s >= 0.25 && v >= 0.12 && v < 0.5) {
-      out = rgb(H[0], Math.min(1, H[1] * Math.min(1.5, s / REF_HAIR[1])), Math.min(1, Math.max(0.06, H[2] * (v / REF_HAIR[2]))));
-    }
-    if (out) { p[i] = out[0]; p[i + 1] = out[1]; p[i + 2] = out[2]; }
+    const out = m[q] === 1
+      ? rgb((S[0] + (hh - REF_SKIN[0]) * 0.5 + 360) % 360, Math.min(1, S[1] * (s / REF_SKIN[1])), Math.min(1, S[2] * (v / REF_SKIN[2])))
+      : rgb(Hh[0], Math.min(1, Hh[1] * Math.min(1.5, s / REF_HAIR[1])), Math.min(1, Math.max(0.06, Hh[2] * (v / REF_HAIR[2]))));
+    p[i] = out[0]; p[i + 1] = out[1]; p[i + 2] = out[2];
   }
   g.putImageData(img, 0, 0);
   cache.set(id, c);
