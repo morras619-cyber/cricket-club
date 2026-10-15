@@ -380,11 +380,15 @@ function sheetFor(view, team) {
 
 // Draw a frame with its feet at (px, py); kPerM is pixels per metre at that depth. False until loaded.
 export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, view = 'front') {
-  // a spinner frame the spin sheets don't have comes from the pace bowler's sheet
-  if (view.startsWith('spin') && !VIEWS[view].frames[frame]) view = view.slice(5);
+  // a spinner frame the spin sheets don't have, or a spin sheet still loading, comes from the
+  // pace bowler's sheet (mapping the spinner's frame names onto his)
+  if (view.startsWith('spin') && (!VIEWS[view]?.ready || !VIEWS[view].frames[frame])) {
+    view = view.slice(5);
+    if (view === 'back' && frame === 'coil') frame = 'frontarm';
+  }
   if (view === 'back') view = 'back-' + (team?.id || 'thunder');
   const v = VIEWS[view];
-  if (!v || !v.ready) return false;
+  if (!v || !v.ready || !v.frames[frame]) return false;
   const img = sheetFor(view, team);
   const [sx, sy, w, h, ax, ay, s] = v.frames[frame];
   const k = kPerM * REF_HEIGHT_M / v.refPx * s;

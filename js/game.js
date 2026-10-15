@@ -2117,7 +2117,10 @@ export class Game {
       if (kind === 'bat' && S.bowler.spr?.anim === 'deliver') bz -= 0.9 * clamp((this.gameTime - S.bowler.spr.t0) / 0.6, 0, 1);
       push(bz, () => {
         const view = (S.bowler.spin ? 'spin-' : '') + (kind === 'bat' ? 'front' : 'back'), p = cam.project(bx, 0, bz);
-        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), kind === 'bat' ? this.oppTeam : this.myTeam, !!S.bowler.left, view)) return;
+        const team = kind === 'bat' ? this.oppTeam : this.myTeam, plain = kind === 'bat' ? 'front' : 'back';
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), team, !!S.bowler.left, view)) return;
+        // never the plain cartoon while a hand-drawn bowler can be shown
+        if (p && view !== plain && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, plain), team, !!S.bowler.left, plain)) return;
         drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem });
       });
     }

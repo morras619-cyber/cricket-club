@@ -2,6 +2,7 @@ import { UI } from './ui.js';
 import { Game, pickRivals } from './game.js';
 import { SPARKS, heroById, heroesFor } from './heroes.js';
 import { TEAMS } from './teams.js';
+import { loadBowlSprites } from './bowlsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE } from './squads.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
@@ -19,6 +20,8 @@ const game = new Game(ui);
 const profile = loadProfile();
 // heroes already picked before unlocks existed stay unlocked
 for (const id of Object.values(profile.squad || {})) if (id && !profile.unlocked.includes(id)) profile.unlocked.push(id);
+// start downloading the bowler sheets (pace and spin) while the menus are up
+loadBowlSprites(profile.team || 'thunder');
 sound.on = profile.settings.sound;
 sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
