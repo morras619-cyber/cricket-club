@@ -138,11 +138,14 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     const L = path.ballAt(path.T);
     let best = null;
     for (const f of outfield) {
-      const margin = F.catchRun * Math.max(0, path.T - F.catchReact) + F.reach - dist(f, L);
+      // fielders dive for catches: a metre more than a standing reach
+      const margin = F.catchRun * Math.max(0, path.T - F.catchReact) + F.reach + F.catchDive - dist(f, L);
       const p = sigmoid(margin);
       if (!best || p > best.p) best = { fielder: f, p, margin, t: path.T, point: L };
     }
     if (best && best.p >= F.minP && !res.forced?.uncatchable) out.catch = best;
+    // landed just in front of someone: the replay shows him diving and falling short
+    else if (best && best.margin > -4) out.nearMiss = { fielder: best.fielder, point: L, t: path.T, short: -best.margin };
   }
 
   // Ground (or after the bounce): first fielder to cut the ball off, else it reaches the rope.

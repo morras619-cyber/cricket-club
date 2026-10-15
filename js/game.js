@@ -822,7 +822,17 @@ export class Game {
     const start = A ? { x: A.x, y: A.y } : null;
     const end = o.caught ? sim.catch.t : o.saved ? sim.save.t : sim.kind === 'field' && sim.intercept ? sim.intercept.t : Math.min(sim.duration, 3);
     const runs = o.caught ? 0 : sim.runs;
-    const dur = Math.max(0.8, end + 0.6);
+    // a catch that wasn't on (or a ball landing just in front of someone): he dives and falls short
+    const miss = !o.caught && !o.dropped ? (sim.catch ? { fielder: sim.catch.fielder, point: sim.catch.point, t: sim.catch.t, short: 0.6 } : sim.nearMiss) : null;
+    const D = miss && fs.find(f => f.id === miss.fielder.id);
+    let dStart = D && { x: D.x, y: D.y }, dStop = null;
+    if (D) {
+      // where he ends up: short of the landing spot by the gap he couldn't make up
+      const dx = miss.point.x - D.x, dy = miss.point.y - D.y, L = Math.hypot(dx, dy) || 1, s = Math.max(0.5, miss.short);
+      dStop = { x: miss.point.x - dx / L * s, y: miss.point.y - dy / L * s };
+    }
+    let missSaid = false;
+    const dur = Math.max(0.8, end + 0.6, miss ? miss.t + 1.5 : 0);
     this.timeScale = 1.6;
     const t0 = this.gameTime;
     let said = false;
@@ -834,11 +844,23 @@ export class Game {
         A.x = lerp(start.x, target.x, p); A.y = lerp(start.y, target.y, p);
         A.pose = p < 1 ? POSES.run(t * 14) : o.caught ? POSES.celebrate() : POSES.crouch();
       }
+      if (D && D !== A) {
+        const p = Math.min(1, Math.max(0, (t - 0.25) / Math.max(0.3, miss.t - 0.25)));
+        D.x = lerp(dStart.x, dStop.x, p); D.y = lerp(dStart.y, dStop.y, p);
+        D.pose = t < miss.t - 0.15 ? POSES.run(t * 14) : t < miss.t + 0.9 ? POSES.dive(Math.sign(miss.point.x - dStart.x) || 1) : POSES.crouch();
+      } else if (D && t > miss.t - 0.15 && t < miss.t + 0.35) D.pose = POSES.dive(Math.sign(miss.point.x - dStart.x) || 1);
+      if (D && !missSaid && t >= miss.t) {
+        missSaid = true;
+        const q = this.of.to(miss.point.x, miss.point.y);
+        this.fx.sparks(q.x, q.y, 10, ['#c9a46a', '#8a6a3c', '#f2e2b8'], 3);
+        this.fx.word('JUST SHORT!', q.x, q.y - 50, { size: 40, color: '#fff4da', stroke: '#e8343b', dur: 1100 });
+        sfx.crowd(0.6);
+      }
       if (t >= end && A && (o.caught || sim.intercept)) { b.x = A.x; b.y = A.y; b.h = o.caught ? 1.6 : 0.3; }
       this.O.ball = b;
       this.runBatters(t, runs);
       this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : [])]);
-      if (!said && t >= end) {
+      if (!said && t >= end && (!D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
         if (sim.kind === 'six' && !o.caught) {
@@ -850,7 +872,7 @@ export class Game {
         }
         else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
         else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); }
-        else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * 0.3, { size: 44, color: '#fff4da', stroke: INK });
+        else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * (D ? 0.62 : 0.3), { size: 44, color: '#fff4da', stroke: INK });
       }
       return t >= dur;
     });
