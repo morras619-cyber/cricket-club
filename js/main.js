@@ -80,7 +80,7 @@ function statGrid(items) {
   for (const [label, value] of items) { const d = el('div'); d.append(el('b', '', value), el('span', '', label)); g.append(d); }
   return g;
 }
-const batItems = t => [['Innings', t.inns], ['Runs', t.runs], ['Balls', t.balls], ['Highest', fmt.hs(t)], ['Average', fmt.avg(t.runs, t.inns - t.notOuts)], ['Strike rate', fmt.sr(t.runs, t.balls)], ['4s / 6s', `${t.fours}/${t.sixes}`], ['Ducks', t.ducks]];
+const batItems = t => [['Innings', t.inns], ['Runs', t.runs], ['Balls', t.balls], ['Highest', fmt.hs(t)], ['Average', fmt.avg(t.runs, t.inns - t.notOuts)], ['Strike rate', fmt.sr(t.runs, t.balls)], ['4s / 6s', `${t.fours}/${t.sixes}`], ['Longest six', t.longestSix ? `${t.longestSix}m` : '—'], ['Ducks', t.ducks]];
 const bowlItems = t => [['Overs', fmt.overs(t.balls)], ['Wickets', t.wkts], ['Runs against', t.runs], ['Best', fmt.best(t)], ['Economy', fmt.econ(t.runs, t.balls)], ['Average', fmt.avg(t.runs, t.wkts)], ['Dot balls', t.dots], ['Maidens', t.maidens]];
 
 function renderStats() {
@@ -219,7 +219,7 @@ async function startMatch(opts) {
   const seed = opts.mode === 'challenge' ? opts.challenge.seed : randomSeed();
   const order = opts.mode === 'quick' ? await coinToss(pickRivals(seed, sq)) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
-  const summary = await game.runMatch({ mode: opts.mode, squad: sq, team: opts.mode === 'tutorial' ? 'thunder' : profile.team, seed, order, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
+  const summary = await game.runMatch({ mode: opts.mode, records: { longestSix: careerStats(profile).bat.longestSix || 0 }, squad: sq, team: opts.mode === 'tutorial' ? 'thunder' : profile.team, seed, order, challenge: opts.challenge, field: opts.mode === 'tutorial' ? null : profile.field });
   if (!summary) return; // quit mid-match
   if (opts.mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
@@ -312,6 +312,7 @@ function showResult(summary) {
     r2.append(el('span', '', `${runs} runs off ${balls} · SR ${fmt.sr(runs, balls)} · ${rec.batting.reduce((a, b) => a + b.fours, 0)}×4 ${rec.batting.reduce((a, b) => a + b.sixes, 0)}×6`));
     if (rec.batting.some(st => st.out && st.runs === 0)) r2.append(el('span', 'badge', 'DUCK!'));
     if (rec.newHS) r2.append(el('span', 'badge', 'NEW HIGH SCORE'));
+    if (rec.newLongSix) r2.append(el('span', 'badge', `LONGEST SIX · ${summary.stats.longestSix}m`));
     ms.append(r2);
   }
   if (rec?.bowling) {

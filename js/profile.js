@@ -54,7 +54,7 @@ export function matchRewards(p, summary) {
 }
 
 // ---------- career stats ----------
-const batBlank = () => ({ inns: 0, notOuts: 0, runs: 0, balls: 0, hs: 0, hsNotOut: false, ducks: 0, fours: 0, sixes: 0 });
+const batBlank = () => ({ inns: 0, notOuts: 0, runs: 0, balls: 0, hs: 0, hsNotOut: false, ducks: 0, fours: 0, sixes: 0, longestSix: 0 });
 const bowlBlank = () => ({ inns: 0, balls: 0, runs: 0, wkts: 0, dots: 0, maidens: 0, best: null });
 
 export function careerStats(p) {
@@ -91,7 +91,12 @@ function addBowling(t, f) {
 // Adds a finished match to the career and per-hero records. Returns what's new.
 export function recordStats(p, summary) {
   const stats = careerStats(p);
-  const out = { batting: null, bowling: null, newHS: false, newBest: false };
+  const out = { batting: null, bowling: null, newHS: false, newBest: false, newLongSix: false };
+  const six = summary.stats?.longestSix || 0;
+  if (six) {
+    out.newLongSix = six > (stats.bat.longestSix || 0) && stats.bat.longestSix > 0;
+    stats.bat.longestSix = Math.max(stats.bat.longestSix || 0, six);
+  }
   const batInn = summary.innings.find(i => i.side === 'player');
   if (batInn && batInn.balls > 0) {
     const card = batInn.battingCard();

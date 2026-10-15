@@ -22,7 +22,7 @@ Open it on a phone on the same network, or use desktop Chrome's device toolbar. 
 | Field | Before a delivery, tap **SET FIELD** or the field map (top right) to open a top-down board. Drag a fielder token (it lifts above your thumb), or tap one and then tap where it should stand. Presets are starting points; the Power Burst still allows only 2 outside the circle. Your field is remembered. |
 | Their field | While batting, the map in the top right shows the opposition's fielders. Tap it before the ball to see it full size with position names. |
 | Coin toss | Quick Match starts with a toss: call heads or tails; win it and choose to bat or bowl first. |
-| Banter | After a good ball, **Talk smack** or **Leave it**. Smack talk can rattle a batter (more mistakes) or fire him up (more aggressive, better timing). Leaving it earns Composure, sometimes Respect. When the opposition sledges you, answer with a dot/wicket (bowling) or a boundary (batting) for +10 REVENGE. |
+| Banter | After a wicket (and now and then after a dot ball, at most once an over), **Talk smack** or **Leave it**. Smack talk can rattle a batter (more mistakes) or fire him up (more aggressive, better timing). Leaving it earns Composure, sometimes Respect. When the opposition sledges you, answer with a dot/wicket (bowling) or a boundary (batting) for +10 REVENGE. |
 | Keeper Mode | A ring closes on the ball. **Tap while it's green and it's caught**; if the ball is wide he dives for it himself. A tap just outside green juggles it (tap again). Stumpings need a swipe up. |
 | Outfield Mode | Catch: **tap while the ring is green and it's caught**; out of reach, your fielder dives for it himself. Run-out: tap to pick up, then swipe at the stumps you want to hit. Rope save: swipe to dive. |
 | Powers | Tap a hero button when you have the Charge. Batting powers lock when the ball is bowled; bowling powers lock when you press BOWL. |
@@ -40,7 +40,7 @@ Fielding control triggers only on chances you can swing (5–90% success), at mo
 - **8 teams**: pick yours on the squad screen (Thunder Strikers, Green Cyclones, Volt Vipers, Golden Eagles, Phoenix Blaze, Steel Titans, Purple Storm, Pink Royals). Your batter, keeper and fielders wear your kit; the opposition is another team.
 - **Share card**: a 1080×1350 comic panel of your biggest moment, generated on the device.
 - **Light progression**: XP and levels, coins, a 7-day login calendar that pauses rather than resets. Saved in the browser.
-- **Stats**: a live hero line during play, a scorecard after each match, and Career stats (runs, balls, highest score, average, strike rate, ducks; overs, wickets, runs against, best figures, economy, maidens), overall and per hero. Each dismissal ends a batting innings; run-outs aren't bowler wickets.
+- **Stats**: a live hero line during play, a scorecard after each match, and Career stats (runs, balls, highest score, average, strike rate, ducks, longest six with NEW RECORD! when you beat it; overs, wickets, runs against, best figures, economy, maidens), overall and per hero. Each dismissal ends a batting innings; run-outs aren't bowler wickets.
 
 Not built yet: real-money store and cosmetics, online accounts and group leaderboards (they need a server), Hindi/Urdu text, licensed audio. Sound effects are synthesised in the browser.
 

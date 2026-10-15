@@ -212,7 +212,9 @@ export class Game {
     this.fieldState = { events: 0, lastEventBall: -9, setting: this.settings.fielding };
     this.moments = [];
     this.rebowls = 0;
-    this.stats = { fieldingWins: 0, perfects: 0, powers: 0 };
+    this.stats = { fieldingWins: 0, perfects: 0, powers: 0, longestSix: 0 };
+    this.recordSix = opts.records?.longestSix || 0; // career longest six going into the match
+    this.lastBanterBall = -99;
     this.bowlChoice = { field: opts.field?.preset || 'balanced', custom: opts.field?.custom || null };
     this.bowlHistory = []; this.batterMood = { state: 'calm', balls: 0 };
     this.scouted = false; this.revenge = false; this.playerRevenge = false;
@@ -733,6 +735,18 @@ export class Game {
     if (saved) this.fx.word('SAVED!', this.W / 2, this.H * 0.35, { size: 48, color: '#fff4da', stroke: '#3ec6ff' });
     inn.ball({ runs });
     if (runs === 6) {
+      const m = this.sixDistance(sim);
+      this.stats.longestSix = Math.max(this.stats.longestSix, m);
+      if (m > this.recordSix) {
+        // beat the career longest (the very first six of a career just sets it)
+        if (this.recordSix > 0) {
+          this.fx.word('NEW RECORD!', this.W / 2, this.H * 0.22, { size: 58, color: '#ffd23f', stroke: '#e8343b', rot: -0.06, dur: 1800 });
+          this.board(`NEW RECORD · ${m}m SIX!`, 5000);
+          sfx.crowd(1.4);
+          await this.sleepReal(this.bot ? 0 : 1200);
+        }
+        this.recordSix = m;
+      }
       this.charge.award('six', 'SIX');
       sfx.crowd(1.2);
       const powered = fx.thunder;
@@ -832,6 +846,8 @@ export class Game {
       return t >= dur;
     });
     this.timeScale = 1;
+    // let a boundary sink in before the next thing pops up
+    if ((sim.kind === 'six' && !o.caught) || (sim.kind === 'four' && !o.saved)) await this.sleepReal(this.bot ? 0 : 1100);
   }
 
   // ---------- bowling innings ----------
@@ -1322,6 +1338,9 @@ export class Game {
       return;
     }
     if (!goodBall) return;
+    // always after a wicket; after a dot ball at most once an over, and only sometimes
+    if (!wicketFell && (inn.balls - this.lastBanterBall < 6 || !rng.chance(0.4))) return;
+    this.lastBanterBall = inn.balls;
     const choice = await this.banterChoice();
     if (choice === 'smack') {
       if (wicketFell) {
