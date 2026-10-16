@@ -210,8 +210,8 @@ function renderPainted(cam, art) {
     g.fillStyle = gr; g.fillRect(0, hy, W, H - hy); g.restore();
   }
   // rope, 30-yard circle and creases (crease lines are 5 cm wide)
-  ring(g, cam, R, 'rgba(255,255,255,0.34)', 2, [16, 12]); // the rope: a soft white dashed line
-  ring(g, cam, 27, 'rgba(255,255,255,0.4)', 1.5, [6, 6]);
+  // one line on the outfield: the 30-yard circle (in the Power Burst only two fielders may stand outside it)
+  ring(g, cam, 27, 'rgba(255,255,255,0.5)', 1.6, [8, 7]);
   // creases: white with a fine ink edge, kept on the pitch
   const crease = (x0, z0, x1, z1) => {
     const p = cam.project(0, 0, (z0 + z1) / 2);
@@ -699,12 +699,6 @@ function drawPaintedBoard(ctx, cam, t, message) {
   ctx.restore();
 }
 
-// the painted grounds' rope in the top-down view: soft white dashes
-function ropeSoft(ctx, path) {
-  ctx.save(); ctx.setLineDash([16, 12]); ctx.strokeStyle = 'rgba(255,255,255,0.34)'; ctx.lineWidth = 2;
-  path(); ctx.stroke(); ctx.restore();
-}
-
 function ring(g, cam, r, color, w, dash) {
   g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash);
   g.beginPath();
@@ -862,7 +856,6 @@ export class OutfieldView {
       const o = this.to(-2.5, 0);
       for (let x = o.x - Math.ceil(o.x / tw) * tw; x < W; x += tw) for (let y = o.y - Math.ceil(o.y / th) * th; y < H; y += th) ctx.drawImage(tex, x, y, tw + 0.5, th + 0.5);
       ctx.restore();
-      ropeSoft(ctx, () => { ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k, R * k * 0.78, 0, 0, Math.PI * 2); });
     } else {
       ctx.fillStyle = '#ffd23f'; ctx.fill();
       ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k + 2, R * k * 0.78 + 2, 0, 0, Math.PI * 2);
