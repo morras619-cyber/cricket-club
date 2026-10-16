@@ -1,4 +1,4 @@
-import { peopleSheet, loadPeopleMask, SKIN } from './looks.js';
+import { peopleSheet, loadPeopleMask } from './looks.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
 // tools/build_batter_sprites.py, so a single frame table serves every team.
@@ -28,200 +28,6 @@ const FRAMES = {
   bowled: [755, 954, 215, 238, 107.5, 237, 0.976],
 };
 
-// Teams drawn in several skin tones (img/batter-<team>-<tone>.webp, tools/build_batter_tones.py).
-// Each sheet is drawn separately, so each has its own frame table. A player gets the sheet nearest
-// his skin (looks.js SKIN index) and is drawn as drawn: no repainting.
-const TONES = {
-  thunder: {
-    fair: {
-      ready: [0,  0,  198,  286,  98.5,  285,  0.92],
-      leave1: [200,  0,  195,  283,  96.5,  282,  0.93],
-      leave2: [397,  0,  191,  282,  102.2,  281,  0.92],
-      backlift: [590,  0,  185,  327,  97.5,  326,  1.0],
-      drive1: [777,  0,  234,  271,  94.8,  270,  1.0],
-      drive2: [0,  329,  289,  265,  138.0,  264,  1.0],
-      drive3: [291,  329,  124,  329,  73.0,  328,  1.08],
-      pull0: [417,  329,  235,  271,  119.8,  270,  0.952],
-      pull1: [654,  329,  197,  270,  80.5,  269,  0.952],
-      pull2: [0,  660,  223,  262,  95.2,  261,  0.976],
-      pull3: [225,  660,  171,  286,  66.2,  285,  0.976],
-      def1: [398,  660,  198,  266,  107.5,  265,  0.92],
-      def2: [598,  660,  154,  263,  73.8,  262,  0.92],
-      def3: [754,  660,  198,  272,  102.5,  271,  1.026],
-      cut1: [0,  948,  248,  287,  110.0,  286,  0.952],
-      cut2: [250,  948,  263,  254,  105.5,  253,  0.93],
-      cut3: [515,  948,  238,  255,  84.8,  254,  1.0],
-      bowled: [755,  948,  215,  238,  107.5,  237,  1.0],
-    },
-    fair2: {
-      ready: [0,  0,  194,  284,  107.5,  283,  0.976],
-      leave1: [196,  0,  189,  282,  101.8,  281,  0.952],
-      leave2: [387,  0,  194,  281,  106.5,  280,  0.976],
-      backlift: [583,  0,  185,  327,  98.8,  326,  1.026],
-      drive1: [770,  0,  234,  270,  95.2,  269,  1.026],
-      drive2: [0,  329,  288,  264,  138.5,  263,  1.0],
-      drive3: [290,  329,  125,  330,  81.2,  329,  1.08],
-      pull0: [417,  329,  235,  271,  120.0,  270,  0.976],
-      pull1: [654,  329,  197,  270,  80.8,  269,  1.026],
-      pull2: [0,  661,  222,  262,  95.0,  261,  1.0],
-      pull3: [224,  661,  172,  286,  66.0,  285,  1.053],
-      def1: [398,  661,  196,  266,  107.8,  265,  0.952],
-      def2: [596,  661,  154,  262,  74.8,  261,  0.952],
-      def3: [752,  661,  198,  271,  106.2,  270,  1.0],
-      cut1: [0,  949,  248,  286,  109.5,  285,  0.952],
-      cut2: [250,  949,  262,  254,  106.0,  253,  0.93],
-      cut3: [514,  949,  238,  254,  85.0,  253,  1.0],
-      bowled: [754,  949,  215,  237,  106.5,  236,  0.976],
-    },
-    tan: {
-      ready: [0,  0,  197,  287,  100.8,  286,  0.92],
-      leave1: [199,  0,  196,  284,  99.5,  283,  0.92],
-      leave2: [397,  0,  197,  282,  105.2,  281,  0.92],
-      backlift: [596,  0,  187,  327,  99.5,  326,  0.976],
-      drive1: [785,  0,  234,  272,  94.8,  271,  1.0],
-      drive2: [0,  329,  288,  265,  138.2,  264,  1.0],
-      drive3: [290,  329,  125,  328,  82.2,  327,  1.08],
-      pull0: [417,  329,  236,  271,  120.0,  270,  0.952],
-      pull1: [655,  329,  197,  271,  80.0,  270,  1.0],
-      pull2: [0,  659,  223,  262,  95.5,  261,  0.976],
-      pull3: [225,  659,  173,  286,  67.0,  285,  0.976],
-      def1: [400,  659,  198,  266,  108.5,  265,  0.952],
-      def2: [600,  659,  154,  263,  73.5,  262,  0.92],
-      def3: [756,  659,  197,  272,  102.5,  271,  1.0],
-      cut1: [0,  947,  248,  287,  110.0,  286,  0.93],
-      cut2: [250,  947,  262,  254,  105.8,  253,  0.93],
-      cut3: [514,  947,  238,  255,  84.2,  254,  1.0],
-      bowled: [754,  947,  215,  238,  107.8,  237,  1.0],
-    },
-    brown: {
-      ready: [0,  0,  199,  287,  109.8,  286,  0.92],
-      leave1: [201,  0,  189,  282,  97.5,  281,  0.93],
-      leave2: [392,  0,  193,  281,  103.2,  280,  0.92],
-      backlift: [587,  0,  188,  327,  99.8,  326,  0.976],
-      drive1: [777,  0,  235,  272,  95.2,  271,  1.0],
-      drive2: [0,  329,  290,  266,  139.2,  265,  0.976],
-      drive3: [292,  329,  125,  330,  82.0,  329,  1.08],
-      pull0: [419,  329,  236,  271,  120.5,  270,  0.952],
-      pull1: [657,  329,  198,  271,  81.2,  270,  1.0],
-      pull2: [0,  661,  224,  262,  96.5,  261,  1.0],
-      pull3: [226,  661,  173,  286,  67.0,  285,  1.0],
-      def1: [401,  661,  198,  267,  108.5,  266,  0.976],
-      def2: [601,  661,  154,  263,  74.5,  262,  0.93],
-      def3: [757,  661,  200,  272,  106.8,  271,  1.0],
-      cut1: [0,  949,  249,  286,  110.8,  285,  0.952],
-      cut2: [251,  949,  263,  254,  106.8,  253,  0.93],
-      cut3: [516,  949,  240,  255,  85.2,  254,  1.0],
-      bowled: [758,  949,  215,  239,  108.2,  238,  0.976],
-    },
-    dark: {
-      ready: [0,  0,  200,  287,  101.2,  286,  0.92],
-      leave1: [202,  0,  192,  283,  95.8,  282,  0.93],
-      leave2: [396,  0,  194,  282,  105.0,  281,  0.92],
-      backlift: [592,  0,  185,  327,  98.0,  326,  0.976],
-      drive1: [779,  0,  234,  271,  94.8,  270,  0.976],
-      drive2: [0,  329,  289,  266,  138.5,  265,  1.0],
-      drive3: [291,  329,  124,  330,  81.5,  329,  1.08],
-      pull0: [417,  329,  235,  271,  119.8,  270,  0.952],
-      pull1: [654,  329,  197,  270,  80.8,  269,  0.976],
-      pull2: [0,  661,  223,  262,  95.5,  261,  1.0],
-      pull3: [225,  661,  171,  286,  66.0,  285,  1.0],
-      def1: [398,  661,  198,  266,  108.8,  265,  0.93],
-      def2: [598,  661,  155,  263,  74.2,  262,  0.92],
-      def3: [755,  661,  199,  272,  106.0,  271,  1.026],
-      cut1: [0,  949,  248,  287,  110.0,  286,  0.952],
-      cut2: [250,  949,  264,  254,  106.5,  253,  0.93],
-      cut3: [516,  949,  238,  255,  84.8,  254,  1.0],
-      bowled: [756,  949,  215,  238,  107.5,  237,  1.0],
-    },
-  },
-  // the leave holds pose 2 and the block skips the reverse sweep (12)
-  vipers: {
-    fair: {
-      ready: [0,  0,  136,  291,  85.5,  290,  1.0],
-      leave1: [138,  0,  141,  290,  86.0,  289,  1.0],
-      leave2: [138,  0,  141,  290,  86.0,  289,  1.0],
-      backlift: [484,  0,  185,  325,  96.5,  324,  1.0],
-      drive1: [671,  0,  234,  272,  95.2,  271,  1.0],
-      drive2: [0,  327,  290,  266,  136.8,  265,  1.0],
-      drive3: [292,  327,  124,  330,  69.2,  329,  1.0],
-      pull0: [418,  327,  235,  271,  119.0,  270,  1.0],
-      pull1: [655,  327,  196,  270,  79.8,  269,  1.0],
-      pull2: [0,  659,  223,  263,  94.5,  262,  1.0],
-      pull3: [225,  659,  169,  285,  69.0,  284,  1.0],
-      def1: [675,  659,  156,  264,  72.5,  263,  1.0],
-      def2: [675,  659,  156,  264,  72.5,  263,  1.0],
-      def3: [0,  946,  198,  272,  105.5,  271,  1.0],
-      cut1: [200,  946,  248,  289,  109.2,  288,  1.0],
-      cut2: [450,  946,  265,  255,  106.2,  254,  1.0],
-      cut3: [717,  946,  238,  257,  85.0,  256,  1.0],
-      bowled: [0,  1237,  215,  236,  114.6,  235,  1.0],
-    },
-    brown: {
-      ready: [0,  0,  197,  288,  106.0,  287,  1.0],
-      leave1: [199,  0,  193,  285,  100.0,  284,  1.0],
-      leave2: [199,  0,  193,  285,  100.0,  284,  1.0],
-      backlift: [591,  0,  190,  325,  100.2,  324,  1.0],
-      drive1: [783,  0,  234,  272,  93.8,  271,  1.0],
-      drive2: [0,  327,  289,  267,  135.8,  266,  1.0],
-      drive3: [291,  327,  124,  330,  76.5,  329,  1.0],
-      pull0: [417,  327,  235,  270,  118.8,  269,  1.0],
-      pull1: [654,  327,  196,  270,  79.5,  269,  1.0],
-      pull2: [0,  659,  223,  263,  94.2,  262,  1.0],
-      pull3: [225,  659,  169,  285,  73.2,  284,  1.0],
-      def1: [673,  659,  156,  264,  72.5,  263,  1.0],
-      def2: [673,  659,  156,  264,  72.5,  263,  1.0],
-      def3: [0,  946,  198,  272,  105.2,  271,  1.0],
-      cut1: [200,  946,  248,  289,  109.0,  288,  1.0],
-      cut2: [450,  946,  265,  253,  105.2,  252,  1.0],
-      cut3: [717,  946,  238,  257,  84.5,  256,  1.0],
-      bowled: [0,  1237,  215,  237,  102.0,  236,  1.0],
-    },
-    dark: {
-      ready: [0,  0,  198,  288,  108.0,  287,  1.0],
-      leave1: [200,  0,  194,  285,  99.2,  284,  1.0],
-      leave2: [200,  0,  194,  285,  99.2,  284,  1.0],
-      backlift: [595,  0,  190,  325,  100.0,  324,  1.0],
-      drive1: [787,  0,  234,  272,  94.0,  271,  1.0],
-      drive2: [0,  327,  289,  267,  135.8,  266,  1.0],
-      drive3: [291,  327,  124,  331,  75.5,  330,  1.0],
-      pull0: [417,  327,  236,  271,  120.0,  270,  1.0],
-      pull1: [655,  327,  197,  270,  80.0,  269,  1.0],
-      pull2: [0,  660,  223,  264,  94.5,  263,  1.0],
-      pull3: [225,  660,  169,  285,  81.0,  284,  1.0],
-      def1: [673,  660,  156,  264,  72.8,  263,  1.0],
-      def2: [673,  660,  156,  264,  72.8,  263,  1.0],
-      def3: [0,  947,  198,  272,  105.2,  271,  1.0],
-      cut1: [200,  947,  248,  289,  157.3,  288,  1.0],
-      cut2: [450,  947,  265,  255,  105.8,  254,  1.0],
-      cut3: [717,  947,  238,  257,  84.5,  256,  1.0],
-      bowled: [0,  1238,  215,  237,  101.0,  236,  1.0],
-    },
-  },
-};
-// looks.js SKIN index (0 lightest .. 5 darkest) -> sheet (null: no drawn sheet, repaint the team's own)
-const TONE_OF_SKIN = {
-  thunder: ['fair', 'fair2', 'tan', 'brown', 'brown', 'dark'],
-  vipers: ['fair', 'fair', 'brown', 'brown', 'dark', 'dark'],
-};
-// how long one frame blends into the next, in ms: longer on sheets whose stance turns between poses
-const BLEND = { vipers: 90 };
-// skin is a SKIN index, or a colour (stars have their own): a colour takes the nearest SKIN tone
-function skinIndex(skin) {
-  if (typeof skin === 'number') return skin;
-  if (typeof skin !== 'string' || !/^#[0-9a-f]{6}$/i.test(skin)) return 2;
-  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
-  const c = rgb(skin);
-  let best = 0, bd = Infinity;
-  SKIN.forEach((t, i) => { const d = rgb(t).reduce((a, v, k) => a + (v - c[k]) ** 2, 0); if (d < bd) { bd = d; best = i; } });
-  return best;
-}
-const toneKey = (team, skin) => {
-  const list = TONE_OF_SKIN[team];
-  const tone = list?.[Math.max(0, Math.min(list.length - 1, skinIndex(skin)))];
-  return tone ? `${team}-${tone}` : null;
-};
-const framesOf = key => { const [team, tone] = key.split('-'); return TONES[team]?.[tone] || FRAMES; };
-
 // frame, ms on screen. The swing starts when the finger lifts, which is the moment of contact,
 // so the downswing is brief and the contact frame lands almost at once.
 const SEQ = {
@@ -248,11 +54,9 @@ const atlases = new Map(); // team id -> { img, ready }
 
 // start loading the sheets for the teams in this match (others stay unloaded)
 export function loadBatSprites(...teamIds) {
-  // a team drawn in skin tones loads its tone sheets too (the repaintable sheet stays as a fallback)
-  teamIds = teamIds.flatMap(id => [id, ...[...new Set(TONE_OF_SKIN[id] || [])].filter(Boolean).map(t => `${id}-${t}`)]);
   for (const id of teamIds) {
     if (!id || atlases.has(id)) continue;
-    if (!id.includes('-')) loadPeopleMask(`batter-${id}`);
+    loadPeopleMask(`batter-${id}`);
     const a = { img: null, ready: false };
     // retried a few times if the download fails, instead of cartoon batters all session
     const load = (tries = 0) => {
@@ -285,27 +89,21 @@ export function drawTeamThumb(canvas, teamId) {
 }
 
 // The frame (and the one before it, for a short cross-fade) for the batter right now.
-// (between the ready stance and the backlift too, so lifting the bat doesn't snap)
-let idle = { f: 'ready', prev: null, t: 0 };
 export function batFrame(b, now) {
   if (b.anim === 'celebrate') return { f: 'drive3' };
-  const blend = (b.team && BLEND[b.team] && toneKey(b.team, b.people?.skin)) ? BLEND[b.team] : BLEND_MS;
   if (b.shot) {
     const seq = SEQ[b.shot.anim] || SEQ.drive;
     let t = now - b.shot.t0, prev = b.shot.from || 'backlift';
     for (const [f, ms] of seq) {
-      if (t < ms) return { f, prev, a: Math.min(1, t / Math.min(blend, ms)) };
+      if (t < ms) return { f, prev, a: Math.min(1, t / BLEND_MS) };
       t -= ms; prev = f;
     }
   }
-  const f = b.angle <= -2 ? 'backlift' : 'ready';
-  if (f !== idle.f) idle = { f, prev: idle.f, t: now };
-  const a = Math.min(1, (now - idle.t) / blend);
-  return a < 1 && idle.prev ? { f, prev: idle.prev, a } : { f };
+  return { f: b.angle <= -2 ? 'backlift' : 'ready' };
 }
 
-function drawOne(ctx, img, name, px, py, k, alpha, frames = FRAMES) {
-  const [sx, sy, w, h, ax, ay, s] = frames[name];
+function drawOne(ctx, img, name, px, py, k, alpha) {
+  const [sx, sy, w, h, ax, ay, s] = FRAMES[name];
   const sc = k * s;
   ctx.globalAlpha = alpha;
   ctx.drawImage(img, sx, sy, w, h, px - ax * sc, py - ay * sc, w * sc, h * sc);
@@ -313,13 +111,9 @@ function drawOne(ctx, img, name, px, py, k, alpha, frames = FRAMES) {
 
 // Draw at the projected feet position (px, py); kPerM is pixels per metre at that depth.
 export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
-  // his own skin tone, drawn, when the team has one; otherwise the team sheet repainted
-  const tk = toneKey(b.team, b.people?.skin);
-  const drawn = tk && atlases.get(tk);
-  const atlas = drawn?.ready ? drawn : atlases.get(b.team);
+  const atlas = atlases.get(b.team);
   if (!atlas || !atlas.ready) return false;
-  const frames = atlas === drawn ? framesOf(tk) : FRAMES;
-  const img = atlas === drawn ? atlas.img : peopleSheet(atlas.img, `batter-${b.team}`, b.people); // the batter's own skin and hair
+  const img = peopleSheet(atlas.img, `batter-${b.team}`, b.people); // the batter's own skin and hair
   const k = kPerM * REF_HEIGHT_M / REF_HEIGHT_PX;
   const { f, prev, a = 1 } = batFrame(b, now);
   ctx.save();
@@ -328,8 +122,8 @@ export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   ctx.beginPath(); ctx.ellipse(px, py, 0.55 * kPerM, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
   if (opts.glow) { ctx.shadowColor = opts.glow; ctx.shadowBlur = 22; }
   // the previous frame fades out underneath, which reads as motion blur on a fast swing
-  if (prev && a < 1) drawOne(ctx, img, prev, px, py, k, (1 - a) * 0.6, frames);
-  drawOne(ctx, img, f, px, py, k, 1, frames);
+  if (prev && a < 1) drawOne(ctx, img, prev, px, py, k, (1 - a) * 0.6);
+  drawOne(ctx, img, f, px, py, k, 1);
   ctx.restore();
   return true;
 }
