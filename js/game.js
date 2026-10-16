@@ -1111,7 +1111,11 @@ export class Game {
     const start = A ? { x: A.x, y: A.y } : null;
     // a four runs all the way to the rope (however long it takes): that's the satisfying bit
     const toRope = sim.kind === 'four' && !o.saved && sim.ropeT != null;
-    const end = o.caught ? sim.catch.t : o.saved ? sim.save.t : sim.kind === 'field' && sim.intercept ? sim.intercept.t : toRope ? sim.ropeT : Math.min(sim.duration, 3);
+    // a six flies on into the crowd (it lands among them, it doesn't stop in mid-air)
+    const six = sim.kind === 'six' && !o.caught;
+    let crowdT = null;
+    if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR + 9) { crowdT = tt; break; } }
+    const end = o.caught ? sim.catch.t : o.saved ? sim.save.t : sim.kind === 'field' && sim.intercept ? sim.intercept.t : toRope ? sim.ropeT : six ? Math.min(crowdT ?? path.T, path.T, 4) : Math.min(sim.duration, 3);
     // ...with the nearest fielder chasing it, and running out of rope
     let chaser = null, cStart = null;
     if (toRope && !A) {
@@ -1140,6 +1144,12 @@ export class Game {
     await this.until(() => {
       const t = this.gameTime - t0;
       const b = path.ballAt(Math.min(t, end));
+      if (toRope && t > end) {
+        // a four rolls on over the rope, hopping as it crosses, and dies in the grass beyond
+        const dt = t - end, extra = 4.5 * (1 - Math.exp(-dt * 2.2));
+        b.x = sim.ropePoint.x + path.dir.x * extra; b.y = sim.ropePoint.y + path.dir.y * extra;
+        b.h = dt < 0.32 ? 0.75 * Math.sin(Math.PI * dt / 0.32) : dt < 0.5 ? 0.18 * Math.sin(Math.PI * (dt - 0.32) / 0.18) : 0;
+      }
       if (A && target) {
         const p = Math.min(1, Math.max(0, (t - 0.25) / Math.max(0.3, tArrive - 0.25)));
         A.x = lerp(start.x, target.x, p); A.y = lerp(start.y, target.y, p);
@@ -1170,12 +1180,13 @@ export class Game {
       const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
       const trail = sim.kind === 'six' && !o.caught ? 'comet1' : toRope ? 'streak' : null;
       this.O.comet = hitSet && trail && t < end ? { ...(this.O.comet || {}), set: hitSet, name: trail, prev: this.O.ball && { ...this.O.ball } } : null;
-      this.O.ball = b;
+      // the six is gone once the lightning has struck where it landed
+      this.O.ball = six && said ? null : b;
       this.runBatters(t, legs);
       // once the ball is dealt with, hurry through the rest of the running
       this.timeScale = t > end + 0.6 ? 2.6 : 1.6;
       this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : [])]);
-      if (!said && t >= end && (!D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read
+      if (!said && t >= end && (six || !D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read (a six strikes as it lands)
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
         if (sim.kind === 'six' && !o.caught) {
@@ -2856,7 +2867,7 @@ export class Game {
     const t = this.realTime, four = c.name === 'streak';
     const step = Math.floor(t / 55);
     const pulse = 0.85 + 0.25 * Math.sin(t * 0.03) + 0.15 * Math.random();
-    const base = Math.min(four ? 70 : 85, Math.max(four ? 45 : 55, (four ? 4 : 5) * k)) * pulse;
+    const base = Math.min(four ? 48 : 60, Math.max(four ? 32 : 40, (four ? 3 : 3.6) * k)) * pulse;
     const pieces = four ? ['streak', 'speed'] : ['comet1', 'comet2'];
     const name = pieces[step % 2];
     // 'speed' points left (its head on its left edge); the comets and the streak point down-left
@@ -2869,12 +2880,12 @@ export class Game {
     if (!c.lastSpark || t - c.lastSpark > 45) {
       c.lastSpark = t;
       const back = ang + Math.PI + (Math.random() - 0.5) * 0.8, d = base * (0.15 + Math.random() * 0.35);
-      this.fx.effect(c.set, Math.random() < 0.5 ? 'shards' : 'burst2', a.x + Math.cos(back) * d, a.y + Math.sin(back) * d, { w: 12 + Math.random() * 14, dur: 300 + Math.random() * 220, rot: Math.random() * 6, grow: 0.6 });
+      this.fx.effect(c.set, Math.random() < 0.5 ? 'shards' : 'burst2', a.x + Math.cos(back) * d, a.y + Math.sin(back) * d, { w: 8 + Math.random() * 10, dur: 280 + Math.random() * 200, rot: Math.random() * 6, grow: 0.6 });
     }
     // a little bolt to the ground now and then
     if (!c.lastBolt || t - c.lastBolt > 180 + Math.random() * 200) {
       c.lastBolt = t;
-      this.fx.effect(c.set, Math.random() < 0.5 ? 'zigzag' : 'fork', a.x, a.y, { w: 14 + Math.random() * 10, h: 16 + Math.random() * 12, dur: 140, rot: (Math.random() - 0.5) * 2.4, anchor: [0.5, 0], grow: 1 });
+      this.fx.effect(c.set, Math.random() < 0.5 ? 'zigzag' : 'fork', a.x, a.y, { w: 10 + Math.random() * 7, h: 11 + Math.random() * 8, dur: 140, rot: (Math.random() - 0.5) * 2.4, anchor: [0.5, 0], grow: 1 });
     }
   }
 
