@@ -197,7 +197,7 @@ function renderPainted(cam, art) {
   const ends = [[-PX, PZ0], [PX, PZ0], [PX, PZ1], [-PX, PZ1]].map(([x, z]) => cam.project(x, 0, Math.max(z, cam.dir > 0 ? cam.cz + 1 : z)));
   if (ends.every(Boolean)) {
     g.save();
-    g.strokeStyle = INK; g.lineJoin = 'round'; g.lineWidth = 2.5;
+    g.strokeStyle = INK; g.lineJoin = 'round'; g.lineWidth = 1.4;
     g.beginPath(); ends.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y))); g.closePath(); g.stroke();
     g.restore();
   }
@@ -210,14 +210,20 @@ function renderPainted(cam, art) {
     g.fillStyle = gr; g.fillRect(0, hy, W, H - hy); g.restore();
   }
   // rope, 30-yard circle and creases (crease lines are 5 cm wide)
-  ring(g, cam, R, T.trim === '#1c1c1c' || T.trim === '#1a1a1a' ? T.suit : T.trim, 3, []);
-  ring(g, cam, 27, 'rgba(255,255,255,0.5)', 1.5, [6, 6]);
+  ring(g, cam, R, 'rgba(255,255,255,0.34)', 2, [16, 12]); // the rope: a soft white dashed line
+  ring(g, cam, 27, 'rgba(255,255,255,0.4)', 1.5, [6, 6]);
+  // creases: white with a fine ink edge, kept on the pitch
   const crease = (x0, z0, x1, z1) => {
     const p = cam.project(0, 0, (z0 + z1) / 2);
-    if (p) line(g, cam, x0, z0, x1, z1, 'rgba(255,253,240,0.95)', Math.max(1.2, 0.05 * p.k));
+    if (!p) return;
+    const w = Math.max(1.2, 0.05 * p.k);
+    g.lineCap = 'butt';
+    line(g, cam, x0, z0, x1, z1, INK, w + 1.6);
+    line(g, cam, x0, z0, x1, z1, '#fffdf0', w);
   };
+  const PE = PX - 0.06;
   for (const [z, d] of [[0, 1], [20, -1]]) {
-    crease(-1.83, z + 1.22 * d, 1.83, z + 1.22 * d); // popping crease
+    crease(-PE, z + 1.22 * d, PE, z + 1.22 * d); // popping crease
     crease(-1.32, z, 1.32, z); // bowling crease, through the stumps
     for (const x of [-1.32, 1.32]) crease(x, z + 1.22 * d, x, z - 1.22 * d); // return creases
   }
@@ -668,7 +674,7 @@ export function drawBoard(ctx, cam, t, message) {
   const G = groundOf(HOME), T = teamById(HOME);
   const text = message ? `★ ${message} ★   `.repeat(6) : `★ WELCOME TO ${G.name.toUpperCase()} ★   HOME OF THE ${T.name.toUpperCase()}   ${BOARD_TEXT}`;
   const tw = ctx.measureText(text).width;
-  const off = -((t * 0.05) % tw);
+  const off = -((t * 0.025) % tw);
   for (let x = off; x < W; x += tw) ctx.fillText(text, x, b.y + b.h / 2 + 1);
   ctx.restore();
   ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.strokeRect(-2, b.y, W + 4, b.h);
@@ -685,12 +691,18 @@ function drawPaintedBoard(ctx, cam, t, message) {
   if (quality.high) { ctx.shadowColor = message ? '#fff' : '#ffb000'; ctx.shadowBlur = 8; }
   const text = message ? `★ ${message} ★   `.repeat(6) : `★ WELCOME TO ${G.name.toUpperCase()} ★   HOME OF THE ${T.name.toUpperCase()}   ${BOARD_TEXT}`;
   const tw = ctx.measureText(text).width;
-  const off = -((t * 0.05) % tw);
+  const off = -((t * 0.025) % tw);
   for (let x = off; x < W; x += tw) ctx.fillText(text, x, b.y + b.h / 2 + 1);
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(0,10,40,0.28)';
   for (let x = 0; x < W; x += 3) ctx.fillRect(x, b.y, 1, b.h);
   ctx.restore();
+}
+
+// the painted grounds' rope in the top-down view: soft white dashes
+function ropeSoft(ctx, path) {
+  ctx.save(); ctx.setLineDash([16, 12]); ctx.strokeStyle = 'rgba(255,255,255,0.34)'; ctx.lineWidth = 2;
+  path(); ctx.stroke(); ctx.restore();
 }
 
 function ring(g, cam, r, color, w, dash) {
@@ -839,33 +851,35 @@ export class OutfieldView {
     ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 26) * k, (R + 26) * k * 0.78, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#0d0a24'; ctx.lineWidth = 4; ctx.stroke();
     ctx.restore();
+    const art = artFor();
     ctx.save();
     ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 4) * k, (R + 4) * k * 0.78, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffd23f'; ctx.fill();
-    ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k + 2, R * k * 0.78 + 2, 0, 0, Math.PI * 2);
-    const art = artFor();
     if (art) {
-      // the painted grass, its stripes along the pitch as in the match views
-      const tex = mipFor(grassMips(art), k), TS = tex.width;
-      const pat = ctx.createPattern(tex, 'repeat');
+      // the painted grass right up to the stands, its stripes along the pitch as in the match
+      // views: whole tiles with drawImage (pattern transforms are unreliable on iPhone Safari)
+      ctx.clip();
+      const tex = mipFor(grassMips(art), k), tw = TILE_M * k, th = TILE_M * k * 0.78;
       const o = this.to(-2.5, 0);
-      pat.setTransform(new DOMMatrix([k * TILE_M / TS, 0, 0, k * 0.78 * TILE_M / TS, o.x, o.y]));
-      ctx.fillStyle = pat; ctx.fill();
+      for (let x = o.x - Math.ceil(o.x / tw) * tw; x < W; x += tw) for (let y = o.y - Math.ceil(o.y / th) * th; y < H; y += th) ctx.drawImage(tex, x, y, tw + 0.5, th + 0.5);
       ctx.restore();
+      ropeSoft(ctx, () => { ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k, R * k * 0.78, 0, 0, Math.PI * 2); });
     } else {
+      ctx.fillStyle = '#ffd23f'; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k + 2, R * k * 0.78 + 2, 0, 0, Math.PI * 2);
       ctx.fillStyle = groundOf(HOME).grass[1]; ctx.fill();
       ctx.clip();
       ctx.fillStyle = 'rgba(255,255,255,0.05)';
       for (let x = -R; x < R; x += 10) { const a = this.to(x, 0); ctx.fillRect(a.x, 0, 5 * k, H); }
       ctx.restore();
+      ctx.strokeStyle = '#fff4da'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k, R * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke();
     }
-    ctx.strokeStyle = '#fff4da'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k, R * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, 27 * k, 27 * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     if (art) {
-      const a = this.to(-1.55, 22), b = this.to(1.55, -2);
-      ctx.drawImage(art.pitch, a.x, a.y, b.x - a.x, b.y - a.y);
+      const a = this.to(-1.52, 22), b = this.to(1.52, -2), pt = art.pitch;
+      ctx.drawImage(pt, pt.naturalWidth * 0.04, 0, pt.naturalWidth * 0.92, pt.naturalHeight, a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
       const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);
       ctx.fillStyle = groundOf(HOME).pitchCol; ctx.strokeStyle = 'rgba(20,16,24,0.5)'; ctx.lineWidth = 1.5;

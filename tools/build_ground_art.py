@@ -98,7 +98,14 @@ def main():
     if (p[..., 3] > 250).all():
         p = keyed(pitch)
     p, _, _ = crop(p)
-    p = np.array(Image.fromarray(p).resize((300, round(p.shape[0] * 300 / p.shape[1])), Image.LANCZOS))
+    p = np.array(Image.fromarray(p).resize((300, round(p.shape[0] * 300 / p.shape[1])), Image.LANCZOS)).astype(np.float32)
+    # painted, not photographed: blur away the grit, halve the contrast, and flatten the colour
+    # into a few bands like the rest of the game's comic art
+    rgb = ndi.gaussian_filter(p[..., :3], (2.4, 2.4, 0))
+    mean = rgb[p[..., 3] > 128].mean(0)
+    rgb = mean + (rgb - mean) * 0.55
+    rgb = np.round(rgb / 10) * 10
+    p = np.dstack([np.clip(rgb, 0, 255), p[..., 3]]).astype(np.uint8)
     save(p, d + 'pitch.webp')
 
     # grass: blend the tile with itself shifted half a width, more towards the sides, so its
