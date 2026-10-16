@@ -86,6 +86,11 @@ def anchors(img):
     blue = al & (b > r + 70) & (b > g + 30)
     lab, _ = ndimage.label(blue)
     cand = [(s[0].start, i + 1) for i, s in enumerate(ndimage.find_objects(lab)) if (lab[s] == i + 1).sum() > 200]
+    if not cand:  # a black helmet (the Vipers): the dark and red parts, not the bat, gloves or skin
+        helm = al & ((a[..., :3].max(-1) < 90) | ((r > 150) & (g < 70) & (b < 70)))
+        helm = ndimage.binary_opening(helm, iterations=1)
+        lab, _ = ndimage.label(helm)
+        cand = [(s[0].start, i + 1) for i, s in enumerate(ndimage.find_objects(lab)) if (lab[s] == i + 1).sum() > 200]
     top, li = min(cand)
     hm = lab == li
     hw = max(hm[y].sum() for y in range(top, min(top + 22, hm.shape[0])))

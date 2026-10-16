@@ -134,9 +134,37 @@ const TONES = {
       bowled: [756,  949,  215,  238,  107.5,  237,  1.0],
     },
   },
+  // drawn with one skin tone so far; the leave holds pose 2 and the block skips the reverse sweep
+  vipers: {
+    fair: {
+      ready: [0,  0,  136,  291,  85.5,  290,  1.0],
+      leave1: [138,  0,  141,  290,  86.0,  289,  1.0],
+      leave2: [138,  0,  141,  290,  86.0,  289,  1.0],
+      backlift: [484,  0,  185,  325,  96.5,  324,  1.0],
+      drive1: [671,  0,  234,  272,  95.2,  271,  1.0],
+      drive2: [0,  327,  290,  266,  136.8,  265,  1.0],
+      drive3: [292,  327,  124,  330,  69.2,  329,  1.0],
+      pull0: [418,  327,  235,  271,  119.0,  270,  1.0],
+      pull1: [655,  327,  196,  270,  79.8,  269,  1.0],
+      pull2: [0,  659,  223,  263,  94.5,  262,  1.0],
+      pull3: [225,  659,  169,  285,  69.0,  284,  1.0],
+      def1: [675,  659,  156,  264,  72.5,  263,  1.0],
+      def2: [675,  659,  156,  264,  72.5,  263,  1.0],
+      def3: [0,  946,  198,  272,  105.5,  271,  1.0],
+      cut1: [200,  946,  248,  289,  109.2,  288,  1.0],
+      cut2: [450,  946,  265,  255,  106.2,  254,  1.0],
+      cut3: [717,  946,  238,  257,  85.0,  256,  1.0],
+      bowled: [0,  1237,  215,  236,  114.6,  235,  1.0],
+    },
+  },
 };
-// looks.js SKIN index (0 lightest .. 5 darkest) -> sheet
-const TONE_OF_SKIN = { thunder: ['fair', 'fair2', 'tan', 'brown', 'brown', 'dark'] };
+// looks.js SKIN index (0 lightest .. 5 darkest) -> sheet (null: no drawn sheet, repaint the team's own)
+const TONE_OF_SKIN = {
+  thunder: ['fair', 'fair2', 'tan', 'brown', 'brown', 'dark'],
+  vipers: ['fair', 'fair', null, null, null, null],
+};
+// how long one frame blends into the next, in ms: longer on sheets whose stance turns between poses
+const BLEND = { vipers: 90 };
 // skin is a SKIN index, or a colour (stars have their own): a colour takes the nearest SKIN tone
 function skinIndex(skin) {
   if (typeof skin === 'number') return skin;
@@ -149,7 +177,8 @@ function skinIndex(skin) {
 }
 const toneKey = (team, skin) => {
   const list = TONE_OF_SKIN[team];
-  return list ? `${team}-${list[Math.max(0, Math.min(list.length - 1, skinIndex(skin)))]}` : null;
+  const tone = list?.[Math.max(0, Math.min(list.length - 1, skinIndex(skin)))];
+  return tone ? `${team}-${tone}` : null;
 };
 const framesOf = key => { const [team, tone] = key.split('-'); return TONES[team]?.[tone] || FRAMES; };
 
@@ -180,7 +209,7 @@ const atlases = new Map(); // team id -> { img, ready }
 // start loading the sheets for the teams in this match (others stay unloaded)
 export function loadBatSprites(...teamIds) {
   // a team drawn in skin tones loads its tone sheets too (the repaintable sheet stays as a fallback)
-  teamIds = teamIds.flatMap(id => [id, ...[...new Set(TONE_OF_SKIN[id] || [])].map(t => `${id}-${t}`)]);
+  teamIds = teamIds.flatMap(id => [id, ...[...new Set(TONE_OF_SKIN[id] || [])].filter(Boolean).map(t => `${id}-${t}`)]);
   for (const id of teamIds) {
     if (!id || atlases.has(id)) continue;
     if (!id.includes('-')) loadPeopleMask(`batter-${id}`);
@@ -216,17 +245,23 @@ export function drawTeamThumb(canvas, teamId) {
 }
 
 // The frame (and the one before it, for a short cross-fade) for the batter right now.
+// (between the ready stance and the backlift too, so lifting the bat doesn't snap)
+let idle = { f: 'ready', prev: null, t: 0 };
 export function batFrame(b, now) {
   if (b.anim === 'celebrate') return { f: 'drive3' };
+  const blend = (b.team && BLEND[b.team] && toneKey(b.team, b.people?.skin)) ? BLEND[b.team] : BLEND_MS;
   if (b.shot) {
     const seq = SEQ[b.shot.anim] || SEQ.drive;
     let t = now - b.shot.t0, prev = b.shot.from || 'backlift';
     for (const [f, ms] of seq) {
-      if (t < ms) return { f, prev, a: Math.min(1, t / BLEND_MS) };
+      if (t < ms) return { f, prev, a: Math.min(1, t / Math.min(blend, ms)) };
       t -= ms; prev = f;
     }
   }
-  return { f: b.angle <= -2 ? 'backlift' : 'ready' };
+  const f = b.angle <= -2 ? 'backlift' : 'ready';
+  if (f !== idle.f) idle = { f, prev: idle.f, t: now };
+  const a = Math.min(1, (now - idle.t) / blend);
+  return a < 1 && idle.prev ? { f, prev: idle.prev, a } : { f };
 }
 
 function drawOne(ctx, img, name, px, py, k, alpha, frames = FRAMES) {
