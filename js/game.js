@@ -1169,7 +1169,7 @@ export class Game {
       // a six by a side with painted effects flies as a comet; a four races along with a streak
       const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
       const trail = sim.kind === 'six' && !o.caught ? 'comet1' : toRope ? 'streak' : null;
-      this.O.comet = hitSet && trail && t < end ? { set: hitSet, name: trail, prev: this.O.ball && { ...this.O.ball } } : null;
+      this.O.comet = hitSet && trail && t < end ? { ...(this.O.comet || {}), set: hitSet, name: trail, prev: this.O.ball && { ...this.O.ball } } : null;
       this.O.ball = b;
       this.runBatters(t, legs);
       // once the ball is dealt with, hurry through the rest of the running
@@ -2849,6 +2849,35 @@ export class Game {
     return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, view, false, b.people);
   }
 
+  // the ball's electric trail: never the same twice. The tail pulses longer and shorter, swaps
+  // between two drawings, flips and wobbles; sparks fly off it and now and then a bolt jumps
+  // from the ball to the grass.
+  drawTrail(ctx, c, a, ang, k) {
+    const t = this.realTime, four = c.name === 'streak';
+    const step = Math.floor(t / 55);
+    const pulse = 0.85 + 0.25 * Math.sin(t * 0.03) + 0.15 * Math.random();
+    const base = Math.max(four ? 95 : 115, (four ? 8 : 10) * k) * pulse;
+    const pieces = four ? ['streak', 'speed'] : ['comet1', 'comet2'];
+    const name = pieces[step % 2];
+    // 'speed' points left (its head on its left edge); the comets and the streak point down-left
+    const turn = name === 'speed' ? Math.PI : Math.PI * 0.75, anchor = name === 'speed' ? [0.02, 0.5] : [0.12, 0.88];
+    const wob = (Math.random() - 0.5) * 0.12;
+    drawEffect(ctx, c.set, name, a.x, a.y, { w: base, rot: ang - turn + wob, anchor, alpha: 0.95, flip: false });
+    // a second, thinner layer a beat behind, for depth
+    drawEffect(ctx, c.set, pieces[(step + 1) % 2], a.x, a.y, { w: base * 0.7, rot: ang - (pieces[(step + 1) % 2] === 'speed' ? Math.PI : Math.PI * 0.75) - wob, anchor: pieces[(step + 1) % 2] === 'speed' ? [0.02, 0.5] : [0.12, 0.88], alpha: 0.45 });
+    // sparks shed behind the ball
+    if (!c.lastSpark || t - c.lastSpark > 45) {
+      c.lastSpark = t;
+      const back = ang + Math.PI + (Math.random() - 0.5) * 0.8, d = base * (0.15 + Math.random() * 0.35);
+      this.fx.effect(c.set, Math.random() < 0.5 ? 'shards' : 'burst2', a.x + Math.cos(back) * d, a.y + Math.sin(back) * d, { w: 26 + Math.random() * 30, dur: 320 + Math.random() * 240, rot: Math.random() * 6, grow: 0.6 });
+    }
+    // a little bolt to the ground now and then
+    if (!c.lastBolt || t - c.lastBolt > 180 + Math.random() * 200) {
+      c.lastBolt = t;
+      this.fx.effect(c.set, Math.random() < 0.5 ? 'zigzag' : 'fork', a.x, a.y, { w: 26 + Math.random() * 20, h: 30 + Math.random() * 20, dur: 140, rot: (Math.random() - 0.5) * 2.4, anchor: [0.5, 0], grow: 1 });
+    }
+  }
+
   renderOutfield() {
     const ctx = this.ctx, O = this.O, V = this.of;
     V.drawGround(ctx);
@@ -2881,7 +2910,7 @@ export class Game {
       // the comet's head on the ball, its tail streaming back along the flight
       const a = V.to(O.ball.x, O.ball.y, O.ball.h), q = O.comet.prev && V.to(O.comet.prev.x, O.comet.prev.y, O.comet.prev.h);
       if (q && Math.hypot(a.x - q.x, a.y - q.y) > 0.5) O.cometAng = Math.atan2(a.y - q.y, a.x - q.x);
-      if (O.cometAng != null) drawEffect(ctx, O.comet.set, O.comet.name, a.x, a.y, { w: Math.max(O.comet.name === 'streak' ? 60 : 80, (O.comet.name === 'streak' ? 5 : 7) * V.k), rot: O.cometAng - Math.PI * 0.75, anchor: [0.12, 0.88], alpha: 0.95 });
+      if (O.cometAng != null) this.drawTrail(ctx, O.comet, a, O.cometAng, V.k);
     }
     if (O.ball) V.ball(ctx, O.ball);
   }
