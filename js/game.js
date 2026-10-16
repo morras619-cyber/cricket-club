@@ -2306,9 +2306,19 @@ export class Game {
     // your partner at the bowler's end: behind his crease, on the side away from the bowler's arm
     if (kind === 'bat' && S.nonStriker?.team) {
       const nx = S.bowler.left ? 1.35 : -1.35, nz = 19.4;
-      push(nz, () => {
-        const p = cam.project(nx, 0, nz);
-        if (p) drawBowlSprite(ctx, p.x, p.y, p.k, 'leave2', S.nonStriker.team, false, 'batfront', S.nonStriker.people);
+      // he waits, then backs up as the bowler runs in, a step or two down the pitch as the ball goes
+      const spr = S.bowler.spr;
+      let frame = 'ns1', fwd = 0;
+      if (spr?.anim === 'run') frame = spr.p < 0.45 ? 'ns2' : spr.p < 0.7 ? 'ns3' : spr.p < 0.85 ? 'ns4' : 'ns5';
+      else if (spr?.anim === 'deliver') {
+        const t = this.gameTime - spr.t0;
+        frame = t < 0.12 ? 'ns6' : t < 0.26 ? 'ns7' : t < 0.4 ? 'ns8' : t < 0.55 ? 'ns9' : 'ns10';
+        fwd = 0.7 * clamp(t / 0.55, 0, 1);
+      }
+      push(nz - fwd, () => {
+        const p = cam.project(nx, 0, nz - fwd);
+        if (p && !drawBowlSprite(ctx, p.x, p.y, p.k, frame, S.nonStriker.team, false, 'nonstriker', S.nonStriker.people))
+          drawBowlSprite(ctx, p.x, p.y, p.k, 'leave2', S.nonStriker.team, false, 'batfront', S.nonStriker.people);
       });
     }
     // batter with swing animation

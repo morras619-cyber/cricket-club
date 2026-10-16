@@ -12,6 +12,7 @@ Run after the sheet builders (which put the bolts back):
     python3 tools/build_kit_logos.py
 """
 import json
+import sys
 import numpy as np
 from PIL import Image
 from scipy import ndimage as ndi
@@ -22,6 +23,7 @@ SHEETS = {
     'batfront': 'img/batter-front.webp',
     'keeper-front': 'img/keeper-front.webp',
     'field-front': 'img/field-front.webp',
+    'nonstriker': 'img/nonstriker.webp',
 }
 
 # The badges, picked by hand from the yellow patches the detector finds (the shoulder panels
@@ -67,6 +69,16 @@ BADGES = {
       'cap': [
         (145, 24), (415, 19), (685, 21), (157, 367), (450, 328), (428, 656), (741, 653),
         (265, 946), (579, 969),
+      ],
+    },
+    'nonstriker': {
+      'chest': [
+        (127, 143), (425, 136), (713, 136), (131, 571), (378, 571), (698, 569), (97, 977), (363, 982), (623, 975),
+        (127, 1394),
+      ],
+      'cap': [
+        (127, 26), (426, 28), (714, 26), (132, 459), (381, 460), (699, 462), (93, 873), (368, 871), (617, 872),
+        (127, 1280),
       ],
     },
     'field-front': {
@@ -190,7 +202,17 @@ def process(name, path):
 
 
 def main():
-    spots = {k: process(k, p) for k, p in SHEETS.items()}
+    # with sheet names (python3 tools/build_kit_logos.py nonstriker), only those are done and the
+    # rest of js/kitlogos.js is kept: the other sheets have had their bolts painted out already
+    only = sys.argv[1:]
+    spots = {}
+    if only:
+        import re
+        for m in re.finditer(r"^  '([\w-]+)': (\[.*\]),$", open('js/kitlogos.js').read(), re.M):
+            spots[m.group(1)] = json.loads(m.group(2))
+    for k, p in SHEETS.items():
+        if not only or k in only:
+            spots[k] = process(k, p)
     for k, v in spots.items():
         print(k, len(v), 'badges')
     with open('js/kitlogos.js', 'w') as f:

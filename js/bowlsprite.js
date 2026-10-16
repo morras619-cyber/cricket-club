@@ -373,6 +373,21 @@ const SPIN_BACKS = {
   },
 };
 
+// your partner at the bowler's end (tools/build_nonstriker.py): front view, backing up as the
+// bowler runs in. name: [x, y, w, h, anchorX, anchorY (feet), scale]
+const NONSTRIKER = {
+  ns1: [0,  0,  284,  431,  134.5,  429,  1.0],
+  ns2: [286,  0,  286,  404,  141.5,  402,  1.0],
+  ns3: [574,  0,  274,  409,  138.5,  407,  1.0],
+  ns4: [0,  433,  271,  408,  133.5,  406,  1.0],
+  ns5: [273,  433,  279,  408,  124.0,  406,  1.0],
+  ns6: [554,  433,  300,  403,  147.5,  402,  1.0],
+  ns7: [0,  843,  237,  405,  105.8,  403,  1.0],
+  ns8: [239,  843,  273,  407,  132.8,  405,  1.0],
+  ns9: [514,  843,  268,  403,  118.8,  401,  1.0],
+  ns10: [0,  1252,  270,  427,  131.0,  425,  1.0],
+};
+
 const VIEWS = {
   'field-top': { src: 'img/field-top.webp', frames: FIELD_TOP },
   'field-front': { src: 'img/field-front.webp', frames: FIELD_FRONT },
@@ -383,6 +398,7 @@ const VIEWS = {
   // drawn in the blue kit: other teams get it repainted in theirs
   'spin-back': { src: 'img/spinner-back-thunder.webp', frames: SPIN_BACK, refPx: SPIN_BACK.start[5] },
   // the ready stance is 1.72 m tall, as for the back-view batter
+  nonstriker: { src: 'img/nonstriker.webp', frames: NONSTRIKER, refPx: NONSTRIKER.ns1[5] },
   batfront: { src: 'img/batter-front.webp', frames: BAT_FRONT, refPx: Math.round(291 * 1.081 * 1.85 / 1.72) },
 };
 for (const [id, frames] of Object.entries(BACK)) {
@@ -429,9 +445,9 @@ function loadView(v, tries = 0) {
 // the front sheets plus the back sheets of the teams in this match. Repainted copies for
 // teams that aren't playing are thrown away, so memory doesn't pile up match after match.
 export function loadBowlSprites(...teamIds) {
-  for (const key of ['front', 'spin-front', 'spin-back', 'batfront', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.flatMap(id => ['back-' + id, 'spin-back-' + id])]) {
+  for (const key of ['front', 'spin-front', 'spin-back', 'batfront', 'nonstriker', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.flatMap(id => ['back-' + id, 'spin-back-' + id])]) {
     const v = VIEWS[key];
-    if (/^(front|batfront|spin-|back-|field-)/.test(key)) loadPeopleMask(key); // where the players' skin and hair are
+    if (/^(front|batfront|nonstriker|spin-|back-|field-)/.test(key)) loadPeopleMask(key); // where the players' skin and hair are
     if (!v || v.ready || (v.img && !v.failed)) continue;
     loadView(v);
   }

@@ -255,7 +255,7 @@ function sheetMasks(key, p, w, h) {
   // where a skin or hair area may spread to: the same family of colours, stopped by the ink outlines
   const looseSkin = new Uint8Array(n), looseHair = new Uint8Array(n), warmSkin = new Uint8Array(n), ink = new Uint8Array(n);
   let orangeKit = 0, opaque = 0;
-  const hasBat = /^bat/.test(key); // only the batting sheets have a bat to protect
+  const hasBat = /^bat/.test(key) || key === 'nonstriker'; // only the batting sheets have a bat to protect
   const darkWarm = new Uint8Array(n), darkBrown = new Uint8Array(n), sat = new Float32Array(n);
   let bat = new Uint8Array(n);
   for (let i = 0, q = 0; q < n; i += 4, q++) {
@@ -327,7 +327,9 @@ function sheetMasks(key, p, w, h) {
     for (let q = 0; q < n; q++) sk[q] |= pieces[q] & keepGroup[q] & head[q];
   }
   // the front-view batter's hair is all under his helmet: shadows on his face are not hair
-  const hr = key === 'batfront' ? new Uint8Array(n) : fix(hair, area => area >= 40);
+  let hr = key === 'batfront' ? new Uint8Array(n) : fix(hair, area => area >= 40);
+  // the non-striker's hair is under his helmet: only the beard shows, on his face, not the arms
+  if (key === 'nonstriker') { const head = upperBody(p, w, h, 0.22); for (let q = 0; q < n; q++) hr[q] &= head[q]; }
   // spread each area over its own shading until the outlines stop it, so the whole arm or face is repainted
   const spread = (core, loose, other, steps) => {
     let m = core;
