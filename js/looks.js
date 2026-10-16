@@ -167,6 +167,64 @@ function fillHoles(m, w, h, maxArea) {
     if (!open && pix.length < maxArea) for (const j of pix) m[j] = 1;
   }
 }
+// The skin patches of m that sit on a bat blade, removed. Each patch is matched with the wood-toned
+// region around it (skin and bat share those colours; outlines and gloves cut them apart), and a
+// region long and thin like a blade (length x stretch >= 105 px) is the bat: arms come to <= 97.
+function dropBlades(m, p, w, h, H, S, V) {
+  const n = m.length, woody = new Uint8Array(n);
+  for (let q = 0; q < n; q++) woody[q] = p[q * 4 + 3] > 70 && H[q] >= 8 && H[q] <= 46 && S[q] > 0.2 && V[q] > 0.45 ? 1 : 0;
+  const label = (mask) => {
+    const lab = new Int32Array(n), stack = [];
+    let id = 0;
+    for (let i = 0; i < n; i++) {
+      if (!mask[i] || lab[i]) continue;
+      id++; lab[i] = id; stack.push(i);
+      while (stack.length) {
+        const j = stack.pop(), x = j % w;
+        if (x > 0 && mask[j - 1] && !lab[j - 1]) { lab[j - 1] = id; stack.push(j - 1); }
+        if (x < w - 1 && mask[j + 1] && !lab[j + 1]) { lab[j + 1] = id; stack.push(j + 1); }
+        if (j >= w && mask[j - w] && !lab[j - w]) { lab[j - w] = id; stack.push(j - w); }
+        if (j + w < n && mask[j + w] && !lab[j + w]) { lab[j + w] = id; stack.push(j + w); }
+      }
+    }
+    return { lab, count: id };
+  };
+  const W = label(woody);
+  // shape of each wood region: length (4 sd along its long axis) times how stretched it is
+  const k = W.count + 1, a = new Float64Array(k), sx = new Float64Array(k), sy = new Float64Array(k), sxx = new Float64Array(k), syy = new Float64Array(k), sxy = new Float64Array(k);
+  for (let q = 0; q < n; q++) { const i = W.lab[q]; if (!i) continue; const x = q % w, y = (q / w) | 0; a[i]++; sx[i] += x; sy[i] += y; sxx[i] += x * x; syy[i] += y * y; sxy[i] += x * y; }
+  const blade = new Uint8Array(k);
+  for (let i = 1; i < k; i++) {
+    if (a[i] < 150) continue;
+    const mx = sx[i] / a[i], my = sy[i] / a[i], cxx = sxx[i] / a[i] - mx * mx, cyy = syy[i] / a[i] - my * my, cxy = sxy[i] / a[i] - mx * my;
+    const tr = cxx + cyy, d = Math.sqrt(Math.max(0, tr * tr / 4 - (cxx * cyy - cxy * cxy)));
+    const big = tr / 2 + d, small = Math.max(1e-3, tr / 2 - d);
+    if (4 * Math.sqrt(big) * Math.sqrt(big / small) >= 105) blade[i] = 1;
+  }
+  // a skin patch goes with the wood region it mostly lies in
+  const P = label(m), votes = new Map();
+  for (let q = 0; q < n; q++) {
+    const i = P.lab[q]; if (!i) continue;
+    const key = i * k + W.lab[q]; votes.set(key, (votes.get(key) || 0) + 1);
+  }
+  const best = new Int32Array(P.count + 1), bestN = new Int32Array(P.count + 1);
+  for (const [key, c] of votes) { const i = Math.floor(key / k), j = key % k; if (j && c > bestN[i]) { bestN[i] = c; best[i] = j; } }
+  // ...but a forearm laid along the handle (the defensive stance) fills a long wood region of its
+  // own: it's the bat only if the patch is a small part of the wood, or is itself blade-thin
+  const pk = P.count + 1, pa = new Float64Array(pk), px = new Float64Array(pk), py = new Float64Array(pk), pxx = new Float64Array(pk), pyy = new Float64Array(pk), pxy = new Float64Array(pk);
+  for (let q = 0; q < n; q++) { const i = P.lab[q]; if (!i) continue; const x = q % w, y = (q / w) | 0; pa[i]++; px[i] += x; py[i] += y; pxx[i] += x * x; pyy[i] += y * y; pxy[i] += x * y; }
+  const isBat = new Uint8Array(pk);
+  for (let i = 1; i < pk; i++) {
+    if (!blade[best[i]]) continue;
+    const mx = px[i] / pa[i], my = py[i] / pa[i], cxx = pxx[i] / pa[i] - mx * mx, cyy = pyy[i] / pa[i] - my * my, cxy = pxy[i] / pa[i] - mx * my;
+    const tr = cxx + cyy, d = Math.sqrt(Math.max(0, tr * tr / 4 - (cxx * cyy - cxy * cxy)));
+    const stretch = Math.sqrt((tr / 2 + d) / Math.max(1e-3, tr / 2 - d));
+    if (bestN[i] / a[best[i]] < 0.6 || stretch >= 2.5) isBat[i] = 1;
+  }
+  const out = new Uint8Array(n);
+  for (let q = 0; q < n; q++) { const i = P.lab[q]; if (i && !isBat[i]) out[q] = 1; }
+  return out;
+}
 // 1 where a pixel lies in the top `share` of its figure (each separate drawing on the sheet)
 function upperBody(p, w, h, share) {
   const n = w * h, seen = new Int32Array(n).fill(-1), out = new Uint8Array(n), stack = [], pix = [];
@@ -198,7 +256,8 @@ function sheetMasks(key, p, w, h) {
   const looseSkin = new Uint8Array(n), looseHair = new Uint8Array(n), warmSkin = new Uint8Array(n), ink = new Uint8Array(n);
   let orangeKit = 0, opaque = 0;
   const hasBat = /^bat/.test(key); // only the batting sheets have a bat to protect
-  const darkWarm = new Uint8Array(n), bat = new Uint8Array(n), darkBrown = new Uint8Array(n), sat = new Float32Array(n);
+  const darkWarm = new Uint8Array(n), darkBrown = new Uint8Array(n), sat = new Float32Array(n);
+  let bat = new Uint8Array(n);
   for (let i = 0, q = 0; q < n; i += 4, q++) {
     if (p[i + 3] < 70) continue;
     // hue, saturation, value inline (no allocation: this runs over a million pixels)
@@ -214,7 +273,8 @@ function sheetMasks(key, p, w, h) {
     if (hh > 50) continue;
     H[q] = hh; V[q] = v; sat[q] = s;
     // skin's highlights and deep shadows: warm, not white, not a vivid kit orange, not the bright bat
-    const batWood = hasBat && hh > 33 && v > 0.9 && s > 0.45;
+    // bat wood is hue 33-45; a yellow kit (the Eagles, hue 50+) is not the bat
+    const batWood = hasBat && hh > 33 && hh < 45 && v > 0.9 && s > 0.45;
     if (batWood) bat[q] = 1;
     if (hh <= 48 && s >= 0.12 && v >= 0.24 && !(s > 0.85 && v > 0.6) && !batWood) looseSkin[q] = 1;
     // some sheets shade skin with vivid orange (the Phoenix one): allowed, but only inside the outlines
@@ -337,8 +397,12 @@ function sheetMasks(key, p, w, h) {
   // the dark red-brown strokes on and around the skin take the new tone too (kept dark)
   const ring = morph(morph(skinAll, w, h, true), w, h, true);
   for (let q = 0; q < n; q++) if (ring[q] && darkWarm[q] && !hr[q]) skinAll[q] = 1;
-  // patches lying on the bat (its shaded edge, its stickers) are not skin, however they got in
-  if (hasBat) {
+  // patches lying on the bat (its shaded edge, its stickers) are not skin, however they got in.
+  // Told apart by shape: the bat is one long straight piece of wood, an arm is short. (Counting
+  // bat-coloured pixels doesn't work: lit skin, the Eagles' especially, is speckled with them.)
+  if (hasBat && key !== 'batfront') skinAll = dropBlades(skinAll, p, w, h, H, sat, V);
+  else if (hasBat) {
+    // (the front-view batter: his arms and face join up with the bat's colours, so the old rule)
     let nearBat = bat;
     for (let k = 0; k < 2; k++) nearBat = morph(nearBat, w, h, true);
     skinAll = filterParts(skinAll, w, h, H, V, (area, hue, v, b) => b <= 0.3, nearBat);
