@@ -389,6 +389,7 @@ export class Game {
   // a new over: the AI follows its plan; you pick from your attack
   async startOver(inn) {
     const over = Math.floor(inn.balls / 6);
+    if (inn.balls === 0 && !inn.openersShown) await this.openersBanner(inn);
     let p;
     if (inn.side === 'player') p = this.aiPlan[Math.min(over, this.aiPlan.length - 1)];
     else {
@@ -415,6 +416,19 @@ export class Game {
     await this.sleepReal(50); // let the banner show first
     this.prepPlayers(inn);
     await this.sleepReal(this.bot ? 10 : 1050);
+  }
+
+  // the openers walk out: their cards (if they have them) side by side
+  async openersBanner(inn) {
+    inn.openersShown = true;
+    const pair = [this.batterOf(inn), this.nonStrikerOf(inn)].filter(Boolean);
+    const cards = pair.map(p => cardFor(p)).filter(Boolean);
+    if (!cards.length || this.mode === 'tutorial') return;
+    const box = document.createElement('div');
+    box.className = 'pcard-pair';
+    box.append(...cards);
+    this.ui.banner('OPENERS', pair.map(p => flagName(p)).join(' & '), 1900, box);
+    await this.sleepReal(this.bot ? 60 : 1900);
   }
 
   // a wicket: the next batter walks out
