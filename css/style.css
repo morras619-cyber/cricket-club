@@ -56,6 +56,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .overballs b.empty { background: rgba(42,31,90,0.45); }
 .overballs b.r4 { background: var(--sky); color: var(--ink); }
 .overballs b.r6 { background: var(--bolt); color: var(--ink); }
+.overballs b.nb { background: var(--hot); color: #fffbe8; font-size: 10px; }
 .overballs b.rW { background: var(--hot); }
 .iconbtn { pointer-events: auto; flex: none; width: 38px; height: 38px; border-radius: 12px; border: 2.5px solid var(--ink); background: var(--paper); color: var(--ink); font-size: 12px; box-shadow: 3px 3px 0 var(--ink); }
 

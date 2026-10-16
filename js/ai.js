@@ -104,10 +104,12 @@ function chooseShot(d, ctx, rng) {
   if (rate > 1.8) loftP += 0.25;
   if (ctx.wicketsLeft <= 1) loftP -= 0.2;
   if (d.length === 'yorker') loftP *= 0.4;
+  // a free hit: nothing to lose, so he goes over the top for six, mostly straight or over cow corner
+  if (ctx.freeHit) return { kind: 'drive', angle: rng.chance(0.6) ? rng.range(-0.25, 0.2) : rng.range(-0.9, -0.5), loft: true, len: 200 };
   return { kind: 'drive', angle, loft: rng.chance(loftP), len: 200 };
 }
 
-// ctx: { ballNo, need, ballsLeft, wicketsLeft, release ('perfect'|'good'|'loose'|'bad'), repeats, fx, stance, power }
+// ctx: { ballNo, need, ballsLeft, wicketsLeft, release ('perfect'|'good'|'loose'|'bad'), repeats, fx, stance, power, freeHit }
 export function aiBat(d, ctx, rng) {
   let sigma = 78;
   // the batter's own skill (a squads.js rating, 75 = a solid regular)
@@ -117,6 +119,7 @@ export function aiBat(d, ctx, rng) {
   if (ctx.release === 'loose') sigma *= 0.8;
   if (ctx.repeats >= 3) sigma *= 0.8;
   if (ctx.power === 'thunder') sigma *= 0.7;
+  if (ctx.freeHit) sigma *= 0.85; // he picks his spot and commits to it
   const mods = ctx.mods || {};
   sigma *= mods.sigmaMul || 1;
   const w = { ...CFG.timing };

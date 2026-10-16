@@ -11,9 +11,13 @@ export class Innings {
     this.target = target;
     this.runs = 0; this.wkts = 0; this.balls = 0;
     this.log = []; // per legal ball: '0' '1' '4' '6' 'W' ...
-    // batting stints, one per batter: each dismissal ends one and the next batter comes in
+    this.noBalls = []; // legal balls bowled when each no-ball came (for the over strip)
+    // batting stints, one per batter: each dismissal ends one and the next batter comes in.
+    // Two are at the crease: cur is on strike, other at the bowler's end. An odd number of runs
+    // swaps them, and so does the end of an over.
     this.stints = [];
     this.cur = freshStint();
+    this.other = freshStint();
     // the whole attack's figures (run-outs aren't the bowler's wickets) and each bowler's own
     this.bowler = { balls: 0, runs: 0, wkts: 0, dots: 0 };
     this.figs = {};
@@ -22,6 +26,11 @@ export class Innings {
 
   // The batter now on strike. Only valid at the start of a stint.
   setBatter(p) { if (p && this.cur.balls === 0) Object.assign(this.cur, { id: p.id, name: p.name, nation: p.nation || null }); }
+  // His partner at the other end (only fills an empty place)
+  setPartner(p) { if (p && !this.other.id && this.other.balls === 0) Object.assign(this.other, { id: p.id, name: p.name, nation: p.nation || null }); }
+  // ids of everyone who has batted or is in
+  battedIds() { return [...this.stints.map(s => s.id), this.cur.id, this.other.id].filter(Boolean); }
+  swapStrike() { [this.cur, this.other] = [this.other, this.cur]; }
   // The bowler of the current over.
   setBowler(p) {
     if (!p) return;
@@ -38,7 +47,8 @@ export class Innings {
   get need() { return this.target == null ? null : Math.max(0, this.target - this.runs); }
   get overs() { return `${Math.floor(this.balls / 6)}.${this.balls % 6}`; }
 
-  extra(runs) {
+  extra(runs, noBall = false) {
+    if (noBall) this.noBalls.push(this.balls);
     this.runs += runs; this.bowler.runs += runs;
     if (this.curBowler) this.figs[this.curBowler].runs += runs;
   }
@@ -63,12 +73,17 @@ export class Innings {
       if (wicket && !runOut) f.wkts++;
     }
     if (wicket) { this.stints.push({ ...c, out: true, how: runOut ? 'run out' : f ? `b ${f.short}` : 'out' }); this.cur = freshStint(); }
+    // they crossed: 1, 3 or 5 runs puts the other man on strike (a wicket brings the new man in on strike)
+    else if (runs % 2 === 1) this.swapStrike();
+    // end of the over: the bowling switches ends, so the other batter faces
+    if (this.balls % 6 === 0 && this.balls < CFG.balls) this.swapStrike();
   }
 
   // Every stint, including the unbeaten one at the end.
   battingCard() {
     const list = [...this.stints];
-    if (this.cur.balls > 0 || list.length === 0) list.push({ ...this.cur, out: false });
+    for (const s of [this.cur, this.other]) if (s.balls > 0 || (s.id && list.length === 0)) list.push({ ...s, out: false });
+    if (list.length === 0) list.push({ ...this.cur, out: false });
     return list;
   }
 

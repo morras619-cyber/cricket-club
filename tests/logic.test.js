@@ -207,3 +207,22 @@ test('a tap defends: safe in the window, even against Shatter Seam, and yields a
   const miss = resolveContact({ grade: 'miss', errMs: 400, shot, d, fx: {}, rng });
   assert.ok(['bowled', 'beaten'].includes(miss.outcome));
 });
+
+test('strike rotates: odd runs and the end of an over swap the batters', () => {
+  const i = new Innings('player');
+  const A = { id: 'a', name: 'A' }, B = { id: 'b', name: 'B' }, C = { id: 'c', name: 'C' };
+  i.setBatter(A); i.setPartner(B);
+  i.ball({ runs: 1 }); assert.equal(i.cur.id, 'b');   // a single: they cross
+  i.ball({ runs: 2 }); assert.equal(i.cur.id, 'b');   // two: same man faces
+  i.ball({ runs: 3 }); assert.equal(i.cur.id, 'a');   // three: they cross again
+  i.ball({ runs: 4 }); assert.equal(i.cur.id, 'a');   // a boundary: no change
+  i.ball({ runs: 0 }); assert.equal(i.cur.id, 'a');
+  i.ball({ runs: 0 }); assert.equal(i.cur.id, 'b');   // end of the over: the other end faces
+  i.ball({ wicket: true });                             // b out: the new man is on strike, a stays
+  assert.equal(i.cur.id, null); assert.equal(i.other.id, 'a');
+  i.setBatter(C); assert.equal(i.cur.id, 'c');
+  const card = i.battingCard();
+  assert.equal(card.find(c => c.id === 'a').runs, 5); // 1 + 4
+  assert.equal(card.find(c => c.id === 'b').runs, 5); // 2 + 3
+  assert.equal(card.find(c => c.id === 'b').out, true);
+});

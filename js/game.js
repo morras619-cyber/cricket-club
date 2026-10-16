@@ -195,12 +195,20 @@ export class Game {
     const o = this.mySide?.order;
     return o?.length ? lookOf(o[0]) : null;
   }
+  // your batter at the other end, while you bat
+  myPartner() {
+    const inn = this.innings?.[this.innings.length - 1];
+    if (!inn || inn.side !== 'player' || !this.myTeam) return null;
+    const p = this.nonStrikerOf(inn);
+    return p ? { team: this.myTeam, people: lookOf(p) } : null;
+  }
   freshScene() {
     return {
       ball: null, trail: [], maya: null, ring: null, delivery: null, ballT0: 0, flight: null, kball: null,
       // between balls (banners, the pitch report) the scene still shows your team's drawn batter
       batter: { x: -0.5, z: 0.95, angle: -0.4, swingT0: null, shot: null, look: this.myTeam ? teamLook(this.myTeam) : null, team: this.myTeam?.id, emblem: null, glow: null, people: this.myBatterLook() },
       bowler: { x: 0.6, z: 27.5, pose: POSES.stand(), look: null },
+      nonStriker: this.myPartner(),
       keeper: { x: 0, z: -2.4, pose: POSES.keeper(), look: AI_LOOK },
       stumps: { 0: null, 20: null }, stumpGlow: false, reticle: null, stance: null,
     };
@@ -331,7 +339,30 @@ export class Game {
   // ---------- who's in ----------
   sideOf(inn, batting) { return (inn.side === 'player') === batting ? this.mySide : this.oppSide; }
   // the batter on strike: the order walks in one by one as wickets fall
-  batterOf(inn) { const o = this.sideOf(inn, true).order; return o[Math.min(inn.wkts, o.length - 1)]; }
+  // The batter on strike, and his partner at the other end (two at the crease; see Innings)
+  batterOf(inn) {
+    const o = this.sideOf(inn, true).order;
+    return (inn.cur?.id && o.find(p => p.id === inn.cur.id)) || this.nextIn(inn)[0] || o[Math.min(inn.wkts, o.length - 1)];
+  }
+  nonStrikerOf(inn) {
+    const o = this.sideOf(inn, true).order;
+    if (inn.other?.id) return o.find(p => p.id === inn.other.id) || null;
+    const n = this.nextIn(inn);
+    return (inn.cur?.id ? n[0] : n[1]) || null;
+  }
+  // who's still to come in, in batting order (a scenario that starts wickets down has lost the first few)
+  nextIn(inn) {
+    const o = this.sideOf(inn, true).order, used = new Set(inn.battedIds ? inn.battedIds() : []);
+    const lost = Math.max(0, inn.wkts - (inn.stints?.length || 0));
+    return o.filter(p => !used.has(p.id)).slice(lost);
+  }
+  // fill the empty places at the crease; returns who walked out
+  fillCrease(inn) {
+    const came = [];
+    if (!inn.cur.id) { const p = this.batterOf(inn); if (p) { inn.setBatter(p); came.push(p); } }
+    if (!inn.other.id) { const p = this.nextIn(inn)[0]; if (p) { inn.setPartner(p); came.push(p); } }
+    return came;
+  }
   bowlerOf(inn) {
     const att = this.sideOf(inn, false).attack;
     return att.find(p => p.id === inn.curBowler) || att.find(p => p.hero) || att[0];
@@ -383,8 +414,7 @@ export class Game {
 
   // a wicket: the next batter walks out
   async newBatter(inn) {
-    const p = this.batterOf(inn);
-    inn.setBatter(p);
+    const p = this.fillCrease(inn)[0] || this.batterOf(inn);
     this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700, p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.myTeam : this.oppTeam, 64));
     await this.sleepReal(this.bot ? 60 : 1200);
   }
@@ -548,7 +578,7 @@ export class Game {
   async battingInnings(inn, script) {
     this.phase = 'bat';
     this.overStarted = -1;
-    inn.setBatter(this.batterOf(inn));
+    this.fillCrease(inn);
     this.hud(inn);
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
@@ -598,6 +628,8 @@ export class Game {
     S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = striker.hero?.emblem || null;
     S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler); // their own skin and hair on the drawn sprites
+    const partner = this.nonStrikerOf(inn);
+    S.nonStriker = partner ? { team: this.myTeam, people: lookOf(partner) } : null;
     if (btype.left) S.bowler.x = -0.6;
     const rng = this.ballRng(ballNo);
     const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
@@ -958,9 +990,7 @@ export class Game {
   battingPair() {
     const inn = this.innings?.[this.innings.length - 1];
     if (!inn) return [null, null];
-    const o = this.sideOf(inn, true).order, i = Math.min(inn.wkts, o.length - 1);
-    const partner = o.find((p, j) => j > i) || o.find((p, j) => j !== i) || null;
-    return [lookOf(o[i]), lookOf(partner)];
+    return [lookOf(this.batterOf(inn)), lookOf(this.nonStrikerOf(inn))];
   }
 
   runBatters(t, runs) {
@@ -1077,7 +1107,7 @@ export class Game {
     this.overStarted = -1;
     this.aiPowerBalls = new Set([16, 26]);
     this.lastBowlerId = null;
-    inn.setBatter(this.batterOf(inn));
+    this.fillCrease(inn);
     this.hud(inn);
     await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `${this.myTeam.name} v ${this.oppTeam.name} · keep them quiet` : `Defend ${inn.target - 1}`);
     while (!inn.done()) {
@@ -1202,7 +1232,7 @@ export class Game {
 
     if (rg === 'bad') {
       S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
-      inn.extra(1);
+      inn.extra(1, true);
       this.freeHit = true;
       this.ui.banner('NO BALL!', 'Too fast — you overstepped. +1 run, free hit next', 1700);
       sfx.trombone();
@@ -1279,7 +1309,7 @@ export class Game {
     const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * this.pitch.ai * aiHome / (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1) / this.pitch.bat };
-    let ai = aiBat(d, { skill: aiSkill, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods }, rng);
+    let ai = aiBat(d, { skill: aiSkill, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods, freeHit: this.freeHit }, rng);
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
@@ -1973,10 +2003,17 @@ export class Game {
     this.O.ring = null;
     this.timeScale = 0.25;
     this.fx.speed = 0.8;
-    this.ui.hint('SWIPE AT THE STUMPS!');
+    this.ui.hint('TAP THE STUMPS TO THROW!');
     let sw = null;
     const ts = this.realTime;
-    this.onInput = (type, g) => { if (type === 'up' && !sw && Math.hypot(g.dx, g.dy) > 30) sw = g; };
+    // a tap on (or near) either set of stumps throws there at once; a swipe still aims the throw
+    this.onInput = (type, g) => {
+      if (sw) return;
+      if (type === 'down') {
+        const hit = ['striker', 'bowler'].map(id => { const s = this.of.to(ENDS[id].x, ENDS[id].y); return { id, d: Math.hypot(g.x - s.x, g.y - (s.y - 8)) }; }).sort((a, b) => a.d - b.d)[0];
+        if (hit.d <= Math.max(48, 2.6 * this.of.k)) sw = { tapEnd: hit.id };
+      } else if (type === 'up' && Math.hypot(g.dx, g.dy) > 30) sw = g;
+    };
     if (this.bot) this.sleepReal(400).then(() => {
       const end = margins.striker < margins.bowler ? ENDS.striker : ENDS.bowler;
       const a = this.of.to(me.x, me.y), b = this.of.to(end.x, end.y);
@@ -1995,7 +2032,11 @@ export class Game {
     const relay = !!this.armed.relay;
     const ms = this.of.to(me.x, me.y);
     let endId = margins.striker < margins.bowler ? 'striker' : 'bowler', direct = false, extra = 0.8, wild = false;
-    if (sw) {
+    if (sw?.tapEnd) {
+      // tapped the stumps: thrown straight at them (a fumble costs a little accuracy)
+      endId = sw.tapEnd;
+      if (fumble) extra = 0.3; else { direct = true; extra = 0; }
+    } else if (sw) {
       const got = Math.atan2(sw.dy, sw.dx);
       const errs = ['striker', 'bowler'].map(id => { const s = this.of.to(ENDS[id].x, ENDS[id].y); return { id, e: angDiff(Math.atan2(s.y - ms.y, s.x - ms.x), got) }; }).sort((a, b) => a.e - b.e);
       endId = errs[0].id;
@@ -2097,7 +2138,7 @@ export class Game {
       for (let attempt = 0; attempt < 2; attempt++) {
         const before = inn.balls;
         const runsBefore = inn.runs;
-        const curBefore = { ...inn.cur }, stintsBefore = [...inn.stints];
+        const curBefore = { ...inn.cur }, otherBefore = { ...inn.other }, stintsBefore = [...inn.stints];
         const out = { v: false };
         await this.batBall(inn, inn.balls + 1, straight, {
           slow, extra, assist: assistHit, onOut: () => { out.v = true; },
@@ -2106,7 +2147,7 @@ export class Game {
         if (inn.runs > runsBefore || attempt === 1) break;
         // can't be lost: undo the miss and replay once
         inn.balls = before; inn.runs = runsBefore; inn.log.pop(); if (out.v) inn.wkts--;
-        inn.cur = curBefore; inn.stints = stintsBefore;
+        inn.cur = curBefore; inn.other = otherBefore; inn.stints = stintsBefore;
         this.ui.banner(`${this.team.bat.name.toUpperCase()} GOT LUCKY!`, 'Try that one again', 1400);
         await this.sleepReal(this.bot ? 100 : 1400);
       }
@@ -2249,6 +2290,14 @@ export class Game {
         // never the plain cartoon while a hand-drawn bowler can be shown
         if (p && view !== plain && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, plain), team, !!S.bowler.left, plain, S.bowler.people)) return;
         drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem });
+      });
+    }
+    // your partner at the bowler's end: behind his crease, on the side away from the bowler's arm
+    if (kind === 'bat' && S.nonStriker?.team) {
+      const nx = S.bowler.left ? 1.35 : -1.35, nz = 19.4;
+      push(nz, () => {
+        const p = cam.project(nx, 0, nz);
+        if (p) drawBowlSprite(ctx, p.x, p.y, p.k, 'leave2', S.nonStriker.team, false, 'batfront', S.nonStriker.people);
       });
     }
     // batter with swing animation
