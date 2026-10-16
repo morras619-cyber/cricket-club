@@ -1,4 +1,4 @@
-import { peopleSheet, loadPeopleMask } from './looks.js';
+import { peopleSheet, loadPeopleMask, SKIN } from './looks.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
 // tools/build_batter_sprites.py, so a single frame table serves every team.
@@ -137,9 +137,19 @@ const TONES = {
 };
 // looks.js SKIN index (0 lightest .. 5 darkest) -> sheet
 const TONE_OF_SKIN = { thunder: ['fair', 'fair2', 'tan', 'brown', 'brown', 'dark'] };
+// skin is a SKIN index, or a colour (stars have their own): a colour takes the nearest SKIN tone
+function skinIndex(skin) {
+  if (typeof skin === 'number') return skin;
+  if (typeof skin !== 'string' || !/^#[0-9a-f]{6}$/i.test(skin)) return 2;
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const c = rgb(skin);
+  let best = 0, bd = Infinity;
+  SKIN.forEach((t, i) => { const d = rgb(t).reduce((a, v, k) => a + (v - c[k]) ** 2, 0); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
 const toneKey = (team, skin) => {
   const list = TONE_OF_SKIN[team];
-  return list ? `${team}-${list[Math.max(0, Math.min(list.length - 1, skin ?? 2))]}` : null;
+  return list ? `${team}-${list[Math.max(0, Math.min(list.length - 1, skinIndex(skin)))]}` : null;
 };
 const framesOf = key => { const [team, tone] = key.split('-'); return TONES[team]?.[tone] || FRAMES; };
 

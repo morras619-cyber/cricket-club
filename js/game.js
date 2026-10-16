@@ -185,11 +185,21 @@ export class Game {
   }
 
   // ---------- scene state ----------
+  // the skin and hair of your batter on strike (or next in), so the batter shown between balls is
+  // the same man as the one who just played the shot
+  myBatterLook() {
+    const inn = this.innings?.[this.innings.length - 1];
+    if (inn && inn.side === 'player') return lookOf(this.batterOf(inn));
+    const prev = this.S?.batter;
+    if (prev?.people && prev.team === this.myTeam?.id) return prev.people;
+    const o = this.mySide?.order;
+    return o?.length ? lookOf(o[0]) : null;
+  }
   freshScene() {
     return {
       ball: null, trail: [], maya: null, ring: null, delivery: null, ballT0: 0, flight: null, kball: null,
       // between balls (banners, the pitch report) the scene still shows your team's drawn batter
-      batter: { x: -0.5, z: 0.95, angle: -0.4, swingT0: null, shot: null, look: this.myTeam ? teamLook(this.myTeam) : null, team: this.myTeam?.id, emblem: null, glow: null },
+      batter: { x: -0.5, z: 0.95, angle: -0.4, swingT0: null, shot: null, look: this.myTeam ? teamLook(this.myTeam) : null, team: this.myTeam?.id, emblem: null, glow: null, people: this.myBatterLook() },
       bowler: { x: 0.6, z: 27.5, pose: POSES.stand(), look: null },
       keeper: { x: 0, z: -2.4, pose: POSES.keeper(), look: AI_LOOK },
       stumps: { 0: null, 20: null }, stumpGlow: false, reticle: null, stance: null,
