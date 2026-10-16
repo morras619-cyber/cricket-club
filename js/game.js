@@ -1250,11 +1250,10 @@ export class Game {
 
     // the delivery the swipe describes
     const spec = { x: G.x, length: G.length, bounce: G.bounce, h: G.h, kmh: G.kmh, swing: G.swing, move: G.move, loop: G.loop, rx: btype.left ? -0.3 : 0.3 };
-    // a regular bowler's skill: weaker ones bowl a little looser
-    if (!bowler.hero && rg !== 'perfect' && rng.chance((85 - (bowler.bowlSkill || 75)) / 60)) spec.x = clamp(spec.x + rng.range(-0.08, 0.08), -0.8, 0.8);
+    // where you draw is where it lands: no random scatter, only a little spray on a flick that was too fast
     if (rg === 'loose') {
-      spec.x = clamp(spec.x + rng.range(-0.18, 0.18), -0.8, 0.8);
-      if (spec.bounce != null) { spec.bounce = clamp(spec.bounce + rng.range(-1.2, 1.2), 0.7, 11.5); spec.length = lengthForBounce(spec.bounce); spec.h = heightForBounce(spec.bounce); }
+      spec.x = clamp(spec.x + rng.range(-0.06, 0.06), -1.0, 1.0);
+      if (spec.bounce != null) { spec.bounce = clamp(spec.bounce + rng.range(-0.4, 0.4), 0.7, 11.5); spec.length = lengthForBounce(spec.bounce); spec.h = heightForBounce(spec.bounce); }
     }
     if (rg === 'perfect') { spec.swing *= 1.15; spec.move *= 1.15; }
     if (bowler.ability === 'swingMaster') { spec.swing *= 1.3; spec.move *= 1.3; }
@@ -1265,6 +1264,8 @@ export class Game {
     if (A.maya) { fxFlags.maya = true; A.maya = false; usedPower = 'maya'; }
     if (A.shatter) { spec.move = 0.3; fxFlags.shatter = true; A.shatter = false; usedPower = 'shatter'; }
     if (!usedPower) Object.assign(spec, this.pitched(spec, btype));
+    // the ball pitches on the ring; seam and spin move it after the bounce (x is its line at the stumps)
+    if (!usedPower && spec.bounce != null) spec.x = spec.x + (spec.move || 0);
     if (opt.spec) Object.assign(spec, opt.spec);
 
     // release, then aftertouch: drag sideways while the ball is in the air to bend it late
@@ -1411,6 +1412,15 @@ export class Game {
     await this.sleepReal(this.bot ? 50 : 400);
   }
 
+  // The swipe's length sets how far up the pitch it lands; its line is wherever the finger ends:
+  // the landing ring sits straight under the fingertip.
+  aimAt(r, end) {
+    if (!r) return r;
+    const z = r.bounce ?? 0;
+    r.x = clamp(this.cams.bowl.xAt(end.x, z), -1.0, 1.0);
+    return r;
+  }
+
   // Waits for the delivery swipe. Touch down starts the run-up; lift to bowl.
   async captureBowlGesture(S, kind) {
     const scale = this.H / 844;
@@ -1427,11 +1437,11 @@ export class Game {
         this.bowlTrail = pts;
       } else if (type === 'move' && pts) {
         pts.push({ x: g.x, y: g.y, t: g.t });
-        const r = gestureToDelivery(pts, kind, scale);
+        const r = this.aimAt(gestureToDelivery(pts, kind, scale), g);
         S.aim = r ? { ...r, pts } : null;
       } else if (type === 'up' && pts) {
         pts.push({ x: g.x, y: g.y, t: g.t });
-        const r = gestureToDelivery(pts, kind, scale);
+        const r = this.aimAt(gestureToDelivery(pts, kind, scale), g);
         if (!r) {
           this.fx.word('SWIPE FURTHER UP THE PITCH', this.W / 2, this.H * 0.5, { size: 26, color: '#fff4da', stroke: INK, rot: 0, dur: 1000 });
           pts = null; S.aim = null; S.runStart = null; this.bowlTrail = null;
@@ -1449,7 +1459,7 @@ export class Game {
         const p = Math.min(1, e / 1100);
         S.bowler.z = lerp(26, 21.4, p); S.bowler.pose = POSES.run(p * 10); S.bowler.spr = { anim: 'run', p: (26 - S.bowler.z) / 5.3 };
         if (e > 2600) {
-          done = gestureToDelivery(pts, kind, scale) || { x: 0.2, length: 'good', bounce: 5.5, h: 0.8, kmh: 120, swing: 0, move: 0, loop: 0.6, type: 'Seam up', grade: 'loose', lateWorld: 0, mag: 0, slower: false, speedP: 0.3 };
+          done = this.aimAt(gestureToDelivery(pts, kind, scale), pts[pts.length - 1]) || { x: 0.2, length: 'good', bounce: 5.5, h: 0.8, kmh: 120, swing: 0, move: 0, loop: 0.6, type: 'Seam up', grade: 'loose', lateWorld: 0, mag: 0, slower: false, speedP: 0.3 };
           done.hesitated = true;
         }
       }
@@ -1462,8 +1472,11 @@ export class Game {
   }
 
   botBowl() {
-    const sc = this.H / 844, x0 = this.W * 0.62, y0 = this.H * 0.8;
+    const sc = this.H / 844, y0 = this.H * 0.8;
     const up = 150 + Math.random() * 230, dx = (Math.random() - 0.5) * 220, bend = (Math.random() - 0.5) * 90;
+    // it ends its swipe over a line near the stumps (the line is wherever the finger ends)
+    const end = this.cams.bowl.project((Math.random() - 0.5) * 0.9, 0, 6) || { x: this.W * 0.55 };
+    const x0 = end.x - dx;
     const steps = 5, dur = 100 + Math.random() * 250;
     const run = async () => {
       await this.sleepReal(300);

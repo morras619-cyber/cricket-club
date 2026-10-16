@@ -25,6 +25,17 @@ export class Cam3D {
     this.bg = null;
   }
   depth(z) { return this.dir > 0 ? z - this.cz : this.cz - z; }
+  // the point on the ground (y = 0) at screen point (sx, sy), or null above the horizon
+  groundAt(sx, sy) {
+    const k = (sy - this.hy) / this.cy;
+    if (k <= 0) return null;
+    return { x: this.cx + (sx - this.W / 2) / (this.dir * k), z: this.cz - this.dir * (this.f / k) };
+  }
+  // the ground x under screen x, at depth z (where the ring sits)
+  xAt(sx, z) {
+    const k = this.f / this.depth(z);
+    return this.cx + (sx - this.W / 2) / (this.dir * k);
+  }
   project(x, y, z) {
     const d = this.depth(z);
     if (d < 0.4) return null;
@@ -162,7 +173,6 @@ function renderBackground(cam) {
   };
   const cheer = `GO ${T.name.split(' ').slice(-1)[0].toUpperCase()}!`;
   banner(W * 0.3, mid + 18, cheer, T.suit === '#ffcf1a' ? '#1a1a1a' : T.suit, -0.06);
-  banner(W * 0.78, standTop + 16, '6 6 6', '#e8343b', 0.05);
 
   // floodlights (lit only after dark) — the Thunderdome's are lightning bolts
   const towers = [W * 0.08, W * 0.92];
