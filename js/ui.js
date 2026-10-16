@@ -1,4 +1,5 @@
 import { portrait } from './figure.js';
+import { drawEffect } from './fx.js';
 
 const $ = id => document.getElementById(id);
 
@@ -94,6 +95,26 @@ export class UI {
   hint(text) {
     const h = $('hint');
     if (text) { h.textContent = text; h.classList.add('show'); } else h.classList.remove('show');
+  }
+
+  // electricity crawling along a full charge bar: set is the team's effect set, or null to stop
+  chargeZap(set, t) {
+    let c = $('chargeZap');
+    if (!set) { if (c && !c.hidden) c.hidden = true; return; }
+    const bar = $('charge');
+    if (!c) { c = document.createElement('canvas'); c.id = 'chargeZap'; c.className = 'charge-zap'; bar.append(c); }
+    c.hidden = false;
+    const W = bar.clientWidth + 24, H = bar.clientHeight + 24, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+    const g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    if (Math.floor(t / 60) % 3 === 2) return; // it flickers
+    const n = Math.max(2, Math.round(W / 90)), seed = Math.floor(t / 110);
+    for (let i = 0; i < n; i++) {
+      const r = ((seed * 7 + i * 13) % 17) / 17;
+      drawEffect(g, set, 'zigzag', 12 + (i + 0.5) * ((W - 24) / n) + (r - 0.5) * 20, H / 2 + (r - 0.5) * 6, { w: (W - 24) / n * 1.15, h: H * 0.95, alpha: 0.65 + 0.35 * r, flip: (seed + i) % 2 === 0 });
+    }
   }
 
   charge(value) {

@@ -744,6 +744,7 @@ export class Game {
         if (tg < S.ballT0 + 0.15) { S.batter.angle = -0.4; return; }
         swing = { t: tg, dx: g.dx, dy: g.dy, defend: tap };
         S.batter.swingT0 = this.realTime;
+        if (!tap) this.swingArc(this.myTeam, 'bat');
         S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.dx, g.dy, this.loftPx)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
@@ -823,6 +824,7 @@ export class Game {
     // ----- outcomes -----
     if (res.outcome === 'bowled') {
       S.stumps[0] = { dir: rng.range(-1, 1) };
+      this.stumpsBurst(this.oppTeam, 'bat');
       this.wicketFx(res.mayaFooled ? 'FOOLED!' : 'BOWLED!', cs);
       inn.ball({ wicket: true });
       this.charge.wicketLost();
@@ -907,6 +909,21 @@ export class Game {
     this.fx.effect(set, bolt, x, y + 10, { w, h: y + 30, anchor: [0.45, 1], dur: 420, grow: 1, flip: Math.random() < 0.5 });
     this.fx.effect(set, burst, x, y, { w: w * 1.3, anchor: [0.5, burst === 'burst5' ? 0.8 : 0.5], dur: 520 });
     this.fx.flash('#9fd8ff', 0.35);
+  }
+
+  // stumps knocked over: an explosion where they stood, sparks spraying out
+  stumpsBurst(team, kind) {
+    const set = this.fxSet(team), p = set && this.cams[kind]?.project(0, 0.4, 0);
+    if (!p) return;
+    this.fx.effect(set, 'burst3', p.x, p.y, { w: Math.max(120, 2.6 * p.k), dur: 480, rot: Math.random() * 6 });
+    this.fx.effect(set, 'spray', p.x, p.y, { w: Math.max(160, 3.4 * p.k), dur: 560, grow: 1.5 });
+  }
+  // the bat's arc through the swing
+  swingArc(team, kind) {
+    const set = this.fxSet(team), b = this.S.batter, p = set && this.cams[kind]?.project(b.x, 0, b.z);
+    if (!p) return;
+    const front = kind === 'bowl'; // seen from the bowler's end the swing runs the other way
+    this.fx.effect(set, 'arc', p.x + (front ? -0.2 : 0.35) * p.k, p.y - 0.75 * p.k, { w: 1.5 * p.k, dur: 280, grow: 1.05, flip: front, rot: front ? 0.3 : -0.2 });
   }
 
   // the hand-drawn burst on the bat: big and tinted for a powered hit, smaller for a perfect one
@@ -1149,9 +1166,10 @@ export class Game {
         sfx.crowd(0.6);
       }
       if (t >= end && A && (o.caught || sim.intercept)) { b.x = A.x; b.y = A.y; b.h = o.caught ? 1.6 : 0.3; }
-      // a six by a side with painted effects flies as a comet
+      // a six by a side with painted effects flies as a comet; a four races along with a streak
       const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
-      this.O.comet = hitSet && sim.kind === 'six' && !o.caught && t < end ? { set: hitSet, prev: this.O.ball && { ...this.O.ball } } : null;
+      const trail = sim.kind === 'six' && !o.caught ? 'comet1' : toRope ? 'streak' : null;
+      this.O.comet = hitSet && trail && t < end ? { set: hitSet, name: trail, prev: this.O.ball && { ...this.O.ball } } : null;
       this.O.ball = b;
       this.runBatters(t, legs);
       // once the ball is dealt with, hurry through the rest of the running
@@ -1398,7 +1416,7 @@ export class Game {
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
 
     await this.until(() => this.gameTime - S.ballT0 >= d.tContact);
-    if (ai.res.outcome !== 'leave') S.batter.swingT0 = this.realTime;
+    if (ai.res.outcome !== 'leave') { S.batter.swingT0 = this.realTime; if (ai.res.outcome !== 'defend') this.swingArc(this.oppTeam, 'bowl'); }
     S.batter.shot = { anim: ai.res.outcome === 'leave' ? 'leave' : shotAnim({ kind: 'drive', angle: ai.res.angle ?? 0 }), t0: this.realTime, from: 'ready' };
     const res = ai.res;
     const contact = d.pos(d.tContact);
@@ -1440,6 +1458,7 @@ export class Game {
 
     if (res.outcome === 'bowled') {
       S.stumps[0] = { dir: rng.range(-1, 1) };
+      this.stumpsBurst(this.myTeam, 'bowl');
       const comboTag = mods?.tags.find(t => t.id === 'setup' || t.id === 'swingtrap' || t.id === 'changeup');
       const powerWord = usedPower ? { tornado: 'TORNADO YORKER!', maya: 'MAYA BALL!', shatter: 'SHATTERED!' }[usedPower] : comboTag ? comboTag.label : null;
       wicket(res.mayaFooled ? 'FOOLED BY MAYA!' : 'BOWLED!', usedPower || comboTag ? 'twoWickets' : 'wicket', bowlerHero, { word: powerWord || 'BOWLED!', detail: powerWord ? `${powerWord.replace('!', '').toLowerCase()} wicket` : 'stumps cartwheeling' });
@@ -2319,6 +2338,9 @@ export class Game {
     else this.renderIdle();
     ctx.restore();
     this.fx.draw(ctx, W, H);
+    // a full charge bar crackles
+    const zap = !document.getElementById('hud').hidden && this.charge?.value >= this.charge?.cfg.max && this.fxSet(this.myTeam);
+    this.ui.chargeZap(zap, this.realTime);
     this.cutin.draw(ctx, W, H, this.realTime);
     if (this.cutin.busy !== this.cutinShown) { this.cutinShown = this.cutin.busy; document.getElementById('hud').classList.toggle('cutin-on', this.cutinShown); }
   }
@@ -2859,7 +2881,7 @@ export class Game {
       // the comet's head on the ball, its tail streaming back along the flight
       const a = V.to(O.ball.x, O.ball.y, O.ball.h), q = O.comet.prev && V.to(O.comet.prev.x, O.comet.prev.y, O.comet.prev.h);
       if (q && Math.hypot(a.x - q.x, a.y - q.y) > 0.5) O.cometAng = Math.atan2(a.y - q.y, a.x - q.x);
-      if (O.cometAng != null) drawEffect(ctx, O.comet.set, 'comet1', a.x, a.y, { w: Math.max(80, 7 * V.k), rot: O.cometAng - Math.PI * 0.75, anchor: [0.12, 0.88], alpha: 0.95 });
+      if (O.cometAng != null) drawEffect(ctx, O.comet.set, O.comet.name, a.x, a.y, { w: Math.max(O.comet.name === 'streak' ? 60 : 80, (O.comet.name === 'streak' ? 5 : 7) * V.k), rot: O.cometAng - Math.PI * 0.75, anchor: [0.12, 0.88], alpha: 0.95 });
     }
     if (O.ball) V.ball(ctx, O.ball);
   }
