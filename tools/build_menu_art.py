@@ -17,6 +17,7 @@ from PIL import Image
 from scipy import ndimage as ndi
 
 OUT = 'img/menu/'
+HELMET = (390, 447, 96, 110)  # the batter's helmet in the mockup: centre x, y and radii
 
 
 def pieces(path):
@@ -83,9 +84,26 @@ def main():
     # on top of this spot (LOGO_SPOT in the stylesheet) so the smear never shows
     lh = np.zeros_like(hole)
     lh[y:y + a.shape[0], x:x + a.shape[1]] = a
-    hole |= cv2.dilate(lh, np.ones((3, 3), np.uint8), iterations=14)
+    # but never into the batter's helmet, which the old logo only came close to
+    yy, xx = np.mgrid[:hole.shape[0], :hole.shape[1]]
+    r = ((xx - HELMET[0]) / HELMET[2]) ** 2 + ((yy - HELMET[1]) / HELMET[3]) ** 2
+    lh = cv2.dilate(lh, np.ones((3, 3), np.uint8), iterations=14) & (r > 1)
+    hole = (hole & (r > 1)) | lh
     print('logo spot in the background: x', x, 'y', y, 'width', w)
     bg = cv2.inpaint(m, hole * 255, 9, cv2.INPAINT_TELEA)
+    # the logo's hole is sky: fill it with the blurred sky round it (not the helmet's outline,
+    # which an inpaint drags up into streaks), the finest blur that reaches each pixel
+    known = ((hole == 0) & (r > 1.25 ** 2)).astype(np.float32)
+    fill = bg.astype(np.float32)
+    left = lh.astype(bool)
+    for sigma in (8, 16, 32, 64, 128):
+        wsum = cv2.GaussianBlur(known, (0, 0), sigma)
+        acc = cv2.GaussianBlur(m.astype(np.float32) * known[..., None], (0, 0), sigma)
+        ok = left & (wsum > 0.15)
+        fill[ok] = acc[ok] / wsum[ok][:, None]
+        left &= ~ok
+    soft = cv2.GaussianBlur(lh.astype(np.float32), (0, 0), 3)[..., None]
+    bg = np.clip(fill * soft + bg.astype(np.float32) * (1 - soft), 0, 255).astype(np.uint8)
     save(Image.fromarray(bg), 'hero', q=88)
 
     ps = pieces(pas)
