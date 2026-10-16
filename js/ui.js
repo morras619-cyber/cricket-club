@@ -69,13 +69,15 @@ export class UI {
     $('vsA').src = `img/logo-${a}.webp`; $('vsB').src = `img/logo-${b}.webp`;
     $('bannerVs').hidden = false;
   }
-  // face: an optional portrait canvas shown beside the text (a new batter, the bowler of the over)
+  // face: an optional portrait canvas, or a player card, shown above the text (a new batter, the bowler of the over)
   banner(head, sub = '', ms = 1300, face = null) {
     let slot = $('bannerFace');
     if (!slot) { slot = document.createElement('div'); slot.id = 'bannerFace'; slot.className = 'banner-face'; $('banner').prepend(slot); }
     slot.innerHTML = '';
     slot.hidden = !face;
-    if (face) { const c = document.createElement('canvas'); c.width = face.width; c.height = face.height; c.getContext('2d').drawImage(face, 0, 0); slot.append(c); }
+    slot.classList.toggle('has-card', !!face && !(face instanceof HTMLCanvasElement));
+    if (face instanceof HTMLCanvasElement) { const c = document.createElement('canvas'); c.width = face.width; c.height = face.height; c.getContext('2d').drawImage(face, 0, 0); slot.append(c); }
+    else if (face) slot.append(face); // a player card
     $('bannerHead').textContent = head;
     $('bannerSub').textContent = sub;
     const b = $('banner');

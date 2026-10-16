@@ -14,6 +14,7 @@ import { powerDiscount } from './progress.js';
 import { lookOf, faceCanvas, masksReady } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
+import { cardFor } from './cards.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK } from './fx.js';
@@ -410,7 +411,7 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
-    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500, p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.oppTeam : this.myTeam, 64));
+    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500, cardFor(p) || (p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.oppTeam : this.myTeam, 64)));
     await this.sleepReal(50); // let the banner show first
     this.prepPlayers(inn);
     await this.sleepReal(this.bot ? 10 : 1050);
@@ -419,7 +420,7 @@ export class Game {
   // a wicket: the next batter walks out
   async newBatter(inn) {
     const p = this.fillCrease(inn)[0] || this.batterOf(inn);
-    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700, p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.myTeam : this.oppTeam, 64));
+    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700, cardFor(p) || (p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.myTeam : this.oppTeam, 64)));
     this.prepPlayers(inn);
     await this.sleepReal(this.bot ? 60 : 1200);
   }
