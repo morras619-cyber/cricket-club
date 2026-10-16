@@ -1,4 +1,6 @@
 // Comic-book effects: onomatopoeia, speech bubbles, impact frames, flashes, shake, particles.
+import { FX_ATLAS } from './fxatlas.js';
+
 export const INK = '#141018';
 export const FONT_DISPLAY = '"Bangers", "Impact", "Arial Black", sans-serif';
 export const FONT_BODY = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
@@ -38,10 +40,39 @@ function burstSheet(deg) {
   return c;
 }
 
+// ---------- painted electric effects (img/fx/<set>.webp, tools/build_effects.py) ----------
+// Glowing pieces added onto the scene (so their dark edges vanish), animated in code: they pop
+// in, flicker and fade. Thunder's set is electric blue.
+const fxSets = {};
+function fxSheet(set) {
+  if (!FX_ATLAS[set]) return null;
+  if (!fxSets[set]) { const im = new Image(); im.src = `img/fx/${set}.webp`; fxSets[set] = im; }
+  const im = fxSets[set];
+  return im.complete && im.naturalWidth ? im : null;
+}
+export const preloadEffects = set => fxSheet(set);
+// draw one piece now. (x, y) is where its anchor point goes (fractions of the piece: 0.5, 0.5 is
+// its centre); w its width in px (h its height, if given, else in proportion); rot in radians.
+export function drawEffect(ctx, set, name, x, y, { w = 120, h = null, rot = 0, alpha = 1, anchor = [0.5, 0.5], flip = false } = {}) {
+  const im = fxSheet(set), f = FX_ATLAS[set]?.[name];
+  if (!im || !f || alpha <= 0) return;
+  const [sx, sy, sw, sh] = f, dw = w, dh = h ?? (w * sh) / sw;
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot);
+  if (flip) ctx.scale(-1, 1);
+  // painted on as it is (so it stays blue on a light pitch), then a glow pass for the hot core
+  ctx.globalAlpha = Math.min(1, alpha);
+  ctx.drawImage(im, sx, sy, sw, sh, -anchor[0] * dw, -anchor[1] * dh, dw, dh);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = Math.min(1, alpha) * 0.4;
+  ctx.drawImage(im, sx, sy, sw, sh, -anchor[0] * dw, -anchor[1] * dh, dw, dh);
+  ctx.restore();
+}
+
 export class FX {
   constructor() { this.reset(); loadBurst(); }
   reset() {
-    this.words = []; this.bubbles = []; this.parts = []; this.bursts = []; this.blasts = [];
+    this.words = []; this.bubbles = []; this.parts = []; this.bursts = []; this.blasts = []; this.effects = [];
     this.flashA = 0; this.flashColor = '#fff'; this.shakeA = 0; this.speed = 0; this.vignette = null;
   }
 
@@ -54,6 +85,10 @@ export class FX {
   }
   // the hand-drawn impact burst at (x, y), `size` px across at full blast; hue turns the gold
   blast(x, y, { size = 260, hue = 0, dur = 420 } = {}) { this.blasts.push({ x, y, size, hue, dur, t: 0 }); }
+  // a painted effect that pops in, flickers and fades: effect('electric', 'burst1', x, y, { w, dur })
+  effect(set, name, x, y, { w = 160, h = null, rot = 0, dur = 380, anchor = [0.5, 0.5], flip = false, grow = 1.15 } = {}) {
+    this.effects.push({ set, name, x, y, w, h, rot, dur, anchor, flip, grow, t: 0 });
+  }
   flash(color = '#fff', a = 0.9) { this.flashColor = color; this.flashA = a; }
   shake(a = 10) { this.shakeA = Math.max(this.shakeA, a); }
   burst(x, y, { color = '#ffd23f', dur = 260, rays = 18, r = 300 } = {}) { this.bursts.push({ x, y, color, dur, rays, r, t: 0 }); }
@@ -71,6 +106,8 @@ export class FX {
     for (const b of this.bursts) b.t += dtMs;
     for (const b of this.blasts) b.t += dtMs;
     this.blasts = this.blasts.filter(b => b.t < b.dur);
+    for (const e of this.effects) e.t += dtMs;
+    this.effects = this.effects.filter(e => e.t < e.dur);
     this.words = this.words.filter(w => w.t < w.dur);
     this.bubbles = this.bubbles.filter(b => b.t < b.dur);
     this.bursts = this.bursts.filter(b => b.t < b.dur);
@@ -91,6 +128,12 @@ export class FX {
       const [sx, sy, w, h, cx, cy] = BURST[Math.min(7, Math.floor((b.t / b.dur) * 8))];
       const k = b.size / BURST_REF;
       ctx.drawImage(burstSheet(b.hue), sx, sy, w, h, b.x - cx * k, b.y - cy * k, w * k, h * k);
+    }
+    for (const e of this.effects) {
+      const p = e.t / e.dur;
+      const sc = p < 0.15 ? 0.6 + 0.4 * (p / 0.15) : 1 + (e.grow - 1) * (p - 0.15) / 0.85;
+      const alpha = (p < 0.1 ? p / 0.1 : Math.pow(1 - (p - 0.1) / 0.9, 1.3)) * (0.75 + 0.25 * Math.random());
+      drawEffect(ctx, e.set, e.name, e.x, e.y, { w: e.w * sc, h: e.h != null ? e.h * sc : null, rot: e.rot, alpha, anchor: e.anchor, flip: e.flip });
     }
     for (const p of this.parts) {
       ctx.globalAlpha = Math.min(1, p.life / 20);

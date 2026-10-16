@@ -17,7 +17,7 @@ import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
-import { FX, INK } from './fx.js';
+import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
@@ -237,6 +237,7 @@ export class Game {
     this.home = opts.home || homeFromSeed(this.seed, this.myTeam.id, this.oppTeam.id);
     this.ground = groundOf(this.home);
     this.pitch = pitchOf(this.home);
+    preloadEffects('electric');
     setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; });
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
     // hero levels: stronger heroes and cheaper signature powers
@@ -891,9 +892,29 @@ export class Game {
   // the six's carry in metres, from the shot's flight
   sixDistance(sim) { return Math.round(sim.path?.carry || 80); }
 
+  // which painted effect set a team's big moments use (null: the hand-drawn gold bursts)
+  fxSet(team) { return team?.id === 'thunder' ? 'electric' : null; }
+  // a perfect hit, the painted way: a white-hot star where bat meets ball, a spiky one turning over it
+  electricHit(set, at, scale = 1) {
+    const r = Math.random() * Math.PI;
+    this.fx.effect(set, 'burst1', at.x, at.y, { w: 260 * scale, dur: 380, rot: r });
+    this.fx.effect(set, 'burst2', at.x, at.y, { w: 170 * scale, dur: 300, rot: -r });
+    this.fx.effect(set, 'shards', at.x, at.y, { w: 300 * scale, dur: 460, grow: 1.4 });
+  }
+  // a bolt out of the sky onto (x, y), with a ground strike where it lands
+  skyStrike(set, x, y, { w = 200, burst = 'burst5' } = {}) {
+    const bolt = ['bolt2', 'bolt3', 'fork'][Math.floor(Math.random() * 3)];
+    this.fx.effect(set, bolt, x, y + 10, { w, h: y + 30, anchor: [0.45, 1], dur: 420, grow: 1, flip: Math.random() < 0.5 });
+    this.fx.effect(set, burst, x, y, { w: w * 1.3, anchor: [0.5, burst === 'burst5' ? 0.8 : 0.5], dur: 520 });
+    this.fx.flash('#9fd8ff', 0.35);
+  }
+
   // the hand-drawn burst on the bat: big and tinted for a powered hit, smaller for a perfect one
   hitBlast(at, power, grade) {
     const big = Math.min(this.W * 0.95, 420);
+    const set = this.fxSet(this.myTeam);
+    if (set && power === 'thunder') { this.skyStrike(set, at.x, at.y, { w: 230 }); this.electricHit(set, at, 1.3); this.fx.shake(16); return; }
+    if (set && !power && grade === 'perfect') return; // contactFeedback draws the electric hit
     if (power) {
       const hue = { thunder: 0, meteor: -38, mirror: 230 }[power] || 0;
       this.fx.blast(at.x, at.y, { size: big, hue, dur: 460 });
@@ -903,7 +924,9 @@ export class Game {
 
   contactFeedback(grade, at, err) {
     if (grade === 'perfect') {
-      this.hitStop(80); this.fx.flash('#fff', 0.55); this.fx.burst(at.x, at.y, { color: '#ffd23f' });
+      const set = this.fxSet(this.myTeam);
+      this.hitStop(80); this.fx.flash(set ? '#cfeeff' : '#fff', 0.55);
+      if (set) this.electricHit(set, at); else this.fx.burst(at.x, at.y, { color: '#ffd23f' });
       this.fx.word('PERFECT!', this.W / 2, this.H * 0.3, { size: 54 });
       this.fx.word(SHOT_WORDS[Math.floor(Math.random() * SHOT_WORDS.length)], at.x, at.y - 30, { size: 64, color: '#fff4da', stroke: '#e8343b' });
       this.fx.shake(10); sfx.bat('perfect'); buzz(35);
@@ -1126,6 +1149,9 @@ export class Game {
         sfx.crowd(0.6);
       }
       if (t >= end && A && (o.caught || sim.intercept)) { b.x = A.x; b.y = A.y; b.h = o.caught ? 1.6 : 0.3; }
+      // a six by a side with painted effects flies as a comet
+      const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
+      this.O.comet = hitSet && sim.kind === 'six' && !o.caught && t < end ? { set: hitSet, prev: this.O.ball && { ...this.O.ball } } : null;
       this.O.ball = b;
       this.runBatters(t, legs);
       // once the ball is dealt with, hurry through the rest of the running
@@ -1135,7 +1161,9 @@ export class Game {
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
         if (sim.kind === 'six' && !o.caught) {
-          this.fx.word('SIX!', p.x, p.y - 40, { size: 80 }); this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3);
+          const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
+          this.fx.word('SIX!', p.x, p.y - 40, { size: 80 });
+          if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3); }
           // how far it went
           const m = this.sixDistance(sim);
           this.fx.word(`${m} METRES`, p.x, p.y + 30, { size: 40, color: '#fff4da', stroke: '#e8343b', rot: 0, dur: 1400 });
@@ -1381,9 +1409,11 @@ export class Game {
     const before = { runs: inn.runs, wkts: inn.wkts };
 
     if (res.outcome === 'hit' || res.outcome === 'edge') {
-      if (ai.grade === 'perfect') { sfx.bat('perfect'); this.fx.burst(cs.x, cs.y, { r: 140 }); } else sfx.bat('good');
+      const aiSet = this.fxSet(this.oppTeam);
+      if (ai.grade === 'perfect') { sfx.bat('perfect'); if (aiSet) this.electricHit(aiSet, cs, 0.6); else this.fx.burst(cs.x, cs.y, { r: 140 }); } else sfx.bat('good');
+      if (aiSet && res.outcome === 'hit' && aiPower === 'thunder') { this.skyStrike(aiSet, cs.x, cs.y, { w: 120 }); this.fx.shake(10); }
       // far end of the pitch: a smaller burst, still big enough to read
-      if (res.outcome === 'hit' && (aiPower === 'thunder' || aiPower === 'mirror' || ai.grade === 'perfect')) {
+      else if (res.outcome === 'hit' && (aiPower === 'thunder' || aiPower === 'mirror' || (ai.grade === 'perfect' && !aiSet))) {
         const hue = { thunder: 0, mirror: 230 }[aiPower] || 0;
         this.fx.blast(cs.x, cs.y, { size: aiPower ? 240 : 140, hue, dur: aiPower ? 460 : 360 });
         if (aiPower) this.fx.shake(10);
@@ -2323,6 +2353,22 @@ export class Game {
     return null;
   }
 
+  // Thunderclap Six armed: a crackling ring round the batter's feet (its back half behind him)
+  // and sparks running up round him
+  thunderAura(ctx, set, p, part) {
+    const t = this.realTime, w = 1.7 * p.k, flick = 0.7 + 0.3 * Math.sin(t * 0.05) * Math.random();
+    const flip = Math.floor(t / 90) % 2 === 0;
+    ctx.save();
+    ctx.beginPath();
+    if (part === 'back') ctx.rect(0, 0, this.W, p.y - 2); else ctx.rect(0, p.y - 2, this.W, this.H);
+    ctx.clip();
+    drawEffect(ctx, set, 'ring4', p.x, p.y, { w, h: w * 0.42, alpha: 0.95 * flick, flip });
+    ctx.restore();
+    if (part === 'front') {
+      drawEffect(ctx, set, Math.floor(t / 70) % 2 ? 'ring1' : 'ring2', p.x, p.y - 0.95 * p.k, { w: 1.3 * p.k, h: 2.1 * p.k, alpha: 0.45 * flick, flip: !flip });
+    }
+  }
+
   render3D(kind) {
     const ctx = this.ctx, S = this.S, cam = this.cams[kind];
     drawBackground(ctx, cam);
@@ -2392,7 +2438,9 @@ export class Game {
     else push(b.z, () => {
       // seen from behind, the batter is the hand-drawn sprite; from the front (bowling view) the drawn figure
       const p = batterBack && cam.project(b.x, 0, b.z);
-      if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) return;
+      const aura = p && kind === 'bat' && (this.armed.thunder || b.glow === '#5fc8ff') && this.fxSet(this.myTeam);
+      if (aura) this.thunderAura(ctx, aura, p, 'back');
+      if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) { if (aura) this.thunderAura(ctx, aura, p, 'front'); return; }
       // from the bowling camera, the opposing batter's hand-drawn front view
       const q = !batterBack && cam.project(b.x, 0, b.z);
       if (q && drawBowlSprite(ctx, q.x, q.y, q.k, batFrame(b, this.realTime).f, this.oppTeam, false, 'batfront', b.people)) return;
@@ -2806,6 +2854,12 @@ export class Game {
         ctx.beginPath(); ctx.arc(p.x, p.y - 8, 18 + Math.sin(this.realTime / 90) * 3, 0, Math.PI * 2); ctx.stroke();
         V.label(ctx, e.x, e.y + 3.5, `${e.id === 'striker' ? "Keeper's end" : "Bowler's end"} ${e.pct}%`, e.pct >= 50 ? '#2ecc71' : '#fff4da');
       }
+    }
+    if (O.ball && O.comet) {
+      // the comet's head on the ball, its tail streaming back along the flight
+      const a = V.to(O.ball.x, O.ball.y, O.ball.h), q = O.comet.prev && V.to(O.comet.prev.x, O.comet.prev.y, O.comet.prev.h);
+      if (q && Math.hypot(a.x - q.x, a.y - q.y) > 0.5) O.cometAng = Math.atan2(a.y - q.y, a.x - q.x);
+      if (O.cometAng != null) drawEffect(ctx, O.comet.set, 'comet1', a.x, a.y, { w: Math.max(80, 7 * V.k), rot: O.cometAng - Math.PI * 0.75, anchor: [0.12, 0.88], alpha: 0.95 });
     }
     if (O.ball) V.ball(ctx, O.ball);
   }
