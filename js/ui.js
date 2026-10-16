@@ -59,7 +59,9 @@ export class UI {
       const r = over[i];
       cells.push(r == null ? '<b class="empty"></b>' : `<b class="r${r}">${r}</b>`);
     }
-    $('hudOver').innerHTML = cells.join('');
+    // six circles at most: once no-balls push it past that, the oldest drop off the left so the
+    // latest ball always shows on the right
+    $('hudOver').innerHTML = cells.slice(-6).join('');
   }
 
   // team v team, shown with the next banner (cleared after it)
