@@ -256,6 +256,16 @@ function sheetMasks(key, p, w, h) {
     sk = new Uint8Array(n);
     for (let q = 0; q < n; q++) sk[q] = pieces[q] & keepGroup[q];
   }
+  if (key === 'field-front') {
+    // seen from above, the face is a few pixels of skin in the hat brim's shadow, broken up by the
+    // shading: small pieces count when they sit together
+    const pieces = filterParts(skin, w, h, H, V, area => area >= 3);
+    let group = pieces;
+    for (let k = 0; k < 2; k++) group = morph(group, w, h, true);
+    const keepGroup = filterParts(group, w, h, H, V, area => area >= 40);
+    const head = upperBody(p, w, h, 0.32); // not the bat or the trim lower down
+    for (let q = 0; q < n; q++) sk[q] |= pieces[q] & keepGroup[q] & head[q];
+  }
   // the front-view batter's hair is all under his helmet: shadows on his face are not hair
   const hr = key === 'batfront' ? new Uint8Array(n) : fix(hair, area => area >= 40);
   // spread each area over its own shading until the outlines stop it, so the whole arm or face is repainted
@@ -425,6 +435,38 @@ export function peopleSheet(src, key, look, maskName = key, maskSrc = src) {
   cache.set(id, c);
   // keep only a handful (the batter and bowler on screen): free the rest at once on iPhones
   while (cache.size > 6) { const [k, old] = cache.entries().next().value; cache.delete(k); old.width = 0; old.height = 0; }
+  return c;
+}
+
+// One pose of a sheet repainted with a player's skin and hair, as a small canvas of its own:
+// for scenes with many players at once (the top-down field), where repainting whole sheets per
+// player would use too much memory. rect: [x, y, w, h] on the sheet.
+const frameCache = new Map();
+export function peopleFrame(src, key, look, rect, maskName, maskSrc = src) {
+  if (!look) return null;
+  const sk = skinHex(look), hr = hairHex(look);
+  const [x0, y0, w, h] = rect;
+  const id = `${key}|${x0},${y0}|${sk}|${hr}`;
+  if (frameCache.has(id)) { const c = frameCache.get(id); frameCache.delete(id); frameCache.set(id, c); return c; }
+  const W = maskSrc.naturalWidth || maskSrc.width;
+  const m = getMask(maskName, maskSrc);
+  if (!m || !W) return null;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  if (!g) return null;
+  try { g.drawImage(src, x0, y0, w, h, 0, 0, w, h); } catch { return null; }
+  const img = g.getImageData(0, 0, w, h), p = img.data;
+  const T = [hexRgb(sk), hexRgb(hr)], LREF = [lum(...rgb(...REF_SKIN)), lum(...rgb(...REF_HAIR))];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const v = m[(y0 + y) * W + x0 + x];
+    if (!v) continue;
+    const i = (y * w + x) * 4, t = T[v - 1], ratio = lum(p[i], p[i + 1], p[i + 2]) / LREF[v - 1];
+    for (let k = 0; k < 3; k++) p[i + k] = ratio <= 1 ? t[k] * ratio : t[k] + (255 - t[k]) * Math.min(0.85, (ratio - 1) * 1.1);
+  }
+  g.putImageData(img, 0, 0);
+  frameCache.set(id, c);
+  while (frameCache.size > 160) { const [k, old] = frameCache.entries().next().value; frameCache.delete(k); old.width = 0; old.height = 0; }
   return c;
 }
 

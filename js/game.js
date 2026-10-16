@@ -14,7 +14,7 @@ import { powerDiscount } from './progress.js';
 import { lookOf, faceCanvas } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
-import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName } from './squads.js';
+import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
@@ -917,8 +917,23 @@ export class Game {
   }
 
   // ---------- outfield replay (auto) ----------
+  // The fielding side's eleven, one per spot: the man bowling, the wicket-keeper, then the rest of
+  // the squad (batting order and attack first, so the players you know are the ones you see).
+  fieldingXI(list, side) {
+    const team = side === 'ai' ? this.oppTeam : this.myTeam, s = side === 'ai' ? this.oppSide : this.mySide;
+    const inn = this.innings?.[this.innings.length - 1];
+    const seen = new Set(), pool = [];
+    for (const p of [...(s?.order || []), ...(s?.attack || []), ...roster(team.id)]) if (p && !seen.has(p.id)) { seen.add(p.id); pool.push(p); }
+    const bowler = inn ? this.bowlerOf(inn) : null;
+    const keeper = pool.find(p => p.role === 'wk' && p !== bowler) || null;
+    const rest = pool.filter(p => p !== bowler && p !== keeper);
+    let k = 0;
+    return list.map(f => (f.id === 'bowler' ? bowler : f.keeper ? keeper : rest[k++ % Math.max(1, rest.length)]) || rest[0]);
+  }
   fieldLooks(list, side) {
+    const xi = this.fieldingXI(list, side);
     return list.map((f, i) => ({
+      people: lookOf(xi[i]),
       ...f,
       look: side === 'ai'
         ? teamLook(this.oppTeam, i)
@@ -932,12 +947,21 @@ export class Game {
     const fs = this.fieldLooks(fielders, side);
     this.O = {
       fielders: fs,
-      batters: [{ x: -0.6, y: 1.2, look: teamLook(side === 'ai' ? this.myTeam : this.oppTeam) }, { x: 0.8, y: 19, look: teamLook(side === 'ai' ? this.myTeam : this.oppTeam, 1) }],
+      batters: [{ x: -0.6, y: 1.2, look: teamLook(side === 'ai' ? this.myTeam : this.oppTeam), people: this.battingPair()[0] }, { x: 0.8, y: 19, look: teamLook(side === 'ai' ? this.myTeam : this.oppTeam, 1), people: this.battingPair()[1] }],
       ball: { x: 0, y: 1, h: 1 }, marks: [], ring: null, ends: null, throwLine: null, labels: [], side,
     };
     this.view = 'outfield';
-    this.of.focus([{ x: -30, y: -20 }, { x: 30, y: 45 }], true);
+    // the whole fielding side in view: every fielder, both batters
+    this.of.focus([...fs, ...this.O.batters], true);
     return fs;
+  }
+  // the striker and his partner at the other end (the next man in the order)
+  battingPair() {
+    const inn = this.innings?.[this.innings.length - 1];
+    if (!inn) return [null, null];
+    const o = this.sideOf(inn, true).order, i = Math.min(inn.wkts, o.length - 1);
+    const partner = o.find((p, j) => j > i) || o.find((p, j) => j !== i) || null;
+    return [lookOf(o[i]), lookOf(partner)];
   }
 
   runBatters(t, runs) {
@@ -964,7 +988,16 @@ export class Game {
     else if (sim.save) { actor = sim.save.fielder; target = sim.save.point; tArrive = sim.save.t; }
     const A = actor && fs.find(f => f.id === actor.id);
     const start = A ? { x: A.x, y: A.y } : null;
-    const end = o.caught ? sim.catch.t : o.saved ? sim.save.t : sim.kind === 'field' && sim.intercept ? sim.intercept.t : Math.min(sim.duration, 3);
+    // a four runs all the way to the rope (however long it takes): that's the satisfying bit
+    const toRope = sim.kind === 'four' && !o.saved && sim.ropeT != null;
+    const end = o.caught ? sim.catch.t : o.saved ? sim.save.t : sim.kind === 'field' && sim.intercept ? sim.intercept.t : toRope ? sim.ropeT : Math.min(sim.duration, 3);
+    // ...with the nearest fielder chasing it, and running out of rope
+    let chaser = null, cStart = null;
+    if (toRope && !A) {
+      const outfield = fs.filter(f => !f.keeper && f.id !== 'bowler');
+      chaser = outfield.reduce((b, f) => (!b || Math.hypot(f.x - sim.ropePoint.x, f.y - sim.ropePoint.y) < Math.hypot(b.x - sim.ropePoint.x, b.y - sim.ropePoint.y) ? f : b), null);
+      if (chaser) cStart = { x: chaser.x, y: chaser.y };
+    }
     const runs = o.caught ? 0 : sim.runs;
     // a catch that wasn't on (or a ball landing just in front of someone): he dives and falls short
     const miss = !o.caught && !o.dropped ? (sim.catch ? { fielder: sim.catch.fielder, point: sim.catch.point, t: sim.catch.t, short: 0.6 } : sim.nearMiss) : null;
@@ -991,6 +1024,14 @@ export class Game {
         A.x = lerp(start.x, target.x, p); A.y = lerp(start.y, target.y, p);
         A.pose = p < 1 ? POSES.run(t * 14) : o.caught ? POSES.celebrate() : POSES.crouch();
       }
+      if (chaser) {
+        // he sets off after it at full tilt but the ball beats him to the rope
+        const run = Math.max(0, t - 0.3) * CFG.fielding.runSpeed * 0.9;
+        const dx = sim.ropePoint.x - cStart.x, dy = sim.ropePoint.y - cStart.y, L = Math.hypot(dx, dy) || 1;
+        const s2 = Math.min(run, Math.max(0, L - 2.5));
+        chaser.x = cStart.x + dx / L * s2; chaser.y = cStart.y + dy / L * s2;
+        chaser.pose = t > 0.3 && s2 < L - 2.5 ? POSES.run(t * 14) : POSES.crouch();
+      }
       if (D && D !== A) {
         const p = Math.min(1, Math.max(0, (t - 0.25) / Math.max(0.3, miss.t - 0.25)));
         D.x = lerp(dStart.x, dStop.x, p); D.y = lerp(dStart.y, dStop.y, p);
@@ -1008,7 +1049,8 @@ export class Game {
       this.runBatters(t, legs);
       // once the ball is dealt with, hurry through the rest of the running
       this.timeScale = t > end + 0.6 ? 2.6 : 1.6;
-      this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : [])]);
+      // keep the fielding side in shot as the ball goes, so you can see who's where
+      this.of.focus([b, { x: 0, y: 10 }, ...fs, ...(A ? [A] : [])]);
       if (!said && t >= end && (!D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
@@ -2575,7 +2617,7 @@ export class Game {
     const V = this.of, O = this.O, pose = f.pose?.name, ctx = this.ctx;
     const { p, face, moving } = this.topFace(f, O.ball);
     const team = O.side === 'ai' ? this.oppTeam : this.myTeam; // side 'ai': the AI's team fields
-    const size = Math.max(22, 1.85 * V.k) * (f.ctrl ? 1.15 : 1);
+    const size = Math.max(27, 1.85 * V.k) * (f.ctrl ? 1.15 : 1); // never too small to read, with the whole field in view
     // everyone watches the pitch: beyond it on screen they face down (front sheet), in front of it up (back sheet)
     const c = V.to(0, 10);
     let view = p.y < c.y ? 'front' : 'top';
@@ -2597,17 +2639,17 @@ export class Game {
       ctx.fillStyle = 'rgba(255,210,63,0.35)';
       ctx.beginPath(); ctx.ellipse(p.x, p.y + size * 0.4, size * 0.55, size * 0.22, 0, 0, Math.PI * 2); ctx.fill();
     }
-    return drawTopSprite(ctx, p.x, p.y, frame === 'dive' ? size * 1.1 : size, frame, team, view, flip);
+    return drawTopSprite(ctx, p.x, p.y, frame === 'dive' ? size * 1.1 : size, frame, team, view, flip, f.people);
   }
   topBatter(b, i) {
     const V = this.of, O = this.O;
     const { p, face } = this.topFace(b, null);
     const team = O.side === 'ai' ? this.myTeam : this.oppTeam;
-    const size = Math.max(18, 1.85 * V.k * 0.8);
+    const size = Math.max(23, 1.85 * V.k * 0.8);
     const frame = (i ? 'batB' : 'batA') + (O.running ? 1 + (Math.floor(this.gameTime * 8) % 2) : 1);
     // running up the screen shows his back, down the screen his face
     const view = O.running ? (Math.sin(face) > 0 ? 'front' : 'top') : (i ? 'front' : 'top');
-    return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, view);
+    return drawTopSprite(this.ctx, p.x, p.y, size, frame, team, view, false, b.people);
   }
 
   renderOutfield() {

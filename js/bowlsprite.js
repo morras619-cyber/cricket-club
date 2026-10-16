@@ -396,7 +396,7 @@ const SPIN_CYCLE = ['run1', 'run2'];
 // after release (ms of game time): release, follow-through, then he stands and watches
 const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3', 170], ['finish', Infinity]];
 
-import { peopleSheet, loadPeopleMask } from './looks.js';
+import { peopleSheet, peopleFrame, loadPeopleMask } from './looks.js';
 import { KIT_LOGOS } from './kitlogos.js';
 const tinted = new Map();
 
@@ -431,7 +431,7 @@ function loadView(v, tries = 0) {
 export function loadBowlSprites(...teamIds) {
   for (const key of ['front', 'spin-front', 'spin-back', 'batfront', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.flatMap(id => ['back-' + id, 'spin-back-' + id])]) {
     const v = VIEWS[key];
-    if (/^(front|batfront|spin-|back-)/.test(key)) loadPeopleMask(key); // where the players' skin and hair are
+    if (/^(front|batfront|spin-|back-|field-)/.test(key)) loadPeopleMask(key); // where the players' skin and hair are
     if (!v || v.ready || (v.img && !v.failed)) continue;
     loadView(v);
   }
@@ -609,11 +609,14 @@ export function drawKeeperSprite(ctx, px, py, kPerM, frame, team, view, { flip =
 
 // An Outfield Mode player centred at (px, py), sizePx tall, drawn upright as on the sheet.
 // view 'top' looks up the screen (back to the camera), 'front' looks down it (face visible).
-export function drawTopSprite(ctx, px, py, sizePx, frame, team, view = 'top', flip = false) {
+// look: the player's skin and hair (only this pose is repainted, so a whole team can be on screen)
+export function drawTopSprite(ctx, px, py, sizePx, frame, team, view = 'top', flip = false, look = null) {
   const key = 'field-' + view, v = VIEWS[key];
   if (!v || !v.ready) return false;
-  const img = sheetFor(key, team);
-  const [sx, sy, w, h, cx, cy] = v.frames[frame];
+  let img = sheetFor(key, team);
+  let [sx, sy, w, h, cx, cy] = v.frames[frame];
+  const own = look && peopleFrame(img, `${key}-${team?.id}`, look, [sx, sy, w, h], key, v.img);
+  if (own) { img = own; sx = 0; sy = 0; }
   const k = sizePx / 240;
   ctx.save();
   ctx.translate(px, py);

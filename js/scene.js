@@ -633,11 +633,43 @@ export class OutfieldView {
     const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);
     ctx.fillStyle = groundOf(HOME).pitchCol; ctx.strokeStyle = 'rgba(20,16,24,0.5)'; ctx.lineWidth = 1.5;
     ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
-    for (const y of [0, 20]) {
-      const s = this.to(0, y);
-      ctx.fillStyle = '#fff4da'; ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.roundRect(s.x - 0.25 * k - 2, s.y - 0.9 * k - 4, 0.5 * k + 4, 0.9 * k + 4, 2); ctx.fill(); ctx.stroke();
+    // the creases: popping crease 1.22 m in front of each set of stumps, return creases either side
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = Math.max(1, 0.06 * k);
+    for (const [y, dir] of [[0, 1], [20, -1]]) {
+      const pc = y + 1.22 * dir;
+      const l = this.to(-1.5, pc), r = this.to(1.5, pc), bl = this.to(-1.32, y), br = this.to(1.32, y);
+      ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(r.x, r.y);
+      for (const x of [-1.32, 1.32]) { const a2 = this.to(x, pc + 0.6 * dir), b2 = this.to(x, y - 0.6 * dir); ctx.moveTo(a2.x, a2.y); ctx.lineTo(b2.x, b2.y); }
+      ctx.moveTo(bl.x, bl.y); ctx.lineTo(br.x, br.y); // the bowling crease, through the stumps
+      ctx.stroke();
     }
+    for (const y of [0, 20]) this.wicket(ctx, y);
+  }
+  // A set of stumps seen from high up and a little in front: three stumps standing up from their
+  // shadow on the pitch, two bails across the top. Drawn a touch larger than life so they read.
+  wicket(ctx, y) {
+    const k = this.k, base = this.to(0, y);
+    const hgt = Math.max(13, 0.71 * k * 0.85 * 1.6), gap = Math.max(3.2, 0.11 * k * 1.6), sw = Math.max(2.2, 0.045 * k * 1.6);
+    ctx.save();
+    // shadow falling back along the pitch
+    ctx.fillStyle = 'rgba(20,16,10,0.28)';
+    ctx.beginPath(); ctx.ellipse(base.x + gap * 0.4, base.y + 1.5, gap * 1.9, Math.max(2, gap * 0.55), 0, 0, Math.PI * 2); ctx.fill();
+    // three stumps: varnished wood with a dark outline and a lit edge
+    for (const i of [-1, 0, 1]) {
+      const x = base.x + i * gap;
+      ctx.fillStyle = '#e9c98f'; ctx.strokeStyle = INK; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.roundRect(x - sw / 2, base.y - hgt, sw, hgt, sw / 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillRect(x - sw / 2 + 0.6, base.y - hgt + 1.5, Math.max(0.8, sw * 0.28), hgt - 3);
+    }
+    // two bails resting in the grooves on top
+    const bh = Math.max(1.8, sw * 0.7);
+    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = 1;
+    for (const [a, b] of [[-1, 0], [0, 1]]) {
+      const x0 = base.x + a * gap - sw * 0.3, x1 = base.x + b * gap + sw * 0.3;
+      ctx.beginPath(); ctx.roundRect(x0, base.y - hgt - bh * 0.6, x1 - x0, bh, bh / 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
   }
   figure(ctx, x, y, look, pose, opts = {}) {
     const p = this.to(x, y);

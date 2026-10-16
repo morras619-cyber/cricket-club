@@ -155,6 +155,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     const p = path.ballAt(t);
     if (outside(p)) {
       out.kind = 'four'; out.runs = res.forced?.cap != null ? Math.min(2, res.forced.cap) : 4; out.duration = Math.min(t, 3.2);
+      out.ropeT = t; out.ropePoint = p; // when and where it crosses the rope (the replay lets it run there)
       let best = null;
       for (const f of outfield) {
         const m = F.runSpeed * sp * Math.max(0, t - F.react) + F.reach + F.diveReach - dist(f, p);
