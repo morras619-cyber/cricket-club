@@ -2856,7 +2856,7 @@ export class Game {
     const t = this.realTime, four = c.name === 'streak';
     const step = Math.floor(t / 55);
     const pulse = 0.85 + 0.25 * Math.sin(t * 0.03) + 0.15 * Math.random();
-    const base = Math.max(four ? 95 : 115, (four ? 8 : 10) * k) * pulse;
+    const base = Math.min(four ? 70 : 85, Math.max(four ? 45 : 55, (four ? 4 : 5) * k)) * pulse;
     const pieces = four ? ['streak', 'speed'] : ['comet1', 'comet2'];
     const name = pieces[step % 2];
     // 'speed' points left (its head on its left edge); the comets and the streak point down-left
@@ -2869,12 +2869,12 @@ export class Game {
     if (!c.lastSpark || t - c.lastSpark > 45) {
       c.lastSpark = t;
       const back = ang + Math.PI + (Math.random() - 0.5) * 0.8, d = base * (0.15 + Math.random() * 0.35);
-      this.fx.effect(c.set, Math.random() < 0.5 ? 'shards' : 'burst2', a.x + Math.cos(back) * d, a.y + Math.sin(back) * d, { w: 26 + Math.random() * 30, dur: 320 + Math.random() * 240, rot: Math.random() * 6, grow: 0.6 });
+      this.fx.effect(c.set, Math.random() < 0.5 ? 'shards' : 'burst2', a.x + Math.cos(back) * d, a.y + Math.sin(back) * d, { w: 12 + Math.random() * 14, dur: 300 + Math.random() * 220, rot: Math.random() * 6, grow: 0.6 });
     }
     // a little bolt to the ground now and then
     if (!c.lastBolt || t - c.lastBolt > 180 + Math.random() * 200) {
       c.lastBolt = t;
-      this.fx.effect(c.set, Math.random() < 0.5 ? 'zigzag' : 'fork', a.x, a.y, { w: 26 + Math.random() * 20, h: 30 + Math.random() * 20, dur: 140, rot: (Math.random() - 0.5) * 2.4, anchor: [0.5, 0], grow: 1 });
+      this.fx.effect(c.set, Math.random() < 0.5 ? 'zigzag' : 'fork', a.x, a.y, { w: 14 + Math.random() * 10, h: 16 + Math.random() * 12, dur: 140, rot: (Math.random() - 0.5) * 2.4, anchor: [0.5, 0], grow: 1 });
     }
   }
 
