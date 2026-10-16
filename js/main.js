@@ -1056,5 +1056,11 @@ document.addEventListener('visibilitychange', () => {
   game.resize(); // redraw the cached stadium now the comic font is ready
   if (!profile.tutorialDone && !challenge && !window.__SIXCHARGE_BOT) showCover();
   else renderHome();
+  // the logo splash: up for a moment, then it fades away
+  const splash = $('splash');
+  if (splash) {
+    const gone = () => { splash.classList.add('gone'); setTimeout(() => splash.remove(), 500); };
+    if (window.__SIXCHARGE_BOT) splash.remove(); else setTimeout(gone, Math.max(0, 1100 - performance.now()));
+  }
 })();
 
