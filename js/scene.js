@@ -210,9 +210,8 @@ function renderPainted(cam, art) {
     g.fillStyle = gr; g.fillRect(0, hy, W, H - hy); g.restore();
   }
   // rope, 30-yard circle and creases (crease lines are 5 cm wide)
-  // the boundary rope in the home side's colour, and the 30-yard circle (in the Power Burst only
-  // two fielders may stand outside it)
-  ropeRing(g, cam);
+  // the 30-yard circle (in the Power Burst only two fielders may stand outside it); the rope
+  // shows only in the outfield view from above
   ring(g, cam, 27, 'rgba(255,255,255,0.5)', 1.6, [8, 7]);
   // creases, kept on the pitch: white, with a fine ink edge only where they're big enough to
   // carry one (far away an edge turns a crease into a stack of stripes)
@@ -702,29 +701,7 @@ function drawPaintedBoard(ctx, cam, t, message) {
   ctx.restore();
 }
 
-// A boundary rope: a padded tube in the home side's colour, inked like everything else, with a
-// highlight along its top. Thicker near the camera.
 const ropeColour = () => teamById(HOME).suit;
-function ropeRing(g, cam) {
-  const col = ropeColour();
-  g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
-  // drawn in short pieces so its thickness follows the perspective
-  const N = 240;
-  for (const [style, grow] of [[INK, 1], [col, 0.62], ['rgba(255,255,255,0.45)', 0.18]]) {
-    g.strokeStyle = style;
-    for (let i = 0; i < N; i++) {
-      const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1.15) / N) * Math.PI * 2;
-      const z0 = CY + Math.cos(a0) * R, z1 = CY + Math.cos(a1) * R;
-      if (cam.depth(z0) < 1.5 || cam.depth(z1) < 1.5) continue;
-      const lift = grow < 0.3 ? 0.12 : 0;
-      const p = cam.project(Math.sin(a0) * R, lift, z0), q = cam.project(Math.sin(a1) * R, lift, z1);
-      if (!p || !q) continue;
-      g.lineWidth = Math.max(grow < 0.3 ? 0.8 : 2.2 * grow + 0.8, 0.32 * p.k * grow);
-      g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(q.x, q.y); g.stroke();
-    }
-  }
-  g.restore();
-}
 
 function ring(g, cam, r, color, w, dash) {
   g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash);
