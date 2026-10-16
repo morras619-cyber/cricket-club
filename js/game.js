@@ -951,8 +951,7 @@ export class Game {
       ball: { x: 0, y: 1, h: 1 }, marks: [], ring: null, ends: null, throwLine: null, labels: [], side,
     };
     this.view = 'outfield';
-    // the whole fielding side in view: every fielder, both batters
-    this.of.focus([...fs, ...this.O.batters], true);
+    this.of.focus([{ x: -30, y: -20 }, { x: 30, y: 45 }], true);
     return fs;
   }
   // the striker and his partner at the other end (the next man in the order)
@@ -1049,8 +1048,7 @@ export class Game {
       this.runBatters(t, legs);
       // once the ball is dealt with, hurry through the rest of the running
       this.timeScale = t > end + 0.6 ? 2.6 : 1.6;
-      // keep the fielding side in shot as the ball goes, so you can see who's where
-      this.of.focus([b, { x: 0, y: 10 }, ...fs, ...(A ? [A] : [])]);
+      this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : [])]);
       if (!said && t >= end && (!D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
@@ -2617,7 +2615,7 @@ export class Game {
     const V = this.of, O = this.O, pose = f.pose?.name, ctx = this.ctx;
     const { p, face, moving } = this.topFace(f, O.ball);
     const team = O.side === 'ai' ? this.oppTeam : this.myTeam; // side 'ai': the AI's team fields
-    const size = Math.max(27, 1.85 * V.k) * (f.ctrl ? 1.15 : 1); // never too small to read, with the whole field in view
+    const size = Math.max(22, 1.85 * V.k) * (f.ctrl ? 1.15 : 1);
     // everyone watches the pitch: beyond it on screen they face down (front sheet), in front of it up (back sheet)
     const c = V.to(0, 10);
     let view = p.y < c.y ? 'front' : 'top';
@@ -2645,7 +2643,7 @@ export class Game {
     const V = this.of, O = this.O;
     const { p, face } = this.topFace(b, null);
     const team = O.side === 'ai' ? this.myTeam : this.oppTeam;
-    const size = Math.max(23, 1.85 * V.k * 0.8);
+    const size = Math.max(18, 1.85 * V.k * 0.8);
     const frame = (i ? 'batB' : 'batA') + (O.running ? 1 + (Math.floor(this.gameTime * 8) % 2) : 1);
     // running up the screen shows his back, down the screen his face
     const view = O.running ? (Math.sin(face) > 0 ? 'front' : 'top') : (i ? 'front' : 'top');

@@ -646,10 +646,10 @@ export class OutfieldView {
     for (const y of [0, 20]) this.wicket(ctx, y);
   }
   // A set of stumps seen from high up and a little in front: three stumps standing up from their
-  // shadow on the pitch, two bails across the top. Drawn a touch larger than life so they read.
+  // shadow on the pitch, two bails across the top. Small, as the real thing is from up here.
   wicket(ctx, y) {
     const k = this.k, base = this.to(0, y);
-    const hgt = Math.max(13, 0.71 * k * 0.85 * 1.6), gap = Math.max(3.2, 0.11 * k * 1.6), sw = Math.max(2.2, 0.045 * k * 1.6);
+    const hgt = Math.max(6, 0.71 * k * 0.85 * 1.1), gap = Math.max(1.7, 0.11 * k * 1.2), sw = Math.max(1.3, 0.045 * k * 1.3);
     ctx.save();
     // shadow falling back along the pitch
     ctx.fillStyle = 'rgba(20,16,10,0.28)';
@@ -657,14 +657,14 @@ export class OutfieldView {
     // three stumps: varnished wood with a dark outline and a lit edge
     for (const i of [-1, 0, 1]) {
       const x = base.x + i * gap;
-      ctx.fillStyle = '#e9c98f'; ctx.strokeStyle = INK; ctx.lineWidth = 1.2;
+      ctx.fillStyle = '#e9c98f'; ctx.strokeStyle = INK; ctx.lineWidth = 0.8;
       ctx.beginPath(); ctx.roundRect(x - sw / 2, base.y - hgt, sw, hgt, sw / 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
       ctx.fillRect(x - sw / 2 + 0.6, base.y - hgt + 1.5, Math.max(0.8, sw * 0.28), hgt - 3);
     }
     // two bails resting in the grooves on top
-    const bh = Math.max(1.8, sw * 0.7);
-    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = 1;
+    const bh = Math.max(1.1, sw * 0.7);
+    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = 0.6;
     for (const [a, b] of [[-1, 0], [0, 1]]) {
       const x0 = base.x + a * gap - sw * 0.3, x1 = base.x + b * gap + sw * 0.3;
       ctx.beginPath(); ctx.roundRect(x0, base.y - hgt - bh * 0.6, x1 - x0, bh, bh / 2); ctx.fill(); ctx.stroke();
