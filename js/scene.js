@@ -4,6 +4,7 @@ import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
 import { groundOf } from './grounds.js';
 import { teamById } from './teams.js';
+import { GROUND_ART } from './groundart.js';
 
 const { boundaryR: R, centerY: CY } = CFG.ground;
 
@@ -29,7 +30,7 @@ export class Cam3D {
   groundAt(sx, sy) {
     const k = (sy - this.hy) / this.cy;
     if (k <= 0) return null;
-    return { x: this.cx + (sx - this.W / 2) / (this.dir * k), z: this.cz - this.dir * (this.f / k) };
+    return { x: this.cx + (sx - this.W / 2) / (this.dir * k), z: this.cz + this.dir * (this.f / k) };
   }
   // the ground x under screen x, at depth z (where the ring sits)
   xAt(sx, z) {
@@ -57,7 +58,164 @@ export function setGround(teamId, onChange) {
   logo = new Image();
   logo.onload = () => groundListener?.(); // repaint once the club's crest has loaded
   logo.src = `img/logo-${teamId}.webp`;
+  loadArt(teamId);
   onChange?.();
+}
+
+// ---------- painted grounds ----------
+// A club with painted art (js/groundart.js) gets its own stands, pitch, grass and stumps; the
+// rest are painted by code below. The pieces load in the background: until they all have, the
+// code-painted ground stands in.
+const ART = {};
+function loadArt(team) {
+  const meta = GROUND_ART[team];
+  if (!meta || ART[team]) return;
+  const a = (ART[team] = { meta, ready: false });
+  const files = { far: 'far', near: 'near', pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
+  let left = Object.keys(files).length + 1;
+  const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
+  for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${team}/${f}.webp`; a[k] = im; }
+  a.logo = new Image(); a.logo.onload = done; a.logo.onerror = done; a.logo.src = 'img/menu/logo.webp';
+}
+// the average colour along the top of a stand picture, for the sky above it
+function skyTop(art, side) {
+  art.top = art.top || {};
+  if (!art.top[side]) {
+    const c = document.createElement('canvas'); c.width = 8; c.height = 1;
+    const g = c.getContext('2d'), im = art[side];
+    g.drawImage(im, 0, 0, im.naturalWidth, 6, 0, 0, 8, 1);
+    const d = g.getImageData(0, 0, 8, 1).data;
+    let r = 0, gg = 0, b = 0;
+    for (let i = 0; i < 32; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
+    art.top[side] = `rgb(${Math.round(r / 8)},${Math.round(gg / 8)},${Math.round(b / 8)})`;
+  }
+  return art.top[side];
+}
+const artFor = () => (ART[HOME]?.ready && !ART[HOME].failed ? ART[HOME] : null);
+
+// The grass tile at halving sizes, so the far outfield is drawn from a small copy (no glitter).
+const TILE_M = 20; // the grass tile covers 20 m: four 5 m mowing stripes
+function grassMips(art) {
+  if (art.mips) return art.mips;
+  const out = [];
+  let src = art.grass, size = art.grass.naturalWidth;
+  while (size >= 8) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(src, 0, 0, size, size);
+    out.push(c);
+    src = c; size >>= 1;
+  }
+  return (art.mips = out);
+}
+const mipFor = (mips, pxPerM) => {
+  let i = 0;
+  while (i < mips.length - 1 && mips[i].width / TILE_M > pxPerM * 1.3) i++;
+  return mips[i];
+};
+
+// The stand at the far end (or behind the batter, for the bowling view), its board's foot on the
+// horizon; then the grass and pitch from the top-down art, laid into the camera's perspective one
+// screen row at a time, so the ball and the players always meet the painted pitch.
+function renderPainted(cam, art) {
+  const { W, H, hy } = cam;
+  const G = groundOf(HOME), T = teamById(HOME);
+  const night = NIGHT[G.time] ?? 1;
+  const c = document.createElement('canvas');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  g.imageSmoothingQuality = 'high';
+
+  const side = cam.dir > 0 ? 'far' : 'near', m = art.meta[side], img = art[side];
+  // the middle 60% of the stand across a portrait screen (all of it is never narrower than the
+  // screen), the board's foot on the horizon; open sky above it if the picture stops short
+  const s = W / (m.w * Math.min(1, 0.6 * Math.max(1, (H / W) / 1.6)));
+  const dw = m.w * s, dh = m.h * s, dx = (W - dw) / 2, dy = hy - m.board[1] * s;
+  if (dy > 0) {
+    const top = skyTop(art, side);
+    const gr = g.createLinearGradient(0, 0, 0, dy + 2);
+    gr.addColorStop(0, G.sky[0]); gr.addColorStop(1, top);
+    g.fillStyle = gr; g.fillRect(0, 0, W, dy + 2);
+    if (night >= 0.6) for (let i = 0; i < 40; i++) { const r = ((i * 7919) % 997) / 997, q = ((i * 104729) % 991) / 991; g.fillStyle = `rgba(255,255,255,${0.25 + 0.5 * q})`; g.fillRect(r * W, q * dy, 1.3, 1.3); }
+  }
+  g.drawImage(img, dx, dy, dw, dh);
+  if (dy > 0) {
+    // melt the picture's top edge into the sky
+    const gr = g.createLinearGradient(0, dy, 0, dy + dh * 0.14);
+    gr.addColorStop(0, skyTop(art, side)); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, dy, W, dh * 0.14);
+  }
+  if (m.screen && art.logo.naturalWidth) {
+    // the big screen shows the game's logo
+    const [x0, y0, x1, y1] = m.screen.map((v, i) => (i % 2 ? dy : dx) + v * s);
+    const sw = x1 - x0, sh = y1 - y0;
+    let gr = g.createLinearGradient(0, y0, 0, y1);
+    gr.addColorStop(0, '#0b1a4a'); gr.addColorStop(1, '#050a22');
+    g.fillStyle = gr; g.fillRect(x0, y0, sw, sh);
+    const lw = Math.min(sw * 0.86, sh * 0.8 * art.logo.naturalWidth / art.logo.naturalHeight);
+    const lh = lw * art.logo.naturalHeight / art.logo.naturalWidth;
+    g.drawImage(art.logo, x0 + (sw - lw) / 2, y0 + (sh - lh) / 2, lw, lh);
+  }
+
+  // the outfield and the pitch, row by row
+  const mips = grassMips(art);
+  const pats = new Map();
+  const pt = art.pitch, PZ0 = -2, PZ1 = 22, PX = 1.55; // the painted strip covers 24 m by 3.1 m
+  const rowH = 1 / dpr;
+  for (let y = hy; y < H; y += rowH) {
+    const gp = cam.groundAt(W / 2, y + rowH / 2);
+    if (!gp) continue;
+    const k = cam.f / cam.depth(gp.z);
+    const tex = mipFor(mips, k * dpr), TS = tex.width;
+    let pat = pats.get(tex);
+    if (!pat) { pat = g.createPattern(tex, 'repeat'); pats.set(tex, pat); }
+    const q = (((gp.z / TILE_M) * TS) % TS + TS) % TS;
+    pat.setTransform(new DOMMatrix([cam.dir * k * TILE_M / TS, 0, 0, 1, W / 2 + cam.dir * k * (-2.5 - cam.cx), y - q]));
+    g.fillStyle = pat;
+    g.fillRect(0, y, W, rowH + 0.5);
+    if (gp.z > PZ0 && gp.z < PZ1) {
+      const v = ((PZ1 - gp.z) / (PZ1 - PZ0)) * pt.naturalHeight;
+      const a = cam.project(-PX, 0, gp.z), b = cam.project(PX, 0, gp.z);
+      if (a && b) {
+        const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+        const span = Math.max(1, (pt.naturalHeight / (PZ1 - PZ0)) * (rowH / (cam.cy * k)) * cam.depth(gp.z));
+        g.drawImage(pt, 0, Math.min(v, pt.naturalHeight - span), pt.naturalWidth, span, x0, y, x1 - x0, rowH + 0.5);
+      }
+    }
+  }
+  // floodlight pool after dark
+  const pc = cam.project(0, 0, 10) || { x: W / 2, y: H * 0.6 };
+  if (quality.high && night >= 0.6) {
+    g.save(); g.globalCompositeOperation = 'lighter';
+    const gr = g.createRadialGradient(pc.x, pc.y + H * 0.1, 20, pc.x, pc.y + H * 0.1, H * 0.45);
+    gr.addColorStop(0, 'rgba(255,240,190,0.12)'); gr.addColorStop(1, 'rgba(255,240,190,0)');
+    g.fillStyle = gr; g.fillRect(0, hy, W, H - hy); g.restore();
+  }
+  // rope, 30-yard circle and creases (crease lines are 5 cm wide)
+  ring(g, cam, R, T.trim === '#1c1c1c' || T.trim === '#1a1a1a' ? T.suit : T.trim, 3, []);
+  ring(g, cam, 27, 'rgba(255,255,255,0.5)', 1.5, [6, 6]);
+  const crease = (x0, z0, x1, z1) => {
+    const p = cam.project(0, 0, (z0 + z1) / 2);
+    if (p) line(g, cam, x0, z0, x1, z1, 'rgba(255,253,240,0.95)', Math.max(1.2, 0.05 * p.k));
+  };
+  for (const [z, d] of [[0, 1], [20, -1]]) {
+    crease(-1.83, z + 1.22 * d, 1.83, z + 1.22 * d); // popping crease
+    crease(-1.32, z, 1.32, z); // bowling crease, through the stumps
+    for (const x of [-1.32, 1.32]) crease(x, z + 1.22 * d, x, z - 1.22 * d); // return creases
+  }
+  // vignette, darker after dark
+  const gr = g.createRadialGradient(W / 2, H * 0.55, H * 0.32, W / 2, H * 0.55, H * 0.8);
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(6,4,20,${0.12 + 0.22 * night})`);
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+
+  const bh = (m.board[1] - m.board[0]) * s;
+  cam.board = { y: hy - bh, h: bh, painted: true };
+  cam.layout = { roofY: Math.max(0, dy + dh * 0.42), standTop: dy + dh * 0.45, hy, spots: G.landmark === 'bolts' ? { lightning: true } : {} };
+  return c;
 }
 export const groundTeam = () => HOME;
 const shade = (hex, f) => {
@@ -67,6 +225,8 @@ const shade = (hex, f) => {
 const NIGHT = { night: 1, storm: 1, dusk: 0.7, evening: 0.6, sunset: 0.3, overcast: 0, day: 0 };
 
 function renderBackground(cam) {
+  const art = artFor();
+  if (art) return renderPainted(cam, art);
   const { W, H, hy } = cam;
   const G = groundOf(HOME), T = teamById(HOME);
   const night = NIGHT[G.time] ?? 1;
@@ -481,6 +641,7 @@ export function drawBoard(ctx, cam, t, message) {
   const b = cam.board;
   if (!b) return;
   const { W } = cam;
+  if (b.painted) return drawPaintedBoard(ctx, cam, t, message);
   const gr = ctx.createLinearGradient(0, 0, W, 0);
   gr.addColorStop(0, '#ff2d6f'); gr.addColorStop(0.5, '#ff9f1c'); gr.addColorStop(1, '#ff2d6f');
   ctx.fillStyle = gr; ctx.fillRect(0, b.y, W, b.h);
@@ -497,6 +658,25 @@ export function drawBoard(ctx, cam, t, message) {
   for (let x = off; x < W; x += tw) ctx.fillText(text, x, b.y + b.h / 2 + 1);
   ctx.restore();
   ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.strokeRect(-2, b.y, W + 4, b.h);
+}
+
+// The painted ground's own board: the scrolling words light up on it, LED style.
+function drawPaintedBoard(ctx, cam, t, message) {
+  const b = cam.board, { W } = cam;
+  const G = groundOf(HOME), T = teamById(HOME);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, b.y, W, b.h); ctx.clip();
+  ctx.font = `${Math.round(b.h * 0.72)}px ${FONT_DISPLAY}`; ctx.textBaseline = 'middle';
+  ctx.fillStyle = message ? '#fffbe8' : '#ffd23f';
+  if (quality.high) { ctx.shadowColor = message ? '#fff' : '#ffb000'; ctx.shadowBlur = 8; }
+  const text = message ? `★ ${message} ★   `.repeat(6) : `★ WELCOME TO ${G.name.toUpperCase()} ★   HOME OF THE ${T.name.toUpperCase()}   ${BOARD_TEXT}`;
+  const tw = ctx.measureText(text).width;
+  const off = -((t * 0.05) % tw);
+  for (let x = off; x < W; x += tw) ctx.fillText(text, x, b.y + b.h / 2 + 1);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(0,10,40,0.28)';
+  for (let x = 0; x < W; x += 3) ctx.fillRect(x, b.y, 1, b.h);
+  ctx.restore();
 }
 
 function ring(g, cam, r, color, w, dash) {
@@ -530,9 +710,27 @@ export function drawBackground(ctx, cam) {
 }
 
 // Stumps at z (0 or 20). broken: { t, dir } when the wicket has been hit.
-export function drawStumps(ctx, cam, z, broken = null, glow = null) {
+export function drawStumps(ctx, cam, z, broken = null, glow = null, t = 0) {
   const base = cam.project(0, 0, z);
   if (!base) return;
+  const art = artFor();
+  if (art) {
+    // the painted stumps, 71 cm of wood; knocked over, they fall through four frames
+    const m = art.meta.stumps, sc = (0.71 * base.k) / m.wood;
+    ctx.save();
+    if (glow && quality.high) { ctx.shadowColor = glow; ctx.shadowBlur = 14; }
+    if (!broken) {
+      ctx.drawImage(art.stumps, base.x - m.foot * sc, base.y - m.h * sc, m.w * sc, m.h * sc);
+    } else {
+      if (broken.t == null) broken.t = t;
+      const [fx, fy, fw, fh, foot] = art.meta.broken[Math.min(3, Math.max(0, Math.floor((t - broken.t) / 110)))];
+      ctx.translate(base.x, base.y);
+      if (broken.dir < 0) ctx.scale(-1, 1);
+      ctx.drawImage(art.broken, fx, fy, fw, fh, -foot * sc, -fh * sc, fw * sc, fh * sc);
+    }
+    ctx.restore();
+    return;
+  }
   const k = base.k;
   ctx.save();
   ctx.lineCap = 'round';
@@ -631,18 +829,34 @@ export class OutfieldView {
     ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 4) * k, (R + 4) * k * 0.78, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#ffd23f'; ctx.fill();
     ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k + 2, R * k * 0.78 + 2, 0, 0, Math.PI * 2);
-    ctx.fillStyle = groundOf(HOME).grass[1]; ctx.fill();
-    ctx.clip();
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    for (let x = -R; x < R; x += 10) { const a = this.to(x, 0); ctx.fillRect(a.x, 0, 5 * k, H); }
-    ctx.restore();
+    const art = artFor();
+    if (art) {
+      // the painted grass, its stripes along the pitch as in the match views
+      const tex = mipFor(grassMips(art), k), TS = tex.width;
+      const pat = ctx.createPattern(tex, 'repeat');
+      const o = this.to(-2.5, 0);
+      pat.setTransform(new DOMMatrix([k * TILE_M / TS, 0, 0, k * 0.78 * TILE_M / TS, o.x, o.y]));
+      ctx.fillStyle = pat; ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = groundOf(HOME).grass[1]; ctx.fill();
+      ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      for (let x = -R; x < R; x += 10) { const a = this.to(x, 0); ctx.fillRect(a.x, 0, 5 * k, H); }
+      ctx.restore();
+    }
     ctx.strokeStyle = '#fff4da'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k, R * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, 27 * k, 27 * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);
-    ctx.fillStyle = groundOf(HOME).pitchCol; ctx.strokeStyle = 'rgba(20,16,24,0.5)'; ctx.lineWidth = 1.5;
-    ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    if (art) {
+      const a = this.to(-1.55, 22), b = this.to(1.55, -2);
+      ctx.drawImage(art.pitch, a.x, a.y, b.x - a.x, b.y - a.y);
+    } else {
+      const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);
+      ctx.fillStyle = groundOf(HOME).pitchCol; ctx.strokeStyle = 'rgba(20,16,24,0.5)'; ctx.lineWidth = 1.5;
+      ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    }
     // the creases: popping crease 1.22 m in front of each set of stumps, return creases either side
     ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = Math.max(1, 0.06 * k);
     for (const [y, dir] of [[0, 1], [20, -1]]) {

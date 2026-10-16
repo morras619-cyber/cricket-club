@@ -2325,8 +2325,8 @@ export class Game {
         drawFigure3D(ctx, cam, f.x, f.y, teamLook(kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0 ? 1 : 0), POSES.crouch(), { noShadow: false });
       });
     }
-    push(20, () => drawStumps(ctx, cam, 20, S.stumps[20]));
-    push(0, () => drawStumps(ctx, cam, 0, S.stumps[0], S.stumpGlow ? '#e8343b' : null));
+    push(20, () => drawStumps(ctx, cam, 20, S.stumps[20], null, this.realTime));
+    push(0, () => drawStumps(ctx, cam, 0, S.stumps[0], S.stumpGlow ? '#e8343b' : null, this.realTime));
 
     // bowler
     if (kind !== 'keeper') {
