@@ -32,3 +32,30 @@ test('career stats: high score, ducks, best figures', () => {
   assert.equal(fmt.avg(s.bat.runs, s.bat.inns - s.bat.notOuts), '11.5');
   assert.equal(fmt.econ(4, 6), '4.0');
 });
+
+test('season pass: tiers from matches, claims pay coins and gems, then a new season', async () => {
+  const { loadProfile, passState, claimPass, buyCoins, matchRewards, PASS_TIERS, passReward } = await import('../js/profile.js');
+  const p = loadProfile();
+  const sum = outcome => ({ mode: 'quick', result: { outcome }, stats: {}, innings: [] });
+  const r = matchRewards(p, sum('win'));
+  assert.equal(r.gems, 1);
+  assert.equal(r.pass, 1);
+  matchRewards(p, sum('loss'));
+  assert.equal(passState(p).tier, 1);
+  assert.equal(passState(p).progress, 0.5);
+  const coins = p.coins;
+  const got = claimPass(p);
+  assert.deepEqual([got.tiers, got.coins], [1, passReward(1).coins]);
+  assert.equal(p.coins, coins + got.coins);
+  assert.equal(passState(p).ready, 0);
+  p.pass.xp = PASS_TIERS * 100;
+  const all = claimPass(p);
+  assert.equal(all.tiers, PASS_TIERS - 1);
+  assert.ok(all.newSeason);
+  assert.deepEqual(p.pass, { season: 2, xp: 0, claimed: 0 });
+  p.gems = 4;
+  assert.equal(buyCoins(p, 0), false);
+  p.gems = 5; const c = p.coins;
+  assert.equal(buyCoins(p, 0), true);
+  assert.deepEqual([p.gems, p.coins], [0, c + 300]);
+});

@@ -17,7 +17,8 @@ import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
-import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero } from './profile.js';
+import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
+  passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx } from './audio.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
@@ -50,21 +51,22 @@ const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance
 const myTeam = () => teamById(profile.team || 'thunder');
 function renderHome() {
   ui.show('home');
-  $('playerName').value = profile.name;
   const { lv, progress } = level(profile.xp);
   $('lvl').textContent = `Lv ${lv}`;
   $('xpFill').style.width = `${Math.round(progress * 100)}%`;
-  $('coins').textContent = `${profile.coins} coins`;
+  $('coins').textContent = profile.coins;
+  $('gems').textContent = profile.gems || 0;
   const t = myTeam();
   $('badgeLogo').src = `img/logo-${t.id}.webp`;
   $('badgeName').textContent = t.name;
   $('badgeStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
-  const daily = $('dailyBtn');
-  daily.hidden = !dailyAvailable(profile);
-  daily.textContent = `Day ${(profile.daily.day % 7) + 1} reward: +${DAILY[profile.daily.day % 7]} coins — claim`;
-  $('setSound').textContent = `Sound: ${sound.on ? 'on' : 'off'}`;
-  $('setHaptics').textContent = `Haptics: ${sound.haptics ? 'on' : 'off'}`;
-  $('setField').textContent = FIELD_LABEL[game.settings.fielding];
+  // the shop's dot: today's login reward waiting
+  $('shopDot').hidden = !dailyAvailable(profile);
+  const ps = passState(profile);
+  $('passSeason').textContent = `Season ${ps.season}`;
+  $('passCount').textContent = `${ps.tier} / ${PASS_TIERS}`;
+  $('passFill').style.width = `${Math.round(((ps.tier + (ps.tier < PASS_TIERS ? ps.progress : 0)) / PASS_TIERS) * 100)}%`;
+  $('passDot').hidden = ps.ready <= 0;
   // what each mode is doing right now
   const tour = profile.tournament;
   const status = kind => {
@@ -80,9 +82,9 @@ function renderHome() {
           : `S${c.season} · ${teamById(c.club).name} · ${nextFixture(c.league)?.label || ''}`;
   $('cupSub').textContent = status('cup') || 'Quarter, semi, final: 3 wins for the cup';
   const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key;
-  $('dailySub').textContent = done ? `Done today: ${profile.dailyChallenge.line} ${profile.dailyChallenge.won ? '✅' : '❌'}` : `#${sc.no} · ${sc.title}`;
+  $('dailySub').textContent = done ? `Done today: ${profile.dailyChallenge.line} ${profile.dailyChallenge.won ? '✅' : '❌'}` : `#${sc.no}\n${sc.title}`;
   $('btnDaily').classList.toggle('done', done);
-  $('btnTrophies').textContent = `Trophies ${Object.keys(profile.achievements || {}).length}/${ACHIEVEMENTS.length}`;
+  $('trophyCount').textContent = `${Object.keys(profile.achievements || {}).length}/${ACHIEVEMENTS.length}`;
   const card = $('challengeCard');
   if (challenge) {
     card.hidden = false;
@@ -94,19 +96,88 @@ function renderHome() {
   } else { card.hidden = true; $('btnChallengeMode').hidden = true; }
 }
 
+// ---------- settings ----------
+function renderSettings() {
+  ui.show('settings');
+  $('playerName').value = profile.name;
+  const state = (id, text, on) => { const b = $(id); b.querySelector('span').textContent = text; b.classList.toggle('off', !on); };
+  state('setSound', sound.on ? 'On' : 'Off', sound.on);
+  state('setHaptics', sound.haptics ? 'On' : 'Off', sound.haptics);
+  state('setField', { key: 'Key moments', all: 'Every chance', off: 'Auto' }[game.settings.fielding], game.settings.fielding !== 'off');
+}
+$('btnSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
+$('settingsBack').addEventListener('click', () => renderHome());
 $('playerName').addEventListener('input', e => { profile.name = e.target.value.trim().slice(0, 14); saveProfile(profile); });
-$('dailyBtn').addEventListener('click', () => {
-  const r = claimDaily(profile);
-  if (r) { saveProfile(profile); ui.toast(`Day ${r.day}: +${r.coins} coins`); sfx.dhol(); }
-  renderHome();
-});
-$('setSound').addEventListener('click', () => { sound.on = !sound.on; profile.settings.sound = sound.on; saveProfile(profile); unlockAudio(); renderHome(); });
-$('setHaptics').addEventListener('click', () => { sound.haptics = !sound.haptics; profile.settings.haptics = sound.haptics; saveProfile(profile); renderHome(); });
+$('setSound').addEventListener('click', () => { sound.on = !sound.on; profile.settings.sound = sound.on; saveProfile(profile); unlockAudio(); renderSettings(); });
+$('setHaptics').addEventListener('click', () => { sound.haptics = !sound.haptics; profile.settings.haptics = sound.haptics; saveProfile(profile); renderSettings(); });
 $('setField').addEventListener('click', () => {
   const order = ['key', 'all', 'off'];
   game.settings.fielding = order[(order.indexOf(game.settings.fielding) + 1) % 3];
-  profile.settings.fielding = game.settings.fielding; saveProfile(profile); renderHome();
+  profile.settings.fielding = game.settings.fielding; saveProfile(profile); renderSettings();
 });
+
+// ---------- shop: the daily login reward, and gems for coins ----------
+function renderShop() {
+  ui.show('shop');
+  $('shopCoins').textContent = profile.coins;
+  $('shopGems').textContent = profile.gems || 0;
+  const d = $('shopDaily');
+  d.innerHTML = '';
+  const next = profile.daily.day % 7;
+  const cal = el('div', 'dailycal');
+  DAILY.forEach((n, i) => cal.append(el('span', i < next ? 'got' : i === next && dailyAvailable(profile) ? 'now' : '', `D${i + 1}\n${n}`)));
+  d.append(el('h3', '', 'Daily reward'), cal);
+  const claim = el('button', 'bigbtn primary', dailyAvailable(profile) ? `Claim +${DAILY[next]} coins` : 'Come back tomorrow');
+  claim.disabled = !dailyAvailable(profile);
+  claim.addEventListener('click', () => {
+    const r = claimDaily(profile);
+    if (r) { saveProfile(profile); ui.toast(`Day ${r.day}: +${r.coins} coins`); sfx.dhol(); }
+    renderShop();
+  });
+  d.append(claim);
+  const deals = $('shopDeals');
+  deals.innerHTML = '';
+  GEM_DEALS.forEach((g, i) => {
+    const b = el('button', 'dealcard');
+    b.append(el('b', '', `${g.coins}`), el('small', '', 'coins'), el('span', '', `${g.gems} 💎`));
+    b.disabled = (profile.gems || 0) < g.gems;
+    b.addEventListener('click', () => {
+      if (buyCoins(profile, i)) { saveProfile(profile); ui.toast(`+${g.coins} coins`); sfx.dhol(); }
+      renderShop();
+    });
+    deals.append(b);
+  });
+}
+for (const id of ['btnShop', 'coinPill', 'gemPill']) $(id).addEventListener('click', () => { unlockAudio(); renderShop(); });
+$('shopBack').addEventListener('click', () => renderHome());
+
+// ---------- season pass ----------
+function renderPass() {
+  ui.show('pass');
+  const ps = passState(profile);
+  $('passTitle').textContent = `Season ${ps.season} Pass`;
+  $('passLede').textContent = ps.tier >= PASS_TIERS ? 'Every tier reached! Claim the lot to start the next season.'
+    : `Tier ${ps.tier} of ${PASS_TIERS} · ${Math.round((1 - ps.progress) * 100)} pass XP to the next (a win is 100, a loss 50)`;
+  const claim = $('passClaim');
+  claim.hidden = ps.ready <= 0;
+  claim.textContent = `Claim ${ps.ready} tier${ps.ready === 1 ? '' : 's'}`;
+  const list = $('passTiers');
+  list.innerHTML = '';
+  for (let n = 1; n <= PASS_TIERS; n++) {
+    const r = passReward(n);
+    const row = el('div', `passtier${n <= ps.claimed ? ' got' : n <= ps.tier ? ' ready' : ''}`);
+    row.append(el('b', '', `${n}`), el('span', '', `${r.coins} coins${r.gems ? ` + ${r.gems} 💎` : ''}`), el('i', '', n <= ps.claimed ? '✓' : n <= ps.tier ? 'Ready' : '🔒'));
+    list.append(row);
+  }
+}
+$('btnPass').addEventListener('click', () => { unlockAudio(); renderPass(); });
+$('passClaim').addEventListener('click', () => {
+  const g = claimPass(profile);
+  saveProfile(profile);
+  if (g.tiers) { ui.toast(`+${g.coins} coins${g.gems ? ` · +${g.gems} gems` : ''}${g.newSeason ? ' · a new season begins!' : ''}`, 2600); sfx.dhol(); }
+  renderPass();
+});
+$('passBack').addEventListener('click', () => renderHome());
 
 $('btnQuick').addEventListener('click', () => { unlockAudio(); pending = { mode: 'quick' }; renderSquad(); });
 $('btnChallengeMode').addEventListener('click', () => { unlockAudio(); pending = { mode: 'challenge', challenge }; renderSquad(); });
@@ -957,7 +1028,8 @@ function showResult(summary) {
   const extra = [];
   if (got.length) extra.push(...got.map(a => `🏅 ${a.name} +${a.coins}`));
   if (ups.length) extra.push(...ups.map(u => `⬆ ${heroById(u.id).name} level ${u.to}`));
-  $('resRewards').textContent = [`+${rewards.xp} XP · +${rewards.coins} coins · Level ${level(profile.xp).lv}`, ...extra].join(' · ');
+  if (rewards.pass) extra.push(`Season Pass tier ${rewards.pass}!`);
+  $('resRewards').textContent = [`+${rewards.xp} XP · +${rewards.coins} coins${rewards.gems ? ` · +${rewards.gems} 💎` : ''} · Level ${level(profile.xp).lv}`, ...extra].join(' · ');
   // this match's scorecard
   const ms = $('resStats');
   ms.innerHTML = '';

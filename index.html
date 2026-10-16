@@ -74,40 +74,74 @@
     </div>
   </div>
 
-  <section id="home" class="screen">
-    <div class="screen-inner">
-      <div class="logo small" aria-label="Sixcharge: Superhero Cricket">
-        <img class="logo-img" src="img/logo-sixcharge.webp" alt="Sixcharge!" width="900" height="300">
+  <section id="home" class="screen hub">
+    <div class="hub-inner">
+      <div class="hub-top">
+        <button id="teamBadge" class="hb-badge" aria-label="My team">
+          <span class="hb-team"><img id="badgeLogo" alt=""><span><b id="badgeName">Thunder Strikers</b><small id="badgeStyle">Big hitters</small></span></span>
+          <span class="hb-level"><b id="lvl">Lv 1</b><span class="hb-xp"><i id="xpFill"></i></span></span>
+        </button>
+        <button class="hb-pill" id="coinPill" aria-label="Coins: shop"><img src="img/menu/coin.webp" alt=""><span id="coins">0</span><img class="plus" src="img/menu/plus.webp" alt=""></button>
+        <button class="hb-pill" id="gemPill" aria-label="Gems: shop"><img src="img/menu/gem.webp" alt=""><span id="gems">0</span><img class="plus" src="img/menu/plus.webp" alt=""></button>
+        <button class="hb-shop" id="btnShop" aria-label="Shop"><img src="img/menu/cart.webp" alt=""><span>Shop</span><i id="shopDot" hidden>1</i></button>
+        <button class="hb-gear" id="btnSettings" aria-label="Settings"><img src="img/menu/gear.webp" alt=""></button>
       </div>
-      <div class="panel paper profile">
-        <div class="hubtop">
-          <button id="teamBadge" class="teambadge" aria-label="My team"><img id="badgeLogo" alt=""><span><b id="badgeName">Thunder Strikers</b><small id="badgeStyle">Big hitters</small></span></button>
-          <span id="coins" class="coinpill">0</span>
-        </div>
-        <label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label>
-        <div class="levelrow"><b id="lvl">Lv 1</b><div class="xpbar"><div id="xpFill"></div></div></div>
-        <button id="dailyBtn" class="chipbtn" hidden></button>
-      </div>
+      <div class="hub-hero"><img src="img/menu/hero.webp" alt="Sixcharge!" width="852" height="698"></div>
       <div id="challengeCard" class="panel paper challenge" hidden></div>
       <button class="bigbtn" id="btnChallengeMode" hidden>Accept Challenge</button>
       <div class="hubgrid">
-        <button class="tile tile-quick" id="btnQuick"><b>Quick Match</b><small id="quickSub">30 balls each · vs a random team</small></button>
-        <button class="tile tile-league" id="btnLeague"><b>Super League</b><small id="leagueSub">Career: seasons, auctions, records</small></button>
-        <button class="tile tile-cup" id="btnCup"><b>Knockout Cup</b><small id="cupSub">3 wins to lift the cup</small></button>
-        <button class="tile tile-daily" id="btnDaily"><b>Daily Challenge</b><small id="dailySub">A new scenario every day</small></button>
+        <button class="tile tile-quick" id="btnQuick"><b>Quick<br>Match</b><small id="quickSub">30 balls each<br>vs a random team</small></button>
+        <button class="tile tile-league" id="btnLeague"><b>Super<br>League</b><small id="leagueSub">Career: seasons, auctions, records</small></button>
+        <button class="tile tile-cup" id="btnCup"><b>Knockout<br>Cup</b><small id="cupSub">3 wins to lift the cup</small></button>
+        <button class="tile tile-daily" id="btnDaily"><b>Daily<br>Challenge</b><small id="dailySub">A new scenario every day</small></button>
       </div>
+      <button class="hub-pass" id="btnPass">
+        <span class="hp-art"><span class="hp-text"><span class="hp-season" id="passSeason">Season 1</span><b>Season Pass</b><small>Play. Earn. Unlock epic rewards!</small></span></span>
+        <span class="hp-bar"><span class="hp-fill"><i id="passFill"></i></span><span class="hp-count" id="passCount">0 / 30</span></span>
+        <i class="hp-dot" id="passDot" hidden></i>
+      </button>
       <div class="hubrow">
-        <button class="chipbig" id="btnTeam">My Team</button>
-        <button class="chipbig" id="btnTrophies">Trophies</button>
-        <button class="chipbig" id="btnStats">Stats</button>
-        <button class="chipbig" id="btnTutorial">Tutorial</button>
+        <button class="hubbtn" id="btnTeam"><img src="img/menu/btn-team.webp" alt="My Team"></button>
+        <button class="hubbtn" id="btnTrophies"><img src="img/menu/btn-trophies.webp" alt="Trophies"><span id="trophyCount">0/0</span></button>
+        <button class="hubbtn" id="btnStats"><img src="img/menu/btn-stats.webp" alt="Stats"></button>
+        <button class="hubbtn" id="btnTutorial"><img src="img/menu/btn-tutorial.webp" alt="Tutorial"></button>
       </div>
-      <div class="settings">
-        <button class="chipbtn" id="setSound">Sound: on</button>
-        <button class="chipbtn" id="setHaptics">Haptics: on</button>
-        <button class="chipbtn" id="setField">Fielding: key moments</button>
+    </div>
+  </section>
+
+  <section id="settings" class="screen" hidden>
+    <div class="screen-inner">
+      <h2 class="title">Settings</h2>
+      <div class="setrow">
+        <button class="setcard" id="setSound"><img src="img/menu/icon-sound.webp" alt=""><b>Sound</b><span>On</span></button>
+        <button class="setcard" id="setHaptics"><img src="img/menu/icon-haptics.webp" alt=""><b>Haptics</b><span>On</span></button>
+        <button class="setcard" id="setField"><img src="img/menu/icon-fielding.webp" alt=""><b>Fielding</b><span>Key moments</span></button>
       </div>
-      <p class="fineprint">Playtest build · v0.2</p>
+      <div class="panel paper profile"><label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label></div>
+      <button class="bigbtn primary" id="settingsBack">Done</button>
+      <p class="fineprint">Playtest build · v0.3</p>
+    </div>
+  </section>
+
+  <section id="shop" class="screen" hidden>
+    <div class="screen-inner">
+      <h2 class="title">Shop</h2>
+      <div class="shopwallet"><span><img src="img/menu/coin.webp" alt=""><b id="shopCoins">0</b> coins</span><span><img src="img/menu/gem.webp" alt=""><b id="shopGems">0</b> gems</span></div>
+      <div class="panel paper shopcard" id="shopDaily"></div>
+      <h3 class="shophead">Gems for coins</h3>
+      <div class="shopdeals" id="shopDeals"></div>
+      <p class="fineprint">Win matches for gems (1 a win) and claim more on the Season Pass.</p>
+      <button class="bigbtn ghost" id="shopBack">Home</button>
+    </div>
+  </section>
+
+  <section id="pass" class="screen" hidden>
+    <div class="screen-inner">
+      <h2 class="title" id="passTitle">Season Pass</h2>
+      <p class="lede" id="passLede"></p>
+      <button class="bigbtn primary" id="passClaim">Claim</button>
+      <div class="passtiers" id="passTiers"></div>
+      <button class="bigbtn ghost" id="passBack">Home</button>
     </div>
   </section>
 
