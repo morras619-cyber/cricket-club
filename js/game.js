@@ -427,8 +427,9 @@ export class Game {
     const box = document.createElement('div');
     box.className = 'pcard-pair';
     box.append(...cards);
-    this.ui.banner('OPENERS', pair.map(p => flagName(p)).join(' & '), 1900, box);
-    await this.sleepReal(this.bot ? 60 : 1900);
+    const team = inn.side === 'player' ? this.myTeam : this.oppTeam;
+    this.ui.banner('OPENERS', '', 2700, box, { cls: 'card-head', color: team?.suit });
+    await this.sleepReal(this.bot ? 60 : 2700);
   }
 
   // a wicket: the next batter walks out
