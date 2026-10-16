@@ -11,7 +11,7 @@ import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBou
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
 import { powerDiscount } from './progress.js';
-import { lookOf, faceCanvas } from './looks.js';
+import { lookOf, faceCanvas, masksReady } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster } from './squads.js';
@@ -189,6 +189,8 @@ export class Game {
   // the same man as the one who just played the shot
   myBatterLook() {
     const inn = this.innings?.[this.innings.length - 1];
+    // whoever is on strike, on either side (while you bowl it's their batter, not yours)
+    if (inn && !inn.done()) return lookOf(this.batterOf(inn));
     if (inn && inn.side === 'player') return lookOf(this.batterOf(inn));
     const prev = this.S?.batter;
     if (prev?.people && prev.team === this.myTeam?.id) return prev.people;
@@ -409,13 +411,16 @@ export class Game {
     inn.setBowler(p);
     this.lastBowlerId = p.id;
     this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500, p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.oppTeam : this.myTeam, 64));
-    await this.sleepReal(this.bot ? 60 : 1100);
+    await this.sleepReal(50); // let the banner show first
+    this.prepPlayers(inn);
+    await this.sleepReal(this.bot ? 10 : 1050);
   }
 
   // a wicket: the next batter walks out
   async newBatter(inn) {
     const p = this.fillCrease(inn)[0] || this.batterOf(inn);
     this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700, p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.myTeam : this.oppTeam, 64));
+    this.prepPlayers(inn);
     await this.sleepReal(this.bot ? 60 : 1200);
   }
 
@@ -428,7 +433,30 @@ export class Game {
     if (this.myTeam && this.mode !== 'tutorial') this.ui.matchup(this.myTeam.id, this.oppTeam.id);
     this.ui.banner(head, sub, 1800);
     sfx.crowd(0.8);
-    await this.sleepReal(this.bot ? 200 : 1700);
+    // the skin maps arrive while the banner is up, so nobody is ever shown in the drawing's own colours
+    await Promise.all([this.sleepReal(this.bot ? 200 : 1700), masksReady(4000)]);
+  }
+
+  // Repaint the players about to be seen (batter on strike, his partner, the bowler) off screen,
+  // during a pause (a banner, between balls), so it never costs a frame in the middle of play.
+  prepPlayers(inn) {
+    if (!inn || !this.myTeam) return;
+    try {
+      const c = this.prepCanvas || (this.prepCanvas = Object.assign(document.createElement('canvas'), { width: 4, height: 4 }));
+      const g = c.getContext('2d');
+      const batting = inn.side === 'player';
+      const batTeam = batting ? this.myTeam : this.oppTeam, bowlTeam = batting ? this.oppTeam : this.myTeam;
+      const striker = this.batterOf(inn), partner = this.nonStrikerOf(inn), bowler = this.bowlerOf(inn);
+      const spin = bowler && bowlType(bowler.bowl).spin;
+      if (batting) {
+        if (striker) drawBatSprite(g, 2, 2, 1, { team: batTeam.id, people: lookOf(striker), angle: 0 }, this.realTime);
+        if (partner) drawBowlSprite(g, 2, 2, 1, 'ns1', batTeam, false, 'nonstriker', lookOf(partner));
+        if (bowler) drawBowlSprite(g, 2, 2, 1, 'start', bowlTeam, false, spin ? 'spin-front' : 'front', lookOf(bowler));
+      } else {
+        if (striker) drawBowlSprite(g, 2, 2, 1, 'ready', batTeam, false, 'batfront', lookOf(striker));
+        if (bowler) drawBowlSprite(g, 2, 2, 1, 'start', bowlTeam, false, spin ? 'spin-back' : 'back', lookOf(bowler));
+      }
+    } catch { /* only a warm-up */ }
   }
 
   async inningsBreak(first, carry) {
@@ -589,6 +617,7 @@ export class Game {
       await this.batBall(inn, ballNo, script[ballNo - 1]);
       if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
+      if (!inn.done()) this.prepPlayers(inn); // the pair after any change of strike, before the next ball
       if (inn.balls % 6 === 0 && !inn.done()) {
         const runs = inn.log.slice(-6).reduce((s, r) => s + (r === 'W' ? 0 : Number(r)), 0);
         this.ui.banner(`END OF OVER ${inn.balls / 6}`, `${runs} off the over · ${inn.runs}/${inn.wkts}`, 1300);
@@ -1133,6 +1162,7 @@ export class Game {
       const r = await this.bowlBall(inn, ballNo);
       if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
+      if (!inn.done()) this.prepPlayers(inn); // the pair after any change of strike, before the next ball
       if (r?.rebowl) { this.rebowls = (this.rebowls || 0) + 1; continue; }
       if (inn.balls % 6 === 0 && !inn.done()) {
         const runs = inn.log.slice(-6).reduce((s, x) => s + (x === 'W' ? 0 : Number(x)), 0);

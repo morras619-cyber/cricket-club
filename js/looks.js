@@ -422,12 +422,19 @@ function sheetMasks(key, p, w, h) {
 // If a mask file can't load, it's computed here as a fallback.
 const pre = new Map(); // mask name -> { img, ready, failed }
 export function loadPeopleMask(name) {
-  if (pre.has(name)) return;
+  if (pre.has(name)) return pre.get(name).done;
   const P = { img: new Image(), ready: false, failed: false };
-  P.img.onload = () => { P.ready = true; };
-  P.img.onerror = () => { P.failed = true; };
+  P.done = new Promise(res => {
+    P.img.onload = () => { P.ready = true; res(); };
+    P.img.onerror = () => { P.failed = true; res(); };
+  });
   P.img.src = `img/mask-${name}.png`;
   pre.set(name, P);
+  return P.done;
+}
+// every skin map asked for so far has arrived (or failed), or ms have passed
+export function masksReady(ms = 4000) {
+  return Promise.race([Promise.all([...pre.values()].map(P => P.done)), new Promise(r => setTimeout(r, ms))]);
 }
 function pixelsOf(src) {
   const w = src?.naturalWidth || src?.width, h = src?.naturalHeight || src?.height;
