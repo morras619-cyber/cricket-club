@@ -212,14 +212,15 @@ function renderPainted(cam, art) {
   // rope, 30-yard circle and creases (crease lines are 5 cm wide)
   // one line on the outfield: the 30-yard circle (in the Power Burst only two fielders may stand outside it)
   ring(g, cam, 27, 'rgba(255,255,255,0.5)', 1.6, [8, 7]);
-  // creases: white with a fine ink edge, kept on the pitch
+  // creases, kept on the pitch: white, with a fine ink edge only where they're big enough to
+  // carry one (far away an edge turns a crease into a stack of stripes)
   const crease = (x0, z0, x1, z1) => {
     const p = cam.project(0, 0, (z0 + z1) / 2);
     if (!p) return;
-    const w = Math.max(1.2, 0.05 * p.k);
+    const w = 0.045 * p.k;
     g.lineCap = 'butt';
-    line(g, cam, x0, z0, x1, z1, INK, w + 1.6);
-    line(g, cam, x0, z0, x1, z1, '#fffdf0', w);
+    if (w >= 3) line(g, cam, x0, z0, x1, z1, 'rgba(20,16,24,0.7)', w + 1.2);
+    line(g, cam, x0, z0, x1, z1, w >= 3 ? '#fffdf0' : 'rgba(255,253,240,0.7)', Math.max(0.9, w));
   };
   const PE = PX - 0.06;
   for (const [z, d] of [[0, 1], [20, -1]]) {
