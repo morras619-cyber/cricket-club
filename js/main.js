@@ -75,14 +75,17 @@ function renderHome() {
     return f ? `${teamById(tour.team).name} · ${f.label} v ${teamById(f.opp).name}` : 'Finished — see the results';
   };
   const c = profile.career;
-  $('leagueSub').textContent = !c ? 'Career: pick a club, win the auction, build a dynasty'
-    : c.phase === 'pick' ? `Season ${c.season} · pick your club`
-      : c.phase === 'auction' ? `Season ${c.season} · ${teamById(c.club).name} · auction`
-        : c.phase === 'done' ? `Season ${c.season} over · ${money(c.money)}`
-          : `S${c.season} · ${teamById(c.club).name} · ${nextFixture(c.league)?.label || ''}`;
-  $('cupSub').textContent = status('cup') || 'Quarter, semi, final: 3 wins for the cup';
+  // the small print on the mode blocks: one line each, as the blocks were drawn
+  const lines = (...l) => l.filter(Boolean).map(x => `• ${x}`).join('\n');
+  const club = c?.club ? teamById(c.club).name : '';
+  $('leagueSub').textContent = !c ? lines('Pick a club', 'Win the auction', 'Build a dynasty')
+    : c.phase === 'pick' ? lines(`Season ${c.season}`, 'Pick your club')
+      : c.phase === 'auction' ? lines(`Season ${c.season} · ${club}`, 'Auction', `${money(c.money)} to spend`)
+        : c.phase === 'done' ? lines(`Season ${c.season} over · ${club}`, `${money(c.money)} in the bank`)
+          : lines(`Season ${c.season} · ${club}`, (f => f && `${f.label} v ${teamById(f.opp).name}`)(nextFixture(c.league)), `${money(c.money)} in the bank`);
+  $('cupSub').textContent = status('cup')?.replace(' · ', '\n') || 'Quarter, semi, final:\n3 wins for the cup';
   const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key;
-  $('dailySub').textContent = done ? `Done today: ${profile.dailyChallenge.line} ${profile.dailyChallenge.won ? '✅' : '❌'}` : `#${sc.no}\n${sc.title}`;
+  $('dailySub').textContent = done ? `Done today ${profile.dailyChallenge.won ? '✅' : '❌'}\n${profile.dailyChallenge.line}` : `#${sc.no}\n${sc.title}`;
   $('btnDaily').classList.toggle('done', done);
   $('trophyCount').textContent = `${Object.keys(profile.achievements || {}).length}/${ACHIEVEMENTS.length}`;
   const card = $('challengeCard');

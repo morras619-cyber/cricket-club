@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Cut the home-menu art into the pieces the hub uses (img/menu/*.webp).
 
-usage: python3 tools/build_menu_art.py MOCKUP.png PASS.png TOPBAR.png TILES.png BUTTONS.png
+usage: python3 tools/build_menu_art.py MOCKUP.png PASS.png TOPBAR.png TILES.png BUTTONS.png LOGO.png
 
-MOCKUP is the full home screen (852 wide): only the hero art (logo and batter) is taken from it.
+MOCKUP is the full home screen (852 wide): the background (sky, stadium, batter) is taken from
+its top, with the widgets of its top bar and its logo painted out (the hub draws both itself).
+TILES are the four mode blocks with their titles; the small print under each title is painted
+out, because the hub writes it (it changes: the league season, the money, the daily number).
 The other sheets are transparent; each piece is cut to its own bounding box.
+Needs numpy, scipy, Pillow and opencv-python-headless.
 """
 import sys
+import cv2
 import numpy as np
 from PIL import Image
 from scipy import ndimage as ndi
@@ -40,10 +45,48 @@ def near(ps, x, y):
     return min(ps, key=lambda p: abs(p[0] - x) + abs(p[1] - y))[2]
 
 
+def logo_spot(m, lg):
+    """Where the mockup's logo is: (x, y, width) of the best edge match of LOGO over its top."""
+    edges = lambda x: cv2.GaussianBlur(cv2.Canny(cv2.cvtColor(x, cv2.COLOR_RGB2GRAY), 60, 160).astype(np.float32), (5, 5), 0)
+    pad = np.zeros((500, m.shape[1] + 250, 3), np.uint8)
+    pad[:, 120:120 + m.shape[1]] = m[40:540]
+    e = edges(pad)
+    best = None
+    for w in range(640, 900, 3):
+        t = np.array(lg.resize((w, round(lg.height * w / lg.width)), Image.LANCZOS))
+        rgb = t[..., :3].copy()
+        rgb[t[..., 3] < 128] = 0
+        _, score, _, (x, y) = cv2.minMaxLoc(cv2.matchTemplate(e, edges(rgb), cv2.TM_CCORR_NORMED))
+        if best is None or score > best[0]:
+            best = (score, x - 120, y + 40, w)
+    _, x, y, w = best
+    return max(0, x), y, w
+
+
 def main():
-    mock, pas, top, tiles, btns = sys.argv[1:6]
-    m = Image.open(mock).convert('RGB')
-    save(m.crop((0, 128, m.width, 826)), 'hero', q=88)
+    mock, pas, top, tiles, btns, logo = sys.argv[1:7]
+    lg = Image.open(logo).convert('RGBA')
+    lg = lg.crop(lg.getbbox())
+    save(lg, 'logo', 900)
+
+    # the background: paint out the mockup's top-bar widgets and its logo (found where the logo
+    # matches best), leaving sky, stadium and batter
+    m = np.array(Image.open(mock).convert('RGB'))[:826].copy()
+    hole = np.zeros(m.shape[:2], np.uint8)
+    for x0, y0, x1, y1 in [(14, 10, 338, 130), (340, 14, 512, 98), (514, 14, 664, 98), (668, 6, 760, 108), (762, 16, 840, 98)]:
+        hole[y0:y1, x0:x1] = 1
+    x, y, w = logo_spot(m, lg)
+    a = np.array(lg.resize((w, round(lg.height * w / lg.width)), Image.LANCZOS))[..., 3] > 20
+    a = a[:, :max(0, min(w, m.shape[1] - x))]
+    hole = cv2.dilate(hole, np.ones((3, 3), np.uint8), iterations=6)
+    # the logo's hole is grown more: the match is close, not exact, and the hub's logo goes back
+    # on top of this spot (LOGO_SPOT in the stylesheet) so the smear never shows
+    lh = np.zeros_like(hole)
+    lh[y:y + a.shape[0], x:x + a.shape[1]] = a
+    hole |= cv2.dilate(lh, np.ones((3, 3), np.uint8), iterations=14)
+    print('logo spot in the background: x', x, 'y', y, 'width', w)
+    bg = cv2.inpaint(m, hole * 255, 9, cv2.INPAINT_TELEA)
+    save(Image.fromarray(bg), 'hero', q=88)
 
     ps = pieces(pas)
     save(near(ps, 59, 48), 'pass-banner', 900)
@@ -63,9 +106,24 @@ def main():
     save(near(ps, 845, 674), 'plus', 80)
     save(near(ps, 1073, 663), 'gear', 110)
 
-    ps = pieces(tiles)
-    for (x, y), n in zip([(29, 114), (771, 114), (29, 527), (771, 527)], ['quick', 'league', 'cup', 'daily']):
-        save(near(ps, x, y), 'tile-' + n, 520, 86)
+    t = Image.open(tiles).convert('RGBA')
+    a = np.array(t)
+    rgb = np.ascontiguousarray(a[..., :3])
+    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV).astype(int)
+    hole = np.zeros(rgb.shape[:2], np.uint8)
+    # the small print: dark on the yellow and green blocks, white on the blue and red ones
+    for x0, y0, x1, y1, dark in [(165, 345, 500, 435, True), (950, 310, 1385, 445, False), (165, 775, 515, 855, False), (950, 765, 1230, 855, True)]:
+        v, sat = hsv[y0:y1, x0:x1, 2], hsv[y0:y1, x0:x1, 1]
+        hole[y0:y1, x0:x1] = (v < 110) if dark else ((v > 200) & (sat < 90))
+    hole = cv2.dilate(hole, np.ones((5, 5), np.uint8), iterations=2)
+    clean = np.dstack([cv2.inpaint(rgb, hole * 255, 7, cv2.INPAINT_TELEA), a[..., 3]])
+    tmp = OUT + '_tiles.png'
+    Image.fromarray(clean).save(tmp)
+    ps = pieces(tmp)
+    import os
+    os.remove(tmp)
+    for (x, y), n in zip([(115, 39), (908, 39), (115, 473), (908, 473)], ['quick', 'league', 'cup', 'daily']):
+        save(near(ps, x, y), 'tile-' + n, 560, 88)
 
     ps = pieces(btns)
     for (x, n) in [(44, 'team'), (411, 'trophies'), (769, 'stats'), (1132, 'tutorial')]:

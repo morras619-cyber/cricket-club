@@ -76,24 +76,28 @@
 
   <section id="home" class="screen hub">
     <div class="hub-inner">
-      <div class="hub-top">
-        <button id="teamBadge" class="hb-badge" aria-label="My team">
-          <span class="hb-team"><img id="badgeLogo" alt=""><span><b id="badgeName">Thunder Strikers</b><small id="badgeStyle">Big hitters</small></span></span>
-          <span class="hb-level"><b id="lvl">Lv 1</b><span class="hb-xp"><i id="xpFill"></i></span></span>
-        </button>
-        <button class="hb-pill" id="coinPill" aria-label="Coins: shop"><img src="img/menu/coin.webp" alt=""><span id="coins">0</span><img class="plus" src="img/menu/plus.webp" alt=""></button>
-        <button class="hb-pill" id="gemPill" aria-label="Gems: shop"><img src="img/menu/gem.webp" alt=""><span id="gems">0</span><img class="plus" src="img/menu/plus.webp" alt=""></button>
-        <button class="hb-shop" id="btnShop" aria-label="Shop"><img src="img/menu/cart.webp" alt=""><span>Shop</span><i id="shopDot" hidden>1</i></button>
-        <button class="hb-gear" id="btnSettings" aria-label="Settings"><img src="img/menu/gear.webp" alt=""></button>
+      <div class="hub-head">
+        <div class="hub-bg" aria-hidden="true"><img class="hub-logo" src="img/menu/logo.webp" alt="" width="900" height="303"></div>
+        <div class="hub-top">
+          <button id="teamBadge" class="hb-badge" aria-label="My team">
+            <span class="hb-team"><img id="badgeLogo" alt=""><span><b id="badgeName">Thunder Strikers</b><small id="badgeStyle">Big hitters</small></span></span>
+            <span class="hb-level"><b id="lvl">Lv 1</b><span class="hb-xp"><i id="xpFill"></i></span></span>
+          </button>
+          <button class="hb-pill" id="coinPill" aria-label="Coins: shop"><img src="img/menu/coin.webp" alt=""><span id="coins">0</span><img class="plus" src="img/menu/plus.webp" alt=""></button>
+          <button class="hb-pill" id="gemPill" aria-label="Gems: shop"><img src="img/menu/gem.webp" alt=""><span id="gems">0</span><img class="plus" src="img/menu/plus.webp" alt=""></button>
+          <button class="hb-shop" id="btnShop" aria-label="Shop"><img src="img/menu/cart.webp" alt=""><span>Shop</span><i id="shopDot" hidden>1</i></button>
+          <button class="hb-gear" id="btnSettings" aria-label="Settings"><img src="img/menu/gear.webp" alt=""></button>
+        </div>
       </div>
-      <div class="hub-hero"><img src="img/menu/hero.webp" alt="Sixcharge!" width="852" height="698"></div>
+      <div class="hub-stack">
       <div id="challengeCard" class="panel paper challenge" hidden></div>
       <button class="bigbtn" id="btnChallengeMode" hidden>Accept Challenge</button>
       <div class="hubgrid">
-        <button class="tile tile-quick" id="btnQuick"><b>Quick<br>Match</b><small id="quickSub">30 balls each<br>vs a random team</small></button>
-        <button class="tile tile-league" id="btnLeague"><b>Super<br>League</b><small id="leagueSub">Career: seasons, auctions, records</small></button>
-        <button class="tile tile-cup" id="btnCup"><b>Knockout<br>Cup</b><small id="cupSub">3 wins to lift the cup</small></button>
-        <button class="tile tile-daily" id="btnDaily"><b>Daily<br>Challenge</b><small id="dailySub">A new scenario every day</small></button>
+        <button class="tile tile-quick" id="btnQuick" aria-label="Quick Match"><small id="quickSub">30 balls each
+vs a random team</small></button>
+        <button class="tile tile-league" id="btnLeague" aria-label="Super League"><small id="leagueSub"></small></button>
+        <button class="tile tile-cup" id="btnCup" aria-label="Knockout Cup"><small id="cupSub"></small></button>
+        <button class="tile tile-daily" id="btnDaily" aria-label="Daily Challenge"><small id="dailySub"></small></button>
       </div>
       <button class="hub-pass" id="btnPass">
         <span class="hp-art"><span class="hp-text"><span class="hp-season" id="passSeason">Season 1</span><b>Season Pass</b><small>Play. Earn. Unlock epic rewards!</small></span></span>
@@ -105,6 +109,7 @@
         <button class="hubbtn" id="btnTrophies"><img src="img/menu/btn-trophies.webp" alt="Trophies"><span id="trophyCount">0/0</span></button>
         <button class="hubbtn" id="btnStats"><img src="img/menu/btn-stats.webp" alt="Stats"></button>
         <button class="hubbtn" id="btnTutorial"><img src="img/menu/btn-tutorial.webp" alt="Tutorial"></button>
+      </div>
       </div>
     </div>
   </section>
