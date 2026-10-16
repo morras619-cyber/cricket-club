@@ -42,7 +42,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .score small { font-size: 28px; margin: 0 1px; }
 .sc-col { display: flex; flex-direction: column; min-width: 0; flex: 1; font-weight: 700; font-size: 12.5px; line-height: 1.25; color: #4b3f6b; }
 .sc-col .heroline { color: #1f6fe0; font-weight: 800; font-size: 13px; margin-top: 0; }
-.sc-need { font-weight: 800; font-size: 12.5px; padding: 0 8px 5px; }
+.sc-need { font-weight: 800; font-size: 12.5px; padding: 0 8px 5px; display: flex; align-items: baseline; gap: 6px; }
+.sc-need .fit { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+/* current and required run rates, beside the target line */
+.sc-rates { flex: none; font-size: 11px; font-weight: 800; color: #4b3f6b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sc-rates b { color: var(--ink); }
+.sc-rates .hot { color: #e8343b; }
 .hud-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .hr-row { display: flex; gap: 8px; align-items: center; }
 .ribbon { flex: 1; min-width: 0; background: var(--hot); color: #fffbe8; font-family: var(--display); font-size: 16px; letter-spacing: 1px; padding: 5px 16px 4px 9px; border: 3px solid var(--ink); clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%); transform: rotate(1.5deg); }

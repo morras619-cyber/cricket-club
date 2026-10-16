@@ -38,6 +38,14 @@ export class UI {
     setFit($('hudOvers'), `${inn.overs} overs`);
     setFit($('hudLeft'), `${inn.ballsLeft} ball${inn.ballsLeft === 1 ? '' : 's'} left`);
     setFit($('hudLine'), heroLine);
+    // run rates (per 6-ball over): current always once a ball is bowled, required while chasing
+    const crr = inn.balls ? (inn.runs * 6) / inn.balls : null;
+    const left = inn.target != null ? inn.target - inn.runs : null;
+    const rrr = left != null && left > 0 && inn.ballsLeft > 0 ? (left * 6) / inn.ballsLeft : null;
+    const parts = [];
+    if (crr != null) parts.push(`CRR <b>${crr.toFixed(2)}</b>`);
+    if (rrr != null) parts.push(`RRR <b class="${crr != null && rrr > crr ? 'hot' : ''}">${rrr.toFixed(2)}</b>`);
+    $('hudRates').innerHTML = parts.join(' · ');
     setFit($('hudNeed'), need);
     setFit($('hudPhase'), phase.toUpperCase());
     // this over, with empty slots for the balls still to come
