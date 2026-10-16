@@ -880,6 +880,13 @@ export class Game {
     this.fx.word(label, this.W / 2, this.H * 0.62, { size: 24, color: '#fff4da', stroke: INK, dur: 1300, rot: 0 });
   }
 
+  // a wicket the computer took for you (a catch or run out in the field): shown as loudly as your own
+  async announceWicket(text, sub) {
+    this.wicketFx(text, { x: this.W / 2, y: this.H / 2 });
+    this.ui.banner(text.replace('!', ''), sub, 1500);
+    await this.sleepReal(this.bot ? 60 : 1400);
+  }
+
   wicketFx(text, at) {
     this.board(text.replace('!', '') + '!');
     this.fx.flash('#e8343b', 0.4); this.fx.shake(12);
@@ -1091,6 +1098,7 @@ export class Game {
         }
         else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
         else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); }
+        else if (o.runOut) { /* announced straight after the replay */ }
         else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * (D ? 0.62 : 0.3), { size: 44, color: '#fff4da', stroke: INK });
       }
       return t >= dur;
@@ -1668,6 +1676,7 @@ export class Game {
       else {
         r = rng.chance(sim.catch.p) ? 'caught' : sim.catch.p >= 0.3 ? 'dropped' : 'safe';
         await this.showAutoPlay(sim, field, { side: 'player', caught: r === 'caught', dropped: r === 'dropped' });
+        if (r === 'caught' && !freeHit) await this.announceWicket('CAUGHT!', `${this.batterOf(inn).name} caught at ${sim.catch.fielder.name.toLowerCase()}`);
       }
       if (r === 'caught' || r === 'dive') {
         this.charge.award('catch', 'CATCH');
@@ -1693,8 +1702,10 @@ export class Game {
       if (ctl(ch)) { this.noteEvent(ballNo); r = await this.runOutEvent(sim, field); }
       else {
         const out = rng.chance(ch.p * 0.8);
-        await this.showAutoPlay(sim, field, { side: 'player' });
+        await this.showAutoPlay(sim, field, { side: 'player', runOut: out });
         r = { out, runs: out ? sim.runOut.attempt - 1 : sim.runOut.attempt };
+        // a run out you didn't take part in still has to be seen: say who's gone
+        if (out) await this.announceWicket('RUN OUT!', `${this.batterOf(inn).name} is short of his ground`);
       }
       if (r.out) {
         inn.ball({ runs: r.runs, wicket: true, runOut: true });
