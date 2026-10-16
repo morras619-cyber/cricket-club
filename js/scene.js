@@ -161,31 +161,45 @@ function renderPainted(cam, art) {
     g.drawImage(art.logo, x0 + (sw - lw) / 2, y0 + (sh - lh) / 2, lw, lh);
   }
 
-  // the outfield and the pitch, row by row
+  // the outfield and the pitch, row by row: each screen row is one line across the ground, cut
+  // from the art (plain drawImage calls: pattern transforms are unreliable on iPhone Safari)
   const mips = grassMips(art);
-  const pats = new Map();
-  const pt = art.pitch, PZ0 = -2, PZ1 = 22, PX = 1.55; // the painted strip covers 24 m by 3.1 m
+  const pt = art.pitch, PZ0 = -2, PZ1 = 22, PX = 1.52; // the painted strip covers 24 m; its ragged sides are trimmed
+  const ptx0 = pt.naturalWidth * 0.04, ptw = pt.naturalWidth * 0.92;
   const rowH = 1 / dpr;
   for (let y = hy; y < H; y += rowH) {
     const gp = cam.groundAt(W / 2, y + rowH / 2);
     if (!gp) continue;
-    const k = cam.f / cam.depth(gp.z);
+    const d = cam.depth(gp.z), k = cam.f / d;
     const tex = mipFor(mips, k * dpr), TS = tex.width;
-    let pat = pats.get(tex);
-    if (!pat) { pat = g.createPattern(tex, 'repeat'); pats.set(tex, pat); }
-    const q = (((gp.z / TILE_M) * TS) % TS + TS) % TS;
-    pat.setTransform(new DOMMatrix([cam.dir * k * TILE_M / TS, 0, 0, 1, W / 2 + cam.dir * k * (-2.5 - cam.cx), y - q]));
-    g.fillStyle = pat;
-    g.fillRect(0, y, W, rowH + 0.5);
+    const row = Math.min(TS - 1, Math.floor((((gp.z / TILE_M) * TS) % TS + TS) % TS));
+    // the tiles across this row: tile n starts at world x = n·20 + o, so a dark stripe runs under
+    // the pitch (seen from the other end the tile reads backwards: one stripe further over)
+    const o = cam.dir > 0 ? -2.5 : -7.5;
+    const xa = cam.xAt(0, gp.z), xb = cam.xAt(W, gp.z);
+    const n0 = Math.floor((Math.min(xa, xb) - o) / TILE_M), n1 = Math.floor((Math.max(xa, xb) - o) / TILE_M);
+    const tw = TILE_M * k;
+    for (let n = n0; n <= n1; n++) {
+      const sx = W / 2 + cam.dir * (n * TILE_M + o - cam.cx) * k;
+      g.drawImage(tex, 0, row, TS, 1, cam.dir > 0 ? sx : sx - tw, y, tw + 0.6, rowH + 0.4);
+    }
     if (gp.z > PZ0 && gp.z < PZ1) {
       const v = ((PZ1 - gp.z) / (PZ1 - PZ0)) * pt.naturalHeight;
       const a = cam.project(-PX, 0, gp.z), b = cam.project(PX, 0, gp.z);
       if (a && b) {
         const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
-        const span = Math.max(1, (pt.naturalHeight / (PZ1 - PZ0)) * (rowH / (cam.cy * k)) * cam.depth(gp.z));
-        g.drawImage(pt, 0, Math.min(v, pt.naturalHeight - span), pt.naturalWidth, span, x0, y, x1 - x0, rowH + 0.5);
+        const span = Math.max(1, (pt.naturalHeight / (PZ1 - PZ0)) * (rowH * d * d) / (cam.cy * cam.f));
+        g.drawImage(pt, ptx0, Math.min(v, pt.naturalHeight - span), ptw, span, x0, y, x1 - x0, rowH + 0.4);
       }
     }
+  }
+  // an ink outline round the pitch, like everything else in the game
+  const ends = [[-PX, PZ0], [PX, PZ0], [PX, PZ1], [-PX, PZ1]].map(([x, z]) => cam.project(x, 0, Math.max(z, cam.dir > 0 ? cam.cz + 1 : z)));
+  if (ends.every(Boolean)) {
+    g.save();
+    g.strokeStyle = INK; g.lineJoin = 'round'; g.lineWidth = 2.5;
+    g.beginPath(); ends.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y))); g.closePath(); g.stroke();
+    g.restore();
   }
   // floodlight pool after dark
   const pc = cam.project(0, 0, 10) || { x: W / 2, y: H * 0.6 };

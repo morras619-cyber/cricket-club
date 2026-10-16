@@ -107,6 +107,10 @@ def main():
     W = g.shape[1]
     w = (np.abs(np.arange(W) - W / 2) / (W / 2)) ** 3
     g = g * (1 - w)[None, :, None] + np.roll(g, W // 2, axis=1) * w[None, :, None]
+    # quieter than painted: soften the grain and halve the contrast, so the grass stays behind the play
+    g = ndi.gaussian_filter(g, (1.6, 1.6, 0))
+    mean = g.reshape(-1, 3).mean(0)
+    g = mean + (g - mean) * 0.5
     g = Image.fromarray(np.clip(g, 0, 255).astype(np.uint8)).rotate(90, expand=True).resize((512, 512), Image.LANCZOS)
     g.save(d + 'grass.webp', 'WEBP', quality=88, method=6)
     print(d + 'grass.webp', g.size)
