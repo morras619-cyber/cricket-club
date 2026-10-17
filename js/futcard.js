@@ -7,6 +7,56 @@ import { portrait } from './figure.js';
 import { heroById } from './heroes.js';
 import { teamById } from './teams.js';
 import { ABILITIES, potentialStars, money, value } from './career.js';
+import { PORTRAIT_KEYS } from './portraits-list.js';
+
+// ---------- painted portraits ----------
+// Painted in Thunder's blue and yellow; on a player at another club the shirt is recoloured to that
+// club's kit (blue to its main colour, yellow to its trim), skin, hair and face untouched.
+const HAS_PORTRAIT = new Set(PORTRAIT_KEYS);
+const keyOf = p => (p.heroId ? heroById(p.heroId).name : p.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const srcs = new Map(), kits = new Map();
+function portraitSrc(key) {
+  if (!srcs.has(key)) { const im = new Image(); im.src = `img/cards/portraits/${key}.webp`; srcs.set(key, im); }
+  return srcs.get(key);
+}
+const rgbOf = hex => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+function recolour(im, team) {
+  const c = document.createElement('canvas');
+  c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(im, 0, 0);
+  if (!team || team.id === 'thunder') return c;
+  const d = g.getImageData(0, 0, c.width, c.height), px = d.data;
+  const suit = rgbOf(team.suit), trim = rgbOf(team.trim);
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 8) continue;
+    const r = px[i], gg = px[i + 1], b = px[i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), sat = mx ? (mx - mn) / mx : 0;
+    if (sat < 0.45) continue;
+    let h = 0;
+    if (mx === r) h = ((gg - b) / (mx - mn)) % 6; else if (mx === gg) h = (b - r) / (mx - mn) + 2; else h = (r - gg) / (mx - mn) + 4;
+    h = (h * 60 + 360) % 360;
+    let to = null, ref = 1;
+    if (h > 205 && h < 255) { to = suit; ref = 200; } // the blue shirt
+    else if (h > 42 && h < 66 && mx > 150) { to = trim; ref = 245; } // the yellow trim and flashes
+    if (!to) continue;
+    const k = Math.min(1.25, mx / ref);
+    px[i] = Math.min(255, to[0] * k); px[i + 1] = Math.min(255, to[1] * k); px[i + 2] = Math.min(255, to[2] * k);
+  }
+  g.putImageData(d, 0, 0);
+  return c;
+}
+// the painted portrait for a player (in his club's kit), or null if he hasn't one
+function paintedPortrait(p) {
+  const key = keyOf(p);
+  if (!HAS_PORTRAIT.has(key)) return null;
+  const team = p.team ? teamById(p.team) : null, ck = `${key}|${team?.id || ''}`;
+  const holder = document.createElement('div');
+  holder.className = 'fut-pic fut-paint';
+  const put = () => { if (!kits.has(ck)) kits.set(ck, recolour(srcs.get(key), team)); const src = kits.get(ck), c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); holder.append(c); };
+  const im = portraitSrc(key);
+  if (im.complete && im.naturalWidth) put(); else im.addEventListener('load', put, { once: true });
+  return holder;
+}
 
 // tiers by overall rating, best first
 export const TIERS = [
@@ -35,9 +85,13 @@ export function futCard(p, { size = 220, frame = null } = {}) {
   card.append(bg);
   // the portrait: heroes their drawn figure, everyone else their face in his club's kit
   const kit = p.team ? teamById(p.team) : { suit: '#f3efe2', trim: '#3a3a4a' };
-  const pic = p.heroId ? portrait(heroById(p.heroId), 220, 'celebrate') : faceEl(p, kit, 220, 'fut-face', true);
-  pic.classList.add('fut-pic'); if (p.heroId) pic.classList.add('fut-hero'); pic.style.width = pic.style.height = '';
-  card.append(pic);
+  const painted = paintedPortrait(p);
+  if (painted) card.append(painted);
+  else {
+    const pic = p.heroId ? portrait(heroById(p.heroId), 220, 'celebrate') : faceEl(p, kit, 220, 'fut-face', true);
+    pic.classList.add('fut-pic'); if (p.heroId) pic.classList.add('fut-hero'); pic.style.width = pic.style.height = '';
+    card.append(pic);
+  }
   card.append(mk('div', 'fut-name', p.name.toUpperCase()));
   const rate = mk('div', 'fut-rate'); rate.append(mk('b', '', String(o)), mk('small', '', ROLE[p.role] || 'BAT'));
   card.append(rate);
