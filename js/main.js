@@ -183,12 +183,12 @@ $('passClaim').addEventListener('click', () => {
 });
 $('passBack').addEventListener('click', () => renderHome());
 
-$('btnQuick').addEventListener('click', () => { unlockAudio(); pending = { mode: 'quick' }; renderSquad(); });
-$('btnChallengeMode').addEventListener('click', () => { unlockAudio(); pending = { mode: 'challenge', challenge }; renderSquad(); });
+$('btnQuick').addEventListener('click', () => { unlockAudio(); pending = { mode: 'quick' }; squadOpen = false; renderSquad(); });
+$('btnChallengeMode').addEventListener('click', () => { unlockAudio(); pending = { mode: 'challenge', challenge }; squadOpen = false; renderSquad(); });
 $('btnCup').addEventListener('click', () => { unlockAudio(); openTournament('cup'); });
 $('btnDaily').addEventListener('click', () => { unlockAudio(); renderDaily(); });
-$('btnTeam').addEventListener('click', () => { unlockAudio(); pending = null; renderSquad(); });
-$('teamBadge').addEventListener('click', () => { unlockAudio(); pending = null; renderSquad(); });
+$('btnTeam').addEventListener('click', () => { unlockAudio(); pending = null; squadOpen = false; renderSquad(); });
+$('teamBadge').addEventListener('click', () => { unlockAudio(); pending = null; squadOpen = false; renderSquad(); });
 $('btnTrophies').addEventListener('click', () => { unlockAudio(); renderTrophies(); });
 $('btnTutorial').addEventListener('click', () => { unlockAudio(); showCover(); });
 $('btnStats').addEventListener('click', () => { unlockAudio(); renderStats(); });
@@ -289,13 +289,27 @@ function heroCard(hero, { on, locked, note, onTap }) {
   if (onTap) b.addEventListener('click', onTap);
   return b;
 }
+// My Team: the eight clubs on one screen; tap one to pick it and open its page (star, signings,
+// team sheet, squad). squadOpen: that page is showing.
+let squadOpen = false;
 function renderSquad() {
   ui.show('squad');
   $('squadGo').textContent = pending ? 'Start match' : 'Done';
+  $('squadBack').textContent = squadOpen ? 'All teams' : 'Back';
   const rows = $('squadRows');
   rows.innerHTML = '';
-  rows.append(teamPicker());
+  $('squadCoins').textContent = `${profile.coins} coins`;
+  $('squad').classList.toggle('teamsonly', !squadOpen);
+  if (!squadOpen) {
+    $('squadTitle').textContent = 'My Team';
+    $('squadLede').firstChild.textContent = 'Tap a club to pick it and see its squad. ';
+    rows.append(teamPicker());
+    $('squad').scrollTop = 0;
+    return;
+  }
   const t = myTeam(), star = heroById(t.star);
+  $('squadTitle').textContent = t.name;
+  $('squadLede').firstChild.textContent = 'Your star always plays. Sign stars from other teams for the other hero slots, then set your batting order and bowling attack. ';
   // the team's own star always plays
   const starWrap = el('div', 'slot');
   const G = groundOf(t.id);
@@ -335,7 +349,6 @@ function renderSquad() {
     if (onCard) requestAnimationFrame(() => { row.scrollLeft = onCard.offsetLeft - 8; });
   }
   rows.append(teamSheet());
-  $('squadCoins').textContent = `${profile.coins} coins`;
 }
 
 // ---------- team sheet: batting order and bowling attack ----------
@@ -399,14 +412,13 @@ function teamSheet() {
   );
   return wrap;
 }
-$('squadBack').addEventListener('click', renderHome);
+$('squadBack').addEventListener('click', () => { if (squadOpen) { squadOpen = false; sfx.click(); renderSquad(); } else renderHome(); });
 $('squadGo').addEventListener('click', () => (pending ? startMatch(pending) : renderHome()));
 
 // your team: its kit is what your batter, keeper and fielders wear
 function teamPicker() {
   const wrap = el('div', 'slot');
-  const h = el('h3', '', 'Your team');
-  const row = el('div', 'slot-row teams');
+  const row = el('div', 'teamgrid');
   for (const t of TEAMS) {
     const b = document.createElement('button');
     const on = (profile.team || 'thunder') === t.id;
@@ -415,16 +427,17 @@ function teamPicker() {
     b.style.setProperty('--suit', t.suit); b.style.setProperty('--trim', t.trim);
     const logo = document.createElement('img'); logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
     b.append(logo, el('b', '', t.name), el('small', '', t.style.tag));
+    if (on) b.append(el('i', 'team-mine', 'YOUR TEAM'));
     b.addEventListener('click', () => {
       profile.team = t.id; saveProfile(profile); sfx.click();
       loadBowlSprites(t.id);
+      squadOpen = true;
       renderSquad();
+      $('squad').scrollTop = 0;
     });
     row.append(b);
   }
-  wrap.append(h, row);
-  const on = row.querySelector('.on');
-  if (on) requestAnimationFrame(() => { row.scrollLeft = on.offsetLeft - 8; });
+  wrap.append(row);
   return wrap;
 }
 
@@ -1128,7 +1141,7 @@ $('resAgain').addEventListener('click', () => {
   else if (m === 'league' || m === 'cup') renderTournament(tourNotes);
   else if (m === 'daily') renderDaily();
   else if (m === 'career') { careerView = 'hub'; renderCareer(); }
-  else { pending = { mode: 'quick' }; renderSquad(); }
+  else { pending = { mode: 'quick' }; squadOpen = false; renderSquad(); }
 });
 
 addEventListener('hashchange', () => {

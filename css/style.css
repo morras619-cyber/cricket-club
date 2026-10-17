@@ -248,6 +248,16 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .team img { width: 78px; height: 78px; margin: 4px 0 6px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.45)); }
 .team b { font-family: var(--display); letter-spacing: .5px; font-size: 15px; line-height: 1; text-align: center; background: var(--paper); border: 2px solid var(--ink); border-radius: 8px; padding: 3px 5px; margin-top: -6px; }
 .team.on { outline: 4px solid var(--bolt); outline-offset: 1px; transform: translateY(-2px); }
+/* My Team: all eight clubs on one screen, 2 x 4 */
+.teamgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 12px; padding: 4px 4px 2px; }
+.teamgrid .team { position: relative; flex: none; height: clamp(86px, calc((100dvh - 316px) / 4), 168px); padding: 6px 4px; justify-content: center; }
+.teamgrid .team { overflow: visible; gap: 0; }
+.teamgrid .team img { width: auto; height: 42%; min-height: 0; flex: none; margin: 0 0 6px; }
+.teamgrid .team small { margin-top: 2px; }
+.teamgrid .team b { font-size: 15px; }
+.team-mine { position: absolute; top: -9px; right: -6px; font-style: normal; font-family: var(--display); font-size: 12px; letter-spacing: .5px; color: var(--ink); background: var(--bolt); border: 2px solid var(--ink); border-radius: 8px; padding: 1px 6px; transform: rotate(4deg); box-shadow: 2px 2px 0 var(--ink); }
+#squad.teamsonly .screen-inner { padding-bottom: 6px; }
+#squad.teamsonly .title { margin-bottom: 2px; }
 
 /* team logos */
 .sc-head { display: flex; align-items: center; gap: 6px; }
