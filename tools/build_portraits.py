@@ -50,6 +50,10 @@ PICK = {
     # the negotiator, the agent who'll talk to you between seasons (img/people/negotiator.webp)
     'rohan-pillai': (11, 1, 27), 'ankit-desai': (11, 2, 25), 'varun-gill': (11, 3, 28), 'dev-kulkarni': (11, 4, 34),
     'harsh-reddy': (11, 6, 26), 'priyank-yadav': (11, 7, 22), 'ravi-malik': (11, 9, 29), 'neel-chawla': (11, 10, 28),
+    # sheet 12: batch 4, the last South Asian players (#3 and #7 redrawn so they're not lookalikes)
+    'aditya-rao': (12, 1, 24), 'manish-gupta': (12, 2, 32), 'rohan-bhatt': (12, 3, 27), 'tariq-butt': (12, 4, 26),
+    'tharindu-jayasena': (12, 5, 22), 'niroshan-silva': (12, 6, 30), 'dilan-wijesekara': (12, 7, 24),
+    'mahfuz-rahman': (12, 8, 27), 'rafiq-alam': (12, 9, 24), 'farid-jalali': (12, 10, 29),
 }
 # not a player: portraits kept for other parts of the game, [sheet, number, file]
 EXTRA = [(11, 8, 'img/people/negotiator.webp')]
