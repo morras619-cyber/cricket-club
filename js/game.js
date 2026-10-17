@@ -1154,6 +1154,7 @@ export class Game {
       // a perfect six: everything slows for a beat as it sails over the rope
       if (!slowed && Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR) { slowed = true; slowUntil = this.realTime + 380; }
       if (toRope && tb > end) {
+        if (!this.O.ropeShaken) { this.O.ropeShaken = true; this.of.shakeRope(sim.ropePoint.x, sim.ropePoint.y); }
         // a four rolls on over the rope, hopping as it crosses, and dies in the grass beyond
         const dt = tb - end, extra = 4.5 * (1 - Math.exp(-dt * 2.2));
         b.x = sim.ropePoint.x + path.dir.x * extra; b.y = sim.ropePoint.y + path.dir.y * extra;
@@ -1189,6 +1190,8 @@ export class Game {
       const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
       const trail = sim.kind === 'six' && !o.caught ? 'comet1' : toRope ? 'streak' : null;
       this.O.comet = hitSet && trail && tb < end ? { ...(this.O.comet || {}), set: hitSet, name: trail, prev: this.O.ball && { ...this.O.ball } } : null;
+      // a six counts its distance up as it flies
+      this.O.sixCount = six && !said ? { m: Math.round(this.sixDistance(sim) * Math.min(1, tb / end)), b } : null;
       // the six is gone once the lightning has struck where it landed
       this.O.ball = six && said ? null : b;
       this.runBatters(t, legs);
@@ -1210,6 +1213,12 @@ export class Game {
           const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
           this.fx.word('SIX!', p.x, p.y - 40, { size: 80 });
           if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3); }
+          // the crowd where it lands jumps up; a perfect six shakes the whole ground
+          const T = o.side === 'ai' ? this.myTeam : this.oppTeam;
+          this.fx.ripple(p.x, p.y, { colors: [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], r: grade === 'perfect' ? 150 : 110 });
+          this.fx.sparks(p.x, p.y, grade === 'perfect' ? 30 : 18, [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], 6);
+          this.fx.shake(grade === 'perfect' ? 18 : 9);
+          sfx.crowd(grade === 'perfect' ? 1.8 : 1.2);
           // how far it went
           const m = this.sixDistance(sim);
           this.fx.word(`${m} METRES`, p.x, p.y + 30, { size: 40, color: '#fff4da', stroke: '#e8343b', rot: 0, dur: 1400 });
@@ -2942,6 +2951,16 @@ export class Game {
       if (O.cometAng != null) this.drawTrail(ctx, O.comet, a, O.cometAng, V.k);
     }
     if (O.ball) V.ball(ctx, O.ball);
+    if (O.sixCount && O.sixCount.m > 0) {
+      // the six's distance ticking up beside the ball
+      const q = V.to(O.sixCount.b.x, O.sixCount.b.y, O.sixCount.b.h);
+      ctx.save();
+      ctx.font = `26px ${'"Bangers", Impact, sans-serif'}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+      const x = Math.max(40, Math.min(this.W - 40, q.x)), y = Math.max(140, q.y - 34);
+      ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.strokeText(`${O.sixCount.m}m`, x, y);
+      ctx.fillStyle = '#fff4da'; ctx.fillText(`${O.sixCount.m}m`, x, y);
+      ctx.restore();
+    }
   }
 }
 

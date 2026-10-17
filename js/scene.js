@@ -862,10 +862,24 @@ export class OutfieldView {
       ctx.restore();
       // the boundary rope in the home side's colour
       const rw = Math.max(5, 0.5 * k);
+      // a four that crosses it sets the rope wobbling: a bulge that rings out and settles
+      const wave = this.ropeWave, age = wave ? (performance.now() - wave.t0) / 1000 : 9;
+      const bump = age < 1.4 ? a => {
+        let d = a - wave.ang; d = Math.atan2(Math.sin(d), Math.cos(d));
+        return 1.6 * Math.exp(-((d / 0.09) ** 2)) * Math.cos(age * 26 - Math.abs(d) * 40) * Math.exp(-age * 3);
+      } : null;
       ctx.save();
       for (const [style, w] of [[INK, rw + 3], [ropeColour(), rw], ['rgba(255,255,255,0.4)', Math.max(1.2, rw * 0.28)]]) {
         ctx.strokeStyle = style; ctx.lineWidth = w;
-        ctx.beginPath(); ctx.ellipse(c.x, c.y - (w < rw ? rw * 0.18 : 0), (R + 1.5) * k, (R + 1.5) * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke();
+        const lift = w < rw ? rw * 0.18 : 0;
+        ctx.beginPath();
+        if (!bump) ctx.ellipse(c.x, c.y - lift, (R + 1.5) * k, (R + 1.5) * k * 0.78, 0, 0, Math.PI * 2);
+        else for (let i = 0; i <= 360; i++) {
+          const a = (i / 360) * Math.PI * 2, r = (R + 1.5 + bump(a)) * k;
+          const x = c.x + Math.cos(a) * r, y = c.y - lift - Math.sin(a) * r * 0.78;
+          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.stroke();
       }
       ctx.restore();
     } else {
@@ -933,6 +947,8 @@ export class OutfieldView {
     drawFigure(ctx, p.x, p.y, Math.max(26, 1.85 * this.k * 1.5) * (opts.scale || 1), look, pose, opts);
     return p;
   }
+  // set the rope wobbling where the ball crossed it (world x, y)
+  shakeRope(x, y) { this.ropeWave = { ang: Math.atan2(y - CY, x), t0: performance.now() }; }
   ball(ctx, b) {
     const sh = this.to(b.x, b.y), p = this.to(b.x, b.y, b.h);
     const r = Math.max(4, 0.35 * this.k);

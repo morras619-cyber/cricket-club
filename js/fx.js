@@ -72,7 +72,7 @@ export function drawEffect(ctx, set, name, x, y, { w = 120, h = null, rot = 0, a
 export class FX {
   constructor() { this.reset(); loadBurst(); }
   reset() {
-    this.words = []; this.bubbles = []; this.parts = []; this.bursts = []; this.blasts = []; this.effects = [];
+    this.words = []; this.bubbles = []; this.parts = []; this.bursts = []; this.blasts = []; this.effects = []; this.ripples = [];
     this.flashA = 0; this.flashColor = '#fff'; this.shakeA = 0; this.speed = 0; this.vignette = null;
   }
 
@@ -88,6 +88,10 @@ export class FX {
   // a painted effect that pops in, flickers and fades: effect('electric', 'burst1', x, y, { w, dur })
   effect(set, name, x, y, { w = 160, h = null, rot = 0, dur = 380, anchor = [0.5, 0.5], flip = false, grow = 1.15 } = {}) {
     this.effects.push({ set, name, x, y, w, h, rot, dur, anchor, flip, grow, t: 0 });
+  }
+  // rings spreading out across the crowd from (x, y), as people jump up
+  ripple(x, y, { colors = ['#fff4da', '#ffd23f'], r = 90, dur = 700, squash = 0.78 } = {}) {
+    colors.forEach((c, i) => this.ripples.push({ x, y, color: c, r, dur, squash, t: -i * 110 }));
   }
   flash(color = '#fff', a = 0.9) { this.flashColor = color; this.flashA = a; }
   shake(a = 10) { this.shakeA = Math.max(this.shakeA, a); }
@@ -107,6 +111,8 @@ export class FX {
     for (const b of this.blasts) b.t += dtMs;
     this.blasts = this.blasts.filter(b => b.t < b.dur);
     for (const e of this.effects) e.t += dtMs;
+    for (const r of this.ripples) r.t += dtMs;
+    this.ripples = this.ripples.filter(r => r.t < r.dur);
     this.effects = this.effects.filter(e => e.t < e.dur);
     this.words = this.words.filter(w => w.t < w.dur);
     this.bubbles = this.bubbles.filter(b => b.t < b.dur);
@@ -128,6 +134,14 @@ export class FX {
       const [sx, sy, w, h, cx, cy] = BURST[Math.min(7, Math.floor((b.t / b.dur) * 8))];
       const k = b.size / BURST_REF;
       ctx.drawImage(burstSheet(b.hue), sx, sy, w, h, b.x - cx * k, b.y - cy * k, w * k, h * k);
+    }
+    for (const r of this.ripples) {
+      if (r.t < 0) continue;
+      const p = r.t / r.dur, rr = r.r * (0.15 + 0.85 * Math.sqrt(p));
+      ctx.globalAlpha = (1 - p) * 0.8; ctx.strokeStyle = r.color; ctx.lineWidth = 3 + 5 * (1 - p);
+      ctx.setLineDash([4, 7]);
+      ctx.beginPath(); ctx.ellipse(r.x, r.y, rr, rr * r.squash, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
     }
     for (const e of this.effects) {
       const p = e.t / e.dur;
