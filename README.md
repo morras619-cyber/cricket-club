@@ -99,3 +99,9 @@ npm run smoke  # a bot plays the tutorial and a full match in headless Chromium 
 ```
 
 Set `window.__SIXCHARGE_BOT = true` before load to let the bot play; `window.__SIXCHARGE_SPEED` speeds the clock up.
+
+## Ideas for later
+
+- **The negotiator (Super League).** An agent character (portrait: `img/people/negotiator.webp`, the
+  chubby, friendly, greying man holding the ball in both hands) who pops up between matches and
+  seasons: asks you questions, brings news, and offers to sell you players as the seasons go on.

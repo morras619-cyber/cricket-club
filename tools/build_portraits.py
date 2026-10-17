@@ -45,7 +45,13 @@ PICK = {
     'hamza-nawaz': (9, 7, 34), 'ehan-rizvi': (9, 8, 24), 'hamid-usmani': (9, 9, 32), 'zain-mirza': (9, 10, 28),
     # sheet 10: those two redrawn
     'sameer-raza': (10, 1, 30), 'sameer-javed': (10, 2, 31),
+    # sheet 11: batch 3, Indian players. #5 is left out (Rizwan Khan's lookalike); #8 is kept for
+    # the negotiator, the agent who'll talk to you between seasons (img/people/negotiator.webp)
+    'rohan-pillai': (11, 1, 27), 'ankit-desai': (11, 2, 25), 'varun-gill': (11, 3, 28), 'dev-kulkarni': (11, 4, 34),
+    'harsh-reddy': (11, 6, 26), 'priyank-yadav': (11, 7, 22), 'ravi-malik': (11, 9, 29), 'neel-chawla': (11, 10, 28),
 }
+# not a player: portraits kept for other parts of the game, [sheet, number, file]
+EXTRA = [(11, 8, 'img/people/negotiator.webp')]
 
 
 def pieces(path):
@@ -95,6 +101,9 @@ def main():
         p = sheets[s - 1][n - 1]
         p = p.resize((300, round(p.height * 300 / p.width)), Image.LANCZOS)
         p.save(f'img/cards/portraits/{key}.webp', 'WEBP', quality=88, method=6)
+    for s, n, path in EXTRA:
+        p = sheets[s - 1][n - 1]
+        p.resize((400, round(p.height * 400 / p.width)), Image.LANCZOS).save(path, 'WEBP', quality=90, method=6)
     keys = sorted(f[:-5] for f in os.listdir('img/cards/portraits') if f.endswith('.webp'))
     with open('js/portraits-list.js', 'w') as f:
         f.write('// Players with a painted Super League card portrait (img/cards/portraits/<key>.webp).\n')
