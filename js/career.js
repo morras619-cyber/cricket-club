@@ -4,6 +4,7 @@
 // into (until 33), young players arrive every season, the best become stars with an ability,
 // and every run and wicket goes into records that never reset. Pure data and functions:
 // the state lives in the profile (profile.career).
+import { PORTRAIT_AGE } from './portraits-list.js';
 import { CFG } from './config.js';
 import { makeRng } from './rng.js';
 import { TEAMS, teamById } from './teams.js';
@@ -69,7 +70,7 @@ export function newCareer(seed = Date.now() >>> 0) {
     c.budgets[t.id] = AI_BUDGET[t.tier];
     for (const r of roster(t.id)) {
       const pr = makeRng(hashStr(r.id) ^ seed);
-      const age = pr.int(19, 35);
+      const age = lookAge(r) ?? pr.int(19, 35);
       const main = Math.max(...primary(r).map(k => r[k]));
       const pot = Math.min(95, main + (age <= 22 ? pr.int(6, 16) : age <= 26 ? pr.int(2, 6) : age < PEAK_AGE ? pr.int(0, 2) : 0));
       const { hero, ...rest } = r;
@@ -79,11 +80,16 @@ export function newCareer(seed = Date.now() >>> 0) {
   for (const h of HEROES) {
     const { hero, ...rest } = heroPlayer(h);
     const main = Math.max(...primary(rest).map(k => rest[k]));
-    c.players[h.id] = newPlayer(rest, { heroId: h.id, age: rng.int(25, 31), pot: Math.min(97, main + 2), team: null, contract: 0, home: teamOfStar(h.id) });
+    c.players[h.id] = newPlayer(rest, { heroId: h.id, age: lookAge(rest) ?? rng.int(25, 31), pot: Math.min(97, main + 2), team: null, contract: 0, home: teamOfStar(h.id) });
   }
   youthIntake(c, rng, 6);
+  c.lookAges = {};
+  for (const p of Object.values(c.players)) { const a = lookAge(p); if (a != null) c.lookAges[p.id] = a; }
   return c;
 }
+// a player with a painted portrait is as old as he looks in it
+const portraitKey = name => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+export const lookAge = p => PORTRAIT_AGE[portraitKey(p.name || '')];
 const teamOfStar = id => TEAMS.find(t => t.star === id)?.id || null;
 
 const NICKS = ['Kid', 'Rookie', 'Spark', 'Pocket Rocket', 'Wonderboy', 'Junior', 'Prodigy', 'Rising Sun', 'Little Master', 'Cub', 'Comet', 'Bullet', 'Whiz', 'Ace'];
@@ -120,7 +126,20 @@ export function youthIntake(c, rng, n) {
 // Careers saved before players had countries: the regulars take their new names and
 // nations from the squads, heroes get theirs, and older academy graduates get one.
 export function migrateCareer(c) {
-  if (!c || c.nations) return c;
+  if (!c) return c;
+  // painted players get the age they look (as of season 1, older by the seasons since)
+  c.lookAges = c.lookAges || {};
+  for (const p of Object.values(c.players)) {
+    const a = lookAge(p);
+    if (a == null || c.lookAges[p.id] === a) continue;
+    const pot = p.pot, main = Math.max(...primary(p).map(k => p[k] || 0));
+    p.age = a + (c.season - 1);
+    // a young face keeps room to grow; an older one doesn't keep a youngster's ceiling
+    if (p.age <= 22) p.pot = Math.max(pot, Math.min(95, main + 8));
+    else if (p.age >= 28) p.pot = Math.min(pot, Math.max(main, main + 2));
+    c.lookAges[p.id] = a;
+  }
+  if (c.nations) return c;
   for (const p of Object.values(c.players)) {
     const [team] = p.id.split('-');
     const r = TEAMS.some(t => t.id === team) && roster(team).find(x => x.id === p.id);

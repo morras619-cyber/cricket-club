@@ -89,3 +89,18 @@ test('players grow to their potential, stop at 33, and the best become stars', (
   assert.equal(ovr(vet), o, 'no growth from 33');
   assert.ok(C.value({ ...kid, age: 19 }) > C.value({ ...kid, age: 34 }));
 });
+
+test('painted players are as old as they look, in new and saved careers', async () => {
+  const { newCareer, migrateCareer } = await import('../js/career.js');
+  const { PORTRAIT_AGE } = await import('../js/portraits-list.js');
+  const c = newCareer(42);
+  const find = n => Object.values(c.players).find(p => p.name === n);
+  assert.equal(find('Thabo Mthembu').age, PORTRAIT_AGE['thabo-mthembu']);
+  assert.equal(find('Thunder Raja').age, PORTRAIT_AGE['thunder-raja']);
+  // an older save: wrong ages get fixed once, older by the seasons played
+  const p = find('Rakibul Karim'); p.age = 31; delete c.lookAges; c.season = 3;
+  migrateCareer(c);
+  assert.equal(p.age, PORTRAIT_AGE['rakibul-karim'] + 2);
+  p.age += 1; migrateCareer(c); // not reset again after that
+  assert.equal(p.age, PORTRAIT_AGE['rakibul-karim'] + 3);
+});
