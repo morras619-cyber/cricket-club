@@ -112,11 +112,16 @@ def build(view, sheet, hairpaths, place):
     for st, hair in hairs.items():
         hl = hair[..., :3] @ LUM
         v = hl[hair[..., 3] > 0.5]
-        meta['hair'][st] = round(float(np.median(v[v > 0.15])), 4)
+        v = v[v > 0.15]
+        if len(v) < 50:  # nothing in this view (a beard, from behind)
+            continue
+        meta['hair'][st] = round(float(np.median(v)), 4)
     meta['size'] = [W, AH]
     os.makedirs('img/kit', exist_ok=True)
     Image.fromarray((np.clip(atlas, 0, 1) * 255).astype(np.uint8), 'RGBA').save(f'img/kit/{view}.webp', 'WEBP', quality=90, method=6)
     for st, ha in hatlas.items():
+        if st not in meta['hair']:
+            continue
         Image.fromarray((np.clip(ha, 0, 1) * 255).astype(np.uint8), 'RGBA').save(f'img/kit/{view}-hair-{st}.webp', 'WEBP', quality=90, method=6)
     Image.fromarray(mask, 'RGB').save(f'img/kit/{view}-mask.png', optimize=True)
     print(view, (W, AH))

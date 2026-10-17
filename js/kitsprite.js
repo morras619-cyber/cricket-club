@@ -61,10 +61,14 @@ function hairData(view, style) {
 }
 
 // The player's hairstyle: from his portrait (tools: js/portrait-styles.js), else from his look.
-// Styles without their own drawing yet use the nearest one (dreads -> long, bun -> ponytail).
-const CUT = { part: 'part', messy: 'messy', buzz: 'buzz', curly: 'curly', spiky: 'spiky', long: 'long', ponytail: 'ponytail', dreads: 'long', bun: 'ponytail' };
-const STYLE = { crop: 'buzz', swept: 'messy', spiky: 'spiky', curly: 'curly', long: 'long', afro: 'curly', dreads: 'long', patka: 'buzz' };
+// His beard (front views only: from behind there's nothing of it to see) and a backwards cap.
+const CHIN = { full: 'beard_full', beard: 'beard_full', stubble: 'beard_stubble', moustache: 'beard_moustache', goatee: 'beard_goatee', long: 'beard_long' };
+export const beardOf = look => CHIN[look.chin] || (look.chin === undefined ? CHIN[look.beard] : null) || null;
+export const wearOf = look => (look.wear === 'cap' ? 'cap' : null);
+const CUT = { part: 'part', messy: 'messy', buzz: 'buzz', curly: 'curly', spiky: 'spiky', long: 'long', ponytail: 'ponytail', dreads: 'dreads', bun: 'bun' };
+const STYLE = { crop: 'buzz', swept: 'messy', spiky: 'spiky', curly: 'curly', long: 'long', afro: 'curly', dreads: 'dreads', patka: 'buzz' };
 export function hairStyleOf(look) {
+  if (look.wear === 'cap') return null; // the cap's drawing has his short sides under it
   if (look.cut === 'bald' || (!look.cut && look.style === 'bald')) return null;
   if (CUT[look.cut]) return CUT[look.cut];
   if (look.wear) return 'buzz'; // short hair under a cap or wrap
@@ -167,10 +171,13 @@ function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
   if (!data || !fontReady) return null;
   const sk = skinHex(look), hr = hairHex(look), style = hairStyleOf(look);
+  const beard = view === 'front' ? beardOf(look) : null, wear = wearOf(look);
   const hp = style ? hairData(view, style) : null;
-  if (hp === undefined) return null;
+  const bp = beard && KIT_SHEETS[view].hair[beard] ? hairData(view, beard) : null;
+  const wp = wear ? hairData(view, wear) : null;
+  if (hp === undefined || bp === undefined || wp === undefined) return null;
   const name = shirtName(look.who), num = shirtNumber(look);
-  const key = [view, team.id, team.suit, team.trim, sk, hr, style, name, num, mirror].join('|');
+  const key = [view, team.id, team.suit, team.trim, sk, hr, style, beard, wear, name, num, mirror].join('|');
   if (playerCache.has(key)) { const c = playerCache.get(key); playerCache.delete(key); playerCache.set(key, c); return c; }
   if (view === 'front' && !crestCanvas(team.id)) return null;
   const kit = teamSheet(view, team);
@@ -183,17 +190,22 @@ function playerSheet(view, team, look, mirror) {
   g.drawImage(kit, 0, 0);
   // skin, then his hair (none if he's bald)
   let img = g.getImageData(0, 0, W, H), p = img.data;
-  const m = data.mask, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255, href = style ? meta.hair[style] * 255 : 1;
+  const m = data.mask, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255;
+  // hair and beard in his hair colour (shading kept); the cap as drawn
+  const layers = [[hp, style], [bp, beard], [wp, null]].filter(([d]) => d).map(([d, s2]) => [d, s2 ? meta.hair[s2] * 255 : 0]);
   for (let i = 0; i < p.length; i += 4) {
     if (m[i] > 127 && p[i + 3]) {
       const r = lum(p[i], p[i + 1], p[i + 2]) / sref;
       for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
     }
-    const a = hp ? hp[i + 3] / 255 : 0;
-    if (a > 0.01) {
-      const q = lum(hp[i], hp[i + 1], hp[i + 2]) / href;
-      for (let k = 0; k < 3; k++) p[i + k] = (q <= 1 ? ht[k] * q : ht[k] + (255 - ht[k]) * Math.min(0.8, (q - 1) * 0.6)) * a + p[i + k] * (1 - a);
-      p[i + 3] = Math.max(p[i + 3], hp[i + 3]);
+    for (const [d, href] of layers) {
+      const a = d[i + 3] / 255;
+      if (a <= 0.01) continue;
+      if (href) {
+        const q = lum(d[i], d[i + 1], d[i + 2]) / href;
+        for (let k = 0; k < 3; k++) p[i + k] = (q <= 1 ? ht[k] * q : ht[k] + (255 - ht[k]) * Math.min(0.8, (q - 1) * 0.6)) * a + p[i + k] * (1 - a);
+      } else for (let k = 0; k < 3; k++) p[i + k] = d[i + k] * a + p[i + k] * (1 - a);
+      p[i + 3] = Math.max(p[i + 3], d[i + 3]);
     }
   }
   g.putImageData(img, 0, 0);
