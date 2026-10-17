@@ -46,10 +46,10 @@ function recolour(im, team) {
   return c;
 }
 // the painted portrait for a player (in his club's kit), or null if he hasn't one
-function paintedPortrait(p) {
+export function paintedPortrait(p, kitTeam = null) {
   const key = keyOf(p);
   if (!HAS_PORTRAIT.has(key)) return null;
-  const team = p.team ? teamById(p.team) : null, ck = `${key}|${team?.id || ''}`;
+  const team = kitTeam || (p.team ? teamById(p.team) : null), ck = `${key}|${team?.id || ''}`;
   const holder = document.createElement('div');
   holder.className = 'fut-pic fut-paint';
   const put = () => { if (!kits.has(ck)) kits.set(ck, recolour(srcs.get(key), team)); const src = kits.get(ck), c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); holder.append(c); };

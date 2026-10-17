@@ -413,7 +413,7 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
-    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500, cardFor(p) || (p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.oppTeam : this.myTeam, 64)));
+    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500, cardFor(p, inn.side === 'player' ? this.oppTeam : this.myTeam));
     await this.sleepReal(50); // let the banner show first
     this.prepPlayers(inn);
     await this.sleepReal(this.bot ? 10 : 1050);
@@ -423,12 +423,12 @@ export class Game {
   async openersBanner(inn) {
     inn.openersShown = true;
     const pair = [this.batterOf(inn), this.nonStrikerOf(inn)].filter(Boolean);
-    const cards = pair.map(p => cardFor(p)).filter(Boolean);
+    const team = inn.side === 'player' ? this.myTeam : this.oppTeam;
+    const cards = pair.map(p => cardFor(p, team)).filter(Boolean);
     if (!cards.length || this.mode === 'tutorial') return;
     const box = document.createElement('div');
     box.className = 'pcard-pair';
     box.append(...cards);
-    const team = inn.side === 'player' ? this.myTeam : this.oppTeam;
     this.ui.banner('OPENERS', '', 2700, box, { cls: 'card-head', color: team?.suit });
     await this.sleepReal(this.bot ? 60 : 2700);
   }
@@ -436,7 +436,7 @@ export class Game {
   // a wicket: the next batter walks out
   async newBatter(inn) {
     const p = this.fillCrease(inn)[0] || this.batterOf(inn);
-    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700, cardFor(p) || (p.hero ? null : faceCanvas(p, inn.side === 'player' ? this.myTeam : this.oppTeam, 64)));
+    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700, cardFor(p, inn.side === 'player' ? this.myTeam : this.oppTeam));
     this.prepPlayers(inn);
     await this.sleepReal(this.bot ? 60 : 1200);
   }

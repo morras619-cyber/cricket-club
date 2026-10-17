@@ -528,3 +528,18 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .futcell .futnote { font-size: 11px; font-weight: 700; color: #4a4560; text-align: center; line-height: 1.2; }
 
 .chipbtn.confirming { background: var(--hot); color: #fff; border-color: var(--hot); }
+
+/* the match pop-up card: painted portrait on the team-coloured frame (480 x 497) */
+.mcard { position: relative; width: min(48vw, 200px); aspect-ratio: 480 / 497; container-type: inline-size; animation: cardin .32s cubic-bezier(.2, 1.4, .4, 1); filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .55)); }
+.mcard-frame { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mcard-pic { position: absolute; left: 15%; top: 10%; width: 72%; height: 57.5%; overflow: hidden; -webkit-mask-image: linear-gradient(#000 82%, transparent); mask-image: linear-gradient(#000 82%, transparent); }
+.mcard-pic canvas { width: 100%; height: 100%; object-fit: cover; object-position: 30% 0; display: block; }
+.mcard-pic.mcard-drawn { object-fit: contain; height: 52%; top: 14%; }
+.mcard-ovr { position: absolute; right: 13%; top: 11%; font-family: "Barlow Condensed", var(--body); font-style: italic; font-weight: 800; font-size: 19cqw; line-height: 1; color: #ffd23f; -webkit-text-stroke: 1.5px #000; paint-order: stroke fill; text-shadow: 2px 3px 0 #000; }
+.mcard-name { position: absolute; left: 12%; right: 12%; top: 67.5%; height: 10%; display: flex; align-items: center; justify-content: center; font-family: "Barlow Condensed", var(--body); font-style: italic; font-weight: 800; font-size: 10cqw; line-height: 1; color: #fff; white-space: nowrap; overflow: hidden; text-shadow: 0 2px 0 #000; }
+.mcard-role { position: absolute; left: 28%; width: 40%; top: 79.5%; height: 10%; display: flex; align-items: center; justify-content: center; font-family: var(--body); font-weight: 800; font-size: 6.2cqw; letter-spacing: .5px; color: #fff; white-space: nowrap; }
+.pcard-pair .mcard { width: min(44vw, 180px); }
+.pcard-pair .mcard:nth-child(2) { animation-delay: .12s; animation-fill-mode: both; }
+/* the small-face rule above sizes every canvas in the banner: not the ones on a card */
+.banner-face .mcard canvas { width: 100%; height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+.banner-face .mcard-pic canvas { object-fit: cover; object-position: 30% 0; }
