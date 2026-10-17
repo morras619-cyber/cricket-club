@@ -2,6 +2,7 @@
 // a comic face for each player in the menus, and to repaint the hand-drawn match sprites
 // (skin and hair) so the man at the crease looks like himself.
 import { PORTRAIT_LOOKS } from './portrait-looks.js';
+import { PORTRAIT_STYLES } from './portrait-styles.js';
 import { INK } from './fx.js';
 import { makeRng } from './rng.js';
 
@@ -54,9 +55,10 @@ function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c
 export function lookOf(p) {
   if (!p) return null;
   // a player with a painted portrait has its skin tone and hair colour on the pitch too
-  const painted = PORTRAIT_LOOKS[portraitKey(p.name || '')];
+  // (and its haircut, beard and headwear: hair.js)
+  const key = portraitKey(p.name || ''), painted = PORTRAIT_LOOKS[key], cut = PORTRAIT_STYLES[key];
   const base = baseLook(p);
-  return painted ? { ...base, skin: painted.skin, hair: painted.hair } : base;
+  return { ...base, ...painted, ...cut, seed: p.id || p.name || '' };
 }
 const portraitKey = name => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function baseLook(p) {
@@ -487,10 +489,11 @@ export function maskCanvas(src, name) {
 
 // src: the sheet to draw (maybe already repainted in a team's kit); key: its cache name;
 // maskName / maskSrc: which mask, and the plain sheet to compute it from if it isn't shipped
-export function peopleSheet(src, key, look, maskName = key, maskSrc = src) {
+// dress: optional { key, bald, fn(g, mask, pixels, w, h) } drawing hair pieces on the heads (hair.js)
+export function peopleSheet(src, key, look, maskName = key, maskSrc = src, dress = null) {
   if (!look) return src;
   const sk = skinHex(look), hr = hairHex(look);
-  const id = `${key}|${sk}|${hr}`;
+  const id = `${key}|${sk}|${hr}|${dress?.key || ''}`;
   if (cache.has(id)) { const c = cache.get(id); cache.delete(id); cache.set(id, c); return c; }
   const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
   if (!w || !h) return src;
@@ -504,7 +507,10 @@ export function peopleSheet(src, key, look, maskName = key, maskSrc = src) {
   const img = g.getImageData(0, 0, w, h), p = img.data;
   // repaint by brightness: each pixel keeps how light or dark it was relative to the drawn skin
   // (or hair), so the shading survives and the new tone is smooth
-  const T = [hexRgb(sk), hexRgb(hr)], LREF = [lum(...rgb(...REF_SKIN)), lum(...rgb(...REF_HAIR))];
+  // (a bald player's drawn hair becomes scalp: skin a shade darker)
+  const scalp = hexRgb(sk).map(v => v * 0.88);
+  const T = [hexRgb(sk), dress?.bald ? scalp : hexRgb(hr)], LREF = [lum(...rgb(...REF_SKIN)), lum(...rgb(...REF_HAIR))];
+  if (dress?.bald) LREF[1] = LREF[0] * 0.6;
   for (let i = 0, q = 0; i < p.length; i += 4, q++) {
     if (!m[q]) continue;
     const t = T[m[q] - 1], ratio = lum(p[i], p[i + 1], p[i + 2]) / LREF[m[q] - 1];
@@ -513,6 +519,7 @@ export function peopleSheet(src, key, look, maskName = key, maskSrc = src) {
     }
   }
   g.putImageData(img, 0, 0);
+  if (dress) dress.fn(g, m, p, w, h);
   cache.set(id, c);
   // keep only a handful (the batter and bowler on screen): free the rest at once on iPhones
   while (cache.size > 6) { const [k, old] = cache.entries().next().value; cache.delete(k); old.width = 0; old.height = 0; }

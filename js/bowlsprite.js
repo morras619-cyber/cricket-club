@@ -412,7 +412,8 @@ const SPIN_CYCLE = ['run1', 'run2'];
 // after release (ms of game time): release, follow-through, then he stands and watches
 const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3', 170], ['finish', Infinity]];
 
-import { peopleSheet, peopleFrame, loadPeopleMask } from './looks.js';
+import { peopleSheet, peopleFrame, loadPeopleMask, hairHex, skinHex } from './looks.js';
+import { loadHair, hairReady, piecesOf, piecesKey, headsOf, dressSheet } from './hair.js';
 import { KIT_LOGOS } from './kitlogos.js';
 const tinted = new Map();
 
@@ -452,6 +453,7 @@ export function loadBowlSprites(...teamIds) {
     loadView(v);
   }
   for (const id of teamIds) if (id) crestOf(id);
+  loadHair();
   if (teamIds.length >= 2) {
     for (const [key, c] of tinted) {
       if (teamIds.some(id => key.replace('+crest', '').endsWith(id))) continue;
@@ -577,6 +579,19 @@ function stampCrest(p, shirt, W, H, crest, [cx, cy, size, squash = 1]) {
   }
 }
 
+// the player's haircut, beard and headwear drawn onto the repainted sheet (hair.js)
+// (not the batters: their helmets hide it)
+function dressFor(view, v, look) {
+  if (view === 'batfront' || view === 'nonstriker') return null;
+  const pieces = look && piecesOf(look, look.seed || '');
+  const facing = /^(front|spin-front)/.test(view) ? 'front' : 'back';
+  if (!pieces || !hairReady(facing)) return null; // (drawn as soon as the pieces have loaded)
+  return {
+    key: piecesKey(pieces), bald: pieces.hair === 'bald',
+    fn: (g, m, p, w) => dressSheet(g, pieces, headsOf(view, m, p, w, v.frames, v.refPx), facing, hairHex(look), skinHex(look)),
+  };
+}
+
 // Draw a frame with its feet at (px, py); kPerM is pixels per metre at that depth. False until loaded.
 // look: the player's skin and hair (looks.js), repainted onto the drawn sheet
 export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, view = 'front', look = null) {
@@ -592,7 +607,7 @@ export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, vi
   const v = VIEWS[view];
   if (!v || !v.ready || !v.frames[frame]) return false;
   const sheet = sheetFor(view, team);
-  const img = peopleSheet(sheet, `${view}-${team?.id}${sheet.crest ? '+crest' : ''}`, look, view, v.img); // skin and hair, from the plain sheet's mask
+  const img = peopleSheet(sheet, `${view}-${team?.id}${sheet.crest ? '+crest' : ''}`, look, view, v.img, dressFor(view, v, look)); // skin and hair, from the plain sheet's mask
   const [sx, sy, w, h, ax, ay, s] = v.frames[frame];
   const k = kPerM * REF_HEIGHT_M / v.refPx * s;
   ctx.save();

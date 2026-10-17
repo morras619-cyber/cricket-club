@@ -1,0 +1,27 @@
+// Each painted portrait's haircut, facial hair and headwear, read by eye, so the player on the
+// pitch wears the same (hair.js pieces: cut / chin / wear, and the headwear's colour if it isn't
+// white). Skin and hair colour: portrait-looks.js.
+const S = s => { const [cut, chin, wear, wearColour] = s.split(' ').map(v => (v === '-' ? null : v)); return { cut, chin, wear, wearColour }; };
+export const PORTRAIT_STYLES = Object.fromEntries(Object.entries({
+  'aamir-lodhi': 'messy full', 'aarav-nair': 'curly -', 'aditya-rao': 'part -', 'andre-belgrave': 'dreads goatee',
+  'ankit-desai': 'messy -', 'arjun-iyer': 'part -', 'aryan-malhotra': 'part stubble', 'ashik-talukder': 'messy -',
+  'ben-ashworth': 'buzz -', 'bilal-akhtar': 'spiky moustache', 'bilawal-gul': 'buzz full', 'callum-fraser': 'long stubble',
+  'corbin-hayes': 'bun full', 'craig-lockhart': 'long stubble', 'danish-haider': 'messy -', 'danish-iqbal': 'curly moustache',
+  'dev-kulkarni': 'buzz full', 'dev-pillai': 'curly -', 'dev-rana': 'part full', 'dilan-wijesekara': 'part -',
+  'dinesh-wickramasinghe': 'long -', 'dwayne-hollis': 'buzz -', 'ehan-rizvi': 'long - cap', 'ethan-van-der-berg': 'messy stubble',
+  'faisal-naqvi': 'messy full', 'faraz-mirza': 'ponytail moustache', 'farid-jalali': '- full pakol #8a6446', 'fawad-bhatt': 'messy moustache',
+  'finn-gallagher': 'curly -', 'hamid-noorzai': 'bun goatee', 'hamid-usmani': 'buzz long', 'hamza-iqbal': 'messy -',
+  'hamza-nawaz': 'part moustache', 'harsh-reddy': 'buzz full', 'henry-blackwood': 'spiky stubble shades', 'jake-thornton': 'messy -',
+  'james-whitfield': 'part full', 'jaspreet-dhillon': '- full headband #26222a', 'jermaine-alleyne': 'curly -', 'kashif-lone': 'messy -',
+  'kunal-saini': 'messy -', 'liam-buckley': 'messy -', 'mahfuz-rahman': 'part stubble', 'manish-gupta': 'part goatee',
+  'marco-pienaar': 'buzz -', 'marlon-greaves': 'curly stubble', 'mitchell-doyle': 'spiky stubble', 'nadir-sheikh': 'bald full',
+  'neel-chawla': 'curly full', 'niroshan-silva': 'buzz goatee', 'oliver-hartley': 'part -', 'priyank-yadav': 'messy moustache',
+  'rafiq-alam': 'buzz stubble', 'rakibul-karim': 'curly -', 'ravi-malik': 'part stubble', 'rizwan-akram': 'messy stubble',
+  'rizwan-khan': 'messy stubble', 'rocky-van-wyk': 'part full', 'rohan-bhatt': 'part stubble', 'rohan-pillai': 'curly goatee',
+  'ryan-mcallister': 'messy moustache', 'saad-ahmed': 'buzz full', 'sameer-javed': 'buzz full', 'sameer-raza': 'part -',
+  'shane-granger': 'dreads -', 'shoaib-haider': 'messy -', 'shoaib-raza': 'long goatee', 'siddharth-verma': 'curly -',
+  'sipho-nkosi': 'buzz -', 'sunny-bhatia': 'part full', 'tariq-butt': 'curly moustache', 'tariq-mirza': 'part stubble',
+  'tendai-moyo': 'spiky goatee', 'thabo-mthembu': 'curly -', 'tharindu-jayasena': 'messy -', 'thunder-raja': 'spiky - shades',
+  'varun-gill': 'part full', 'yasir-abbasi': 'buzz full', 'yuvraj-sodhi': 'messy full', 'zain-mirza': 'part stubble',
+  'zubair-khan': 'part full',
+}).map(([k, v]) => [k, S(v)]));
