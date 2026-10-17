@@ -642,6 +642,15 @@ $('btnLeague').addEventListener('click', () => { unlockAudio(); careerView = 'hu
 $('careerHome').addEventListener('click', () => { if (careerView === 'squad') { careerView = 'hub'; renderCareer(); } else renderHome(); });
 $('careerSquad').addEventListener('click', () => { careerView = careerView === 'squad' ? 'hub' : 'squad'; renderCareer(); });
 $('careerRecords').addEventListener('click', () => renderRecords());
+// start the Super League again from season 1: a fresh league, a fresh auction (nothing else is touched)
+$('careerRestart').addEventListener('click', () => {
+  if (!confirm('Restart your Super League career? Your club, players, money, seasons and league records start again from season 1. Coins, trophies and everything outside the Super League stay.')) return;
+  profile.career = newCareer(randomSeed());
+  careerView = 'hub';
+  saveProfile(profile);
+  ui.toast('A new Super League career begins');
+  renderCareer();
+});
 
 // pick (or keep) a club for the season
 function careerPick(c, body) {
