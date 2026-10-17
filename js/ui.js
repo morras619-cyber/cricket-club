@@ -19,6 +19,7 @@ export class UI {
     this.bannerTimer = 0;
     this.powerKeys = '';
     $('fieldBtn').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); this.onFieldBtn?.(); });
+    $('shotBtn').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); if (this.onShotBtn) this.setShot(this.onShotBtn()); });
     $('fieldDone').addEventListener('click', e => { e.stopPropagation(); this.onFieldDone?.(); });
     $('btnSmack').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); this.onBanter?.('smack'); });
     $('btnCool').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); this.onBanter?.('cool'); });
@@ -177,6 +178,20 @@ export class UI {
     t.textContent = msg; t.classList.add('show');
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+  }
+
+  // ---------- batting: GROUND / LOFT ----------
+  // onTap flips the choice and returns the new one (true = loft)
+  shotButton(on, loft = false, onTap = null) {
+    const b = $('shotBtn'), changed = b.hidden === on;
+    b.hidden = !on; this.onShotBtn = on ? onTap : null;
+    if (on) this.setShot(loft);
+    if (changed) for (const pn of document.querySelectorAll('#powers .pname')) { setFit(pn, pn.textContent); pn.dataset.fit = `${pn.textContent}|${pn.clientWidth}`; }
+  }
+  setShot(loft) {
+    const b = $('shotBtn');
+    b.classList.toggle('loft', !!loft);
+    b.setAttribute('aria-pressed', loft ? 'true' : 'false');
   }
 
   // ---------- bowling ----------

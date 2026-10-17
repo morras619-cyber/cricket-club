@@ -12,11 +12,12 @@ export function gradeTiming(errMs, w, offSideBall = true) {
 // Screen swipe (px, y down) → shot. angle: 0 = straight back past the bowler,
 // +π/2 = square on the off side, −π/2 = square on the leg side, ±π = straight behind
 // (over the keeper). Every direction is a shot: swiping down plays behind the wicket.
-export function swipeToShot(dx, dy, loftPx = 110) {
+// loft: the player's GROUND / LOFT choice; null (the tutorial) = a long swipe lofts it.
+export function swipeToShot(dx, dy, loftPx = 110, loft = null) {
   const len = Math.hypot(dx, dy);
   if (len < 28) return { kind: 'block', angle: 0, loft: false, len };
   const angle = Math.atan2(dx, -dy);
-  return { kind: 'drive', angle, loft: len > loftPx, len };
+  return { kind: 'drive', angle, loft: loft ?? len > loftPx, len };
 }
 
 const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };

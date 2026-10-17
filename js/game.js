@@ -92,6 +92,7 @@ export class Game {
     for (const c of Object.values(this.cams)) c.resize(this.W, this.H);
     this.of.resize(this.W, this.H);
     this.loftPx = Math.max(90, Math.min(140, this.H * 0.14));
+    this.shotLoft ??= false; // GROUND / LOFT, the batting switch (kept for the session)
   }
 
   frame(now) {
@@ -450,7 +451,7 @@ export class Game {
   }
 
   quit() { this.cancelAll(); this.ui.hud(false); this.clearBowlUI(); this.view = 'idle'; this.paused = false; }
-  clearBowlUI() { document.querySelectorAll('.overpick').forEach(e => e.remove()); this.ui.fieldButton(false); this.ui.fieldEditor(false); this.ui.editing(false); this.ui.banter(false); }
+  clearBowlUI() { document.querySelectorAll('.overpick').forEach(e => e.remove()); this.ui.fieldButton(false); this.ui.shotButton(false); this.ui.fieldEditor(false); this.ui.editing(false); this.ui.banter(false); }
 
   async introBanner(head, sub) {
     this.view = 'bat';
@@ -633,6 +634,7 @@ export class Game {
     this.overStarted = -1;
     this.fillCrease(inn);
     this.hud(inn);
+    this.ui.shotButton(true, this.shotLoft, () => { this.shotLoft = !this.shotLoft; sfx.click(); return this.shotLoft; });
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
       if (inn.balls % 6 === 0 && this.overStarted !== inn.balls) { this.overStarted = inn.balls; await this.startOver(inn); }
@@ -649,6 +651,7 @@ export class Game {
         await this.sleepReal(this.bot ? 100 : 1300);
       } else await this.sleepReal(this.bot ? 80 : 450);
     }
+    this.ui.shotButton(false);
   }
 
   aiFieldPreset(ballNo) { return ballNo <= 12 ? 'attack' : ballNo <= 24 ? 'balanced' : 'defend'; }
@@ -754,7 +757,7 @@ export class Game {
         swing = { t: tg, dx: g.dx, dy: g.dy, defend: tap };
         S.batter.swingT0 = this.realTime;
         if (!tap) this.swingArc(this.myTeam, 'bat');
-        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.dx, g.dy, this.loftPx)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
+        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.dx, g.dy, this.loftPx, this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
     if (this.bot) this.botBat(d, S, fx, rng);
@@ -795,7 +798,7 @@ export class Game {
     } else if (S.maya && S.maya.picked !== S.maya.real) {
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
-      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx)) : null;
+      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
       res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, tornado: aiPower === 'tornado', shatter: aiPower === 'shatter' }, rng, strength: hitStrength(striker.bat) });
       if (aiPower === 'tornado' && grade === 'miss') res.outcome = 'bowled';
     }
@@ -895,6 +898,7 @@ export class Game {
   botBat(d, S, fx, rng) {
     const target = d.tContact * 1000 + rng.normal() * 60;
     this.sleep(Math.max(0, target - 120)).then(() => this.botInput('down')).catch(() => {});
+    this.shotLoft = rng.chance(0.4);
     this.sleep(Math.max(0, target)).then(() => {
       const a = rng.range(-1.2, 1.2), len = rng.chance(0.4) ? 160 : 70;
       this.botInput('up', { dx: Math.sin(a) * len, dy: -Math.cos(a) * len });

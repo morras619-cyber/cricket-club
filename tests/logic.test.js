@@ -63,6 +63,10 @@ test('swipe mapping', () => {
   assert.equal(swipeToShot(0, 100).kind, 'drive');
   assert.ok(Math.abs(swipeToShot(0, 100).angle) > 3);
   assert.ok(swipeToShot(-70, 70).angle < -2 && swipeToShot(70, 70).angle > 2);
+  // the GROUND / LOFT switch decides, whatever the swipe's length
+  assert.equal(swipeToShot(0, -200, 110, false).loft, false);
+  assert.equal(swipeToShot(0, -60, 110, true).loft, true);
+  assert.equal(swipeToShot(0, -10, 110, true).kind, 'block'); // a tap still defends
 });
 
 test('deliveries arrive on time and stumps detection works', () => {

@@ -108,6 +108,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .chips { display: flex; gap: 5px; flex-wrap: wrap; }
 .chip { border: 2px solid var(--ink); background: var(--night-2); color: var(--paper); border-radius: 10px; padding: 5px 11px; font-weight: 700; font-size: 13px; }
 .chip.on { background: var(--bolt); color: var(--ink); }
+/* GROUND / LOFT: both labels shown, the chosen one lit; a ground ball in green, a loft in sky */
+.shotbtn { pointer-events: auto; flex: none; width: 74px; height: 52px; padding: 3px; border-radius: 14px; border: 2.5px solid var(--ink); background: #fff4da; box-shadow: 3px 3px 0 var(--ink); display: flex; flex-direction: column; gap: 2px; }
+.shotbtn span { flex: 1; display: flex; align-items: center; justify-content: center; border-radius: 9px; font-family: var(--display); font-size: 14px; letter-spacing: 1px; line-height: 1; color: rgba(26,20,40,.38); }
+.shotbtn .sb-g { background: #3fbf5f; color: var(--ink); }
+.shotbtn.loft .sb-g { background: none; color: rgba(26,20,40,.38); }
+.shotbtn.loft .sb-l { background: var(--sky); color: var(--ink); }
 .fieldbtn { pointer-events: auto; flex: none; width: 62px; height: 52px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--sky); color: var(--ink); font-family: var(--display); font-size: 16px; line-height: 0.95; letter-spacing: 1px; box-shadow: 3px 3px 0 var(--ink); }
 .fieldsheet { pointer-events: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 7px; }
 .fs-note { font-size: 13px; font-weight: 600; color: var(--paper); line-height: 1.25; min-height: 2.5em; }
