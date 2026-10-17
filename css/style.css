@@ -526,3 +526,5 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .futcell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .futcell .chipbtn { font-size: 11px; padding: 3px 9px; }
 .futcell .futnote { font-size: 11px; font-weight: 700; color: #4a4560; text-align: center; line-height: 1.2; }
+
+.chipbtn.confirming { background: var(--hot); color: #fff; border-color: var(--hot); }

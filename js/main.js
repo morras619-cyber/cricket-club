@@ -196,6 +196,20 @@ $('statsBack').addEventListener('click', () => renderHome());
 
 // ---------- career stats ----------
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+// "Are you sure?" without the browser's pop-up (the Claude app and some web views block it): the
+// first tap turns the button into the question, a second tap within 4 seconds does it.
+function confirmTap(btn, ask, action) {
+  const label = btn.textContent;
+  let armed = 0;
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (performance.now() < armed) { armed = 0; btn.textContent = label; btn.classList.remove('confirming'); action(); return; }
+    armed = performance.now() + 4000;
+    btn.textContent = ask; btn.classList.add('confirming');
+    ui.toast(ask, 2400);
+    setTimeout(() => { if (armed && performance.now() >= armed) { armed = 0; btn.textContent = label; btn.classList.remove('confirming'); } }, 4100);
+  });
+}
 function statGrid(items) {
   const g = el('div', 'statgrid');
   for (const [label, value] of items) { const d = el('div'); d.append(el('b', '', value), el('span', '', label)); g.append(d); }
@@ -586,8 +600,7 @@ function leaguePanels(t) {
 
 $('leagueBack').addEventListener('click', renderHome);
 $('leagueGo').addEventListener('click', () => { const t = profile.tournament; if (t) startMatch({ mode: t.kind }); });
-$('leagueQuit').addEventListener('click', () => {
-  if (!confirm('Abandon this tournament? Your progress in it will be lost.')) return;
+confirmTap($('leagueQuit'), 'Tap again to abandon (progress is lost)', () => {
   profile.tournament = null; saveProfile(profile); renderHome();
 });
 
@@ -643,8 +656,7 @@ $('careerHome').addEventListener('click', () => { if (careerView === 'squad') { 
 $('careerSquad').addEventListener('click', () => { careerView = careerView === 'squad' ? 'hub' : 'squad'; renderCareer(); });
 $('careerRecords').addEventListener('click', () => renderRecords());
 // start the Super League again from season 1: a fresh league, a fresh auction (nothing else is touched)
-$('careerRestart').addEventListener('click', () => {
-  if (!confirm('Restart your Super League career? Your club, players, money, seasons and league records start again from season 1. Coins, trophies and everything outside the Super League stay.')) return;
+confirmTap($('careerRestart'), 'Tap again to restart from season 1', () => {
   profile.career = newCareer(randomSeed());
   careerView = 'hub';
   saveProfile(profile);
@@ -789,8 +801,7 @@ function careerSquad(c, body) {
       el('div', 'futnote', `${p.contract} season${p.contract === 1 ? '' : 's'} left · this season ${s.runs}r ${s.wkts}w · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`));
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
-      rel.addEventListener('click', () => {
-        if (!confirm(`Release ${p.name}? He goes into next season's auction.`)) return;
+      confirmTap(rel, 'Tap again to release', () => {
         c.players[p.id].team = null; c.players[p.id].contract = 0; saveProfile(profile); renderCareer();
       });
       r.append(rel);
@@ -857,8 +868,7 @@ function renderRecords() {
   body.append(board('Most Super League titles', clubs.filter(x => x.titles || x.finals).map(x => `${x.t.name} · ${x.titles} title${x.titles === 1 ? '' : 's'}${x.finals ? `, ${x.finals} runner-up` : ''}`)));
   body.append(board('Season by season', c.history.map(h => `S${h.season}: ${teamById(h.champion).name} champions · you: ${teamById(h.club).name} (${ordinal(h.pos)})${h.orange ? ` · most runs ${playerName(c, h.orange.pid)} ${h.orange.runs}` : ''}`)));
   const reset = el('button', 'chipbtn ghostchip', 'Start a brand-new career');
-  reset.addEventListener('click', () => {
-    if (!confirm('Start again from season 1? Every season, record and player in this career will be lost.')) return;
+  confirmTap(reset, 'Tap again to start over', () => {
     profile.career = null; saveProfile(profile); careerView = 'hub'; renderCareer();
   });
   body.append(reset);
