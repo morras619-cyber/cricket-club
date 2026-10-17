@@ -27,9 +27,10 @@ PICK = {
     'jaspreet-dhillon': (2, 6, 29), 'sipho-nkosi': (2, 2, 27), 'james-whitfield': (2, 5, 31), 'oliver-hartley': (1, 2, 21),
     'mitchell-doyle': (2, 3, 28), 'callum-fraser': (1, 9, 26), 'siddharth-verma': (2, 7, 22), 'arjun-iyer': (3, 1, 23),
     'dinesh-wickramasinghe': (3, 4, 22),
-    # sheet 4: young players, 19 to 24 (its #1 is Jake Thornton again and #3 Rakibul Karim, #9 is left out)
+    # sheet 4: young players, 19 to 24 (its #1 is Jake Thornton again, #9 is left out)
     'thabo-mthembu': (4, 2, 19), 'liam-buckley': (4, 4, 21), 'rizwan-akram': (4, 5, 22), 'finn-gallagher': (4, 6, 22),
     'aarav-nair': (4, 7, 23), 'shane-granger': (4, 8, 23), 'kunal-saini': (4, 10, 21),
+    'dev-pillai': (4, 3, 21),  # first left out as a Rakibul Karim lookalike; judged a different man
     # sheets 5 and 6: experienced players, 29 and up. Left out as the same man again: 5#10 (5#1),
     # 6#1 (5#2), 6#3 (5#3), 6#6 (5#7); and as lookalikes of men already on cards: 5#2 (Mitchell
     # Doyle), 5#7 and 6#8 (Jake Thornton), 5#9 (Andre Belgrave), 6#4 (Finn Gallagher), 6#5 (Jaspreet Dhillon)
