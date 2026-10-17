@@ -4,7 +4,7 @@
 img/cards/portraits/<key>.webp, the key being his name in lower case with dashes. Writes the list
 to js/portraits-list.js.
 
-usage: python3 tools/build_portraits.py SHEET1.png SHEET2.png SHEET3.png SHEET4.png
+usage: python3 tools/build_portraits.py SHEET1.png ... SHEET6.png
 
 PICK below says which portrait (sheet, number) goes to which player, and how old he looks: the
 Super League gives him that age, so a young face is never 30. The same man drawn more than once is
@@ -30,6 +30,12 @@ PICK = {
     # sheet 4: young players, 19 to 24 (its #1 is Jake Thornton again and #3 Rakibul Karim, #9 is left out)
     'thabo-mthembu': (4, 2, 19), 'liam-buckley': (4, 4, 21), 'rizwan-akram': (4, 5, 22), 'finn-gallagher': (4, 6, 22),
     'aarav-nair': (4, 7, 23), 'shane-granger': (4, 8, 23), 'kunal-saini': (4, 10, 21),
+    # sheets 5 and 6: experienced players, 29 and up. Left out as the same man again: 5#10 (5#1),
+    # 6#1 (5#2), 6#3 (5#3), 6#6 (5#7); and as lookalikes of men already on cards: 5#2 (Mitchell
+    # Doyle), 5#7 and 6#8 (Jake Thornton), 5#9 (Andre Belgrave), 6#4 (Finn Gallagher), 6#5 (Jaspreet Dhillon)
+    'faisal-naqvi': (5, 1, 31), 'fawad-bhatt': (5, 3, 30), 'marlon-greaves': (5, 4, 32), 'henry-blackwood': (5, 5, 33),
+    'yuvraj-sodhi': (5, 6, 30), 'tariq-mirza': (5, 8, 31), 'jermaine-alleyne': (6, 2, 29), 'tendai-moyo': (6, 7, 30),
+    'ashik-talukder': (6, 9, 29), 'corbin-hayes': (6, 10, 31),
 }
 
 
@@ -60,7 +66,7 @@ def pieces(path):
 
 
 def main():
-    sheets = [pieces(p) for p in sys.argv[1:5]]
+    sheets = [pieces(p) for p in sys.argv[1:]]
     for key, (s, n, _) in PICK.items():
         p = sheets[s - 1][n - 1]
         p = p.resize((300, round(p.height * 300 / p.width)), Image.LANCZOS)
