@@ -971,7 +971,7 @@ export class OutfieldView {
   ball(ctx, b) {
     const sh = this.to(b.x, b.y), p = this.to(b.x, b.y, b.h);
     // from up here a real ball would be a speck: drawn a touch bigger, still small, a shadow under it
-    const r = Math.max(3.6, 0.045 * this.k * 4);
+    const r = Math.max(2.6, 0.045 * this.k * 3);
     ctx.fillStyle = 'rgba(10,8,20,0.4)';
     ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
     paintBall(ctx, p.x, p.y, r * (1 + Math.min(0.6, (b.h || 0) * 0.05)), ballSpin(b.x, b.y * 1.1, (b.h || 0) * 0.5));
