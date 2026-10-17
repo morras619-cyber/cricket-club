@@ -5,7 +5,7 @@ import { SPARKS, heroById, AI_LOOK } from './heroes.js';
 import { teamById, rivalTeam, teamLook } from './teams.js';
 import { makeDelivery } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
-import { simulateHit, buildField, buildFieldFrom, presetPositions, outsideRing, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
+import { simulateHit, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
@@ -795,7 +795,9 @@ export class Game {
       res = { outcome: 'hit', grade, meteorRuns: runs, angle: rng.range(-0.3, 0.3), loft: true, launchDeg: 36, v: 40, forced: { six: true } };
       S.batter.swingT0 = this.realTime;
       S.batter.shot = { anim: 'drive', t0: this.realTime };
-    } else if (S.maya && S.maya.picked !== S.maya.real) {
+    } else if (S.maya && swing && !swing.defend && (S.maya.picked ? S.maya.picked !== S.maya.real : rng.chance(0.5))) {
+      // Maya Baja: only a shot can be fooled. Defending (a tap) is always safe; play at the wrong
+      // ball, or swing without picking one, and the real one goes through you
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
       const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
@@ -1157,7 +1159,12 @@ export class Game {
     const grade = this.hitGrade;
     const ballK = boundary ? (grade === 'perfect' ? 1.4 : grade === 'good' ? 1 : 0.85) : 1;
     const endT = end / ballK; // the replay's own clock when the ball gets there
-    const dur = Math.max(0.8, endT + 0.6, miss ? miss.t + 1.5 : 0, runTime);
+    // a run out attempt (o.runOut true or false): the throw comes in after the pick-up
+    const ro = o.runOut !== undefined && sim.runOut ? sim.runOut : null;
+    const roEndId = ro && (ro.margins.striker < ro.margins.bowler ? 'striker' : 'bowler');
+    const roEnd = ro && ENDS[roEndId], roThrow = ro ? ro.t + 0.45 : 0, roFlight = ro ? Math.max(0.2, dist(ro.point, roEnd) / F.throwSpeed) : 0;
+    let roDone = false;
+    const dur = Math.max(0.8, endT + 0.6, miss ? miss.t + 1.5 : 0, runTime, ro ? roThrow + roFlight + 1.1 : 0);
     this.timeScale = 1.6;
     const t0 = this.gameTime;
     let said = false, slowUntil = 0, slowed = !(six && grade === 'perfect'), landed = null;
@@ -1199,6 +1206,19 @@ export class Game {
         sfx.crowd(0.6);
       }
       if (tb >= end && A && (o.caught || sim.intercept)) { b.x = A.x; b.y = A.y; b.h = o.caught ? 1.6 : 0.3; }
+      // a run out attempt: he gathers, then throws at the end they're running to, and the ball
+      // either breaks the stumps or misses
+      if (ro && tb >= roThrow) {
+        const p = Math.min(1, (tb - roThrow) / roFlight);
+        b.x = lerp(ro.point.x, roEnd.x, p); b.y = lerp(ro.point.y, roEnd.y, p); b.h = 1.2 * Math.sin(p * Math.PI) * 0.6 + 0.4 * (1 - p);
+        if (A && !A.throwT0) { A.throwT0 = this.realTime; const a1 = this.of.to(A.x, A.y), b1 = this.of.to(roEnd.x, roEnd.y); A.throwFace = Math.atan2(b1.y - a1.y, b1.x - a1.x); }
+        if (p >= 1 && !roDone) {
+          roDone = true;
+          const es = this.of.to(roEnd.x, roEnd.y);
+          if (o.runOut) { this.hitStop(150); sfx.stumps(); this.fx.shake(12); this.fx.burst(es.x, es.y, { color: '#ffd23f' }); this.fx.word('RUN OUT!', es.x, es.y - 50, { size: 62 }); }
+          else this.fx.word('SAFE!', es.x, es.y - 40, { size: 52, color: '#fff4da', stroke: INK });
+        }
+      }
       // a six by a side with painted effects flies as a comet; a four races along with a streak
       const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
       const trail = sim.kind === 'six' && !o.caught ? 'comet1' : toRope ? 'streak' : null;
@@ -1207,9 +1227,9 @@ export class Game {
       this.O.sixCount = six && !said ? { m: Math.round(this.sixDistance(sim) * Math.min(1, tb / end)), b } : null;
       // the six is gone once the lightning has struck where it landed
       this.O.ball = six && said ? null : b;
-      this.runBatters(t, legs);
+      this.runBatters(t, ro ? ro.attempt : legs);
       // once the ball is dealt with, hurry through the rest of the running
-      this.timeScale = this.realTime < slowUntil ? 0.35 : t > endT + 0.6 ? 2.6 : 1.6;
+      this.timeScale = this.realTime < slowUntil ? 0.35 : ro ? 1.2 : t > endT + 0.6 ? 2.6 : 1.6;
       if (six && said) {
         // the six has landed: a quick push in on the strike
         landed = landed || { x: b.x, y: b.y };
@@ -1218,7 +1238,7 @@ export class Game {
         // a boundary: the camera runs ahead of the ball, so you see where it's going
         const ahead = path.ballAt(Math.min(tb + 0.45 * ballK, end));
         this.of.focus([b, ahead, { x: 0, y: 10 }]);
-      } else this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : [])]);
+      } else this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : []), ...(ro ? [roEnd] : [])]);
       if (!said && tb >= end && (six || !D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read (a six strikes as it lands)
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
@@ -1239,7 +1259,7 @@ export class Game {
         }
         else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
         else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); }
-        else if (o.runOut) { /* announced straight after the replay */ }
+        else if (o.runOut !== undefined) { /* the throw says RUN OUT! or SAFE! */ }
         else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * (D ? 0.62 : 0.3), { size: 44, color: '#fff4da', stroke: INK });
       }
       return t >= dur;
@@ -1675,6 +1695,12 @@ export class Game {
       const r = Math.hypot(c.x, c.y - CFG.ground.centerY), max = CFG.ground.boundaryR - 2;
       if (r > max) { c.x *= max / r; c.y = CFG.ground.centerY + (c.y - CFG.ground.centerY) * max / r; }
       if (Math.abs(c.x) < 3 && c.y > -5 && c.y < 23.5) c.x = c.x < 0 ? -3 : 3; // keep off the pitch
+      // the Power Burst: only 2 outside the circle, so a third stops at the ring's edge
+      E.blocked = false;
+      if (E.pp && outsideRing(c) && E.draft.filter(q => q !== f && outsideRing(q)).length >= 2) {
+        const cy = CFG.ground.centerY, r2 = Math.hypot(c.x, c.y - cy), k = (ringRadius - 1.2) / r2;
+        c.x *= k; c.y = cy + (c.y - cy) * k; E.blocked = true;
+      }
       f.x = c.x; f.y = c.y; f.name = positionName(c.x, c.y);
       E.moved = true; E.preset = null; E.touched = true;
       this.ui.fieldPreset(null);
@@ -1683,7 +1709,7 @@ export class Game {
     this.onInput = (type, g) => {
       const L = this.edLayout();
       if (type === 'down') {
-        let best = null, bd = L.tok + 20;
+        let best = null, bd = L.tok + 28;
         for (const f of E.draft) {
           const p = this.edTo(f.x, f.y);
           const dd = Math.hypot(p.x - g.x, p.y - g.y);
@@ -1698,20 +1724,20 @@ export class Game {
           place(E.selected, g.x, g.y); E.selected = null; sfx.click();
         } else E.selected = null;
       } else if (type === 'move' && E.drag) {
-        if (!E.dragMoved && Math.hypot(g.x - E.grab.x0, g.y - E.grab.y0) > 6) { E.dragMoved = true; E.liftT = this.realTime; }
-        if (E.dragMoved) {
-          E.lift = Math.min(1, (this.realTime - E.liftT) / 120) * (L.tok + 22);
-          place(E.drag, g.x + E.grab.dx, g.y + E.grab.dy - E.lift);
-        }
+        if (!E.dragMoved && Math.hypot(g.x - E.grab.x0, g.y - E.grab.y0) > 4) E.dragMoved = true;
+        if (E.dragMoved) { E.lift = 1; place(E.drag, g.x + E.grab.dx, g.y + E.grab.dy); }
       } else if (type === 'up' && E.drag) {
+        if (E.dragMoved) place(E.drag, g.x + E.grab.dx, g.y + E.grab.dy);
+        if (E.blocked) this.ui.toast('Power Burst: only 2 outside the circle');
         E.selected = E.dragMoved ? null : (E.selected === E.drag ? null : E.drag);
-        E.drag = null; E.lift = 0;
+        E.drag = null; E.lift = 0; E.blocked = false;
       }
     };
     if (this.bot) this.sleepReal(400).then(() => { E.done = true; }).catch(() => {});
     await this.until(() => {
       const out = E.draft.filter(outsideRing).length;
-      if (E.pp && out > 2) this.ui.fieldNote(`${out} outside the circle — Power Burst allows 2. Extras move in when you're done.`, true);
+      if (E.blocked) this.ui.fieldNote('Power Burst: only 2 fielders outside the circle. Move one in first.', true);
+      else if (E.pp && out > 2) this.ui.fieldNote(`${out} outside the circle — Power Burst allows 2. Extras move in when you're done.`, true);
       else if (E.selected) this.ui.fieldNote(`Tap where ${E.selected.name} should go.`, false);
       else this.ui.fieldNote(`Drag a fielder, or tap one then tap a spot.${E.pp ? ` ${out}/2 outside the circle.` : ''}`, false);
       return E.done;
@@ -1864,13 +1890,13 @@ export class Game {
       else {
         const out = rng.chance(ch.p * 0.8);
         await this.showAutoPlay(sim, field, { side: 'player', runOut: out });
-        r = { out, runs: out ? sim.runOut.attempt - 1 : sim.runOut.attempt };
+        r = { out, runs: out ? sim.runOut.attempt - 1 : sim.runOut.attempt, auto: true };
         // a run out you didn't take part in still has to be seen: say who's gone
         if (out) await this.announceWicket('RUN OUT!', `${this.batterOf(inn).name} is short of his ground`);
       }
       if (r.out) {
         inn.ball({ runs: r.runs, wicket: true, runOut: true });
-        this.charge.award('directHit', 'DIRECT HIT');
+        if (!r.auto) this.charge.award('directHit', 'DIRECT HIT'); // only for a throw you made
         if (r.long) this.charge.award('longThrowBonus', 'LONG THROW');
         this.charge.award('wicket', 'WICKET');
         this.addMoment('runout', 'RUN OUT!', 'ZZZAP!', this.heroFor('field'), { ballNo, fielding: true, longThrow: r.long, detail: r.margin != null ? `out by ${Math.abs(r.margin).toFixed(2)}s` : 'direct hit' });
@@ -2556,7 +2582,7 @@ export class Game {
             if (s) S.mayaScreen[side] = s;
           });
         }
-        if (split > 0.5 && !S.maya.picked && kind === 'bat') this.ui.hint('TAP THE REAL BALL!');
+        if (split > 0.5 && !S.maya.picked && kind === 'bat') this.ui.hint('PICK THE REAL BALL · OR TAP TO DEFEND');
       } else {
         const bending = S.bendT && this.realTime - S.bendT < 150;
         push(bp.z, () => drawBall3D(ctx, cam, bp, { trail: S.trail, glow: bending ? '#3ec6ff' : S.batter.glow && S.flight ? S.batter.glow : null }));

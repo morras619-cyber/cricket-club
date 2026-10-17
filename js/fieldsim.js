@@ -47,8 +47,14 @@ export function buildFieldFrom(positions, powerplay) {
     for (const f of list) {
       const r = Math.hypot(f.x, f.y - CY);
       if (r > INNER && ++outside > 2) {
-        const k = (INNER - 2) / r;
-        f.x = f.hx = f.x * k; f.y = f.hy = CY + (f.y - CY) * k;
+        // in to just inside the ring, then round it until he isn't standing on anyone
+        const R2 = INNER - 2, a0 = Math.atan2(f.x, f.y - CY);
+        for (let i = 0; i < 40; i++) {
+          const a = a0 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.1;
+          f.x = Math.sin(a) * R2; f.y = CY + Math.cos(a) * R2;
+          if (list.every(q => q === f || Math.hypot(q.x - f.x, q.y - f.y) >= 6)) break;
+        }
+        f.hx = f.x; f.hy = f.y;
         f.name = positionName(f.x, f.y);
         f.pulledIn = true;
       }

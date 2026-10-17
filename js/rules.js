@@ -5,6 +5,8 @@ import { CFG } from './config.js';
 // state:  { events, lastEventBall, setting: 'off'|'key'|'all' }
 export function playerControls(chance, state, ballNo, cfg = CFG.fielding) {
   if (state.setting === 'off') return false;
+  // a run out is always yours to throw (it's never decided for you off-screen)
+  if (chance.kind === 'runout') return true;
   if (state.events >= cfg.cap) return false;
   if (chance.kind !== 'edge' && state.lastEventBall === ballNo - 1) return false;
   if (state.setting === 'all') return true;
