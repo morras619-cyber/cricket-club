@@ -226,3 +226,14 @@ test('strike rotates: odd runs and the end of an over swap the batters', () => {
   assert.equal(card.find(c => c.id === 'b').runs, 5); // 2 + 3
   assert.equal(card.find(c => c.id === 'b').out, true);
 });
+
+test('ratings are felt: a 94 hits it 100 m, a 64 barely clears the short side', async () => {
+  const { hitStrength, timingFor, aiSpread } = await import('../js/ratings.js');
+  const { makePath } = await import('../js/fieldsim.js');
+  const carry = bat => makePath({ angle: 0, loft: true, launchDeg: 33, v: 34 * hitStrength(bat) }).carry; // a perfect loft
+  assert.ok(carry(94) >= 95, `94 carries ${carry(94)}`);
+  assert.ok(carry(64) < 64, `64 carries ${carry(64)}`);
+  assert.ok(Math.abs(carry(75) - 71) < 3, `75 carries ${carry(75)}`);
+  assert.ok(timingFor(94) > timingFor(75) && timingFor(75) > timingFor(64));
+  assert.ok(aiSpread(94) < aiSpread(75) && aiSpread(75) < aiSpread(64));
+});

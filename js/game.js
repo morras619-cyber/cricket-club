@@ -15,7 +15,8 @@ import { lookOf, faceCanvas, masksReady } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
-import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster } from './squads.js';
+import { hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
+import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
@@ -340,6 +341,12 @@ export class Game {
     this.ui.charge(value);
   }
 
+  // a side's quality: the average overall of everyone in it (fielding speed comes from this)
+  sideRating(side) {
+    const ps = [...new Map([...(side?.order || []), ...(side?.attack || [])].filter(Boolean).map(p => [p.id, p])).values()];
+    return ps.length ? ps.reduce((a, p) => a + ovr(p), 0) / ps.length : 72;
+  }
+
   // ---------- who's in ----------
   sideOf(inn, batting) { return (inn.side === 'player') === batting ? this.mySide : this.oppSide; }
   // the batter on strike: the order walks in one by one as wickets fall
@@ -654,10 +661,11 @@ export class Game {
     return fx;
   }
 
-  // skill: the batter's rating. Stars get a little more room, tail-enders a lot less.
-  windowsFor(fx, extra = 0, tornado = false, skill = 75) {
+  // skill: the batter's rating (ratings.js): a star has far more room than a tail-ender, and a
+  // good bowler (bowlSkill) squeezes everyone's timing
+  windowsFor(fx, extra = 0, tornado = false, skill = 75, bowlSkill = 75) {
     const w = { ...CFG.timing };
-    const f = clamp(0.75 + skill / 300, 0.72, 1.12) * (this.pitchBat?.() || 1);
+    const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1);
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? 40 : 0);
     if (fx.focus) w.perfect += 30;
     if (tornado) w.perfect /= 2;
@@ -767,10 +775,10 @@ export class Game {
     // ----- resolve -----
     // star abilities: an Eagle Eye or Finisher batter times it better; a Mystery bowler is harder to read
     let skill = striker.bat;
-    if (striker.ability === 'eagleEye') skill += 30;
-    if (striker.ability === 'finisher' && ballNo >= 25) skill += 60;
-    if (bowler.ability === 'mystery') skill -= 25;
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado', skill);
+    if (striker.ability === 'eagleEye') skill += 12;
+    if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
+    if (bowler.ability === 'mystery') skill -= 12;
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado', skill, bowler.bowlSkill || 75);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
     // defending is forgiving: anywhere in the wide window keeps the ball out
@@ -788,7 +796,7 @@ export class Game {
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
       const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx)) : null;
-      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, tornado: aiPower === 'tornado', shatter: aiPower === 'shatter' }, rng });
+      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, tornado: aiPower === 'tornado', shatter: aiPower === 'shatter' }, rng, strength: hitStrength(striker.bat) });
       if (aiPower === 'tornado' && grade === 'miss') res.outcome = 'bowled';
     }
     if (opt.assist) res = opt.assist(res, grade) || res;
@@ -993,7 +1001,7 @@ export class Game {
       this.addMoment('ultimate', `METEOR ${runs}!`, 'BOOOOM!', this.heroFor('bat'), { ballNo, perfect: runs === 8, detail: `${runs} runs off one ball` });
       return;
     }
-    const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: (this.oppStyle.field || 1) * this.pitch.field });
+    const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: (this.oppStyle.field || 1) * this.pitch.field * fieldSpeed(this.sideRating(this.oppSide)) });
     let caught = false, saved = false, dropped = false;
     if (sim.catch) {
       caught = rng.chance(sim.catch.p * 0.92);
@@ -1386,6 +1394,8 @@ export class Game {
       if (spec.bounce != null) { spec.bounce = clamp(spec.bounce + rng.range(-0.4, 0.4), 0.7, 11.5); spec.length = lengthForBounce(spec.bounce); spec.h = heightForBounce(spec.bounce); }
     }
     if (rg === 'perfect') { spec.swing *= 1.15; spec.move *= 1.15; }
+    // a better bowler moves it more and bowls quicker
+    spec.swing *= movementFor(bowler.bowlSkill); spec.move *= movementFor(bowler.bowlSkill); spec.kmh *= paceFor(bowler.bowlSkill);
     if (bowler.ability === 'swingMaster') { spec.swing *= 1.3; spec.move *= 1.3; }
     const fxFlags = {};
     const A = this.armed;
@@ -1448,7 +1458,7 @@ export class Game {
     const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * this.pitch.ai * aiHome / (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1) / this.pitch.bat };
-    let ai = aiBat(d, { skill: aiSkill, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods, freeHit: this.freeHit }, rng);
+    let ai = aiBat(d, { skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods, freeHit: this.freeHit }, rng);
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
@@ -1813,7 +1823,7 @@ export class Game {
   noteEvent(ballNo) { this.fieldState.events++; this.fieldState.lastEventBall = ballNo; }
 
   async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit) {
-    const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field });
+    const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field * fieldSpeed(this.sideRating(this.mySide)) });
     const ctl = ch => playerControls(ch, this.fieldState, ballNo);
 
     if (sim.catch) {

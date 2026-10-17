@@ -3,6 +3,7 @@ import { makeRng } from './rng.js';
 import { LANES } from './physics.js';
 import { gradeTiming, resolveContact } from './shots.js';
 import { bowlType, deliveryParams } from './squads.js';
+import { aiSpread, bowlerTrouble, hitStrength, movementFor } from './ratings.js';
 
 function weighted(rng, table) {
   const total = table.reduce((s, [, w]) => s + w, 0);
@@ -77,6 +78,8 @@ function planScript(seed, plan, powerKind) {
     const type = variation ? T.variation : rng.pick(T.stock);
     const params = deliveryParams(T.id, type, rng.range(0.2, 1), rng);
     if (p.ability === 'swingMaster') { params.swing *= 1.3; params.move *= 1.3; } // a career star
+    // a better bowler moves it more
+    params.swing = (params.swing || 0) * movementFor(p.bowlSkill); params.move = (params.move || 0) * movementFor(p.bowlSkill);
     const d = { ball, length, lane, x: LANES.find(l => l.id === lane).x + rng.range(-0.04, 0.04), ...params, bowler: p.id, power: null };
     if (type === 'Slower bouncer') Object.assign(d, { length: 'bouncer', lane: rng.pick(['off', 'stumps']), x: 0.05 });
     // the star's power ball comes once in each of his overs
@@ -113,7 +116,8 @@ function chooseShot(d, ctx, rng) {
 export function aiBat(d, ctx, rng) {
   let sigma = 78;
   // the batter's own skill (a squads.js rating, 75 = a solid regular)
-  if (ctx.skill != null) sigma *= 1 + (75 - ctx.skill) / 100;
+  if (ctx.skill != null) sigma *= aiSpread(ctx.skill);
+  if (ctx.bowlSkill != null) sigma *= bowlerTrouble(ctx.bowlSkill); // the bowler he's facing
   sigma *= ctx.style?.sigma || 1;
   if (ctx.release === 'perfect') sigma *= 1.2;
   if (ctx.release === 'loose') sigma *= 0.8;
@@ -135,7 +139,7 @@ export function aiBat(d, ctx, rng) {
   }
   let grade = gradeTiming(errMs, w, d.xt > 0.08);
   if (mods.edgeBoost && ['good', 'early', 'late'].includes(grade) && d.xt > -0.05 && rng.chance(mods.edgeBoost)) grade = 'edge';
-  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder' }, rng });
+  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder' }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) });
   if (ctx.fx?.tornado && (grade === 'miss' || res.outcome === 'beaten')) res.outcome = 'bowled';
   if (ctx.stance === 'charge' && res.outcome === 'beaten') res.outcome = 'stumping-chance';
   return { errMs, shot, grade, res };

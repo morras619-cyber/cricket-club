@@ -30,7 +30,8 @@ function isAgainstLine(angle, d) {
 }
 
 // fx: { thunder, mirror, tornado, shatter }
-export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng }) {
+// strength: how hard the batter hits (ratings.js hitStrength), scales the ball's speed off the bat
+export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, strength = 1 }) {
   if (!shot || shot.kind === 'leave') {
     return { outcome: d.onStumps ? 'bowled' : 'leave', grade: 'leave' };
   }
@@ -96,7 +97,7 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng }) {
   } else if (fx.mirror && !loft && good) {
     forced = { four: true, uncatchable: true };
   }
-  let v = (14 + 20 * power) * (1 + rng.range(-0.04, 0.04));
+  let v = (14 + 20 * power) * (1 + rng.range(-0.04, 0.04)) * strength;
   if (fx.tornado) {
     v = Math.min(v, 15); loft = false; launchDeg = 0; forced = { cap: 2 };
   }
