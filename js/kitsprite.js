@@ -11,6 +11,12 @@ const POSE = {
   follow1: 6, follow2: 7, follow3: 7, finish: 8, field: 9, react: 9, celebrate1: 5, celebrate2: 5,
 };
 const POSE_FRONT = { celebrate2: 4 };
+// the spinner (front, 15 poses): stance, three walking strides, the arm going up (4-7), release (8),
+// follow-through (9-12), walking back (13), standing (14)
+const POSE_SPIN = {
+  start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 6, frontarm: 6, release: 8,
+  follow1: 9, follow2: 10, follow3: 11, finish: 12, field: 14, react: 14, celebrate1: 14, celebrate2: 14,
+};
 
 const views = {}; // 'front' | 'back' -> { img, mask, hair: { style: img }, data }
 let fontReady = false;
@@ -24,7 +30,7 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back']) {
+  for (const view of ['front', 'back', 'spin-front']) {
     if (views[view]) continue;
     views[view] = { img: image(`img/kit/${view}.webp`), mask: image(`img/kit/${view}-mask.png`), hair: {} };
   }
@@ -171,7 +177,8 @@ function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
   if (!data || !fontReady) return null;
   const sk = skinHex(look), hr = hairHex(look), style = hairStyleOf(look);
-  const beard = view === 'front' ? beardOf(look) : null, wear = wearOf(look);
+  const facing = view.endsWith('front');
+  const beard = facing ? beardOf(look) : null, wear = wearOf(look);
   const hp = style ? hairData(view, style) : null;
   const bp = beard && KIT_SHEETS[view].hair[beard] ? hairData(view, beard) : null;
   const wp = wear ? hairData(view, wear) : null;
@@ -179,7 +186,7 @@ function playerSheet(view, team, look, mirror) {
   const name = shirtName(look.who), num = shirtNumber(look);
   const key = [view, team.id, team.suit, team.trim, sk, hr, style, beard, wear, name, num, mirror].join('|');
   if (playerCache.has(key)) { const c = playerCache.get(key); playerCache.delete(key); playerCache.set(key, c); return c; }
-  if (view === 'front' && !crestCanvas(team.id)) return null;
+  if (facing && !crestCanvas(team.id)) return null;
   const kit = teamSheet(view, team);
   if (!kit) return null;
   const W = kit.width, H = kit.height;
@@ -224,7 +231,7 @@ function playerSheet(view, team, look, mirror) {
   layer.width = W; layer.height = H;
   const lg = layer.getContext('2d', { willReadFrequently: true });
   const mx = (x) => (mirror ? W - x : x), ma = (a) => (mirror ? -a : a);
-  if (view === 'front') {
+  if (facing) {
     const cr = crestCanvas(team.id);
     for (const [x, y, size, sx, sy, ang] of meta.place) {
       const s = size / Math.max(cr.width, cr.height);
@@ -249,7 +256,7 @@ function playerSheet(view, team, look, mirror) {
   // onto the shirt only (an arm in front hides it), shaded with the cloth's folds
   const lp = lg.getImageData(0, 0, W, H).data;
   img = g.getImageData(0, 0, W, H); p = img.data;
-  const ref = lum(...hexRgb(team.suit)) || 1, [lo, hi] = view === 'front' ? [0.6, 1.12] : [0.55, 1.15];
+  const ref = lum(...hexRgb(team.suit)) || 1, [lo, hi] = facing ? [0.6, 1.12] : [0.55, 1.15];
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
@@ -274,7 +281,7 @@ export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look)
   const sheet = playerSheet(view, team, look, !!flip);
   if (!sheet) return false;
   const meta = KIT_SHEETS[view];
-  const pose = (view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
+  const pose = (view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
   let [sx, sy, w, h, ax, ay] = meta.frames[pose];
   if (flip) { sx = sheet.width - sx - w; ax = w - ax; }
   const k = kPerM * REF_HEIGHT_M / meta.refPx;

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """The plain-kit bowler (bald master sheets) for the match: img/kit/<view>.webp + js/kitsheets.js.
 
-usage: python3 tools/build_kit_sheets.py FRONT.png BACK.png HAIRDIR
+usage: python3 tools/build_kit_sheets.py FRONT.png BACK.png HAIRDIR [SPIN_FRONT.png]
+
+SPIN_FRONT: the spinner's bald front sheet (15 poses, three rows of five); its hair layers in
+HAIRDIR are hair-<style>-spin-front.png and its crest placements tools/kit/crest-spin-front.json.
 
 FRONT / BACK: the bald master sheets (10 poses each on magenta, blue #1f5fd6 kit with yellow
 trim). HAIRDIR: one layer per hairstyle and view, hair-<style>-<view>.png (grey hair on
@@ -41,17 +44,17 @@ def masks(a):
     return suit, trim, skin
 
 
-def frames_of(a):
+def frames_of(a, count=10, rowh=600):
     op = a[..., 3] > 0.25
     lab, n = ndi.label(op)
     sizes = ndi.sum(op, lab, range(1, n + 1))
     boxes = ndi.find_objects(lab)
-    big = sorted((i for i in range(n) if sizes[i] > 20000), key=lambda i: (boxes[i][0].start // 600, boxes[i][1].start))
-    assert len(big) == 10, f'expected 10 poses, found {len(big)}'
+    big = sorted((i for i in range(n) if sizes[i] > 15000), key=lambda i: (boxes[i][0].start // rowh, boxes[i][1].start))
+    assert len(big) == count, f'expected {count} poses, found {len(big)}'
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place):
+def build(view, sheet, hairpaths, place, count=10, rowh=600):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
@@ -59,12 +62,15 @@ def build(view, sheet, hairpaths, place):
     hair_any = np.max([h[..., 3] for h in hairs.values()], axis=0)
     suit, trim, skin = masks(a)
     L = a[..., :3] @ LUM
-    lab, frames = frames_of(a)
+    lab, frames = frames_of(a, count, rowh)
+    # each pixel belongs to the nearest pose (hair close to two poses goes to its own head only)
+    dist, (iy, ix) = ndi.distance_transform_edt(lab == 0, return_indices=True)
+    owner = np.where(dist <= 40, lab[iy, ix], 0)
     pad, gap, W = 6, 4, 1024
     cells, x, y, rowh = [], gap, gap, 0
     for k, (i, sl) in enumerate(frames):
         me = lab == i
-        hm = (hair_any > 0.02) & ndi.binary_dilation(me, iterations=40)
+        hm = (hair_any > 0.02) & (owner == i)
         ys, xs = np.nonzero(me | hm)
         y0, y1, x0, x1 = ys.min() - pad, ys.max() + pad + 1, xs.min() - pad, xs.max() + pad + 1
         w, h = x1 - x0, y1 - y0
@@ -84,7 +90,7 @@ def build(view, sheet, hairpaths, place):
         src = a[y0:y0 + h, x0:x0 + w].copy()
         src[..., 3] *= keep[y0:y0 + h, x0:x0 + w]
         atlas[ay:ay + h, ax:ax + w] = src
-        near = ndi.binary_dilation(me, iterations=40)[y0:y0 + h, x0:x0 + w]
+        near = (owner == i)[y0:y0 + h, x0:x0 + w]
         for st, hair in hairs.items():
             hs = hair[y0:y0 + h, x0:x0 + w].copy()
             hs[..., 3] *= near
@@ -130,14 +136,18 @@ def build(view, sheet, hairpaths, place):
 
 def main():
     front, back, hairdir = sys.argv[1:4]
-    styles = sorted({f.split('-')[1] for f in os.listdir(hairdir) if f.startswith('hair-') and f.endswith('-front.png')})
-    hp = lambda view: {st: os.path.join(hairdir, f'hair-{st}-{view}.png') for st in styles}
+    spin_front = sys.argv[4] if len(sys.argv) > 4 else None
+    hp = lambda view: {f[5:-len(f'-{view}.png')]: os.path.join(hairdir, f) for f in sorted(os.listdir(hairdir))
+                       if f.startswith('hair-') and f.endswith(f'-{view}.png') and not (view == 'front' and f.endswith('-spin-front.png'))}
     crest = json.load(open('tools/kit/crest-front.json'))['frames']
     prints = json.load(open('tools/kit/shirt-print-back.json'))['frames']
     out = {
         'front': build('front', front, hp('front'), [crest[str(k + 1)] for k in range(10)]),
         'back': build('back', back, hp('back'), [prints[str(k + 1)]['print'] + prints[str(k + 1)]['name'] + prints[str(k + 1)]['number'] for k in range(10)]),
     }
+    if spin_front:
+        sc = json.load(open('tools/kit/crest-spin-front.json'))['frames']
+        out['spin-front'] = build('spin-front', spin_front, hp('spin-front'), [sc[str(k + 1)] for k in range(15)], 15, 500)
     with open('js/kitsheets.js', 'w') as f:
         f.write('// The plain-kit bowler sheets in img/kit/ (tools/build_kit_sheets.py). Per view: frames\n'
                 '// [x, y, w, h, feet x, feet y] in sheet order; place: the crest (front: [x, y, size, squash x,\n'
