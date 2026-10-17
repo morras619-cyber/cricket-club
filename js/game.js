@@ -846,6 +846,7 @@ export class Game {
         this.charge.award('edgeSurvived', 'LUCKY');
       }
     } else {
+      this.hitGrade = grade;
       await this.battingHit(inn, ballNo, res, grade, aiField, rng, fx);
     }
     this.hud(inn);
@@ -1137,16 +1138,24 @@ export class Game {
     // the replay lasts until the batters have made their ground (for a boundary they cross once)
     const legs = runs >= 4 ? 1 : runs;
     const runTime = legs ? CFG.running.first + CFG.running.next * (legs - 1) + 0.3 : 0;
-    const dur = Math.max(0.8, end + 0.6, miss ? miss.t + 1.5 : 0, runTime);
+    // a boundary flies at the speed it was struck: a perfect hit rockets away, a mistimed one floats
+    // (only the ball: the fielders keep their pace, so a middled shot leaves them for dead)
+    const boundary = six || toRope;
+    const grade = this.hitGrade;
+    const ballK = boundary ? (grade === 'perfect' ? 1.4 : grade === 'good' ? 1 : 0.85) : 1;
+    const endT = end / ballK; // the replay's own clock when the ball gets there
+    const dur = Math.max(0.8, endT + 0.6, miss ? miss.t + 1.5 : 0, runTime);
     this.timeScale = 1.6;
     const t0 = this.gameTime;
-    let said = false;
+    let said = false, slowUntil = 0, slowed = !(six && grade === 'perfect'), landed = null;
     await this.until(() => {
-      const t = this.gameTime - t0;
-      const b = path.ballAt(Math.min(t, end));
-      if (toRope && t > end) {
+      const t = this.gameTime - t0, tb = t * ballK;
+      const b = path.ballAt(Math.min(tb, end));
+      // a perfect six: everything slows for a beat as it sails over the rope
+      if (!slowed && Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR) { slowed = true; slowUntil = this.realTime + 380; }
+      if (toRope && tb > end) {
         // a four rolls on over the rope, hopping as it crosses, and dies in the grass beyond
-        const dt = t - end, extra = 4.5 * (1 - Math.exp(-dt * 2.2));
+        const dt = tb - end, extra = 4.5 * (1 - Math.exp(-dt * 2.2));
         b.x = sim.ropePoint.x + path.dir.x * extra; b.y = sim.ropePoint.y + path.dir.y * extra;
         b.h = dt < 0.32 ? 0.75 * Math.sin(Math.PI * dt / 0.32) : dt < 0.5 ? 0.18 * Math.sin(Math.PI * (dt - 0.32) / 0.18) : 0;
       }
@@ -1175,18 +1184,26 @@ export class Game {
         this.fx.word('JUST SHORT!', q.x, q.y - 50, { size: 40, color: '#fff4da', stroke: '#e8343b', dur: 1100 });
         sfx.crowd(0.6);
       }
-      if (t >= end && A && (o.caught || sim.intercept)) { b.x = A.x; b.y = A.y; b.h = o.caught ? 1.6 : 0.3; }
+      if (tb >= end && A && (o.caught || sim.intercept)) { b.x = A.x; b.y = A.y; b.h = o.caught ? 1.6 : 0.3; }
       // a six by a side with painted effects flies as a comet; a four races along with a streak
       const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
       const trail = sim.kind === 'six' && !o.caught ? 'comet1' : toRope ? 'streak' : null;
-      this.O.comet = hitSet && trail && t < end ? { ...(this.O.comet || {}), set: hitSet, name: trail, prev: this.O.ball && { ...this.O.ball } } : null;
+      this.O.comet = hitSet && trail && tb < end ? { ...(this.O.comet || {}), set: hitSet, name: trail, prev: this.O.ball && { ...this.O.ball } } : null;
       // the six is gone once the lightning has struck where it landed
       this.O.ball = six && said ? null : b;
       this.runBatters(t, legs);
       // once the ball is dealt with, hurry through the rest of the running
-      this.timeScale = t > end + 0.6 ? 2.6 : 1.6;
-      this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : [])]);
-      if (!said && t >= end && (six || !D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read (a six strikes as it lands)
+      this.timeScale = this.realTime < slowUntil ? 0.35 : t > endT + 0.6 ? 2.6 : 1.6;
+      if (six && said) {
+        // the six has landed: a quick push in on the strike
+        landed = landed || { x: b.x, y: b.y };
+        this.of.focus([landed, { x: landed.x * 0.82, y: CFG.ground.centerY + (landed.y - CFG.ground.centerY) * 0.82 }]);
+      } else if (boundary && tb < end) {
+        // a boundary: the camera runs ahead of the ball, so you see where it's going
+        const ahead = path.ballAt(Math.min(tb + 0.45 * ballK, end));
+        this.of.focus([b, ahead, { x: 0, y: 10 }]);
+      } else this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : [])]);
+      if (!said && tb >= end && (six || !D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read (a six strikes as it lands)
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
         if (sim.kind === 'six' && !o.caught) {
@@ -1507,6 +1524,7 @@ export class Game {
         if (four) this.fx.word('EDGED FOR FOUR', this.W / 2, this.H * 0.4, { size: 40 });
       }
     } else {
+      this.hitGrade = ai.grade;
       await this.bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit);
     }
     this.view = 'bowl';
