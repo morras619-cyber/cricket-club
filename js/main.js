@@ -7,6 +7,7 @@ import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
 import { flag, nationName } from './nations.js';
 import { faceEl } from './looks.js';
+import { futCard } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
@@ -685,17 +686,9 @@ function careerAuction(c, body) {
     const card = el('div', 'panel paper lotcard');
     const shown = Math.min(A.lots.length, 16);
     card.append(el('div', 'eyebrow', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
-    card.append(p.heroId ? portrait(heroById(p.heroId), 96, 'celebrate') : faceEl(p, kitOf(p), 96));
-    card.append(el('h3', '', pname(p)),
-      el('p', 'lotmeta', `${flag(p)} ${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).name}` : ''} · age ${p.age} (${ageNote(p)})`),
-      el('div', 'lotnums', ''));
-    const nums = card.querySelector('.lotnums');
-    for (const [k, v] of [['OVR', ovr(p)], ['Potential', stars(potentialStars(p))], ['Bat', p.bat], ['Bowl', p.bowlSkill || '—'], ['Value', money(value(p))]]) {
-      const d = el('div'); d.append(el('b', '', String(v)), el('span', '', k)); nums.append(d);
-    }
-    if (p.ability) card.append(el('div', 'herostat', `⭐ ${ABILITIES[p.ability].name}: ${ABILITIES[p.ability].desc}`));
-    if (p.heroId) card.append(el('div', 'herostat', `Hero power: ${heroById(p.heroId).power.name}. ${heroById(p.heroId).power.desc}`));
-    card.append(el('p', 'sheetnote', `${p.trait || ''}${p.stats.all.m ? ` · League: ${p.stats.all.runs} runs, ${p.stats.all.wkts} wickets in ${p.stats.all.m} matches` : ''}`));
+    card.append(futCard(p, { size: Math.min(250, window.innerWidth * 0.62) }));
+    card.append(el('p', 'lotmeta', `${ageNote(p)} · bat ${p.bat}${p.bowlSkill ? ` · bowl ${p.bowlSkill}` : ''} · worth ${money(value(p))}`));
+    if (p.heroId) card.append(el('div', 'herostat', `${heroById(p.heroId).power.name}: ${heroById(p.heroId).power.desc}`));
     const price = el('div', 'lotprice');
     price.append(el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'Opening price'));
     card.append(price);
@@ -778,12 +771,13 @@ function careerSquad(c, body) {
   const list = el('div', 'panel paper sheetbox');
   list.append(el('h3', '', `${teamById(c.club).name} · ${pool.length}/${MAX_SQUAD}`));
   list.append(el('p', 'sheetnote', `Players improve when they play well, up to their potential, until they turn ${PEAK_AGE}. A regular who reaches ${STAR_OVR} becomes a star with an ability.`));
+  const grid = el('div', 'futgrid');
+  list.append(grid);
   for (const p of [...pool].sort((a, b) => ovr(b) - ovr(a))) {
-    const r = el('div', 'squadrow');
+    const r = el('div', 'futcell');
     const s = p.stats.season;
-    r.append(withFace(p, 48, el('b', '', `${pname(p)} · ${ovr(p)}`),
-      el('span', '', `${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · age ${p.age} · potential ${stars(potentialStars(p))} · ${p.contract} season${p.contract === 1 ? '' : 's'} left`),
-      el('span', '', `${p.ability ? `⭐ ${ABILITIES[p.ability].name} · ` : ''}This season: ${s.runs} runs, ${s.wkts} wkts · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`)));
+    r.append(futCard(p, { size: 156 }),
+      el('div', 'futnote', `${p.contract} season${p.contract === 1 ? '' : 's'} left · this season ${s.runs}r ${s.wkts}w · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`));
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
       rel.addEventListener('click', () => {
@@ -792,7 +786,7 @@ function careerSquad(c, body) {
       });
       r.append(rel);
     }
-    list.append(r);
+    grid.append(r);
   }
   // line-up for league matches
   const L = resolveLineup(c.club, clubHeroes(pool), c.lineup, {}, pool);

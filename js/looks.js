@@ -546,24 +546,25 @@ export function peopleFrame(src, key, look, rect, maskName, maskSrc = src) {
 // ---------- comic faces ----------
 const faces = new Map();
 // A head-and-shoulders portrait in the player's kit. kit: { suit, trim }.
-export function faceCanvas(p, kit, size = 64) {
+// bare: no rounded backdrop (the face sits straight on a player card)
+export function faceCanvas(p, kit, size = 64, bare = false) {
   const look = lookOf(p);
   const age = p.age || 26;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const key = `${p.id}|${kit?.suit}|${size}|${age >= 35}|${JSON.stringify(look)}`;
+  const key = `${p.id}|${kit?.suit}|${size}|${age >= 35}|${bare}|${JSON.stringify(look)}`;
   if (faces.has(key)) return faces.get(key);
   const c = document.createElement('canvas');
   c.width = c.height = Math.round(size * dpr);
   const g = c.getContext('2d');
   g.scale(dpr * size / 100, dpr * size / 100);
-  drawFace(g, look, kit || { suit: '#f3efe2', trim: '#3a3a4a' }, age);
+  drawFace(g, look, kit || { suit: '#f3efe2', trim: '#3a3a4a' }, age, bare);
   faces.set(key, c);
   if (faces.size > 300) faces.delete(faces.keys().next().value);
   return c;
 }
 // A fresh canvas element showing a face (a canvas can only sit in the page once).
-export function faceEl(p, kit, size = 64, cls = 'face') {
-  const src = faceCanvas(p, kit, size);
+export function faceEl(p, kit, size = 64, cls = 'face', bare = false) {
+  const src = faceCanvas(p, kit, size, bare);
   const c = document.createElement('canvas');
   c.width = src.width; c.height = src.height; c.className = cls;
   c.style.width = c.style.height = `${size}px`;
@@ -571,14 +572,14 @@ export function faceEl(p, kit, size = 64, cls = 'face') {
   return c;
 }
 
-function drawFace(g, look, kit, age) {
+function drawFace(g, look, kit, age, bare = false) {
   const skin = skinHex(look), hair = hairHex(look, age), dark = shade(skin, -0.22);
   const lw = 3.2;
   g.lineJoin = 'round'; g.lineCap = 'round';
   // backdrop in the kit colour
   const bg = g.createLinearGradient(0, 0, 0, 100);
   bg.addColorStop(0, shade(kit.suit, 0.35)); bg.addColorStop(1, shade(kit.suit, -0.25));
-  g.fillStyle = bg; g.beginPath(); g.roundRect(0, 0, 100, 100, 16); g.fill();
+  if (!bare) { g.fillStyle = bg; g.beginPath(); g.roundRect(0, 0, 100, 100, 16); g.fill(); }
   const ink = (fill) => { if (fill) { g.fillStyle = fill; g.fill(); } g.strokeStyle = INK; g.lineWidth = lw; g.stroke(); };
   const style = look.style || 'short';
   // hair that sits behind the head
