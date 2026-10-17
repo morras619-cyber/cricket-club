@@ -40,6 +40,9 @@ PICK = {
     'aryan-malhotra': (7, 1, 28), 'faraz-mirza': (7, 2, 28), 'saad-ahmed': (7, 3, 27), 'yasir-abbasi': (7, 4, 33),
     'hamza-iqbal': (7, 5, 19), 'shoaib-raza': (7, 6, 29), 'bilawal-gul': (8, 1, 29), 'danish-haider': (7, 8, 25),
     'nadir-sheikh': (7, 9, 35), 'bilal-akhtar': (7, 10, 22),
+    # sheet 9: batch 2. Left out as lookalikes: #2 (Faisal Naqvi) and #4 (Nadir Sheikh)
+    'shoaib-haider': (9, 1, 26), 'danish-iqbal': (9, 3, 24), 'rizwan-khan': (9, 5, 27), 'kashif-lone': (9, 6, 23),
+    'hamza-nawaz': (9, 7, 34), 'ehan-rizvi': (9, 8, 24), 'hamid-usmani': (9, 9, 32), 'zain-mirza': (9, 10, 28),
 }
 
 
