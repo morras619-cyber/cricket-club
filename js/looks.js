@@ -1,6 +1,7 @@
 // What every player looks like: skin tone, hair colour and style, facial hair. Used to draw
 // a comic face for each player in the menus, and to repaint the hand-drawn match sprites
 // (skin and hair) so the man at the crease looks like himself.
+import { PORTRAIT_LOOKS } from './portrait-looks.js';
 import { INK } from './fx.js';
 import { makeRng } from './rng.js';
 
@@ -52,6 +53,13 @@ function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c
 // one made up from his nation and id (always the same for the same player).
 export function lookOf(p) {
   if (!p) return null;
+  // a player with a painted portrait has its skin tone and hair colour on the pitch too
+  const painted = PORTRAIT_LOOKS[portraitKey(p.name || '')];
+  const base = baseLook(p);
+  return painted ? { ...base, skin: painted.skin, hair: painted.hair } : base;
+}
+const portraitKey = name => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function baseLook(p) {
   if (p.app) return p.app;
   if (APPEAR[p.id]) return parse(APPEAR[p.id]);
   const hero = p.hero && typeof p.hero === 'object' ? p.hero : null;

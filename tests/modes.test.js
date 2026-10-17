@@ -134,7 +134,9 @@ test('every squad player has his own look; youngsters get one that fits their co
   for (const t of TEAMS) for (const p of roster(t.id)) {
     assert.ok(hasOwnLook(p.id), p.id);
     const l = lookOf(p);
-    assert.ok(SKIN[l.skin] && HAIR[l.hair] && BEARDS.includes(l.beard), p.id);
+    // a painted player takes his exact skin and hair colour from his portrait; the rest use the palette
+    const ok = (v, pal) => pal[v] || /^#[0-9a-f]{6}$/.test(v);
+    assert.ok(ok(l.skin, SKIN) && ok(l.hair, HAIR) && BEARDS.includes(l.beard), p.id);
   }
   const looks = new Set(TEAMS.flatMap(t => roster(t.id).map(p => JSON.stringify(lookOf(p)))));
   assert.ok(looks.size > 50, 'plenty of different looks');
