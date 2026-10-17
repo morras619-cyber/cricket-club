@@ -54,6 +54,9 @@ PICK = {
     'aditya-rao': (12, 1, 24), 'manish-gupta': (12, 2, 32), 'rohan-bhatt': (12, 3, 27), 'tariq-butt': (12, 4, 26),
     'tharindu-jayasena': (12, 5, 22), 'niroshan-silva': (12, 6, 30), 'dilan-wijesekara': (12, 7, 24),
     'mahfuz-rahman': (12, 8, 27), 'rafiq-alam': (12, 9, 24), 'farid-jalali': (12, 10, 29),
+    # sheet 13: the last six regulars (two rows of three)
+    'marco-pienaar': (13, 1, 29), 'ethan-van-der-berg': (13, 2, 24), 'dwayne-hollis': (13, 3, 31),
+    'ben-ashworth': (13, 4, 26), 'craig-lockhart': (13, 5, 27), 'ryan-mcallister': (13, 6, 30),
 }
 # not a player: portraits kept for other parts of the game, [sheet, number, file]
 EXTRA = [(11, 8, 'img/people/negotiator.webp')]
@@ -85,7 +88,7 @@ def pieces(path):
             cut = x0 + lo + int(np.argmin(col[lo:hi]))
             todo += [(cut, y0, x1, y1), (x0, y0, cut, y1)]
     boxes = sorted(out_boxes, key=lambda b: (round(b[1] / 200), b[0]))
-    assert len(boxes) == 10, (path, len(boxes))
+    assert len(boxes) in (6, 10), (path, len(boxes))  # rows of 4, 4, 2 or of 3, 3
     return [crop_one(im, b) for b in boxes]
 
 
