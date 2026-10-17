@@ -26,3 +26,27 @@ non-strikers, fielders) follows these rules; only the per-frame placement is new
 
 Placement data: `shirt-print-back.json` (frames 1-10 of the back sheet). Frames are counted
 left to right, top row first, as on the sheet.
+
+# Front: club crest only
+
+The front of the shirt carries the club crest and nothing else (no name, no number).
+
+## Look
+- **Where:** the player's LEFT chest (the viewer's right), level with the bottom of the
+  collar points, about halfway between the collar opening and the sleeve seam.
+- **Size:** about 36 px on the 580 px standing frame (roughly the width of the collar's
+  side), the same on every player and club.
+- **Art:** the club's own logo (`img/logo-<club>.webp`) in full colour with a thin dark rim
+  (rgb 14,12,24), so it reads on any kit colour, even a yellow crest on the Eagles' yellow.
+- **On the cloth:** shaded by the shirt's folds (0.6-1.12 of the local brightness); hidden
+  behind arms and hands in front of it; fold lines on the shirt do not cut through it.
+
+## Placement rules
+1. Per frame, place it by eye at 2x zoom on a 10 px grid, relative to the collar point and
+   the sleeve seam on the player's left side.
+2. Keep it clear of the sleeve seam and the arm (move it toward the collar rather than let
+   the seam cut it).
+3. Turned frames squash it horizontally (0.9-0.95), bent-forward frames vertically (0.85);
+   tilt it with the chest when he leans (up to +/-5 deg).
+
+Placement data: `crest-front.json` (frames 1-10 of the front sheet).
