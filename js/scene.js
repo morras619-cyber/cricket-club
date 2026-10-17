@@ -780,11 +780,37 @@ export function drawStumps(ctx, cam, z, broken = null, glow = null, t = 0) {
   ctx.restore();
 }
 
+// ---------- the ball ----------
+// The painted ball (img/ball.webp, tools/build_ball.py). It spins with the distance it covers, so
+// the seam turns in flight and it rolls along the ground; a thin ink rim keeps it crisp.
+const BALL = new Image();
+BALL.src = 'img/ball.webp';
+const BALL_R = 0.036; // a real ball: 7.2 cm across
+export function paintBall(ctx, x, y, r, spin, { glow = null, alpha = 1 } = {}) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 16; }
+  if (BALL.complete && BALL.naturalWidth) {
+    ctx.translate(x, y); ctx.rotate(spin);
+    ctx.drawImage(BALL, -r, -r, r * 2, r * 2);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(20,16,24,0.85)'; ctx.lineWidth = Math.max(0.8, r * 0.16);
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#d7263d'; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1, r * 0.3);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+// how far it has turned, from the distance it has covered: about six turns from the bowler's
+// hand to the bat (fast enough to read as spin, slow enough to see the seam go round)
+export const ballSpin = (...d) => d.reduce((a, v) => a + (v || 0), 0) * 2;
+
 export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false } = {}) {
   const s = cam.project(p.x, p.y, p.z);
   if (!s) return null;
   const sh = cam.project(p.x, 0, p.z);
-  const r = Math.max(3.2, 0.05 * s.k);
+  const r = Math.max(3.4, BALL_R * s.k);
   if (sh) { ctx.fillStyle = 'rgba(10,8,20,0.35)'; ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); }
   if (trail.length > 1) {
     ctx.strokeStyle = glow || 'rgba(255,244,218,0.5)'; ctx.lineCap = 'round';
@@ -797,14 +823,7 @@ export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false
     }
     ctx.globalAlpha = 1;
   }
-  ctx.globalAlpha = ghost ? 0.75 : 1;
-  if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 16; }
-  ctx.fillStyle = '#d7263d'; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.5, r * 0.35);
-  ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = '#fff4da'; ctx.lineWidth = Math.max(1, r * 0.22);
-  ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.55, -0.9, 0.9); ctx.stroke();
-  ctx.globalAlpha = 1;
+  paintBall(ctx, s.x, s.y, r, ballSpin(p.z, p.x * 0.7, p.y * 0.5), { glow, alpha: ghost ? 0.75 : 1 });
   return s;
 }
 
@@ -951,11 +970,11 @@ export class OutfieldView {
   shakeRope(x, y) { this.ropeWave = { ang: Math.atan2(y - CY, x), t0: performance.now() }; }
   ball(ctx, b) {
     const sh = this.to(b.x, b.y), p = this.to(b.x, b.y, b.h);
-    const r = Math.max(4, 0.35 * this.k);
+    // from up here a real ball would be a speck: drawn a touch bigger, still small, a shadow under it
+    const r = Math.max(3.6, 0.045 * this.k * 4);
     ctx.fillStyle = 'rgba(10,8,20,0.4)';
-    ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.2, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#d7263d'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    paintBall(ctx, p.x, p.y, r * (1 + Math.min(0.6, (b.h || 0) * 0.05)), ballSpin(b.x, b.y * 1.1, (b.h || 0) * 0.5));
     return p;
   }
   label(ctx, x, y, text, color = '#ffd23f', size = 12) {
