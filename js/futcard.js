@@ -8,6 +8,7 @@ import { heroById } from './heroes.js';
 import { teamById } from './teams.js';
 import { ABILITIES, potentialStars, money, value } from './career.js';
 import { PORTRAIT_KEYS } from './portraits-list.js';
+import { PORTRAIT_FACES } from './portrait-faces.js';
 
 // ---------- painted portraits ----------
 // Painted in Thunder's blue and yellow; on a player at another club the shirt is recoloured to that
@@ -56,6 +57,31 @@ export function paintedPortrait(p, kitTeam = null) {
   const im = portraitSrc(key);
   if (im.complete && im.naturalWidth) put(); else im.addEventListener('load', put, { once: true });
   return holder;
+}
+
+// The painted portrait's head and shoulders as a small square picture (squad lists and the like),
+// on a backdrop in the club's colour and with the shirt in its kit; null if he has no portrait.
+export function portraitFace(p, kitTeam = null, size = 44) {
+  const key = keyOf(p), crop = PORTRAIT_FACES[key];
+  if (!HAS_PORTRAIT.has(key) || !crop) return null;
+  const team = kitTeam || (p.team ? teamById(p.team) : null), ck = `${key}|${team?.id || ''}`;
+  const px = Math.round(size * Math.min(3, window.devicePixelRatio || 2));
+  const c = document.createElement('canvas');
+  c.width = c.height = px; c.className = 'face';
+  c.style.width = c.style.height = `${size}px`;
+  const g = c.getContext('2d');
+  const bg = g.createLinearGradient(0, 0, 0, px), col = rgbOf(team?.suit || '#f2711c');
+  const tone = f => `rgb(${col.map(v => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f)).join(',')})`;
+  bg.addColorStop(0, tone(0.35)); bg.addColorStop(1, tone(-0.25));
+  g.fillStyle = bg; g.fillRect(0, 0, px, px);
+  const put = () => {
+    if (!kits.has(ck)) kits.set(ck, recolour(srcs.get(key), team));
+    const [x, y, s] = crop;
+    g.drawImage(kits.get(ck), x, y, s, s, 0, 0, px, px);
+  };
+  const im = portraitSrc(key);
+  if (im.complete && im.naturalWidth) put(); else im.addEventListener('load', put, { once: true });
+  return c;
 }
 
 // tiers by overall rating, best first

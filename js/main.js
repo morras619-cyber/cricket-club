@@ -7,7 +7,7 @@ import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
 import { flag, nationName } from './nations.js';
 import { faceEl } from './looks.js';
-import { futCard } from './futcard.js';
+import { futCard, portraitFace } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
@@ -258,7 +258,8 @@ function heroStatLine(hero) {
 const kitOf = p => (p.team ? teamById(p.team) : { suit: '#f3efe2', trim: '#3a3a4a' });
 function withFace(p, size, ...parts) {
   const row = el('div', 'facerow'), txt = el('div');
-  const pic = p.heroId || (p.hero && typeof p.hero === 'object') ? portrait(heroById(p.heroId || p.hero.id), size, 'celebrate') : faceEl(p, kitOf(p), size);
+  // his painted portrait if he has one, else the drawn face (heroes keep their full portrait)
+  const pic = p.heroId || (p.hero && typeof p.hero === 'object') ? portrait(heroById(p.heroId || p.hero.id), size, 'celebrate') : portraitFace(p, p.team ? teamById(p.team) : null, size) || faceEl(p, kitOf(p), size);
   pic.classList.add('face'); pic.style.width = pic.style.height = `${size}px`;
   txt.append(...parts);
   row.append(pic, txt);
@@ -847,7 +848,7 @@ function renderRecords() {
     rows.forEach((r, i) => {
       const d = el('div', 'kotie');
       d.append(el('b', '', `${i + 1}.`));
-      if (r && typeof r === 'object') { if (r.p) d.append(r.p.heroId ? portrait(heroById(r.p.heroId), 28, 'celebrate') : faceEl(r.p, kitOf(r.p), 28)); d.append(el('span', '', r.text)); }
+      if (r && typeof r === 'object') { if (r.p) d.append(r.p.heroId ? portrait(heroById(r.p.heroId), 28, 'celebrate') : portraitFace(r.p, r.p.team ? teamById(r.p.team) : null, 28) || faceEl(r.p, kitOf(r.p), 28)); d.append(el('span', '', r.text)); }
       else d.append(el('span', '', r));
       const pic = d.querySelector('canvas'); if (pic) { pic.classList.add('face'); pic.style.width = pic.style.height = '28px'; }
       b.append(d);
