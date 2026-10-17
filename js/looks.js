@@ -58,7 +58,8 @@ export function lookOf(p) {
   // (and its haircut, beard and headwear: hair.js)
   const key = portraitKey(p.name || ''), painted = PORTRAIT_LOOKS[key], cut = PORTRAIT_STYLES[key];
   const base = baseLook(p);
-  return { ...base, ...painted, ...cut, seed: p.id || p.name || '' };
+  // (who and num: the name and number on his shirt)
+  return { ...base, ...painted, ...cut, seed: p.id || p.name || '', who: p.name || '', num: p.number || null };
 }
 const portraitKey = name => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function baseLook(p) {

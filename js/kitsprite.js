@@ -1,0 +1,252 @@
+// The plain-kit bowler (img/kit/, tools/build_kit_sheets.py): one bald body per view, repainted
+// for each club (kit), then for each player (skin, hair), with the club crest on the front of the
+// shirt and the player's last name and number on the back (style: tools/kit/SHIRT_PRINT.md).
+import { KIT_SHEETS } from './kitsheets.js';
+import { skinHex, hairHex, hsv, rgb } from './looks.js';
+
+const REF_HEIGHT_M = 1.85;
+// the game's frame names -> the sheet's poses (0-9, left to right, top row first)
+const POSE = {
+  start: 0, run1: 1, run2: 2, run3: 8, gather: 3, coil: 4, frontarm: 4, release: 5,
+  follow1: 6, follow2: 7, follow3: 7, finish: 8, field: 9, react: 9, celebrate1: 5, celebrate2: 5,
+};
+const POSE_FRONT = { celebrate2: 4 };
+
+const views = {}; // 'front' | 'back' -> { img, hair, mask, data }
+let fontReady = false;
+const crestImgs = new Map();
+
+function image(src) {
+  const img = new Image();
+  img.src = src;
+  return img;
+}
+const loaded = img => img && img.complete && img.naturalWidth > 0;
+
+export function loadKitSprites(...teamIds) {
+  for (const view of ['front', 'back']) {
+    if (views[view]) continue;
+    views[view] = { img: image(`img/kit/${view}.webp`), hair: image(`img/kit/${view}-hair.webp`), mask: image(`img/kit/${view}-mask.png`) };
+  }
+  for (const id of teamIds) if (id && !crestImgs.has(id)) crestImgs.set(id, image(`img/logo-${id}.webp`));
+  if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
+    document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
+  }
+}
+
+function pixels(img) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  c.width = 0; c.height = 0;
+  return d;
+}
+// the view's pixel data, once its three images are in
+function viewData(view) {
+  const v = views[view];
+  if (!v || !loaded(v.img) || !loaded(v.hair) || !loaded(v.mask)) return null;
+  if (!v.data) v.data = { mask: pixels(v.mask), hair: pixels(v.hair) };
+  return v.data;
+}
+
+const hexRgb = hex => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const lum = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+
+// a kit colour's shadow, middle and light tones (0-255), so a yellow shirt shades to warm brown
+// rather than olive and a black one still shows its folds
+function ramp(hex) {
+  const c = hexRgb(hex), [h, s, v] = hsv(...c), l = lum(...c) / 255;
+  if (l < 0.18) {
+    const mid = rgb(h, s, Math.max(v, 0.2));
+    return [mid.map(x => x * 0.35), mid, mid.map((x, k) => x + ([158, 163, 184][k] - x) * 0.75)];
+  }
+  if (s < 0.15) return [c.map((x, k) => x * 0.45 * [0.95, 0.97, 1.05][k]), c, c.map(x => x + (255 - x) * 0.8)];
+  const shadow = rgb((h + (l > 0.5 ? -12.6 : 0) + 360) % 360, Math.min(1, s * 1.1), v * 0.42);
+  return [shadow, c, c.map(x => x + (255 - x) * 0.6)];
+}
+
+// ---------- the club's kit ----------
+const teamCache = new Map();
+function teamSheet(view, team) {
+  const key = view + '|' + team.id;
+  if (teamCache.has(key)) return teamCache.get(key);
+  const v = views[view], meta = KIT_SHEETS[view], data = viewData(view);
+  const c = document.createElement('canvas');
+  c.width = v.img.naturalWidth; c.height = v.img.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  if (!g) return null;
+  g.drawImage(v.img, 0, 0);
+  const img = g.getImageData(0, 0, c.width, c.height), p = img.data, m = data.mask;
+  const tones = { 255: [ramp(team.suit), meta.suit], 128: [ramp(team.trim), meta.trim] };
+  for (let i = 0; i < p.length; i += 4) {
+    const t = tones[m[i + 2]];
+    if (!t || !p[i + 3]) continue;
+    const [[sh, md, li], [lo, mid, hi]] = t, l = lum(p[i], p[i + 1], p[i + 2]) / 255;
+    let x = l < mid ? (l - lo) / Math.max(mid - lo, 1e-3) - 1 : (l - mid) / Math.max(hi - mid, 1e-3);
+    x = Math.max(-1.15, Math.min(1, x));
+    for (let k = 0; k < 3; k++) p[i + k] = x < 0 ? md[k] + (md[k] - sh[k]) * x : md[k] + (li[k] - md[k]) * x;
+  }
+  g.putImageData(img, 0, 0);
+  teamCache.set(key, c);
+  while (teamCache.size > 4) { const [k, old] = teamCache.entries().next().value; teamCache.delete(k); old.width = 0; old.height = 0; }
+  return c;
+}
+
+// ---------- the player ----------
+const PARTICLES = new Set(['van', 'der', 'de', 'du', 'da', 'le', 'la', 'von', 'ter', 'ten', 'al', 'el', 'bin']);
+export function shirtName(name = '') {
+  const w = name.trim().split(/\s+/);
+  const i = w.findIndex((x, k) => k > 0 && PARTICLES.has(x.toLowerCase()));
+  return (i > 0 ? w.slice(i) : w.slice(-1)).join(' ').toUpperCase();
+}
+function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+export const shirtNumber = look => look.num || (hashStr(look.seed || look.who || 'x') % 99) + 1;
+
+// the crest with a thin dark rim, so it reads on any kit colour
+const crestCache = new Map();
+function crestCanvas(id) {
+  if (crestCache.has(id)) return crestCache.get(id);
+  const img = crestImgs.get(id);
+  if (!loaded(img)) return null;
+  const s = 200 / Math.max(img.naturalWidth, img.naturalHeight), w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s), o = 7;
+  const sil = document.createElement('canvas'), c = document.createElement('canvas');
+  sil.width = c.width = w + 2 * o; sil.height = c.height = h + 2 * o;
+  const gs = sil.getContext('2d'), g = c.getContext('2d');
+  gs.drawImage(img, o, o, w, h);
+  gs.globalCompositeOperation = 'source-in';
+  gs.fillStyle = 'rgba(14,12,24,0.9)'; gs.fillRect(0, 0, sil.width, sil.height);
+  for (let a = 0; a < 16; a++) g.drawImage(sil, Math.cos(a * Math.PI / 8) * o, Math.sin(a * Math.PI / 8) * o);
+  g.drawImage(img, o, o, w, h);
+  crestCache.set(id, c);
+  return c;
+}
+
+// the name and number, laid out as one block 400 units wide (centre at 0, 0): name cap height
+// 52, gap 26, number cap height 190; each line squeezed only if wider than the block
+const BLOCK = { w: 400, name: 52, gap: 26, num: 190 };
+function printLine(g, text, cap, cy, fill, edge) {
+  g.font = `800 ${Math.round(cap / 0.7)}px "Barlow Condensed", "Arial Narrow", sans-serif`;
+  const asc = g.measureText('H').actualBoundingBoxAscent || cap, size = Math.round(cap / 0.7) * cap / asc;
+  g.font = `800 ${size}px "Barlow Condensed", "Arial Narrow", sans-serif`;
+  const wid = g.measureText(text).width, sx = Math.min(1, BLOCK.w / wid);
+  g.save();
+  g.translate(0, cy + cap / 2);
+  g.scale(sx, 1);
+  g.textAlign = 'center';
+  g.textBaseline = 'alphabetic';
+  if (edge) { g.lineJoin = 'round'; g.lineWidth = cap * 0.14; g.strokeStyle = edge; g.strokeText(text, 0, 0); }
+  g.fillStyle = fill;
+  g.fillText(text, 0, 0);
+  g.restore();
+}
+
+const playerCache = new Map();
+function playerSheet(view, team, look, mirror) {
+  const meta = KIT_SHEETS[view], data = viewData(view);
+  if (!data || !fontReady) return null;
+  const sk = skinHex(look), hr = hairHex(look), bald = look.cut === 'bald' || (!look.cut && look.style === 'bald');
+  const name = shirtName(look.who), num = shirtNumber(look);
+  const key = [view, team.id, team.suit, team.trim, sk, hr, bald, name, num, mirror].join('|');
+  if (playerCache.has(key)) { const c = playerCache.get(key); playerCache.delete(key); playerCache.set(key, c); return c; }
+  if (view === 'front' && !crestCanvas(team.id)) return null;
+  const kit = teamSheet(view, team);
+  if (!kit) return null;
+  const W = kit.width, H = kit.height;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  if (!g) return null;
+  g.drawImage(kit, 0, 0);
+  // skin, then hair (unless he's bald)
+  let img = g.getImageData(0, 0, W, H), p = img.data;
+  const m = data.mask, hp = data.hair, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255, href = meta.hair * 255;
+  for (let i = 0; i < p.length; i += 4) {
+    if (m[i] > 127 && p[i + 3]) {
+      const r = lum(p[i], p[i + 1], p[i + 2]) / sref;
+      for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
+    }
+    const a = bald ? 0 : hp[i + 3] / 255;
+    if (a > 0.01) {
+      const q = lum(hp[i], hp[i + 1], hp[i + 2]) / href;
+      for (let k = 0; k < 3; k++) p[i + k] = (q <= 1 ? ht[k] * q : ht[k] + (255 - ht[k]) * Math.min(0.8, (q - 1) * 0.6)) * a + p[i + k] * (1 - a);
+      p[i + 3] = Math.max(p[i + 3], hp[i + 3]);
+    }
+  }
+  g.putImageData(img, 0, 0);
+  // a left-armer: the whole sheet mirrored (the crest and print are drawn after, so they read right)
+  if (mirror) {
+    const flipped = document.createElement('canvas');
+    flipped.width = W; flipped.height = H;
+    const fg = flipped.getContext('2d');
+    fg.translate(W, 0); fg.scale(-1, 1); fg.drawImage(c, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.drawImage(flipped, 0, 0);
+    flipped.width = 0; flipped.height = 0;
+  }
+  // the crest (front) or the name and number (back), on a layer of their own
+  const layer = document.createElement('canvas');
+  layer.width = W; layer.height = H;
+  const lg = layer.getContext('2d', { willReadFrequently: true });
+  const mx = (x) => (mirror ? W - x : x), ma = (a) => (mirror ? -a : a);
+  if (view === 'front') {
+    const cr = crestCanvas(team.id);
+    for (const [x, y, size, sx, sy, ang] of meta.place) {
+      const s = size / Math.max(cr.width, cr.height);
+      lg.save();
+      lg.translate(mx(x), y); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(sx, sy);
+      lg.drawImage(cr, -cr.width * s / 2, -cr.height * s / 2, cr.width * s, cr.height * s);
+      lg.restore();
+    }
+  } else {
+    const fill = team.trim, close = Math.abs(lum(...hexRgb(team.trim)) - lum(...hexRgb(team.suit))) <= 0.35 * 255;
+    const edge = close ? `rgb(${hexRgb(team.suit).map(x => Math.round(x * 0.35)).join(',')})` : null;
+    const hb = BLOCK.name + BLOCK.gap + BLOCK.num;
+    for (const [x, y, w, sx, sy, ang, ndx, ndy, udx, udy] of meta.place) {
+      for (const [text, cap, cy, dx, dy] of [[name, BLOCK.name, -hb / 2 + BLOCK.name / 2, ndx, ndy], [String(num), BLOCK.num, hb / 2 - BLOCK.num / 2, udx, udy]]) {
+        lg.save();
+        lg.translate(mx(x + dx), y + dy); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(w / BLOCK.w * sx, w / BLOCK.w * sy);
+        printLine(lg, text, cap, cy, fill, edge);
+        lg.restore();
+      }
+    }
+  }
+  // onto the shirt only (an arm in front hides it), shaded with the cloth's folds
+  const lp = lg.getImageData(0, 0, W, H).data;
+  img = g.getImageData(0, 0, W, H); p = img.data;
+  const ref = lum(...hexRgb(team.suit)) || 1, [lo, hi] = view === 'front' ? [0.6, 1.12] : [0.55, 1.15];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (!lp[i + 3]) continue;
+      const mi = (y * W + (mirror ? W - 1 - x : x)) * 4;
+      if (m[mi + 1] < 128) continue;
+      const a = lp[i + 3] / 255, f = Math.max(lo, Math.min(hi, lum(p[i], p[i + 1], p[i + 2]) / ref));
+      for (let k = 0; k < 3; k++) p[i + k] = p[i + k] * (1 - a) + Math.min(255, lp[i + k] * f) * a;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  layer.width = 0; layer.height = 0;
+  playerCache.set(key, c);
+  while (playerCache.size > 4) { const [k, old] = playerCache.entries().next().value; playerCache.delete(k); old.width = 0; old.height = 0; }
+  return c;
+}
+
+// The bowler in the plain kit, feet at (px, py). False if it isn't ready (the old sprite is drawn).
+export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look) {
+  if (!team || !look?.who) return false;
+  const sheet = playerSheet(view, team, look, !!flip);
+  if (!sheet) return false;
+  const meta = KIT_SHEETS[view];
+  const pose = (view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
+  let [sx, sy, w, h, ax, ay] = meta.frames[pose];
+  if (flip) { sx = sheet.width - sx - w; ax = w - ax; }
+  const k = kPerM * REF_HEIGHT_M / meta.refPx;
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,8,20,0.26)';
+  ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.drawImage(sheet, sx, sy, w, h, px - ax * k, py - ay * k, w * k, h * k);
+  ctx.restore();
+  return true;
+}
