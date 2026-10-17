@@ -413,10 +413,11 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
-    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 1500, cardFor(p, inn.side === 'player' ? this.oppTeam : this.myTeam));
+    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 2300, cardFor(p, inn.side === 'player' ? this.oppTeam : this.myTeam));
     await this.sleepReal(50); // let the banner show first
     this.prepPlayers(inn);
-    await this.sleepReal(this.bot ? 10 : 1050);
+    // play only starts once the card has been read and has gone
+    await this.sleepReal(this.bot ? 10 : 2600);
   }
 
   // the openers walk out: their cards (if they have them) side by side
@@ -430,15 +431,15 @@ export class Game {
     box.className = 'pcard-pair';
     box.append(...cards);
     this.ui.banner('OPENERS', '', 2700, box, { cls: 'card-head', color: team?.suit });
-    await this.sleepReal(this.bot ? 60 : 2700);
+    await this.sleepReal(this.bot ? 60 : 3000);
   }
 
   // a wicket: the next batter walks out
   async newBatter(inn) {
     const p = this.fillCrease(inn)[0] || this.batterOf(inn);
-    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 1700, cardFor(p, inn.side === 'player' ? this.myTeam : this.oppTeam));
+    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 2300, cardFor(p, inn.side === 'player' ? this.myTeam : this.oppTeam));
     this.prepPlayers(inn);
-    await this.sleepReal(this.bot ? 60 : 1200);
+    await this.sleepReal(this.bot ? 60 : 2600);
   }
 
   quit() { this.cancelAll(); this.ui.hud(false); this.clearBowlUI(); this.view = 'idle'; this.paused = false; }

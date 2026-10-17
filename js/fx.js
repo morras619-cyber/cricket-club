@@ -156,8 +156,10 @@ export class FX {
     }
     ctx.globalAlpha = 1;
     if (this.speed > 0) drawSpeedLines(ctx, W, H, this.speed);
-    for (const b of this.bubbles) drawBubble(ctx, b, W);
-    for (const w of this.words) drawWord(ctx, w, W, H);
+    // every bubble and word keeps clear of the ones already on screen (placed once, then it stays)
+    const taken = [];
+    for (const b of this.bubbles) taken.push(drawBubble(ctx, b, W, taken));
+    for (const w of this.words) taken.push(drawWord(ctx, w, W, H, taken));
     if (this.flashA > 0) {
       ctx.globalAlpha = Math.min(1, this.flashA);
       ctx.fillStyle = this.flashColor; ctx.fillRect(0, 0, W, H);
@@ -166,7 +168,19 @@ export class FX {
   }
 }
 
-function drawWord(ctx, w, W, H) {
+const hits = (r, list) => list.find(q => q && r.x < q.x + q.w + 6 && r.x + r.w + 6 > q.x && r.y < q.y + q.h + 6 && r.y + r.h + 6 > q.y);
+// move a box (x, y = its top left) to the nearest spot, above or below, clear of all of `taken`
+function settle(r, taken, H) {
+  const y0 = r.y, step = r.h + 6;
+  for (const k of [0, -1, 1, -2, 2, -3, 3, -4, 4]) {
+    const y = y0 + k * step;
+    if (y < 8 || y + r.h > H - 8) continue;
+    if (!hits({ ...r, y }, taken)) { r.y = y; return r; }
+  }
+  return r;
+}
+
+function drawWord(ctx, w, W, H, taken = []) {
   const p = w.t / w.dur;
   const pop = p < 0.12 ? p / 0.12 * 1.25 : p < 0.2 ? 1.25 - (p - 0.12) / 0.08 * 0.25 : 1;
   ctx.save();
@@ -181,6 +195,9 @@ function drawWord(ctx, w, W, H) {
     x = Math.max(pad + hx, Math.min(W - pad - hx, x));
     y = Math.max(pad + hy, Math.min(H - pad - hy, y));
   }
+  const hx = halfW * 1.1 * fit, hy = halfH * 1.1 * fit;
+  if (w.ly == null) w.ly = settle({ x: x - hx, y: y - hy, w: hx * 2, h: hy * 2 }, taken, H).y + hy; // its spot, kept
+  y = w.ly;
   ctx.translate(x, y);
   ctx.rotate(w.rot);
   ctx.scale(pop * fit, pop * fit);
@@ -190,9 +207,10 @@ function drawWord(ctx, w, W, H) {
   ctx.lineWidth = w.size * 0.14; ctx.strokeStyle = w.stroke; ctx.strokeText(w.text, 0, 0);
   ctx.fillStyle = w.color; ctx.fillText(w.text, 0, 0);
   ctx.restore();
+  return { x: x - hx, y: y - hy, w: hx * 2, h: hy * 2 };
 }
 
-export function drawBubble(ctx, b, W) {
+export function drawBubble(ctx, b, W, taken = []) {
   const p = b.t / b.dur;
   const a = p < 0.08 ? p / 0.08 : p > 0.85 ? (1 - p) / 0.15 : 1;
   ctx.save();
@@ -206,18 +224,23 @@ export function drawBubble(ctx, b, W) {
   let x = b.x - (b.side > 0 ? 18 : w - 18), y = b.y - h - 16;
   x = Math.max(8, Math.min(W - w - 8, x));
   y = Math.max(8, y);
+  if (b.ly == null) { b.ly = settle({ x, y, w, h }, taken, 9999).y; b.moved = b.ly !== y; } // its spot, kept clear of the others
+  y = Math.max(8, b.ly);
   ctx.fillStyle = '#fff4da'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, 12);
-  ctx.moveTo(Math.min(Math.max(b.x - 8, x + 10), x + w - 24), y + h);
-  ctx.lineTo(b.x, b.y);
-  ctx.lineTo(Math.min(Math.max(b.x + 8, x + 22), x + w - 10), y + h);
+  // the pointer to whoever's talking (not when the bubble had to move: it would cross the others)
+  if (!b.moved) {
+    ctx.moveTo(Math.min(Math.max(b.x - 8, x + 10), x + w - 24), y + h);
+    ctx.lineTo(b.x, b.y);
+    ctx.lineTo(Math.min(Math.max(b.x + 8, x + 22), x + w - 10), y + h);
+  }
   ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#fff4da';
-  ctx.fillRect(Math.min(Math.max(b.x - 6, x + 12), x + w - 22), y + h - 3, 14, 4);
+  if (!b.moved) { ctx.fillStyle = '#fff4da'; ctx.fillRect(Math.min(Math.max(b.x - 6, x + 12), x + w - 22), y + h - 3, 14, 4); }
   ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   lines.forEach((l, i) => ctx.fillText(l, x + pad, y + pad * 0.7 + i * lh));
   ctx.restore();
+  return { x, y, w, h };
 }
 
 function wrap(ctx, text, maxW) {
