@@ -43,6 +43,8 @@ PICK = {
     # sheet 9: batch 2. Left out as lookalikes: #2 (Faisal Naqvi) and #4 (Nadir Sheikh)
     'shoaib-haider': (9, 1, 26), 'danish-iqbal': (9, 3, 24), 'rizwan-khan': (9, 5, 27), 'kashif-lone': (9, 6, 23),
     'hamza-nawaz': (9, 7, 34), 'ehan-rizvi': (9, 8, 24), 'hamid-usmani': (9, 9, 32), 'zain-mirza': (9, 10, 28),
+    # sheet 10: those two redrawn
+    'sameer-raza': (10, 1, 30), 'sameer-javed': (10, 2, 31),
 }
 
 
@@ -57,10 +59,10 @@ def pieces(path):
     # painted (the gap between the two), until every box in the rows of four is one portrait wide
     op = a[..., 3] > 40
     W = a.shape[1]
-    if len(boxes) < 4:  # a single portrait on its own
-        boxes = [max(boxes, key=lambda b: (b[2] - b[0]) * (b[3] - b[1]))]
-    out_boxes = [] if len(boxes) > 1 else boxes[:]
-    boxes = boxes if len(boxes) > 1 else []
+    if len(boxes) < 4:  # one or two portraits on their own: the big shapes, left to right
+        big = max((b[2] - b[0]) * (b[3] - b[1]) for b in boxes)
+        return [crop_one(im, b) for b in sorted((b for b in boxes if (b[2] - b[0]) * (b[3] - b[1]) > big * 0.4), key=lambda b: b[0])]
+    out_boxes = []
     for b in boxes:
         todo = [b]
         while todo:
@@ -72,18 +74,19 @@ def pieces(path):
             cut = x0 + lo + int(np.argmin(col[lo:hi]))
             todo += [(cut, y0, x1, y1), (x0, y0, cut, y1)]
     boxes = sorted(out_boxes, key=lambda b: (round(b[1] / 200), b[0]))
-    assert len(boxes) in (1, 10), (path, len(boxes))
-    out = []
-    for b in boxes:
-        p = np.array(im.crop(b))
-        # only this player: the biggest shape in the box (not a neighbour's bat poking in)
-        lab, n = ndi.label(p[..., 3] > 30)
-        if n > 1:
-            big = lab == (np.argmax(ndi.sum(np.ones_like(lab), lab, range(1, n + 1))) + 1)
-            p[..., 3] = np.where(ndi.binary_dilation(big, iterations=3), p[..., 3], 0)
-        p = Image.fromarray(p, 'RGBA')
-        out.append(p.crop(p.getbbox()))
-    return out
+    assert len(boxes) == 10, (path, len(boxes))
+    return [crop_one(im, b) for b in boxes]
+
+
+def crop_one(im, b):
+    p = np.array(im.crop(b))
+    # only this player: the biggest shape in the box (not a neighbour's bat poking in)
+    lab, n = ndi.label(p[..., 3] > 30)
+    if n > 1:
+        big = lab == (np.argmax(ndi.sum(np.ones_like(lab), lab, range(1, n + 1))) + 1)
+        p[..., 3] = np.where(ndi.binary_dilation(big, iterations=3), p[..., 3], 0)
+    p = Image.fromarray(p, 'RGBA')
+    return p.crop(p.getbbox())
 
 
 def main():
