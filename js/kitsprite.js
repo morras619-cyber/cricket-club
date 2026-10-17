@@ -12,7 +12,7 @@ const POSE = {
 };
 const POSE_FRONT = { celebrate2: 4 };
 
-const views = {}; // 'front' | 'back' -> { img, hair, mask, data }
+const views = {}; // 'front' | 'back' -> { img, mask, hair: { style: img }, data }
 let fontReady = false;
 const crestImgs = new Map();
 
@@ -26,7 +26,7 @@ const loaded = img => img && img.complete && img.naturalWidth > 0;
 export function loadKitSprites(...teamIds) {
   for (const view of ['front', 'back']) {
     if (views[view]) continue;
-    views[view] = { img: image(`img/kit/${view}.webp`), hair: image(`img/kit/${view}-hair.webp`), mask: image(`img/kit/${view}-mask.png`) };
+    views[view] = { img: image(`img/kit/${view}.webp`), mask: image(`img/kit/${view}-mask.png`), hair: {} };
   }
   for (const id of teamIds) if (id && !crestImgs.has(id)) crestImgs.set(id, image(`img/logo-${id}.webp`));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
@@ -46,9 +46,29 @@ function pixels(img) {
 // the view's pixel data, once its three images are in
 function viewData(view) {
   const v = views[view];
-  if (!v || !loaded(v.img) || !loaded(v.hair) || !loaded(v.mask)) return null;
-  if (!v.data) v.data = { mask: pixels(v.mask), hair: pixels(v.hair) };
+  if (!v || !loaded(v.img) || !loaded(v.mask)) return null;
+  if (!v.data) v.data = { mask: pixels(v.mask), hair: {} };
   return v.data;
+}
+// a hairstyle's layer for the view (loaded the first time a player with it is drawn); undefined
+// while it loads
+function hairData(view, style) {
+  const v = views[view], d = v.data;
+  if (d.hair[style]) return d.hair[style];
+  if (!v.hair[style]) v.hair[style] = image(`img/kit/${view}-hair-${style}.webp`);
+  if (!loaded(v.hair[style])) return undefined;
+  return (d.hair[style] = pixels(v.hair[style]));
+}
+
+// The player's hairstyle: from his portrait (tools: js/portrait-styles.js), else from his look.
+// Styles without their own drawing yet use the nearest one (dreads -> long, bun -> ponytail).
+const CUT = { part: 'part', messy: 'messy', buzz: 'buzz', curly: 'curly', spiky: 'spiky', long: 'long', ponytail: 'ponytail', dreads: 'long', bun: 'ponytail' };
+const STYLE = { crop: 'buzz', swept: 'messy', spiky: 'spiky', curly: 'curly', long: 'long', afro: 'curly', dreads: 'long', patka: 'buzz' };
+export function hairStyleOf(look) {
+  if (look.cut === 'bald' || (!look.cut && look.style === 'bald')) return null;
+  if (CUT[look.cut]) return CUT[look.cut];
+  if (look.wear) return 'buzz'; // short hair under a cap or wrap
+  return STYLE[look.style] || (hashStr(look.seed || look.who || 'x') % 2 ? 'part' : 'messy');
 }
 
 const hexRgb = hex => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -146,9 +166,11 @@ const playerCache = new Map();
 function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
   if (!data || !fontReady) return null;
-  const sk = skinHex(look), hr = hairHex(look), bald = look.cut === 'bald' || (!look.cut && look.style === 'bald');
+  const sk = skinHex(look), hr = hairHex(look), style = hairStyleOf(look);
+  const hp = style ? hairData(view, style) : null;
+  if (hp === undefined) return null;
   const name = shirtName(look.who), num = shirtNumber(look);
-  const key = [view, team.id, team.suit, team.trim, sk, hr, bald, name, num, mirror].join('|');
+  const key = [view, team.id, team.suit, team.trim, sk, hr, style, name, num, mirror].join('|');
   if (playerCache.has(key)) { const c = playerCache.get(key); playerCache.delete(key); playerCache.set(key, c); return c; }
   if (view === 'front' && !crestCanvas(team.id)) return null;
   const kit = teamSheet(view, team);
@@ -159,15 +181,15 @@ function playerSheet(view, team, look, mirror) {
   const g = c.getContext('2d', { willReadFrequently: true });
   if (!g) return null;
   g.drawImage(kit, 0, 0);
-  // skin, then hair (unless he's bald)
+  // skin, then his hair (none if he's bald)
   let img = g.getImageData(0, 0, W, H), p = img.data;
-  const m = data.mask, hp = data.hair, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255, href = meta.hair * 255;
+  const m = data.mask, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255, href = style ? meta.hair[style] * 255 : 1;
   for (let i = 0; i < p.length; i += 4) {
     if (m[i] > 127 && p[i + 3]) {
       const r = lum(p[i], p[i + 1], p[i + 2]) / sref;
       for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
     }
-    const a = bald ? 0 : hp[i + 3] / 255;
+    const a = hp ? hp[i + 3] / 255 : 0;
     if (a > 0.01) {
       const q = lum(hp[i], hp[i + 1], hp[i + 2]) / href;
       for (let k = 0; k < 3; k++) p[i + k] = (q <= 1 ? ht[k] * q : ht[k] + (255 - ht[k]) * Math.min(0.8, (q - 1) * 0.6)) * a + p[i + k] * (1 - a);
@@ -222,7 +244,8 @@ function playerSheet(view, team, look, mirror) {
       if (!lp[i + 3]) continue;
       const mi = (y * W + (mirror ? W - 1 - x : x)) * 4;
       if (m[mi + 1] < 128) continue;
-      const a = lp[i + 3] / 255, f = Math.max(lo, Math.min(hi, lum(p[i], p[i + 1], p[i + 2]) / ref));
+      // (long hair hanging over the back hides the print)
+      const a = lp[i + 3] / 255 * (hp ? 1 - hp[mi + 3] / 255 : 1), f = Math.max(lo, Math.min(hi, lum(p[i], p[i + 1], p[i + 2]) / ref));
       for (let k = 0; k < 3; k++) p[i + k] = p[i + k] * (1 - a) + Math.min(255, lp[i + k] * f) * a;
     }
   }
