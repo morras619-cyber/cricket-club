@@ -595,7 +595,7 @@ function dressFor(view, v, look) {
 }
 
 // the bowler views drawn from the plain-kit sheets (kitsprite.js)
-const KIT_VIEW = { front: 'front', 'spin-front': 'spin-front', back: 'back', 'spin-back': 'back' };
+const KIT_VIEW = { front: 'front', 'spin-front': 'spin-front', back: 'back', 'spin-back': 'spin-back' };
 
 // Draw a frame with its feet at (px, py); kPerM is pixels per metre at that depth. False until loaded.
 // look: the player's skin and hair (looks.js), repainted onto the drawn sheet

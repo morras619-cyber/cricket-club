@@ -54,12 +54,12 @@ def frames_of(a, count=10, rowh=600):
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place, count=10, rowh=600):
+def build(view, sheet, hairpaths, place, count=10, rowh=600, hairzones=None):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
     hairs = {st: np.pad(np.array(Image.open(hp).convert('RGBA')).astype(np.float32) / 255, ((M, M), (M, M), (0, 0))) for st, hp in hairpaths.items()}
-    hair_any = np.max([h[..., 3] for h in hairs.values()], axis=0)
+    hair_any = np.max([h[..., 3] for h in hairs.values()], axis=0) if hairs else np.zeros(a.shape[:2])
     suit, trim, skin = masks(a)
     L = a[..., :3] @ LUM
     lab, frames = frames_of(a, count, rowh)
@@ -102,6 +102,16 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600):
         mask[ay:ay + h, ax:ax + w, 0] = sk * 255
         mask[ay:ay + h, ax:ax + w, 1] = shirt * 255
         mask[ay:ay + h, ax:ax + w, 2] = np.where(su, 255, np.where(tr, 128, 0))
+        if hairzones:
+            # his own drawn hair (a hairstyle sheet used as it is): B = 64
+            hx, hy, hr, hdown = hairzones[k]; hx, hy = hx + M, hy + M
+            yy, xx = np.mgrid[y0:y0 + h, x0:x0 + w]
+            zone = (((xx - hx) / hr) ** 2 + ((yy - hy) / hr) ** 2 <= 1) | ((np.abs(xx - hx) <= hr) & (yy >= hy) & (yy <= hy + hdown))
+            H_, S_, V_ = hsv(a[y0:y0 + h, x0:x0 + w, :3])
+            grey = m & zone & ~sk & ~su & ~tr & (((S_ < 0.35) & (V_ < 0.85)) | (V_ < 0.3))
+            mask[ay:ay + h, ax:ax + w, 2][grey] = 64
+            hv = (a[y0:y0 + h, x0:x0 + w, :3] @ LUM)[grey & (V_ > 0.15)]
+            if len(hv): meta.setdefault('_hv', []).extend(hv.tolist())
         # feet: the bottom of the pose, under the planted foot (the lowest 8% of it)
         ys, xs = np.nonzero(me)
         foot = ys >= ys.max() - (ys.max() - ys.min()) * 0.08
@@ -122,6 +132,8 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600):
         if len(v) < 50:  # nothing in this view (a beard, from behind)
             continue
         meta['hair'][st] = round(float(np.median(v)), 4)
+    if '_hv' in meta:
+        meta['hairRef'] = round(float(np.median(meta.pop('_hv'))), 4)
     meta['size'] = [W, AH]
     os.makedirs('img/kit', exist_ok=True)
     Image.fromarray((np.clip(atlas, 0, 1) * 255).astype(np.uint8), 'RGBA').save(f'img/kit/{view}.webp', 'WEBP', quality=90, method=6)
@@ -145,6 +157,11 @@ def main():
         'front': build('front', front, hp('front'), [crest[str(k + 1)] for k in range(10)]),
         'back': build('back', back, hp('back'), [prints[str(k + 1)]['print'] + prints[str(k + 1)]['name'] + prints[str(k + 1)]['number'] for k in range(10)]),
     }
+    if len(sys.argv) > 6:
+        # SPIN_BACK_BALD.png SPIN_BACK_DIR (<style>.png per hairstyle) HEADS.json
+        sb_dir = sys.argv[6]
+        sheets = {'bald': sys.argv[5], **{f[:-4]: os.path.join(sb_dir, f) for f in sorted(os.listdir(sb_dir)) if f.endswith('.png')}}
+        out.update(spin_back(sys.argv[5], sheets, json.load(open(sys.argv[7]))['back']))
     if spin_front:
         sc = json.load(open('tools/kit/crest-spin-front.json'))['frames']
         out['spin-front'] = build('spin-front', spin_front, hp('spin-front'), [sc[str(k + 1)] for k in range(15)], 15, 500)
@@ -154,6 +171,60 @@ def main():
                 '// squash y, tilt]) or the name-and-number print (back: [x, y, width, squash x, squash y, tilt,\n'
                 '// name dx, dy, number dx, dy]) per frame; shading references for the repaint.\n')
         f.write('export const KIT_SHEETS = ' + json.dumps(out, separators=(',', ':'), default=lambda o: o.item()) + ';\n')
+
+
+
+# ---------- the spinner from behind: each hairstyle sheet used as drawn ----------
+def poses_of(path, count=15, rowh=500):
+    a = keyed(path) / 255
+    _, frames = frames_of(np.pad(a, ((60, 60), (60, 60), (0, 0))), count, rowh)
+    return a, [(sl[0].start - 60, sl[0].stop - 60, sl[1].start - 60, sl[1].stop - 60) for _, sl in frames]
+
+
+def collar_top(a, box):
+    """top edge and middle of the yellow collar under the head, inside box (sheet coords)"""
+    x0, y0, x1, y1 = box
+    H_, S_, V_ = hsv(a[y0:y1, x0:x1, :3])
+    yel = (H_ > 40) & (H_ < 70) & (S_ > 0.55) & (V_ > 0.45)
+    lab, n = ndi.label(yel)
+    if not n:
+        return None
+    sz = ndi.sum(yel, lab, range(1, n + 1)); bb = ndi.find_objects(lab)
+    h, w = yel.shape
+    c = [(abs((b[1].start + b[1].stop) / 2 - w / 2) + b[0].start, b) for i, b in enumerate(bb) if sz[i] > 40 and b[0].start > h * 0.3]
+    if not c:
+        return None
+    b = min(c, key=lambda t: t[0])[1]
+    return b[0].start, (b[1].start + b[1].stop) / 2
+
+
+def spin_back(bald_path, sheets, heads):
+    """sheets: {style: path} plus 'bald'. heads: per pose [cx, top, width] on the bald sheet."""
+    prints = json.load(open('tools/kit/shirt-print-spin-back.json'))['frames']
+    ba, bp = poses_of(bald_path)
+    out = {}
+    for style, path in sheets.items():
+        a, pp = poses_of(path) if style != 'bald' else (ba, bp)
+        place, zones, ref = [], [], None
+        for k in range(15):
+            by0, by1, bx0, bx1 = bp[k]; ey0, ey1, ex0, ex1 = pp[k]
+            dx, dy = round(((ex0 + ex1) - (bx0 + bx1)) / 2), ey1 - by1
+            cx, top, w = heads[k]
+            box = (int(cx - w), int(top - w * 0.4), int(cx + w), int(top + w * 1.9))
+            cb, ce = collar_top(ba, box), collar_top(a, (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy))
+            if k == 0 and cb and ce:
+                # scale: the body from the collar to the feet, not the full height (hair adds to that)
+                ref = round(502 * (ey1 - (box[1] + dy + ce[0])) / (by1 - (box[1] + cb[0])))
+            if cb and ce and abs(ce[0] - cb[0]) < 40 and abs(ce[1] - cb[1]) < 40:
+                dx, dy = dx + round(ce[1] - cb[1]), dy + round(ce[0] - cb[0])
+            # the print: bald tile coords -> sheet -> this sheet's tile coords (origin: pose left - 40, top)
+            p = prints[str(k + 1)]
+            sx, sy = p['print'][0] + bx0 - 40 + dx, p['print'][1] + by0 + dy
+            place.append([sx - (ex0 - 40), sy - ey0] + p['print'][2:] + p['name'] + p['number'])
+            zones.append([cx + dx, top + dy + w * 0.5, w * 0.95, w * 2.2])
+        out[f'spin-back-{style}'] = build(f'spin-back-{style}', path, {}, place, 15, 500, zones if style not in ('bald', 'cap') else None)
+        out[f'spin-back-{style}']['refPx'] = ref or out[f'spin-back-{style}']['refPx']
+    return out
 
 
 if __name__ == '__main__':

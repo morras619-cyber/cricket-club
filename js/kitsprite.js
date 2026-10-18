@@ -18,6 +18,11 @@ const POSE_SPIN = {
   follow1: 9, follow2: 10, follow3: 11, finish: 12, field: 14, react: 14, celebrate1: 14, celebrate2: 14,
 };
 
+// the spinner from behind (15 poses, one sheet per hairstyle as drawn, the bald one for bald players)
+const POSE_SPIN_BACK = {
+  start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 6, frontarm: 7, release: 8,
+  follow1: 10, follow2: 11, follow3: 12, finish: 13, field: 14, react: 9, celebrate1: 14, celebrate2: 14,
+};
 const views = {}; // 'front' | 'back' -> { img, mask, hair: { style: img }, data }
 let fontReady = false;
 const crestImgs = new Map();
@@ -51,6 +56,7 @@ function pixels(img) {
 }
 // the view's pixel data, once its three images are in
 function viewData(view) {
+  if (!views[view] && KIT_SHEETS[view]) views[view] = { img: image(`img/kit/${view}.webp`), mask: image(`img/kit/${view}-mask.png`), hair: {} };
   const v = views[view];
   if (!v || !loaded(v.img) || !loaded(v.mask)) return null;
   if (!v.data) v.data = { mask: pixels(v.mask), hair: {} };
@@ -172,6 +178,13 @@ function printLine(g, text, cap, cy, fill, edge) {
   g.restore();
 }
 
+// the sheet a player is drawn from: the spinner from behind has one per hairstyle
+function sheetView(view, look) {
+  if (view !== 'spin-back') return view;
+  const key = wearOf(look) || hairStyleOf(look) || 'bald';
+  return KIT_SHEETS[`spin-back-${key}`] ? `spin-back-${key}` : 'spin-back-bald';
+}
+
 const playerCache = new Map();
 function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
@@ -179,9 +192,10 @@ function playerSheet(view, team, look, mirror) {
   const sk = skinHex(look), hr = hairHex(look), style = hairStyleOf(look);
   const facing = view.endsWith('front');
   const beard = facing ? beardOf(look) : null, wear = wearOf(look);
-  const hp = style ? hairData(view, style) : null;
-  const bp = beard && KIT_SHEETS[view].hair[beard] ? hairData(view, beard) : null;
-  const wp = wear ? hairData(view, wear) : null;
+  const own = meta.hairRef != null; // his hair is drawn into the sheet (mask B = 64)
+  const hp = style && !own && meta.hair?.[style] ? hairData(view, style) : null;
+  const bp = beard && meta.hair?.[beard] ? hairData(view, beard) : null;
+  const wp = wear && meta.hair?.[wear] ? hairData(view, wear) : null;
   if (hp === undefined || bp === undefined || wp === undefined) return null;
   const name = shirtName(look.who), num = shirtNumber(look);
   const key = [view, team.id, team.suit, team.trim, sk, hr, style, beard, wear, name, num, mirror].join('|');
@@ -204,6 +218,9 @@ function playerSheet(view, team, look, mirror) {
     if (m[i] > 127 && p[i + 3]) {
       const r = lum(p[i], p[i + 1], p[i + 2]) / sref;
       for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
+    } else if (own && m[i + 2] === 64 && p[i + 3]) {
+      const q = lum(p[i], p[i + 1], p[i + 2]) / (meta.hairRef * 255);
+      for (let k = 0; k < 3; k++) p[i + k] = q <= 1 ? ht[k] * q : ht[k] + (255 - ht[k]) * Math.min(0.8, (q - 1) * 0.6);
     }
     for (const [d, href] of layers) {
       const a = d[i + 3] / 255;
@@ -278,10 +295,11 @@ function playerSheet(view, team, look, mirror) {
 // The bowler in the plain kit, feet at (px, py). False if it isn't ready (the old sprite is drawn).
 export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look) {
   if (!team || !look?.who) return false;
+  view = sheetView(view, look);
   const sheet = playerSheet(view, team, look, !!flip);
   if (!sheet) return false;
   const meta = KIT_SHEETS[view];
-  const pose = (view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
+  const pose = (view.startsWith('spin-back') ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
   let [sx, sy, w, h, ax, ay] = meta.frames[pose];
   if (flip) { sx = sheet.width - sx - w; ax = w - ax; }
   const k = kPerM * REF_HEIGHT_M / meta.refPx;
