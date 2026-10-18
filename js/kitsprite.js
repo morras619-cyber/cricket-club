@@ -258,7 +258,10 @@ function playerSheet(view, team, look, mirror) {
       lg.restore();
     }
   } else {
-    const fill = team.trim, close = Math.abs(lum(...hexRgb(team.trim)) - lum(...hexRgb(team.suit))) <= 0.35 * 255;
+    // the print in the trim colour, blended a little into the shirt so it sits in the cloth (a very
+    // dark trim, black on orange, becomes a deep shade of the shirt rather than stark black)
+    const tr = hexRgb(team.trim), su = hexRgb(team.suit), dark = lum(...tr) < 0.2 * 255, mixK = dark ? 0.42 : 0.12;
+    const fill = `rgb(${tr.map((v, k) => Math.round(v + (su[k] * (dark ? 0.45 : 1) - v) * mixK)).join(',')})`, close = Math.abs(lum(...hexRgb(team.trim)) - lum(...hexRgb(team.suit))) <= 0.35 * 255;
     const edge = close ? `rgb(${hexRgb(team.suit).map(x => Math.round(x * 0.35)).join(',')})` : null;
     const hb = BLOCK.name + BLOCK.gap + BLOCK.num;
     for (const [x, y, w, sx, sy, ang, ndx, ndy, udx, udy] of meta.place) {

@@ -9,7 +9,7 @@ non-strikers, fielders) follows these rules; only the per-frame placement is new
 - **Sizes (relative to the print block width W):** name cap height 0.13 W, number height
   0.52 W; 26/400 W gap between them. Every player's print is the same size; a long name
   (e.g. VAN DER BERG) is only narrowed to fit W, never made smaller in height.
-- **Colour:** the club's trim colour. A thin outline in the suit colour darkened to 35% is
+- **Colour:** the club's trim colour blended into the shirt colour (12%; a very dark trim 42% toward a deep shade of the shirt, so black on orange reads as dark burnt orange, not stark black). A thin outline in the suit colour darkened to 35% is
   added only when trim and suit are close in brightness (difference under 0.35).
 - **On the cloth:** clipped to the shirt (arms in front hide it), and darkened/lightened with
   the shirt's own folds (factor 0.55-1.15 of the local cloth brightness).
