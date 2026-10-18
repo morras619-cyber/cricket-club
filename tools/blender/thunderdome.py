@@ -98,7 +98,7 @@ def grass_color(nt):
     return mix.outputs[2]
 
 grass = shaded('grass', grass_color, emit=0.62)
-bpy.ops.mesh.primitive_circle_add(vertices=256, radius=67, fill_type='TRIFAN', location=(0, 0, 0))
+bpy.ops.mesh.primitive_circle_add(vertices=256, radius=80, fill_type='TRIFAN', location=(0, 0, 0))
 g = bpy.context.active_object
 for v in g.data.vertices: v.co.y += CY
 g.data.materials.append(grass)
@@ -142,7 +142,7 @@ r = bpy.context.active_object; r.data.materials.append(rope)
 for p in r.data.polygons: p.use_smooth = True
 
 # ---------- ring helpers ----------
-def ring_surface(name, profile, mat, a0=0, a1=2 * math.pi, seg=256, u_len=None, v_rep=1, inked=False):
+def ring_surface(name, profile, mat, a0=0, a1=2 * math.pi, seg=256, u_len=None, v_rep=1, inked=False, u_off=0.0):
     """a surface of revolution round the ground centre: profile = [(radius, height)], u across the arc"""
     verts, faces, uvs = [], [], []
     n = max(2, int(seg * (a1 - a0) / (2 * math.pi)))
@@ -160,7 +160,7 @@ def ring_surface(name, profile, mat, a0=0, a1=2 * math.pi, seg=256, u_len=None, 
     def uvof(vi):
         i, j = divmod(vi, P)
         a = a0 + (a1 - a0) * i / n
-        u = (a - a0) * rm / (u_len or 1)
+        u = (a - a0 - u_off) * rm / (u_len or 1)
         return (u, v_rep * j / (P - 1))
     uv = [uvof(i) for i in range(len(verts))]
     return mesh(name, verts, faces, uvs=uv, mat=mat, inked=inked)
@@ -198,14 +198,17 @@ navy = flat('navy', '#0b1f5c', 0.45)
 fascia = flat('fascia', '#9fb0cc', 0.5)
 dark = flat('dark', '#0a0f24', 0.4)
 crowd = picture('crowd', 'crowd.png', 1.0)
-# front wall
-ring_surface('wall', [(65.2, 0), (65.2, 1.5)], navy, inked=True)
-ring_surface('walltop', [(65.2, 1.5), (65.8, 1.5)], navy)
-# the crowd, raked back: the painted crowd tiled four rows high (6 m a tile)
-ring_surface('crowd', [(65.8, 1.5), (90, 16.5)], crowd, u_len=186, v_rep=4)
-ring_surface('back', [(90, 16.5), (90, 18)], dark)
+# the stands sit well back from the rope, past a grass apron and a perimeter track, so the night
+# sky and the city show above them
+track = flat('track', '#16264f', 0.45)
+ring_surface('track', [(76, 0.01), (79, 0.01)], track)
+ring_surface('wall', [(79, 0), (79, 1.4)], navy, inked=True)
+ring_surface('walltop', [(79, 1.4), (79.6, 1.4)], navy)
+# the crowd, raked back: the painted crowd tiled three rows high (5 m a tile)
+ring_surface('crowd', [(79.6, 1.4), (99, 12.0)], crowd, u_len=155, v_rep=3)
+ring_surface('back', [(99, 12.0), (99, 13.6)], dark)
 # the roof: a light fascia, a dark underside dotted with lamps, the canopy on top
-ring_surface('fascia', [(81, 17.6), (81, 19.0)], fascia, inked=True)
+ring_surface('fascia', [(94, 13.2), (94, 14.4)], fascia, inked=True)
 under = bpy.data.materials.new('under'); under.use_nodes = True
 nt = under.node_tree; nt.nodes.clear(); o_ = nt.nodes.new('ShaderNodeOutputMaterial')
 tc = nt.nodes.new('ShaderNodeTexCoord'); vor = nt.nodes.new('ShaderNodeTexVoronoi'); vor.feature = 'DISTANCE_TO_EDGE'
@@ -216,11 +219,11 @@ mix = nt.nodes.new('ShaderNodeMix'); mix.data_type = 'RGBA'; mix.inputs[6].defau
 nt.links.new(lt.outputs[0], mix.inputs[0])
 e = nt.nodes.new('ShaderNodeEmission'); e.inputs['Strength'].default_value = 1.2
 nt.links.new(mix.outputs[2], e.inputs['Color']); nt.links.new(e.outputs[0], o_.inputs[0])
-ring_surface('under', [(81, 17.6), (90, 18)], under)
-ring_surface('canopy', [(81, 19.0), (94, 20.5)], navy, inked=True)
+ring_surface('under', [(94, 13.2), (99, 13.6)], under)
+ring_surface('canopy', [(94, 14.4), (104, 15.4)], navy, inked=True)
 
 # the big screens, one behind each end, showing the game's logo
-def screen(a, r=70.5, w=12, h0=3.4, h1=9.4):
+def screen(a, r=83.5, w=13, h0=3.6, h1=10.1):
     c, s = math.cos(a), math.sin(a)
     t = Vector((-s, c, 0))           # along the stand
     base = Vector((r * c, CY + r * s, 0))
@@ -264,8 +267,8 @@ def halo(p, rad):
 for side in (-1, 1):
     for end in (-1, 1):
         a = math.pi / 2 * end + side * math.radians(13)
-        x, y = 97 * math.cos(a), CY + 97 * math.sin(a)
-        HT = 25.0
+        x, y = 108 * math.cos(a), CY + 108 * math.sin(a)
+        HT = 24.0
         for dx in (-1, 1):  # a lattice pair of legs
             bpy.ops.mesh.primitive_cube_add(location=(x + dx * 0.9 * math.sin(a), y - dx * 0.9 * math.cos(a), HT / 2), scale=(0.35, 0.35, HT / 2))
             o = bpy.context.active_object; o.data.materials.append(tower); sc.collection.objects.unlink(o); ink.objects.link(o)
@@ -290,8 +293,8 @@ for side in (-1, 1):
 # the city behind: the painted skyline on a far cylinder, the gap below filled with its shade
 sky_pic = picture('skyline', 'skyline.png', 1.0)
 R2 = 430
-ring_surface('skyline', [(R2, 70), (R2, 150)], sky_pic, u_len=2 * math.pi * R2 / 1.0, v_rep=1)
-ring_surface('cityfoot', [(R2, -5), (R2, 70.2)], glow('cityfoot', srgb('#0b1640'), 1.0))
+ring_surface('skyline', [(R2, 30), (R2, 112)], sky_pic, u_len=2 * math.pi * R2 / 1.0, v_rep=1, u_off=math.radians(45))
+ring_surface('cityfoot', [(R2, -5), (R2, 30.2)], glow('cityfoot', srgb('#0b1640'), 1.0))
 
 # ---------- world ----------
 w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True
