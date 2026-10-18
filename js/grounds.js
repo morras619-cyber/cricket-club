@@ -55,6 +55,9 @@ export const GROUNDS = {
     pitch: { id: 'quick', name: 'Lightning outfield', report: 'A true pitch and a glass-fast outfield: the ball races to the rope.', field: 0.92 },
   },
 };
+// the national sides' grounds: a club's ground and pitch under its own name
+GROUNDS.india = { ...GROUNDS.thunder, name: 'Blue Lights Stadium' };
+GROUNDS.pakistan = { ...GROUNDS.cyclones, name: 'Crescent Park' };
 export const groundOf = teamId => GROUNDS[teamId] || GROUNDS.thunder;
 export const PITCH_DEFAULT = { swing: 1, seam: 1, turn: 1, kmh: 1, bat: 1, ai: 1, field: 1, dew: false };
 export const pitchOf = teamId => ({ ...PITCH_DEFAULT, ...groundOf(teamId).pitch });

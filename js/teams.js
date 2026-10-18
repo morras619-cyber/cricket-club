@@ -23,7 +23,20 @@ export const TEAMS = [
 ];
 export const teamOfHero = heroId => TEAMS.find(t => t.star === heroId);
 
-export const teamById = id => TEAMS.find(t => t.id === id) || TEAMS[0];
+// The national sides for the Weekend War (not in the clubs' leagues). sheet: the club whose drawn
+// batter and back-view sheets they borrow (the same colours); heroes: their countrymen among the
+// heroes, one per slot.
+export const NATIONAL = [
+  { id: 'india', national: true, tier: 4, name: 'India', suit: '#1c5ad6', trim: '#ff9933', star: 'raja', sheet: 'thunder', nation: 'IN',
+    heroes: { bat: 'raja', bowl: null, field: 'rani' },
+    style: { tag: 'Men in Blue', desc: 'Deep batting and a fearless top order.', loft: 0.08, sigma: 1 } },
+  { id: 'pakistan', national: true, tier: 4, name: 'Pakistan', suit: '#0d7a3c', trim: '#ffffff', star: 'babar', sheet: 'cyclones', nation: 'PK',
+    heroes: { bat: 'meher', bowl: 'babar', field: 'bilal' },
+    style: { tag: 'Pace and mystery', desc: 'Raw pace, wrist spin and the unexpected.', loft: 0.05, sigma: 1.02 } },
+];
+export const teamById = id => TEAMS.find(t => t.id === id) || NATIONAL.find(t => t.id === id) || TEAMS[0];
+// the club whose drawn sheets a side uses (its own, or the one a national side borrows)
+export const sheetOf = id => teamById(id).sheet || id;
 
 // the opponents for a match: any other team, fixed by the match seed so challenges replay the same
 export function rivalTeam(seed, myId) {

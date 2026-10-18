@@ -1,4 +1,5 @@
 import { peopleSheet, loadPeopleMask } from './looks.js';
+import { sheetOf } from './teams.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
 // tools/build_batter_sprites.py, so a single frame table serves every team.
@@ -54,7 +55,7 @@ const atlases = new Map(); // team id -> { img, ready }
 
 // start loading the sheets for the teams in this match (others stay unloaded)
 export function loadBatSprites(...teamIds) {
-  for (const id of teamIds) {
+  for (const id of teamIds.map(t => t && sheetOf(t))) {
     if (!id || atlases.has(id)) continue;
     loadPeopleMask(`batter-${id}`);
     const a = { img: null, ready: false };
@@ -78,7 +79,7 @@ export function batSpriteMissing() {
 // a thumbnail of a team's batter in his ready stance, for the team picker
 export function drawTeamThumb(canvas, teamId) {
   loadBatSprites(teamId);
-  const a = atlases.get(teamId);
+  const a = atlases.get(sheetOf(teamId));
   const paint = () => {
     const g = canvas.getContext('2d'), [sx, sy, w, h] = FRAMES.ready;
     const k = Math.min(canvas.width / w, canvas.height / h);
@@ -111,9 +112,9 @@ function drawOne(ctx, img, name, px, py, k, alpha) {
 
 // Draw at the projected feet position (px, py); kPerM is pixels per metre at that depth.
 export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
-  const atlas = atlases.get(b.team);
+  const sheet = sheetOf(b.team), atlas = atlases.get(sheet);
   if (!atlas || !atlas.ready) return false;
-  const img = peopleSheet(atlas.img, `batter-${b.team}`, b.people); // the batter's own skin and hair
+  const img = peopleSheet(atlas.img, `batter-${sheet}`, b.people); // the batter's own skin and hair
   const k = kPerM * REF_HEIGHT_M / REF_HEIGHT_PX;
   const { f, prev, a = 1 } = batFrame(b, now);
   ctx.save();

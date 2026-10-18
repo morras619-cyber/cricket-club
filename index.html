@@ -93,6 +93,9 @@
       <div class="hub-stack">
       <div id="challengeCard" class="panel paper challenge" hidden></div>
       <button class="bigbtn" id="btnChallengeMode" hidden>Accept Challenge</button>
+      <button class="warbanner" id="btnWar" aria-label="Weekend War: India v Pakistan">
+        <img src="img/logo-india.webp" alt=""><span class="wb-mid"><span class="wb-tag">Weekend War</span><b><span id="warIn">0</span><i>v</i><span id="warPk">0</span></b><small id="warSub">India v Pakistan · 4 weekends</small></span><img src="img/logo-pakistan.webp" alt="">
+      </button>
       <div class="hubgrid">
         <button class="tile tile-quick" id="btnQuick" aria-label="Quick Match"><small id="quickSub">30 balls each
 vs a random team</small></button>
@@ -162,6 +165,18 @@ vs a random team</small></button>
         <button class="bigbtn primary" id="leagueGo">Play</button>
       </div>
       <button class="chipbtn ghostchip" id="leagueQuit">Abandon this tournament</button>
+    </div>
+  </section>
+
+  <section id="war" class="screen leaguescreen warscreen" hidden>
+    <div class="screen-inner wide">
+      <img class="lg-logo" src="img/logo-sixcharge.webp" alt="Sixcharge" width="900" height="300">
+      <h2 class="title">Weekend War</h2>
+      <p class="lede">India v Pakistan · four weekends · one match a weekend</p>
+      <div id="warBody" class="leaguebody"></div>
+      <div class="menu row">
+        <button class="bigbtn ghost" id="warBack">Home</button>
+      </div>
     </div>
   </section>
 

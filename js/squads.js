@@ -2,7 +2,7 @@
 // how a side rotates its bowlers. Pure data and functions (no DOM), fixed by ids and seeds.
 import { makeRng } from './rng.js';
 import { HEROES, heroById } from './heroes.js';
-import { teamById, teamOfHero } from './teams.js';
+import { teamById, teamOfHero, TEAMS, NATIONAL } from './teams.js';
 import { flag } from './nations.js';
 
 // ---------- bowler types ----------
@@ -164,9 +164,24 @@ function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c
 
 const TIER_OFFSET = { 1: -5, 2: -2, 3: 1, 4: 4 };
 const rosterCache = new Map();
+// A national side: the country's best ten from all the clubs (five batters with the best keeper,
+// two all-rounders, three bowlers with at least one spinner). Each keeps his club id and his look.
+function nationalRoster(team) {
+  const pool = TEAMS.flatMap(t => roster(t.id)).filter(p => p.nation === team.nation).sort((a, b) => ovr(b) - ovr(a));
+  const keeper = pool.find(p => p.role === 'wk');
+  const bats = pool.filter(p => p.role === 'bat').slice(0, 4);
+  const alls = pool.filter(p => p.role === 'all').slice(0, 2);
+  const bowlers = pool.filter(p => p.role === 'bowl');
+  const spinner = bowlers.find(p => bowlType(p.bowl).spin) || alls.find(p => bowlType(p.bowl).spin);
+  const pace = bowlers.filter(p => p !== spinner).slice(0, spinner && bowlers.includes(spinner) ? 2 : 3);
+  return [...bats, keeper, ...alls, ...pace, ...(spinner && bowlers.includes(spinner) ? [spinner] : [])]
+    .filter(Boolean).map(p => ({ ...p, team: team.id, ai: { ...p.ai } }));
+}
 // A team's ten regulars, in squad order. Ids are stable (`<team>-<index>`) so saved line-ups keep.
 export function roster(teamId) {
   if (rosterCache.has(teamId)) return rosterCache.get(teamId);
+  const nat = NATIONAL.find(t => t.id === teamId);
+  if (nat) { const list = nationalRoster(nat); rosterCache.set(teamId, list); return list; }
   const rng = makeRng(hashStr(teamId));
   // the giants have better players than the underdogs
   const off = TIER_OFFSET[teamById(teamId).tier] || 0;
@@ -220,7 +235,9 @@ export const ratingStars = r => Math.max(1, Math.min(5, Math.round((r - 60) / 4.
 // ---------- whose heroes play ----------
 // A team's own star, in his slot: { bat, bowl, field } with the other slots empty.
 export function starSquad(teamId) {
-  const h = heroById(teamById(teamId).star);
+  const T = teamById(teamId);
+  if (T.heroes) return Object.fromEntries(Object.entries(T.heroes).map(([slot, id]) => [slot, id ? heroById(id) : null]));
+  const h = heroById(T.star);
   return { bat: null, bowl: null, field: null, [h.slot]: h };
 }
 // Your side: your team's star, plus the heroes you've signed for the other slots. A signed

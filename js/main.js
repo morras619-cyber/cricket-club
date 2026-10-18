@@ -21,6 +21,7 @@ import { renderShareCard } from './sharecard.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx } from './audio.js';
+import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -52,6 +53,7 @@ const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance
 const myTeam = () => teamById(profile.team || 'thunder');
 function renderHome() {
   ui.show('home');
+  warWatch(); warBanner();
   const { lv, progress } = level(profile.xp);
   $('lvl').textContent = `Lv ${lv}`;
   $('xpFill').style.width = `${Math.round(progress * 100)}%`;
@@ -469,6 +471,16 @@ async function startMatch(opts) {
   let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null, home = null;
   if (mode === 'tutorial') {
     team = 'thunder'; home = 'thunder'; sq = { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') }; levels = {};
+  } else if (mode === 'war' || mode === 'warmup') {
+    // the national sides: your country (picked once) against the other, at your country's ground
+    team = warSide(); opp = SIDES.find(s => s !== team); home = team; sq = starSquad(team); rival = starSquad(opp); levels = {};
+    if (mode === 'war') {
+      // the weekend's one match counts from the first ball: quitting it is a loss
+      const k = warClock().weekend, mine = warRecordNow() || { country: team, r: {} };
+      if (!k || mine.r?.[k]) { ui.toast('Your match this weekend is already played'); return renderWar(); }
+      await saveMine({ ...mine, country: team, r: { ...mine.r, [k]: { win: false, at: Date.now(), pending: true } }, at: Date.now() });
+      warPending = k;
+    }
   } else if (mode === 'daily') {
     // the same for everyone: the day's two teams, their own stars, default line-ups, no levels
     team = opts.scenario.team; opp = opts.scenario.opp; home = team; sq = starSquad(team); levels = {};
@@ -493,13 +505,13 @@ async function startMatch(opts) {
     }
   }
   home = home || homeFromSeed(seed, team, opp);
-  const order = mode === 'quick' || mode === 'league' || mode === 'cup' || mode === 'career' ? await coinToss(teamById(opp), home) : 'bat';
+  const order = ['quick', 'league', 'cup', 'career', 'war', 'warmup'].includes(mode) ? await coinToss(teamById(opp), home) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
   const summary = await game.runMatch({
     mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
     records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
   });
-  if (!summary) return; // quit mid-match
+  if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
 }
@@ -665,6 +677,131 @@ function tournamentAfterMatch(summary) {
   }
   return { notes, events };
 }
+
+// ---------- the Weekend War: India v Pakistan ----------
+let warState = { mine: null, entries: [], online: false }, warStop = null, warPending = null, warNames = {};
+const warSide = () => warState.mine?.country || myRecord()?.country || null;
+const warRecordNow = () => warState.mine || myRecord();
+const sideName = id => teamById(id).name;
+const num = n => Number(n || 0).toLocaleString();
+function warWatch() {
+  if (warStop) return;
+  warStop = watchWar(s => {
+    warState = s;
+    if (!$('war').hidden) renderWar();
+    if (!$('home').hidden) warBanner();
+    const ids = feed(s.entries).map(f => f.id).filter(id => id !== 'me' && !(id in warNames));
+    if (ids.length) namesOf(ids).then(n => { Object.assign(warNames, n); if (!$('war').hidden) renderWar(); });
+  });
+}
+// the home banner: the live score and what's next for you
+function warBanner() {
+  const t = totals(warState.entries.map(e => e[1])), c = warClock(), mine = warRecordNow();
+  $('warIn').textContent = num(t.india); $('warPk').textContent = num(t.pakistan);
+  $('warSub').textContent = c.phase === 'over' ? `Final · ${leader(t) ? `${sideName(leader(t))} win the war!` : 'All square!'}`
+    : c.phase === 'open' ? (mine?.r?.[c.weekend] ? (c.weekend < WEEKENDS ? `Weekend ${c.weekend} played · next in ${countdown(weekendSpan(c.weekend + 1)[0] - Date.now())}` : 'Last weekend played · final on Sunday night') : `Weekend ${c.weekend} · your match is ready!`)
+    : `Weekend ${c.next} starts in ${countdown(c.opensAt - Date.now())}`;
+  $('btnWar').classList.toggle('live', c.phase === 'open' && !mine?.r?.[c.weekend]);
+}
+function renderWar() {
+  ui.show('war');
+  const body = $('warBody');
+  body.innerHTML = '';
+  const t = totals(warState.entries.map(e => e[1])), c = warClock(), mine = warRecordNow(), side = warSide();
+  // the scoreboard
+  const board = el('div', 'warboard');
+  for (const id of SIDES) {
+    const col = el('div', 'wb-side' + (leader(t) === id ? ' lead' : '') + (side === id ? ' mine' : ''));
+    const logo = document.createElement('img'); logo.src = `img/logo-${id}.webp`; logo.alt = '';
+    col.append(logo, el('b', 'wb-name', sideName(id)), el('strong', 'wb-pts', num(t[id])), el('small', '', `${t.players[id]} player${t.players[id] === 1 ? '' : 's'}`));
+    board.append(col);
+    if (id === 'india') { const v = document.createElement('img'); v.src = 'img/league-vs.webp'; v.alt = 'v'; v.className = 'wb-vs'; board.append(v); }
+  }
+  const head = el('div', 'fixcard warcard');
+  head.append(el('div', 'fixribbon', c.phase === 'over' ? 'Final score' : 'Live score'), board,
+    el('p', 'fixabout', c.phase === 'over' ? (leader(t) ? `${sideName(leader(t))} win the Weekend War!` : 'The war ends all square!')
+      : leader(t) ? `${sideName(leader(t))} lead by ${num(Math.abs(t.india - t.pakistan))}` : 'All square'));
+  // your side, and your match this weekend
+  if (!side) {
+    head.append(el('p', 'warpick-q', 'Choose your side. You play for them every weekend: this can\'t be changed.'));
+    const pick = el('div', 'warpick');
+    for (const id of SIDES) {
+      const b = el('button', 'warpick-btn'); b.style.setProperty('--suit', teamById(id).suit);
+      const logo = document.createElement('img'); logo.src = `img/logo-${id}.webp`; logo.alt = '';
+      b.append(logo, el('b', '', `Play for ${sideName(id)}`));
+      confirmTap(b, `Tap again: you'll play for ${sideName(id)} all four weekends`, async () => {
+        sfx.dhol?.();
+        await saveMine({ country: id, r: {}, at: Date.now() });
+        warState = { ...warState, mine: myRecord() };
+        renderWar();
+      });
+      pick.append(b);
+    }
+    head.append(pick);
+  } else {
+    const r = c.phase === 'open' ? mine?.r?.[c.weekend] : null;
+    head.append(el('p', 'fixvenue', `You play for ${sideName(side)} · ${num(Object.values(mine?.r || {}).filter(x => x.win).length)} point${Object.values(mine?.r || {}).filter(x => x.win).length === 1 ? '' : 's'} from you so far`));
+    if (c.phase === 'open' && !r) {
+      const go = el('button', 'playbtn', `Play weekend ${c.weekend} match`);
+      go.addEventListener('click', () => startMatch({ mode: 'war' }));
+      head.append(go, el('p', 'warnote', `One match this weekend, against ${sideName(SIDES.find(s => s !== side))}. A win is +1 for ${sideName(side)}. Once it starts it counts: leaving it is a loss. Closes in ${countdown(c.closesAt - Date.now())}.`));
+    } else if (c.phase === 'open') {
+      head.append(el('div', 'warstatus', r.win ? `You won: +1 for ${sideName(side)}!` : r.pending ? 'Your match is being played' : 'You lost this one: no point'),
+        el('p', 'warnote', c.weekend < WEEKENDS ? `Next match: weekend ${c.weekend + 1}, opens in ${countdown(weekendSpan(c.weekend + 1)[0] - Date.now())}.` : 'That was the last weekend. The war ends Sunday at midnight.'));
+    } else if (c.phase !== 'over') {
+      head.append(el('div', 'warstatus', `Weekend ${c.next} opens in ${countdown(c.opensAt - Date.now())}`),
+        el('p', 'warnote', `${new Date(c.opensAt).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}, from midnight. One match per weekend.`));
+    }
+  }
+  body.append(head);
+  // the four weekends
+  const wk = el('div', 'lpanel'), wkin = el('div', 'lp-body lp-list');
+  wk.append(lpHead('Weekends'), wkin);
+  for (let k = 1; k <= WEEKENDS; k++) {
+    const [s] = weekendSpan(k), w = t.weeks[k - 1], my = mine?.r?.[k];
+    const row = el('div', 'lres warweek' + (c.weekend === k ? ' now' : ''));
+    row.append(el('b', my ? (my.win ? 'lres-W' : my.pending ? 'lres-T' : 'lres-L') : 'lres-T', my ? (my.win ? 'W' : my.pending ? '…' : 'L') : String(k)),
+      el('span', '', `Weekend ${k} · ${new Date(s).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`),
+      el('em', '', `IND ${w.india} · PAK ${w.pakistan}`));
+    wkin.append(row);
+  }
+  body.append(wk);
+  // what's been happening
+  const fd = feed(warState.entries);
+  if (fd.length) {
+    const fp = el('div', 'lpanel'), fin = el('div', 'lp-body lp-list');
+    fp.append(lpHead('Latest', 'live'), fin);
+    for (const f of fd) {
+      const row = el('div', 'lres'), logo = document.createElement('img');
+      logo.src = `img/logo-${f.country}.webp`; logo.alt = '';
+      const who = f.id === myId() || f.id === 'me' ? 'You' : warNames[f.id] || 'A player';
+      row.append(el('b', f.win ? 'lres-W' : 'lres-L', f.win ? '+1' : '0'), logo, el('span', '', `${who} ${f.win ? 'won' : 'lost'} for ${sideName(f.country)}`), el('em', '', f.line));
+      fin.append(row);
+    }
+    body.append(fp);
+  }
+  // a warm-up, any time, no points
+  const wu = el('button', 'chipbtn', 'Warm-up match (no points)');
+  wu.addEventListener('click', () => { if (!warSide()) return ui.toast('Choose your side first'); startMatch({ mode: 'warmup' }); });
+  const rules = el('div', 'lnote');
+  rules.append(el('i', '', '⚔️'), el('span', '', warOnline()
+    ? 'Every player\'s wins count for their country, live. A win is +1; a loss scores nothing. The side with the most points after four weekends wins.'
+    : 'Offline here: only your own results show. Open the game on claude.ai to join the live table.'));
+  body.append(wu, rules);
+}
+// after the weekend's match: the result into the shared table
+function warAfterMatch(summary) {
+  const k = warPending; warPending = null;
+  if (!k) return [];
+  const mine = warRecordNow() || { country: warSide(), r: {} };
+  const win = summary?.result.outcome === 'win';
+  const p = summary?.innings.find(i => i.side === 'player'), o = summary?.innings.find(i => i.side === 'ai');
+  const line = summary ? `${p.runs}/${p.wkts} v ${o.runs}/${o.wkts}` : 'left the match';
+  saveMine({ ...mine, r: { ...mine.r, [k]: { win, at: Date.now(), line } }, at: Date.now() }).then(() => { warState = { ...warState, mine: myRecord() }; });
+  return [win ? `+1 point for ${sideName(mine.country)}! Your win is on the Weekend War table.` : `No point this weekend. Back next weekend for ${sideName(mine.country)}!`];
+}
+$('btnWar').addEventListener('click', () => { unlockAudio(); warWatch(); renderWar(); });
+$('warBack').addEventListener('click', renderHome);
 
 // ---------- career: the Super League ----------
 let careerView = 'hub'; // 'hub' | 'squad'
@@ -1043,10 +1180,12 @@ function showResult(summary) {
   const win = summary.result.outcome === 'win';
   // heroes level up by playing
   const ups = counts ? addHeroXp(profile, heroXpFromMatch(summary)) : [];
-  if (counts && win) profile.beaten = [...new Set([...(profile.beaten || []), summary.oppTeam.id])];
+  if (counts && win && !summary.oppTeam.national) profile.beaten = [...new Set([...(profile.beaten || []), summary.oppTeam.id])];
   const events = [];
   let notes = [];
   if (mode === 'league' || mode === 'cup') { const r = tournamentAfterMatch(summary); notes = r.notes; tourNotes = notes; events.push(...r.events); }
+  if (mode === 'war') notes = warAfterMatch(summary);
+  if (mode === 'warmup') notes = ['A warm-up: no points. Your Weekend War match counts from Saturday.'];
   if (mode === 'career') {
     const c = profile.career;
     notes = afterLeagueMatch(c, summary);
@@ -1146,7 +1285,7 @@ function showResult(summary) {
       };
     }
   }, 'image/jpeg', 0.86);
-  $('resAgain').textContent = { tutorial: 'Play Quick Match', league: 'Back to the league', cup: 'Back to the cup', daily: 'Daily results', career: 'Back to the season' }[mode] || 'Play again';
+  $('resAgain').textContent = { tutorial: 'Play Quick Match', league: 'Back to the league', cup: 'Back to the cup', daily: 'Daily results', career: 'Back to the season', war: 'Back to the war', warmup: 'Back to the war' }[mode] || 'Play again';
 }
 
 $('copyLink').addEventListener('click', async () => {
@@ -1159,6 +1298,7 @@ $('resAgain').addEventListener('click', () => {
   const m = lastSummary?.mode;
   if (m === 'challenge') { pending = { mode: 'challenge', challenge }; startMatch(pending); }
   else if (m === 'league' || m === 'cup') renderTournament(tourNotes);
+  else if (m === 'war' || m === 'warmup') renderWar();
   else if (m === 'daily') renderDaily();
   else if (m === 'career') { careerView = 'hub'; renderCareer(); }
   else { pending = { mode: 'quick' }; squadOpen = false; renderSquad(); }

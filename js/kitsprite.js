@@ -112,6 +112,7 @@ const PREMIUM = {
   vipers: ['#1c1c22', '#3b3c47', '#e8262b'], eagles: ['#ffcc12', '#16161a', '#ffffff'],
   phoenix: ['#f2711c', '#1c1c1c', '#ffd23f'], titans: ['#9a9da3', '#2b2d33', '#ffffff'],
   storm: ['#6a22c4', '#2a0b5a', '#f2b21b'], royals: ['#ec2f9a', '#5c0c3a', '#ffffff'],
+  india: ['#1c5ad6', '#0b2a6e', '#ff9933'], pakistan: ['#0d7a3c', '#063d1d', '#ffffff'],
 };
 function premiumOf(team) {
   if (PREMIUM[team.id]) return PREMIUM[team.id].map(hexRgb);

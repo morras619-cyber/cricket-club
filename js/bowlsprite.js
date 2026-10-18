@@ -418,6 +418,7 @@ import { peopleSheet, peopleFrame, loadPeopleMask, hairHex, skinHex } from './lo
 import { loadKitSprites, drawKitSprite } from './kitsprite.js';
 import { loadHair, hairReady, piecesOf, piecesKey, headsOf, dressSheet } from './hair.js';
 import { KIT_LOGOS } from './kitlogos.js';
+import { sheetOf } from './teams.js';
 const tinted = new Map();
 
 // club crests for the shirts and helmets (the front sheets have a blank badge spot for them)
@@ -448,19 +449,20 @@ function loadView(v, tries = 0) {
 
 // the front sheets plus the back sheets of the teams in this match. Repainted copies for
 // teams that aren't playing are thrown away, so memory doesn't pile up match after match.
-export function loadBowlSprites(...teamIds) {
+export function loadBowlSprites(...ids) {
+  const teamIds = ids.map(t => t && sheetOf(t));
   for (const key of ['front', 'spin-front', 'spin-back', 'batfront', 'nonstriker', 'keeper-back', 'keeper-front', 'field-top', 'field-front', ...teamIds.flatMap(id => ['back-' + id, 'spin-back-' + id])]) {
     const v = VIEWS[key];
     if (/^(front|batfront|nonstriker|spin-|back-|field-)/.test(key)) loadPeopleMask(key); // where the players' skin and hair are
     if (!v || v.ready || (v.img && !v.failed)) continue;
     loadView(v);
   }
-  for (const id of teamIds) if (id) crestOf(id);
+  for (const id of ids) if (id) crestOf(id); // (a national side wears its own crest)
   loadHair();
-  loadKitSprites(...teamIds);
+  loadKitSprites(...ids);
   if (teamIds.length >= 2) {
     for (const [key, c] of tinted) {
-      if (teamIds.some(id => key.replace('+crest', '').endsWith(id))) continue;
+      if ([...teamIds, ...ids].some(id => id && key.replace('+crest', '').endsWith(id))) continue;
       if (c instanceof HTMLCanvasElement) { c.width = 0; c.height = 0; } // frees the memory now on iOS
       tinted.delete(key);
     }
@@ -612,14 +614,14 @@ export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, vi
   const kit = KIT_VIEW[view];
   if (kit && look?.who && drawKitSprite(ctx, px, py, kPerM, frame, team, flip, kit, look)) return true;
   // a club's own spinner sheet when it has loaded (the Thunder one, repainted, until then)
-  if (view === 'spin-back' && VIEWS['spin-back-' + team?.id]?.ready) view = 'spin-back-' + team.id;
+  if (view === 'spin-back' && team && VIEWS['spin-back-' + sheetOf(team.id)]?.ready) view = 'spin-back-' + sheetOf(team.id);
   // a spinner frame the spin sheets don't have, or a spin sheet still loading, comes from the
   // pace bowler's sheet (mapping the spinner's frame names onto his)
   if (view.startsWith('spin') && (!VIEWS[view]?.ready || !VIEWS[view].frames[frame])) {
     view = view.slice(5);
     if (view === 'back' && frame === 'coil') frame = 'frontarm';
   }
-  if (view === 'back') view = 'back-' + (team?.id || 'thunder');
+  if (view === 'back') view = 'back-' + (team ? sheetOf(team.id) : 'thunder');
   const v = VIEWS[view];
   if (!v || !v.ready || !v.frames[frame]) return false;
   const sheet = sheetFor(view, team);
