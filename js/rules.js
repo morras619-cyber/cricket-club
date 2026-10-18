@@ -5,8 +5,9 @@ import { CFG } from './config.js';
 // state:  { events, lastEventBall, setting: 'off'|'key'|'all' }
 export function playerControls(chance, state, ballNo, cfg = CFG.fielding) {
   if (state.setting === 'off') return false;
-  // a run out is always yours to throw (it's never decided for you off-screen)
-  if (chance.kind === 'runout') return true;
+  // a run out is yours to throw when your fielder is close to the ball; one who'd have a long
+  // run to it first is played out for you (no slow-motion wait for him to get there)
+  if (chance.kind === 'runout') return chance.near !== false;
   if (state.events >= cfg.cap) return false;
   if (chance.kind !== 'edge' && state.lastEventBall === ballNo - 1) return false;
   if (state.setting === 'all') return true;

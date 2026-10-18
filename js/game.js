@@ -1936,7 +1936,8 @@ export class Game {
 
     if (sim.runOut) {
       const best = Math.min(sim.runOut.margins.striker, sim.runOut.margins.bowler);
-      const ch = { kind: 'runout', p: 1 / (1 + Math.exp(best * 5)) };
+      const ro = sim.runOut, near = Math.hypot(ro.fielder.x - ro.point.x, ro.fielder.y - ro.point.y) <= 10;
+      const ch = { kind: 'runout', p: 1 / (1 + Math.exp(best * 5)), near };
       let r;
       if (ctl(ch)) { this.noteEvent(ballNo); r = await this.runOutEvent(sim, field); }
       else {

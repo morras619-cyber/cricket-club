@@ -167,6 +167,7 @@ test('fielding control rules', () => {
   // run outs: always the player's throw, whatever the cap or the last event
   assert.equal(playerControls({ kind: 'runout', p: 0.97 }, { ...s, events: 6, lastEventBall: 9 }, 10), true);
   assert.equal(playerControls({ kind: 'runout', p: 0.5 }, { ...s, setting: 'off' }, 10), false);
+  assert.equal(playerControls({ kind: 'runout', p: 0.5, near: false }, s, 10), false); // a long run to the ball: played for you
 });
 
 test('innings and match result', () => {

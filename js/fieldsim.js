@@ -25,6 +25,14 @@ export const FIELD_PRESETS = {
   ],
 };
 
+// fielders field the ball at least this far inside the rope (one over it would be a four)
+const ROPE_GAP = 2;
+export function insideRope(p, gap = ROPE_GAP) {
+  const r = Math.hypot(p.x, p.y - CY);
+  if (r <= R - gap) return p;
+  const k = (R - gap) / r;
+  return { ...p, x: p.x * k, y: CY + (p.y - CY) * k };
+}
 const INNER = 27; // the 30-yard circle, measured from the pitch centre
 
 // Builds the 9 outfielders plus bowler and keeper. In the Power Burst only 2 may stay outside the ring.
@@ -168,7 +176,12 @@ export function simulateHit(res, fielders, rng, opts = {}) {
         const pr = sigmoid(m);
         if (!best || pr > best.p) best = { fielder: f, p: pr, t, point: p };
       }
-      if (best && best.p >= F.minP && !res.forced?.uncatchable && res.forced?.cap == null) out.save = best;
+      if (best && best.p >= F.minP && !res.forced?.uncatchable && res.forced?.cap == null) {
+        // he stops it a stride inside the rope, never standing over it: when the ball got there
+        let ts = t;
+        while (ts > t0 && Math.hypot(path.ballAt(ts).x, path.ballAt(ts).y - CY) > R - ROPE_GAP) ts -= 0.02;
+        out.save = { ...best, t: ts, point: path.ballAt(ts) };
+      }
       break;
     }
     if (res.forced?.four) continue; // powered fours beat every fielder
@@ -178,7 +191,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
       if (need <= F.runSpeed * sp * Math.max(0, t - F.react)) { hit = f; break; }
     }
     if (hit) {
-      out.intercept = { fielder: hit, t, point: p };
+      out.intercept = { fielder: hit, t, point: insideRope(p) };
       out.runs = runsAfterCollect(t, p);
       if (res.forced?.cap != null) out.runs = Math.min(out.runs, res.forced.cap);
       out.duration = Math.min(t + 0.8, 3.2);
