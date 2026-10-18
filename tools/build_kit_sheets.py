@@ -69,6 +69,37 @@ def tones(a):
     return kit, w, Ls, ref
 
 
+def clean_hair(h):
+    """a lifted hair layer without what isn't hair: skin showing through a fade (it would turn
+    white-grey in the recolour) becomes hair thinning out over the skin; bright slivers of the old
+    sheet's outlines at the layer's edge and away from the head go"""
+    H, S, V = hsv(h[..., :3])
+    L = h[..., :3] @ LUM
+    al = h[..., 3]
+    op = al > 0.5
+    skin = op & (H > 5) & (H < 45) & (S > 0.22) & (V > 0.35)
+    dark = op & ~skin & (L < 0.66)
+    lab, n = ndi.label(dark)
+    if n:
+        thick = ndi.sum(ndi.binary_erosion(dark, iterations=2), lab, range(1, n + 1))
+        core = np.isin(lab, 1 + np.nonzero(thick > 30)[0])
+    else:
+        core = dark
+    near = ndi.binary_fill_holes(ndi.binary_dilation(core, iterations=2))
+    edge = ~ndi.binary_erosion(op, iterations=4)
+    keep = near & ~(edge & (L > 0.8))
+    out = h.copy()
+    out[..., 3] = al * keep
+    if skin.sum() > 20 and core.any():
+        # a fade: each skin-toned pixel read as hair over skin, alpha = how much hair is in it
+        ls, lh = float(np.percentile(L[skin], 75)), float(np.median(L[core]))
+        f = np.clip((ls - L) / max(ls - lh, 0.05), 0, 1)
+        out[..., 3] = np.where(skin, al * keep * f, out[..., 3])
+        for k in range(3):
+            out[..., k] = np.where(skin, lh, out[..., k])
+    return out
+
+
 def frames_of(a, count=10, rowh=600):
     op = a[..., 3] > 0.25
     lab, n = ndi.label(op)
@@ -83,7 +114,7 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
-    hairs = {st: np.pad(np.array(Image.open(hp).convert('RGBA')).astype(np.float32) / 255, ((M, M), (M, M), (0, 0))) for st, hp in hairpaths.items()}
+    hairs = {st: clean_hair(np.pad(np.array(Image.open(hp).convert('RGBA')).astype(np.float32) / 255, ((M, M), (M, M), (0, 0)))) for st, hp in hairpaths.items()}
     hair_any = np.max([h[..., 3] for h in hairs.values()], axis=0) if hairs else np.zeros(a.shape[:2])
     suit, trim, skin = masks(a)
     L = a[..., :3] @ LUM
