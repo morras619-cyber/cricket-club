@@ -35,7 +35,7 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'spin-front', 'spin-back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(id)) crestImgs.set(id, image(`img/logo-${id}.webp`));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });

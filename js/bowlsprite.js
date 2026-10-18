@@ -411,6 +411,8 @@ const RUN_CYCLE = ['run1', 'run2', 'run3', 'run2'];
 const SPIN_CYCLE = ['run1', 'run2'];
 // after release (ms of game time): release, follow-through, then he stands and watches
 const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3', 170], ['finish', Infinity]];
+// a spinner, drawn from the fast bowler's sheets: an easier stride and an unhurried follow-through
+const SPIN_DELIVERY = [['release', 90], ['follow1', 200], ['follow2', 240], ['follow3', 280], ['finish', Infinity]];
 
 import { peopleSheet, peopleFrame, loadPeopleMask, hairHex, skinHex } from './looks.js';
 import { loadKitSprites, drawKitSprite } from './kitsprite.js';
@@ -479,12 +481,17 @@ export function bowlFrame(spr, gameTime, realTime, view = 'front') {
   if (!spr) return 'start';
   switch (spr.anim) {
     case 'run':
+      if (view.startsWith('spin') && KIT_VIEW[view] === view.slice(5)) {
+        // the fast bowler's frames at about half his stride rate: a few walking-pace strides
+        if (view === 'spin-back') return spr.p < 0.72 ? RUN_CYCLE[Math.floor(spr.p * 7) % 4] : spr.p < 0.82 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
+        return spr.p < 0.78 ? RUN_CYCLE[Math.floor(spr.p * 7) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
+      }
       if (view.startsWith('spin')) return spr.p < 0.7 ? SPIN_CYCLE[Math.floor(spr.p * 8) % 2] : spr.p < 0.85 ? 'gather' : 'coil';
       if (view === 'back') return spr.p < 0.74 ? RUN_CYCLE[Math.floor(spr.p * 14) % 4] : spr.p < 0.83 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
       return spr.p < 0.8 ? RUN_CYCLE[Math.floor(spr.p * 14) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
     case 'deliver': {
       let t = (gameTime - spr.t0) * 1000;
-      for (const [f, ms] of DELIVERY) { if (t < ms) return f; t -= ms; }
+      for (const [f, ms] of view.startsWith('spin') ? SPIN_DELIVERY : DELIVERY) { if (t < ms) return f; t -= ms; }
       return 'finish';
     }
     case 'react': return 'react';
@@ -595,7 +602,8 @@ function dressFor(view, v, look) {
 }
 
 // the bowler views drawn from the plain-kit sheets (kitsprite.js)
-const KIT_VIEW = { front: 'front', 'spin-front': 'spin-front', back: 'back', 'spin-back': 'spin-back' };
+// (spinners wear the fast bowler's sheets too: one art style and finish for every bowler)
+const KIT_VIEW = { front: 'front', 'spin-front': 'front', back: 'back', 'spin-back': 'back' };
 
 // Draw a frame with its feet at (px, py); kPerM is pixels per metre at that depth. False until loaded.
 // look: the player's skin and hair (looks.js), repainted onto the drawn sheet
