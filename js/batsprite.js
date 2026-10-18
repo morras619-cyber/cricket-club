@@ -36,18 +36,21 @@ const SEQ = {
   drive: [['drive1', 45], ['drive2', 120], ['drive3', Infinity]],
   pull: [['pull0', 35], ['pull1', 45], ['pull2', 110], ['pull3', Infinity]],
   cut: [['cut1', 45], ['cut2', 120], ['cut3', Infinity]],
+  rsweep: [['rsweep1', 60], ['rsweep2', 130], ['rsweep3', Infinity]], // down on one knee, swept fine on the off side
   block: [['def1', 60], ['def2', 220], ['def3', Infinity]],
   leave: [['leave1', 170], ['leave2', Infinity]],
   bowled: [['bowled', Infinity]], // beaten: looking back at the stumps
 };
 const BLEND_MS = 40;
 
-// which animation a swipe plays: straight and cover drives, pulls to leg, cuts to off
+// which animation a swipe plays: straight and cover drives, pulls to leg, cuts to off, the reverse
+// sweep fine behind square on the off side
 export function shotAnim(shot) {
   if (!shot) return 'drive';
   if (shot.kind === 'block') return 'block';
   if (shot.kind === 'leave') return 'leave';
   if (shot.angle < -0.55) return 'pull';
+  if (shot.angle > 1.9) return 'rsweep'; // behind square on the off side
   if (shot.angle > 0.95) return 'cut';
   return 'drive';
 }
@@ -121,7 +124,9 @@ export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   if (!atlas || !atlas.ready) return false;
   const img = peopleSheet(atlas.img, `batter-${sheet}`, b.people); // the batter's own skin and hair
   const k = kPerM * REF_HEIGHT_M / REF_HEIGHT_PX;
-  const { prev, a = 1 } = fr, f = fr.f === 'celebrate' ? 'drive3' : fr.f; // (the old sheets have no celebration)
+  // (the old sheets have no celebration or reverse sweep)
+  const old = n => (n === 'celebrate' ? 'drive3' : n?.startsWith('rsweep') ? 'cut' + n.slice(6) : n);
+  const { a = 1 } = fr, f = old(fr.f), prev = old(fr.prev);
   ctx.save();
   // ground shadow
   ctx.fillStyle = 'rgba(10,8,20,0.28)';

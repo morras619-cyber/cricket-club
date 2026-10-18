@@ -2,6 +2,7 @@
 """The plain-kit bowler (bald master sheets) for the match: img/kit/<view>.webp + js/kitsheets.js.
 
 usage: python3 tools/build_kit_sheets.py FRONT.png BACK.png HAIRDIR [SPIN_FRONT.png [SPIN_BACK.png]]
+       python3 tools/build_kit_sheets.py --bat   (the batter only)
 
 SPIN_FRONT / SPIN_BACK: the spinner's bald sheets in the premium kit (15 poses, three rows of
 five; blue with a navy yoke and side panels and yellow piping), repainted in three club colours
@@ -329,21 +330,6 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
     return meta
 
 
-def bat_print(P):
-    """the name and number on a batter's back, from his panel outline (SHIRT_PRINT.md): on the spine
-    42% of the way down from the collar, tilted with it, a little narrower than the panel there"""
-    cl, cr, yr, ar, wr, wl, al, yl = [np.array(p, float) for p in P]
-    top, bot = (cl + cr) / 2, (wl + wr) / 2
-    c = top + 0.45 * (bot - top)
-    t = (c[1] - ar[1]) / max(1e-3, wr[1] - ar[1])
-    right = ar + np.clip(t, 0, 1) * (wr - ar)
-    t = (c[1] - al[1]) / max(1e-3, wl[1] - al[1])
-    left = al + np.clip(t, 0, 1) * (wl - al)
-    w = min(0.8 * (right[0] - left[0]), 0.9 * np.linalg.norm(bot - top) / 0.67)
-    tilt = math.degrees(math.atan2(bot[0] - top[0], bot[1] - top[1])) * -1
-    return [round(float((left[0] + right[0]) / 2), 1), round(float(c[1]), 1), round(float(w), 1), 1, 1, round(tilt, 1), 0, 0, 0, 0]
-
-
 def main():
     front, back, hairdir = sys.argv[1:4]
     spin_front = sys.argv[4] if len(sys.argv) > 4 else None
@@ -366,10 +352,20 @@ def main():
         out['spin-back'] = build('spin-back', sys.argv[5], hp('spin-back'),
                                  [sp[str(k + 1)]['print'] + sp[str(k + 1)]['name'] + sp[str(k + 1)]['number'] for k in range(15)], 15, 500, premium=True,
                                  marks={k: v for k, v in json.load(open('tools/kit/premium-spin-back.json')).items() if not k.startswith('_')})
-    # the batter from behind: his back panel from the outlines, the print placed on it
-    bat = {k: v for k, v in json.load(open('tools/kit/premium-bat-back.json')).items() if not k.startswith('_')}
-    out['bat-back'] = build('bat-back', 'tools/kit/src/batter-back.png', {}, [bat_print(bat[str(k + 1)]) for k in range(19)], 19, 300,
-                            premium=True, design={k: {'outline': v} for k, v in bat.items()}, place_abs=True)
+    out['bat-back'] = build_bat()
+    write_sheets(out)
+
+
+def build_bat():
+    """the batter from behind (tools/kit/compose_batter.py makes the sheet: drawn in the premium kit,
+    read as drawn), his name and number where that tool found the shirt"""
+    pr = json.load(open('tools/kit/bat-back-print.json'))
+    n = len(pr['frames'])
+    return build('bat-back', 'tools/kit/src/batter-back.png', {}, [pr[str(k + 1)] for k in range(n)], n, pr['rowh'],
+                 premium=True, place_abs=True)
+
+
+def write_sheets(out):
     with open('js/kitsheets.js', 'w') as f:
         f.write('// The plain-kit bowler sheets in img/kit/ (tools/build_kit_sheets.py). Per view: frames\n'
                 '// [x, y, w, h, feet x, feet y] in sheet order; place: the crest (front: [x, y, size, squash x,\n'
@@ -380,4 +376,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    if sys.argv[1:] == ['--bat']:
+        # only the batter: the other views as they were
+        src = open('js/kitsheets.js').read()
+        out = json.loads(src[src.index('= ') + 2:src.rindex(';')])
+        out['bat-back'] = build_bat()
+        write_sheets(out)
+    else:
+        main()

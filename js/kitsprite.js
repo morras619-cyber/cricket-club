@@ -24,11 +24,11 @@ const POSE_SPIN_BACK = {
   start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 6, frontarm: 7, release: 8,
   follow1: 10, follow2: 11, follow3: 12, finish: 13, field: 14, react: 9, celebrate1: 14, celebrate2: 14,
 };
-// the batter from behind (19 poses: ready, leave x2, drive x4, pull x4, defend x3, cut x3, bowled,
-// celebration), named as batsprite.js names its frames
+// the batter from behind (22 poses, tools/kit/compose_batter.py: ready, leave x2, backlift, drive x3,
+// pull x4, defend x3, cut x3, bowled, celebration, reverse sweep x3), named as batsprite.js names them
 const POSE_BAT = {
   ready: 0, leave1: 1, leave2: 2, backlift: 3, drive1: 4, drive2: 5, drive3: 6, pull0: 7, pull1: 8, pull2: 9, pull3: 10,
-  def1: 11, def2: 12, def3: 13, cut1: 14, cut2: 15, cut3: 16, bowled: 17, celebrate: 18,
+  def1: 11, def2: 12, def3: 13, cut1: 14, cut2: 15, cut3: 16, bowled: 17, celebrate: 18, rsweep1: 19, rsweep2: 20, rsweep3: 21,
 };
 const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
 const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }
