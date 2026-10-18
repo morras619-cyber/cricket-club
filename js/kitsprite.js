@@ -23,6 +23,13 @@ const POSE_SPIN_BACK = {
   start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 6, frontarm: 7, release: 8,
   follow1: 10, follow2: 11, follow3: 12, finish: 13, field: 14, react: 9, celebrate1: 14, celebrate2: 14,
 };
+// the batter from behind (19 poses: ready, leave x2, drive x4, pull x4, defend x3, cut x3, bowled,
+// celebration), named as batsprite.js names its frames
+const POSE_BAT = {
+  ready: 0, leave1: 1, leave2: 2, backlift: 3, drive1: 4, drive2: 5, drive3: 6, pull0: 7, pull1: 8, pull2: 9, pull3: 10,
+  def1: 11, def2: 12, def3: 13, cut1: 14, cut2: 15, cut3: 16, bowled: 17, celebrate: 18,
+};
+const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
 const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }
 let fontReady = false;
 const crestImgs = new Map();
@@ -35,7 +42,7 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(id)) crestImgs.set(id, image(`img/logo-${id}.webp`));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -343,6 +350,28 @@ export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look)
   ctx.fillStyle = 'rgba(10,8,20,0.26)';
   ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
   ctx.drawImage(sheet, sx, sy, w, h, px - ax * k, py - ay * k, w * k, h * k);
+  ctx.restore();
+  return true;
+}
+
+// The batter from behind in his club's kit, feet at (px, py): frame f, with the frame before it
+// faded out underneath (a fast swing reads as motion). False until the sheet is ready.
+export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) {
+  if (!team || !look?.who || !KIT_SHEETS['bat-back']) return false;
+  const sheet = playerSheet('bat-back', team, look, false);
+  if (!sheet) return false;
+  const meta = KIT_SHEETS['bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx;
+  const one = (name, alpha) => {
+    const [sx, sy, w, h, ax, ay] = meta.frames[POSE_BAT[name] ?? 0];
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(sheet, sx, sy, w, h, px - ax * k, py - ay * k, w * k, h * k);
+  };
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,8,20,0.28)';
+  ctx.beginPath(); ctx.ellipse(px, py, 0.55 * kPerM, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 22; }
+  if (prev && a < 1) one(prev, (1 - a) * 0.6);
+  one(f, 1);
   ctx.restore();
   return true;
 }

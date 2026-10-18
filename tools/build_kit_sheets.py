@@ -20,6 +20,7 @@ kit and skin repaint, and the crest (front) / name-and-number (back) placements 
 tools/kit/*.json moved into atlas coordinates. Needs numpy, scipy and Pillow.
 """
 import json
+import math
 import os
 import sys
 import numpy as np
@@ -76,10 +77,14 @@ def paint_design(a, design, off, pipe=3.2):
     suit = masks(a)[0]
     H, W = suit.shape
     lab, _ = ndi.label(a[..., 3] > 0.3)
-    navy = np.zeros((H, W), np.float32); pip = np.zeros((H, W), np.float32)
+    navy = np.zeros((H, W), np.float32); pip = np.zeros((H, W), np.float32); conv = np.zeros((H, W), bool)
+    H_, S_, V_ = hsv(a[..., :3])
+    yel = (a[..., 3] > 0.3) & (H_ > 35) & (H_ < 72) & (S_ > 0.4) & (V_ > 0.4)
+    skin = masks(a)[2]
     for f in design.values():
-        P = [(x + off, y + off) for x, y in f['panel']]
-        (wrx, wry), (wlx, wly) = P[3], P[4]
+        outline = f.get('outline')
+        P = [(x + off, y + off) for x, y in (outline or f['panel'])]
+        (wrx, wry), (wlx, wly) = (P[4], P[5]) if outline else (P[3], P[4])
         x0, x1 = max(0, int(min(p[0] for p in P)) - 120), min(W, int(max(p[0] for p in P)) + 120)
         y0, y1 = max(0, int(min(p[1] for p in P)) - 60), int(max(wry, wly)) + 6
         sl = (slice(y0, y1), slice(x0, x1))
@@ -88,6 +93,20 @@ def paint_design(a, design, off, pipe=3.2):
         above = (yy - wly) * (wrx - wlx) - (xx - wlx) * (wry - wly) < 0
         cx, cy = int(np.mean([p[0] for p in P])), int(np.mean([p[1] for p in P]))
         shirt = suit[sl] & above & (lab[sl] == lab[cy, cx])
+        if outline:
+            # a drawn sheet with its own yellow seams (the batter): those outside the panel become
+            # panel colour, all but the collar and the cuffs
+            local = [(x - x0, y - y0) for x, y in P]
+            inside = coverage(local, shirt.shape)
+            dc = seg_dist(shirt.shape, [(local[0], local[1])])
+            seams = yel[sl] & above & (lab[sl] == lab[cy, cx]) & (inside < 0.5) & (dc > 9) & ~ndi.binary_dilation(skin[sl], iterations=3)
+            conv[sl] |= seams
+            shirt = shirt | seams
+            segs = [(local[i], local[(i + 1) % 8]) for i in (1, 2, 3, 5, 6, 7)]
+            p = np.clip(pipe / 2 + 0.5 - seg_dist(shirt.shape, segs), 0, 1) * shirt
+            navy[sl] = np.maximum(navy[sl], shirt * (1 - inside) * (1 - p))
+            pip[sl] = np.maximum(pip[sl], p)
+            continue
         if f.get('yoke'):
             # the spinner's shape: from each collar end out to a corner at the shoulder blades
             (ylx, yly), (yrx, yry) = [(x + off, y + off) for x, y in f['yoke']]
@@ -99,7 +118,7 @@ def paint_design(a, design, off, pipe=3.2):
         p = np.clip(pipe / 2 + 0.5 - seg_dist(shirt.shape, segs), 0, 1) * shirt
         navy[sl] = np.maximum(navy[sl], shirt * (1 - inside) * (1 - p))
         pip[sl] = np.maximum(pip[sl], p)
-    return navy, pip
+    return navy, pip, conv
 
 
 def rework_yoke(a, kit, w, Ls, ref, marks, off, pipe=3.2):
@@ -152,7 +171,9 @@ def tones(a, design=None, off=0, marks=None):
     yel = np.clip((0.18 - np.linalg.norm(chroma(rgb) - chroma(TONE_REF[2]), axis=-1)) / 0.08, 0, 1)
     Ls = ndi.gaussian_filter(L, 0.6)
     if design:
-        navy, pip = paint_design(a, design, off)
+        navy, pip, conv = paint_design(a, design, off)
+        Ls0 = Ls.copy()
+        yel = yel * ~conv
         pip *= 1 - yel
         w = np.stack([(1 - yel) * (1 - navy) * (1 - pip), (1 - yel) * navy, np.maximum(yel, pip)], -1)
         w /= w.sum(-1, keepdims=True) + 1e-6
@@ -160,6 +181,8 @@ def tones(a, design=None, off=0, marks=None):
         # colour's brightness, the piping lifted to the drawn yellow's
         rm = float(np.median(L[kit & (w[..., 0] > 0.8)])); ry = float(np.median(L[kit & (yel > 0.8)]))
         Ls = Ls * (1 + pip * (ry / rm - 1))
+        # drawn yellow seams turned panel colour: shaded as cloth, not as bright yellow
+        Ls = np.where(conv, Ls0 * rm / ry, Ls)
         return kit, w, Ls, [round(rm, 4), round(rm, 4), round(ry, 4)]
     navy = np.clip((72 / 255 - ndi.gaussian_filter(L, 1.2)) / (20 / 255), 0, 1)
     w = np.stack([(1 - yel) * (1 - navy), (1 - yel) * navy, yel], -1)
@@ -212,7 +235,7 @@ def frames_of(a, count=10, rowh=600):
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None):
+def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
@@ -276,7 +299,7 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
         meta['frames'].append([ax, ay, w, h, round(float(xs[foot].mean()) - x0, 1), int(ys.max()) - y0])
         # placements are in tile coordinates: origin = the pose's box left - 40, top
         p = place[k]
-        tx, ty = sl[1].start - 40 - x0 + ax, sl[0].start - y0 + ay
+        tx, ty = (M - x0 + ax, M - y0 + ay) if place_abs else (sl[1].start - 40 - x0 + ax, sl[0].start - y0 + ay)
         meta['place'].append([round(p[0] + tx, 1), round(p[1] + ty, 1)] + p[2:])
     meta['refPx'] = int(frames[0][1][0].stop - frames[0][1][0].start)
     pct = lambda m: [round(float(np.percentile(L[m], q)), 4) for q in (4, 50, 99)]
@@ -306,6 +329,21 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
     return meta
 
 
+def bat_print(P):
+    """the name and number on a batter's back, from his panel outline (SHIRT_PRINT.md): on the spine
+    42% of the way down from the collar, tilted with it, a little narrower than the panel there"""
+    cl, cr, yr, ar, wr, wl, al, yl = [np.array(p, float) for p in P]
+    top, bot = (cl + cr) / 2, (wl + wr) / 2
+    c = top + 0.45 * (bot - top)
+    t = (c[1] - ar[1]) / max(1e-3, wr[1] - ar[1])
+    right = ar + np.clip(t, 0, 1) * (wr - ar)
+    t = (c[1] - al[1]) / max(1e-3, wl[1] - al[1])
+    left = al + np.clip(t, 0, 1) * (wl - al)
+    w = min(0.8 * (right[0] - left[0]), 0.9 * np.linalg.norm(bot - top) / 0.67)
+    tilt = math.degrees(math.atan2(bot[0] - top[0], bot[1] - top[1])) * -1
+    return [round(float((left[0] + right[0]) / 2), 1), round(float(c[1]), 1), round(float(w), 1), 1, 1, round(tilt, 1), 0, 0, 0, 0]
+
+
 def main():
     front, back, hairdir = sys.argv[1:4]
     spin_front = sys.argv[4] if len(sys.argv) > 4 else None
@@ -328,6 +366,10 @@ def main():
         out['spin-back'] = build('spin-back', sys.argv[5], hp('spin-back'),
                                  [sp[str(k + 1)]['print'] + sp[str(k + 1)]['name'] + sp[str(k + 1)]['number'] for k in range(15)], 15, 500, premium=True,
                                  marks={k: v for k, v in json.load(open('tools/kit/premium-spin-back.json')).items() if not k.startswith('_')})
+    # the batter from behind: his back panel from the outlines, the print placed on it
+    bat = {k: v for k, v in json.load(open('tools/kit/premium-bat-back.json')).items() if not k.startswith('_')}
+    out['bat-back'] = build('bat-back', 'tools/kit/src/batter-back.png', {}, [bat_print(bat[str(k + 1)]) for k in range(19)], 19, 300,
+                            premium=True, design={k: {'outline': v} for k, v in bat.items()}, place_abs=True)
     with open('js/kitsheets.js', 'w') as f:
         f.write('// The plain-kit bowler sheets in img/kit/ (tools/build_kit_sheets.py). Per view: frames\n'
                 '// [x, y, w, h, feet x, feet y] in sheet order; place: the crest (front: [x, y, size, squash x,\n'

@@ -1,5 +1,6 @@
 import { peopleSheet, loadPeopleMask } from './looks.js';
-import { sheetOf } from './teams.js';
+import { sheetOf, teamById } from './teams.js';
+import { drawKitBatter } from './kitsprite.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
 // tools/build_batter_sprites.py, so a single frame table serves every team.
@@ -91,7 +92,8 @@ export function drawTeamThumb(canvas, teamId) {
 
 // The frame (and the one before it, for a short cross-fade) for the batter right now.
 export function batFrame(b, now) {
-  if (b.anim === 'celebrate') return { f: 'drive3' };
+  if (b.forceFrame) return { f: b.forceFrame }; // (previews)
+  if (b.anim === 'celebrate') return { f: 'celebrate' };
   if (b.shot) {
     const seq = SEQ[b.shot.anim] || SEQ.drive;
     let t = now - b.shot.t0, prev = b.shot.from || 'backlift';
@@ -112,11 +114,14 @@ function drawOne(ctx, img, name, px, py, k, alpha) {
 
 // Draw at the projected feet position (px, py); kPerM is pixels per metre at that depth.
 export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
+  // a named batter: the kit sheet (his club's colours, his skin, his name and number)
+  const fr = batFrame(b, now);
+  if (b.people?.who && drawKitBatter(ctx, px, py, kPerM, fr.f, fr.prev, fr.a ?? 1, teamById(b.team), b.people, opts.glow)) return true;
   const sheet = sheetOf(b.team), atlas = atlases.get(sheet);
   if (!atlas || !atlas.ready) return false;
   const img = peopleSheet(atlas.img, `batter-${sheet}`, b.people); // the batter's own skin and hair
   const k = kPerM * REF_HEIGHT_M / REF_HEIGHT_PX;
-  const { f, prev, a = 1 } = batFrame(b, now);
+  const { prev, a = 1 } = fr, f = fr.f === 'celebrate' ? 'drive3' : fr.f; // (the old sheets have no celebration)
   ctx.save();
   // ground shadow
   ctx.fillStyle = 'rgba(10,8,20,0.28)';
