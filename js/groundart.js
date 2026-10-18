@@ -2,6 +2,7 @@
 // pixels. Made by tools/build_ground_art.py; clubs not listed are painted by scene.js.
 export const GROUND_ART = {
  "thunder": {
+  "views": {"bat": {"f": 1600, "w": 2400, "h": 1536, "above": 480, "top": "#011a61", "bottom": "#33a01c", "board": {"r": 63.8, "h": 0.95}, "roof": {"r": 81, "h": 19}}, "bowl": {"f": 2400, "w": 2400, "h": 1536, "above": 576, "top": "#31589b", "bottom": "#2e9b1c", "board": {"r": 63.8, "h": 0.95}, "roof": {"r": 81, "h": 19}}, "keeper": {"f": 1200, "w": 2520, "h": 1704, "above": 480, "top": "#0b1d56", "bottom": "#339f1c", "board": {"r": 63.8, "h": 0.95}, "roof": {"r": 81, "h": 19}}},
   "far": {
    "w": 2172,
    "h": 452,

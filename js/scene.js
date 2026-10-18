@@ -72,6 +72,8 @@ function loadArt(team) {
   if (!meta || ART[team]) return;
   const a = (ART[team] = { meta, ready: false });
   const files = { far: 'far', near: 'near', pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
+  // a ground built in Blender: one finished background per camera (tools/blender)
+  for (const v of Object.keys(meta.views || {})) files['view-' + v] = 'view-' + v;
   let left = Object.keys(files).length + 1;
   const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
   for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${team}/${f}.webp`; a[k] = im; }
@@ -120,6 +122,7 @@ const mipFor = (mips, pxPerM) => {
 // horizon; then the grass and pitch from the top-down art, laid into the camera's perspective one
 // screen row at a time, so the ball and the players always meet the painted pitch.
 function renderPainted(cam, art) {
+  if (art.meta.views?.[cam.kind]) return renderBuilt(cam, art, art.meta.views[cam.kind], art['view-' + cam.kind]);
   const { W, H, hy } = cam;
   const G = groundOf(HOME), T = teamById(HOME);
   const night = NIGHT[G.time] ?? 1;
@@ -239,6 +242,43 @@ function renderPainted(cam, art) {
   cam.layout = { roofY: Math.max(0, dy + dh * 0.42), standTop: dy + dh * 0.45, hy, spots: G.landmark === 'bolts' ? { lightning: true } : {} };
   return c;
 }
+// A ground rendered in Blender from this very camera (tools/blender/thunderdome.py): the picture
+// was taken with focal length v.f px, the horizon v.above px from its top, so scaled by f / v.f and
+// pinned on the horizon it lines up with everything the game projects (players, ball, stumps).
+function renderBuilt(cam, art, v, im) {
+  const { W, H, hy, f } = cam;
+  const G = groundOf(HOME), night = NIGHT[G.time] ?? 1;
+  const c = document.createElement('canvas');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  g.imageSmoothingQuality = 'high';
+  const k = f / v.f, dw = v.w * k, dh = v.h * k, dx = W / 2 - dw / 2, dy = hy - v.above * k;
+  if (dy > 0) {
+    const gr = g.createLinearGradient(0, 0, 0, dy + 2);
+    gr.addColorStop(0, G.sky[0]); gr.addColorStop(1, v.top);
+    g.fillStyle = gr; g.fillRect(0, 0, W, dy + 2);
+    if (night >= 0.6) for (let i = 0; i < 40; i++) { const r = ((i * 7919) % 997) / 997, q = ((i * 104729) % 991) / 991; g.fillStyle = `rgba(255,255,255,${0.25 + 0.5 * q})`; g.fillRect(r * W, q * dy, 1.3, 1.3); }
+  }
+  if (dy + dh < H) { g.fillStyle = v.bottom; g.fillRect(0, dy + dh - 1, W, H - dy - dh + 1); }
+  g.drawImage(im, dx, dy, dw, dh);
+  if (dy > 0) {
+    const gr = g.createLinearGradient(0, dy, 0, dy + dh * 0.06);
+    gr.addColorStop(0, v.top); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, dy, W, dh * 0.06);
+  }
+  const gr = g.createRadialGradient(W / 2, H * 0.55, H * 0.32, W / 2, H * 0.55, H * 0.8);
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(6,4,20,${0.1 + 0.18 * night})`);
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  // the boards along the far rope carry the scrolling words; the roof line for the sky effects
+  const at = (r, h) => { const d = cam.depth(CY + cam.dir * r); return hy + (cam.cy - h) * f / d; };
+  const by = at(v.board.r, v.board.h);
+  cam.board = { y: by, h: at(v.board.r, 0) - by, painted: true };
+  cam.layout = { roofY: Math.max(0, at(v.roof.r, v.roof.h)), standTop: at(v.roof.r, v.roof.h - 1.5), hy, spots: G.landmark === 'bolts' ? { lightning: true } : {} };
+  return c;
+}
+
 export const groundTeam = () => HOME;
 const shade = (hex, f) => {
   const n = parseInt(hex.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f));
