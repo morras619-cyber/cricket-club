@@ -99,8 +99,11 @@ function ramp(hex) {
     return [mid.map(x => x * 0.35), mid, mid.map((x, k) => x + ([158, 163, 184][k] - x) * 0.75)];
   }
   if (s < 0.15) return [c.map((x, k) => x * 0.45 * [0.95, 0.97, 1.05][k]), c, c.map(x => x + (255 - x) * 0.8)];
-  const shadow = rgb((h + (l > 0.5 ? -12.6 : 0) + 360) % 360, Math.min(1, s * 1.1), v * 0.42);
-  return [shadow, c, c.map(x => x + (255 - x) * 0.6)];
+  // a richer, more saturated main colour (a match shirt, not a training top), deep shadows and a
+  // bright, still-coloured light side
+  const mid = rgb(h, Math.min(1, s * 1.14 + 0.04), Math.min(1, v * 1.06 + 0.03));
+  const shadow = rgb((h + (l > 0.5 ? -12.6 : 0) + 360) % 360, Math.min(1, s * 1.18 + 0.05), v * 0.36);
+  return [shadow, mid, mid.map(x => x + (255 - x) * 0.5)];
 }
 
 // ---------- the club's kit ----------
@@ -122,7 +125,12 @@ function teamSheet(view, team) {
     const [[sh, md, li], [lo, mid, hi]] = t, l = lum(p[i], p[i + 1], p[i + 2]) / 255;
     let x = l < mid ? (l - lo) / Math.max(mid - lo, 1e-3) - 1 : (l - mid) / Math.max(hi - mid, 1e-3);
     x = Math.max(-1.15, Math.min(1, x));
-    for (let k = 0; k < 3; k++) p[i + k] = x < 0 ? md[k] + (md[k] - sh[k]) * x : md[k] + (li[k] - md[k]) * x;
+    // the fabric's sheen: the drawn highlight streaks stay crisp and bright, like a polyester shirt
+    const gloss = x > 0.7 ? (x - 0.7) / 0.3 * 0.55 : 0;
+    for (let k = 0; k < 3; k++) {
+      const v = x < 0 ? md[k] + (md[k] - sh[k]) * x : md[k] + (li[k] - md[k]) * x;
+      p[i + k] = v + (255 - v) * gloss;
+    }
   }
   g.putImageData(img, 0, 0);
   teamCache.set(key, c);
@@ -276,7 +284,7 @@ function playerSheet(view, team, look, mirror) {
   // onto the shirt only (an arm in front hides it), shaded with the cloth's folds
   const lp = lg.getImageData(0, 0, W, H).data;
   img = g.getImageData(0, 0, W, H); p = img.data;
-  const ref = lum(...hexRgb(team.suit)) || 1, [lo, hi] = facing ? [0.6, 1.12] : [0.55, 1.15];
+  const ref = lum(...ramp(team.suit)[1]) || 1, [lo, hi] = facing ? [0.6, 1.12] : [0.55, 1.15];
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
