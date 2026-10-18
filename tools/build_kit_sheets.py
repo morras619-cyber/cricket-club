@@ -195,7 +195,9 @@ def collar_top(a, box):
     if not c:
         return None
     b = min(c, key=lambda t: t[0])[1]
-    return b[0].start, (b[1].start + b[1].stop) / 2
+    # hair hanging over the collar (a ponytail, dreads) splits it: join the pieces at its height
+    parts = [q for i, q in enumerate(bb) if sz[i] > 15 and abs(q[0].start - b[0].start) <= 14 and abs((q[1].start + q[1].stop) / 2 - (b[1].start + b[1].stop) / 2) < w * 0.3]
+    return b[0].start, (min(q[1].start for q in parts) + max(q[1].stop for q in parts)) / 2
 
 
 def spin_back(bald_path, sheets, heads):
