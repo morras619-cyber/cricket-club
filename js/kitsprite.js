@@ -18,12 +18,12 @@ const POSE_SPIN = {
   follow1: 9, follow2: 10, follow3: 11, finish: 12, field: 14, react: 14, celebrate1: 14, celebrate2: 14,
 };
 
-// the spinner from behind (15 poses, one sheet per hairstyle as drawn, the bald one for bald players)
+// the spinner from behind (15 poses)
 const POSE_SPIN_BACK = {
   start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 6, frontarm: 7, release: 8,
   follow1: 10, follow2: 11, follow3: 12, finish: 13, field: 14, react: 9, celebrate1: 14, celebrate2: 14,
 };
-const views = {}; // 'front' | 'back' -> { img, mask, hair: { style: img }, data }
+const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }
 let fontReady = false;
 const crestImgs = new Map();
 
@@ -35,10 +35,7 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'spin-front']) {
-    if (views[view]) continue;
-    views[view] = { img: image(`img/kit/${view}.webp`), mask: image(`img/kit/${view}-mask.png`), hair: {} };
-  }
+  for (const view of ['front', 'back', 'spin-front', 'spin-back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(id)) crestImgs.set(id, image(`img/logo-${id}.webp`));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -54,12 +51,14 @@ function pixels(img) {
   c.width = 0; c.height = 0;
   return d;
 }
-// the view's pixel data, once its three images are in
+// (a premium kit has a tone map too: its three colours' weights and the cloth's brightness)
+const openView = view => ({ img: image(`img/kit/${view}.webp`), mask: image(`img/kit/${view}-mask.png`), tone: KIT_SHEETS[view].tones ? image(`img/kit/${view}-tone.png`) : null, hair: {} });
+// the view's pixel data, once its images are in
 function viewData(view) {
-  if (!views[view] && KIT_SHEETS[view]) views[view] = { img: image(`img/kit/${view}.webp`), mask: image(`img/kit/${view}-mask.png`), hair: {} };
+  if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   const v = views[view];
-  if (!v || !loaded(v.img) || !loaded(v.mask)) return null;
-  if (!v.data) v.data = { mask: pixels(v.mask), hair: {} };
+  if (!v || !loaded(v.img) || !loaded(v.mask) || (v.tone && !loaded(v.tone))) return null;
+  if (!v.data) v.data = { mask: pixels(v.mask), tone: v.tone && pixels(v.tone), hair: {} };
   return v.data;
 }
 // a hairstyle's layer for the view (loaded the first time a player with it is drawn); undefined
@@ -106,6 +105,20 @@ function ramp(hex) {
   return [shadow, mid, mid.map(x => x + (255 - x) * 0.5)];
 }
 
+// The premium kit's three colours per club: the main shirt, the yoke and side panels, the piping
+// (collar, cuffs, belt, trouser stripe). Another club: its suit, a deep shade of it and its trim.
+const PREMIUM = {
+  thunder: ['#1f5fd6', '#0c2a6e', '#ffd23f'], cyclones: ['#1e8a3a', '#0b3d1b', '#ffd21f'],
+  vipers: ['#1c1c22', '#3b3c47', '#e8262b'], eagles: ['#ffcc12', '#16161a', '#ffffff'],
+  phoenix: ['#f2711c', '#1c1c1c', '#ffd23f'], titans: ['#9a9da3', '#2b2d33', '#ffffff'],
+  storm: ['#6a22c4', '#2a0b5a', '#f2b21b'], royals: ['#ec2f9a', '#5c0c3a', '#ffffff'],
+};
+function premiumOf(team) {
+  if (PREMIUM[team.id]) return PREMIUM[team.id].map(hexRgb);
+  const c = hexRgb(team.suit);
+  return [c, c.map(x => x * 0.38), hexRgb(team.trim)];
+}
+
 // ---------- the club's kit ----------
 const teamCache = new Map();
 function teamSheet(view, team) {
@@ -118,6 +131,29 @@ function teamSheet(view, team) {
   if (!g) return null;
   g.drawImage(v.img, 0, 0);
   const img = g.getImageData(0, 0, c.width, c.height), p = img.data, m = data.mask;
+  if (data.tone) {
+    // each colour shaded by the cloth's brightness against that colour's drawn brightness, then
+    // mixed by the soft weights (so panel edges and piping blend, no patches)
+    const tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0];
+    for (let i = 0; i < p.length; i += 4) {
+      if (m[i + 2] !== 255 || !p[i + 3] || !tn[i + 2]) continue;
+      w[1] = tn[i] / 255; w[2] = tn[i + 1] / 255; w[0] = Math.max(0, 1 - w[1] - w[2]);
+      const L = tn[i + 2];
+      let r = 0, gg = 0, b = 0;
+      for (let k = 0; k < 3; k++) {
+        if (!w[k]) continue;
+        const t = pal[k], q = L / ref[k], sh = q <= 1 ? q ** 0.9 : 0, hi = q > 1 ? Math.min(0.7, (q - 1) * 0.8) : 0;
+        r += w[k] * (q <= 1 ? t[0] * sh : t[0] + (255 - t[0]) * hi);
+        gg += w[k] * (q <= 1 ? t[1] * sh : t[1] + (255 - t[1]) * hi);
+        b += w[k] * (q <= 1 ? t[2] * sh : t[2] + (255 - t[2]) * hi);
+      }
+      p[i] = r; p[i + 1] = gg; p[i + 2] = b;
+    }
+    g.putImageData(img, 0, 0);
+    teamCache.set(key, c);
+    while (teamCache.size > 4) { const [k, old] = teamCache.entries().next().value; teamCache.delete(k); old.width = 0; old.height = 0; }
+    return c;
+  }
   const tones = { 255: [ramp(team.suit), meta.suit], 128: [ramp(team.trim), meta.trim] };
   for (let i = 0; i < p.length; i += 4) {
     const t = tones[m[i + 2]];
@@ -186,13 +222,6 @@ function printLine(g, text, cap, cy, fill, edge) {
   g.restore();
 }
 
-// the sheet a player is drawn from: the spinner from behind has one per hairstyle
-function sheetView(view, look) {
-  if (view !== 'spin-back') return view;
-  const key = wearOf(look) || hairStyleOf(look) || 'bald';
-  return KIT_SHEETS[`spin-back-${key}`] ? `spin-back-${key}` : 'spin-back-bald';
-}
-
 const playerCache = new Map();
 function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
@@ -200,8 +229,7 @@ function playerSheet(view, team, look, mirror) {
   const sk = skinHex(look), hr = hairHex(look), style = hairStyleOf(look);
   const facing = view.endsWith('front');
   const beard = facing ? beardOf(look) : null, wear = wearOf(look);
-  const own = meta.hairRef != null; // his hair is drawn into the sheet (mask B = 64)
-  const hp = style && !own && meta.hair?.[style] ? hairData(view, style) : null;
+  const hp = style && meta.hair?.[style] ? hairData(view, style) : null;
   const bp = beard && meta.hair?.[beard] ? hairData(view, beard) : null;
   const wp = wear && meta.hair?.[wear] ? hairData(view, wear) : null;
   if (hp === undefined || bp === undefined || wp === undefined) return null;
@@ -226,9 +254,6 @@ function playerSheet(view, team, look, mirror) {
     if (m[i] > 127 && p[i + 3]) {
       const r = lum(p[i], p[i + 1], p[i + 2]) / sref;
       for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
-    } else if (own && m[i + 2] === 64 && p[i + 3]) {
-      const q = lum(p[i], p[i + 1], p[i + 2]) / (meta.hairRef * 255);
-      for (let k = 0; k < 3; k++) p[i + k] = q <= 1 ? ht[k] * q : ht[k] + (255 - ht[k]) * Math.min(0.8, (q - 1) * 0.6);
     }
     for (const [d, href] of layers) {
       const a = d[i + 3] / 255;
@@ -284,7 +309,7 @@ function playerSheet(view, team, look, mirror) {
   // onto the shirt only (an arm in front hides it), shaded with the cloth's folds
   const lp = lg.getImageData(0, 0, W, H).data;
   img = g.getImageData(0, 0, W, H); p = img.data;
-  const ref = lum(...ramp(team.suit)[1]) || 1, [lo, hi] = facing ? [0.6, 1.12] : [0.55, 1.15];
+  const ref = (meta.tones ? lum(...premiumOf(team)[0]) : lum(...ramp(team.suit)[1])) || 1, [lo, hi] = facing ? [0.6, 1.12] : [0.55, 1.15];
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
@@ -306,11 +331,10 @@ function playerSheet(view, team, look, mirror) {
 // The bowler in the plain kit, feet at (px, py). False if it isn't ready (the old sprite is drawn).
 export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look) {
   if (!team || !look?.who) return false;
-  view = sheetView(view, look);
   const sheet = playerSheet(view, team, look, !!flip);
   if (!sheet) return false;
   const meta = KIT_SHEETS[view];
-  const pose = (view.startsWith('spin-back') ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
+  const pose = (view === 'spin-back' ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
   let [sx, sy, w, h, ax, ay] = meta.frames[pose];
   if (flip) { sx = sheet.width - sx - w; ax = w - ax; }
   const k = kPerM * REF_HEIGHT_M / meta.refPx;

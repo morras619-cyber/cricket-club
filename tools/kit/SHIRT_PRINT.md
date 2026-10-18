@@ -50,3 +50,12 @@ The front of the shirt carries the club crest and nothing else (no name, no numb
    tilt it with the chest when he leans (up to +/-5 deg).
 
 Placement data: `crest-front.json` (frames 1-10 of the front sheet).
+
+# Premium kit (the spinner's sheets)
+
+Drawn in three colours: main blue, a navy yoke and side panels, yellow piping. Each club
+repaints them with its own three (`PREMIUM` in js/kitsprite.js: main, panels, piping). The
+build stores soft weights for navy and yellow plus the cloth's brightness
+(`img/kit/<view>-tone.png`), so panel edges and piping blend instead of forming patches;
+each colour is shaded against its own drawn brightness. Nothing is printed on the yoke:
+the name and number sit below it, as placed in shirt-print-spin-back.json.
