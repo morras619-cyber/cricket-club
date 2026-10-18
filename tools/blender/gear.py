@@ -4,10 +4,9 @@
 import bpy, bmesh, math, os, sys
 from mathutils import Vector
 
-OUT = sys.argv[sys.argv.index('--') + 1]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', '..')
-os.makedirs(OUT, exist_ok=True)
+OUT = None
 
 # Thunder Strikers: royal blue, navy and yellow
 KIT = dict(main='#1c5ad6', dark='#0b2a6e', trim='#ffd23f')
@@ -430,8 +429,10 @@ def bat_both():
     b = bat(); e2 = group(b, (0.09, 0, 0)); e2.rotation_euler = (0, 0, math.pi)
     return a + b
 
-render('helmet', helmet, (-0.42, -0.62, 0.16), (0, 0, -0.01), 0.42)
-render('helmet-back', helmet, (0.25, 0.7, 0.2), (0, 0, -0.01), 0.42)
-render('pads', pads_pair, (-0.35, -1.6, 0.6), (0, 0, 0.36), 0.9)
-render('gloves', gloves_pair, (-0.15, -0.8, 0.25), (0, 0, 0.0), 0.3)
-render('bat', bat_both, (-0.12, -2.0, 0.45), (0, 0, 0.45), 1.0, size=(800, 1000))
+if __name__ == '__main__':
+    OUT = sys.argv[sys.argv.index('--') + 1]; os.makedirs(OUT, exist_ok=True)
+    render('helmet', helmet, (-0.42, -0.62, 0.16), (0, 0, -0.01), 0.42)
+    render('helmet-back', helmet, (0.25, 0.7, 0.2), (0, 0, -0.01), 0.42)
+    render('pads', pads_pair, (-0.35, -1.6, 0.6), (0, 0, 0.36), 0.9)
+    render('gloves', gloves_pair, (-0.15, -0.8, 0.25), (0, 0, 0.0), 0.3)
+    render('bat', bat_both, (-0.12, -2.0, 0.45), (0, 0, 0.45), 1.0, size=(800, 1000))
