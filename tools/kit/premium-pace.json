@@ -1,5 +1,5 @@
 {
- "_note": "The premium design painted onto the plain pace bowler sheets (tools/build_kit_sheets.py): per frame, in sheet pixels, the main-colour panel [collar or yoke left, right, armpit right, waist right, waist left, armpit left]; everything else of the shirt is the panel colour, with piping along the panel edge (and its top when top is set).",
+ "_note": "The premium design painted onto the plain pace bowler sheets (tools/build_kit_sheets.py): per frame, in sheet pixels, the main-colour panel [collar or yoke left, right, armpit right, waist right, waist left, armpit left]; everything else of the shirt is the panel colour, with piping along the panel edge (and its top when top is set). Back frames: yoke = the corners at the shoulder blades the piping runs out to from the collar ends, placed as on the spinner's drawing (0.267 of the collar-to-belt height out, 0.22 down).",
  "front": {
   "1": {
    "panel": [
@@ -286,12 +286,12 @@
   "1": {
    "panel": [
     [
-     64,
-     228
+     87,
+     229
     ],
     [
-     166,
-     228
+     140,
+     229
     ],
     [
      160,
@@ -309,17 +309,27 @@
      63,
      310
     ]
+   ],
+   "yoke": [
+    [
+     51,
+     258
+    ],
+    [
+     176,
+     258
+    ]
    ]
   },
   "2": {
    "panel": [
     [
-     275,
-     229
+     297,
+     230
     ],
     [
-     376,
-     229
+     346,
+     230
     ],
     [
      366,
@@ -337,17 +347,27 @@
      265,
      312
     ]
+   ],
+   "yoke": [
+    [
+     265,
+     257
+    ],
+    [
+     378,
+     257
+    ]
    ]
   },
   "3": {
    "panel": [
     [
-     459,
-     228
+     496,
+     229
     ],
     [
-     568,
-     228
+     547,
+     229
     ],
     [
      565,
@@ -365,12 +385,22 @@
      475,
      292
     ]
+   ],
+   "yoke": [
+    [
+     463,
+     256
+    ],
+    [
+     580,
+     256
+    ]
    ]
   },
   "4": {
    "panel": [
     [
-     663,
+     705,
      234
     ],
     [
@@ -393,12 +423,22 @@
      663,
      308
     ]
+   ],
+   "yoke": [
+    [
+     673,
+     260
+    ],
+    [
+     800,
+     266
+    ]
    ]
   },
   "5": {
    "panel": [
     [
-     899,
+     925,
      252
     ],
     [
@@ -421,12 +461,22 @@
      878,
      300
     ]
+   ],
+   "yoke": [
+    [
+     897,
+     275
+    ],
+    [
+     1013,
+     285
+    ]
    ]
   },
   "6": {
    "panel": [
     [
-     105,
+     140,
      925
     ],
     [
@@ -449,16 +499,26 @@
      85,
      975
     ]
+   ],
+   "yoke": [
+    [
+     110,
+     950
+    ],
+    [
+     225,
+     960
+    ]
    ]
   },
   "7": {
    "panel": [
     [
-     266,
+     275,
      938
     ],
     [
-     364,
+     328,
      930
     ],
     [
@@ -477,6 +537,16 @@
      275,
      1020
     ]
+   ],
+   "yoke": [
+    [
+     248,
+     960
+    ],
+    [
+     355,
+     952
+    ]
    ]
   },
   "8": {
@@ -486,7 +556,7 @@
      948
     ],
     [
-     569,
+     535,
      940
     ],
     [
@@ -505,17 +575,27 @@
      458,
      1010
     ]
+   ],
+   "yoke": [
+    [
+     446,
+     968
+    ],
+    [
+     559,
+     960
+    ]
    ]
   },
   "9": {
    "panel": [
     [
-     665,
-     925
+     699,
+     926
     ],
     [
-     775,
-     925
+     750,
+     926
     ],
     [
      767,
@@ -533,17 +613,27 @@
      678,
      992
     ]
+   ],
+   "yoke": [
+    [
+     667,
+     952
+    ],
+    [
+     782,
+     952
+    ]
    ]
   },
   "10": {
    "panel": [
     [
-     865,
-     925
+     893,
+     926
     ],
     [
-     972,
-     925
+     945,
+     926
     ],
     [
      968,
@@ -560,6 +650,16 @@
     [
      872,
      1005
+    ]
+   ],
+   "yoke": [
+    [
+     857,
+     956
+    ],
+    [
+     981,
+     956
     ]
    ]
   }

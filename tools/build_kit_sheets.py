@@ -88,16 +88,59 @@ def paint_design(a, design, off, pipe=3.2):
         above = (yy - wly) * (wrx - wlx) - (xx - wlx) * (wry - wly) < 0
         cx, cy = int(np.mean([p[0] for p in P])), int(np.mean([p[1] for p in P]))
         shirt = suit[sl] & above & (lab[sl] == lab[cy, cx])
+        if f.get('yoke'):
+            # the spinner's shape: from each collar end out to a corner at the shoulder blades
+            (ylx, yly), (yrx, yry) = [(x + off, y + off) for x, y in f['yoke']]
+            P = [P[0], P[1], (yrx, yry), P[3], P[4], (ylx, yly)]
         local = [(x - x0, y - y0) for x, y in P]
         inside = coverage(local, shirt.shape)
-        segs = [(local[1], local[2]), (local[2], local[3]), (local[4], local[5]), (local[5], local[0])] + ([(local[0], local[1])] if f.get('top') else [])
+        n = len(local)
+        segs = [(local[i], local[(i + 1) % n]) for i in range(1, n) if not (n == 6 and i == 3) and not (n == 8 and i == 4)] + ([(local[0], local[1])] if f.get('top') else [])
         p = np.clip(pipe / 2 + 0.5 - seg_dist(shirt.shape, segs), 0, 1) * shirt
         navy[sl] = np.maximum(navy[sl], shirt * (1 - inside) * (1 - p))
         pip[sl] = np.maximum(pip[sl], p)
     return navy, pip
 
 
-def tones(a, design=None, off=0):
+def rework_yoke(a, kit, w, Ls, ref, marks, off, pipe=3.2):
+    """a drawn premium back with a yoke, repainted to the pace design: inside the band between the
+    collar and the yoke corners the cloth becomes the main colour (its brightness rescaled to the
+    main colour's), and piping runs from each collar end to the yoke corner"""
+    H_, S_, V_ = hsv(a[..., :3])
+    yel = kit & (H_ > 38) & (H_ < 72) & (S_ > 0.45)
+    thick = ndi.binary_dilation(ndi.binary_opening(yel, iterations=3), iterations=3) & yel  # collar, cuffs, belt
+    cloth = kit & ~thick
+    # (the old piping's anti-aliased edges are no kit colour: taken in with the cloth around them)
+    edge = (a[..., 3] > 0.3) & ~kit & ndi.binary_dilation(cloth, iterations=2) & ~masks(a)[2]
+    rm, rn, ry = ref
+    to_main = w[..., 0] + w[..., 1] * rm / rn + w[..., 2] * rm / ry
+    to_pipe = w[..., 0] * ry / rm + w[..., 1] * ry / rn + w[..., 2]
+    for m in marks.values():
+        (cl, cr), (yl, yr) = [[(x + off, y + off) for x, y in m[k]] for k in ('collar', 'yoke')]
+        x0, x1 = int(min(cl[0], yl[0])) - 12, int(max(cr[0], yr[0])) + 12
+        y0, y1 = int(min(cl[1], cr[1])) - 12, int(max(yl[1], yr[1])) + 12
+        sl = (slice(y0, y1), slice(x0, x1))
+        loc = lambda p: (p[0] - x0, p[1] - y0)
+        shape = (y1 - y0, x1 - x0)
+        poly = coverage([loc(cl), loc(cr), loc((yr[0], yr[1] + 4)), loc((yl[0], yl[1] + 4))], shape)
+        kit[sl] |= (poly > 0.5) & edge[sl]
+        cl_ = cloth[sl] | ((poly > 0.5) & edge[sl])
+        band = poly * cl_
+        p = np.clip(pipe / 2 + 0.5 - seg_dist(shape, [(loc(cl), loc(yl)), (loc(cr), loc(yr))]), 0, 1) * cl_
+        band *= 1 - p
+        ws = w[sl]
+        new = ws * (1 - band - p)[..., None]
+        new[..., 0] += band; new[..., 2] += p
+        conv = np.where(cloth[sl], Ls[sl] * to_main[sl], 0)
+        # brightness across the band from the cloth around each pixel (no trace of the old line)
+        num, den = ndi.gaussian_filter(conv, 1.4), ndi.gaussian_filter(cloth[sl].astype(np.float32), 1.4)
+        smooth = num / np.maximum(den, 1e-3)
+        Ls[sl] = Ls[sl] * (1 - band - p) + smooth * band + Ls[sl] * to_pipe[sl] * p
+        w[sl] = new
+    return w, Ls, kit
+
+
+def tones(a, design=None, off=0, marks=None):
     """soft class weights (navy, yellow; main = the rest) and lightly smoothed brightness. A sheet
     drawn in the premium kit is read as drawn; a plain one gets the design painted on (design)."""
     H, S, V = hsv(a[..., :3])
@@ -123,6 +166,8 @@ def tones(a, design=None, off=0):
     w = ndi.gaussian_filter(w, (0.8, 0.8, 0))
     w /= w.sum(-1, keepdims=True) + 1e-6
     ref = [round(float(np.median(L[kit & (w[..., k] > 0.8)])), 4) for k in range(3)]
+    if marks:
+        w, Ls, kit = rework_yoke(a, kit, w, Ls, ref, marks, off)
     return kit, w, Ls, ref
 
 
@@ -167,7 +212,7 @@ def frames_of(a, count=10, rowh=600):
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None):
+def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
@@ -176,7 +221,7 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
     suit, trim, skin = masks(a)
     L = a[..., :3] @ LUM
     if premium:
-        kit, tw, tL, tref = tones(a, design, M)
+        kit, tw, tL, tref = tones(a, design, M, marks)
     lab, frames = frames_of(a, count, rowh)
     # each pixel belongs to the nearest pose (hair close to two poses goes to its own head only)
     dist, (iy, ix) = ndi.distance_transform_edt(lab == 0, return_indices=True)
@@ -281,7 +326,8 @@ def main():
     if len(sys.argv) > 5:
         sp = json.load(open('tools/kit/shirt-print-spin-back.json'))['frames']
         out['spin-back'] = build('spin-back', sys.argv[5], hp('spin-back'),
-                                 [sp[str(k + 1)]['print'] + sp[str(k + 1)]['name'] + sp[str(k + 1)]['number'] for k in range(15)], 15, 500, premium=True)
+                                 [sp[str(k + 1)]['print'] + sp[str(k + 1)]['name'] + sp[str(k + 1)]['number'] for k in range(15)], 15, 500, premium=True,
+                                 marks={k: v for k, v in json.load(open('tools/kit/premium-spin-back.json')).items() if not k.startswith('_')})
     with open('js/kitsheets.js', 'w') as f:
         f.write('// The plain-kit bowler sheets in img/kit/ (tools/build_kit_sheets.py). Per view: frames\n'
                 '// [x, y, w, h, feet x, feet y] in sheet order; place: the crest (front: [x, y, size, squash x,\n'
