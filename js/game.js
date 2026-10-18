@@ -2134,7 +2134,7 @@ export class Game {
     this.fx.word('CATCH IT!', this.W / 2, this.H * 0.2, { size: 50, dur: 1000 });
     this.timeScale = 0.6;
     const t0 = this.gameTime;
-    let last = this.gameTime, input = null, prompted = false;
+    let last = this.gameTime, input = null;
     this.onInput = (type, g) => {
       if (input || type !== 'up') return;
       const isSwipe = Math.hypot(g.dx, g.dy) > 28;
@@ -2156,15 +2156,12 @@ export class Game {
       const green = Math.abs(T - t) * 1000 / 0.6 <= F.catchPerfect;
       this.O.ring = { x: L.x, y: L.y, r: 0.5 + 6 * k, color: green ? '#2ecc71' : '#fff4da', w: green ? 5 : 3 };
       this.O.marks = [{ x: L.x, y: L.y }];
+      // the timing bar up top, clear of the thumb: tap anywhere while the marker is in the green
+      this.O.meter = { k: t / T, zone: (F.catchPerfect * 0.6 / 1000) / T, green, label: 'TAP ANYWHERE IN THE GREEN!' };
       this.of.focus([b, me, L]);
-      if (!prompted && t > T - 1.1) {
-        prompted = true;
-        const predicted = Math.max(0, dist(me, L) - speed * Math.max(0, T - t));
-        this.ui.hint('TAP WHEN THE RING TURNS GREEN!');
-      }
       return t >= T && (input || t >= T + 0.45); // room for a swipe that started in time to finish
     });
-    this.onInput = null; this.ui.hint(null);
+    this.onInput = null; this.ui.hint(null); this.O.meter = null;
     gap = dist(me, L);
     let result = 'dropped';
     if (input) {
@@ -2215,18 +2212,18 @@ export class Game {
     let pick = null;
     this.onInput = (type, g) => { if (type === 'down' && !pick) pick = { tg: this.realToGame(g.t) }; };
     if (this.bot) this.sleep(ro.t * 1000).then(() => this.botInput('down')).catch(() => {});
-    this.ui.hint('TAP TO PICK UP');
     await this.until(() => {
       const t = this.gameTime - t0, dt = this.gameTime - last; last = this.gameTime;
       const speed = F.runSpeed * (this.armed.burst ? 2 : 1);
       if (t > F.react) this.moveFielder(me, P, dt, speed);
       this.O.ball = path.ballAt(Math.min(t, ro.t));
       this.O.ring = { x: P.x, y: P.y, r: 0.6 + 4 * clamp((ro.t - t) / ro.t, 0, 1), color: Math.abs(ro.t - t) < 0.14 ? '#2ecc71' : '#fff4da' };
+      this.O.meter = { k: t / ro.t, zone: (F.collectWindow * 0.7 / 1000) / ro.t, green: Math.abs(ro.t - t) * 1000 / 0.7 <= F.collectWindow, label: 'TAP ANYWHERE TO PICK UP' };
       this.runBatters(t, ro.attempt);
       this.of.focus([this.O.ball, me, { x: 0, y: 0 }, { x: 0, y: 20 }]);
       return t >= ro.t + 0.25 || (pick && t >= ro.t);
     });
-    this.onInput = null; this.ui.hint(null);
+    this.onInput = null; this.ui.hint(null); this.O.meter = null;
     let fumble = 0;
     const pickErr = pick ? Math.abs((pick.tg - (t0 + ro.t)) * 1000) / 0.7 : 999;
     if (pickErr > F.collectWindow) { fumble = 0.6; this.fx.word('FUMBLE!', this.W / 2, this.H * 0.3, { size: 44 }); }
@@ -2996,6 +2993,25 @@ export class Game {
     }
   }
 
+  // A timing bar across the top of the screen: the marker slides right and reaches the middle
+  // of the green zone at the perfect moment. m: { k (0 at the start, 1 = perfect), zone, green, label }
+  drawMeter(ctx, m) {
+    const w = Math.min(this.W - 48, 360), x0 = (this.W - w) / 2, y = Math.max(this.H * 0.17, 128), h = 26, span = 1.35;
+    const xAt = k => x0 + w * clamp(k / span, 0, 1);
+    ctx.save();
+    ctx.fillStyle = 'rgba(16,12,28,0.82)'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(x0 - 4, y - 4, w + 8, h + 8, 12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(xAt(1 - m.zone), y, xAt(1 + m.zone) - xAt(1 - m.zone), h);
+    const mx = xAt(m.k);
+    ctx.fillStyle = m.green ? '#fff' : '#ffd23f'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(mx - 5, y - 8, 10, h + 16, 4); ctx.fill(); ctx.stroke();
+    ctx.font = '800 17px "Bangers", "Arial Black", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(m.label, this.W / 2, y - 12);
+    ctx.fillStyle = m.green ? '#2ecc71' : '#fff4da'; ctx.fillText(m.label, this.W / 2, y - 12);
+    ctx.restore();
+  }
+
   renderOutfield() {
     const ctx = this.ctx, O = this.O, V = this.of;
     V.drawGround(ctx);
@@ -3016,6 +3032,7 @@ export class Game {
     for (const f of figs) f.draw();
     const me = O.fielders.find(f => f.ctrl);
     if (me) V.label(ctx, me.x, me.y, 'YOU', '#ffd23f');
+    if (O.meter) this.drawMeter(ctx, O.meter);
     if (O.ends) {
       for (const e of O.ends) {
         const p = V.to(e.x, e.y);
