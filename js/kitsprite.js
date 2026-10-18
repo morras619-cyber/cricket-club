@@ -3,6 +3,7 @@
 // shirt and the player's last name and number on the back (style: tools/kit/SHIRT_PRINT.md).
 import { KIT_SHEETS } from './kitsheets.js';
 import { skinHex, hairHex, hsv, rgb } from './looks.js';
+import { buildOf } from './builds.js';
 
 const REF_HEIGHT_M = 1.85;
 // the game's frame names -> the sheet's poses (0-9, left to right, top row first)
@@ -345,11 +346,12 @@ export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look)
   const pose = (view === 'spin-back' ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
   let [sx, sy, w, h, ax, ay] = meta.frames[pose];
   if (flip) { sx = sheet.width - sx - w; ax = w - ax; }
-  const k = kPerM * REF_HEIGHT_M / meta.refPx;
+  // his own build: taller or shorter, broader or slighter, about his feet
+  const [bh, bw] = buildOf(look), k = kPerM * REF_HEIGHT_M / meta.refPx * bh, kx = k * bw;
   ctx.save();
   ctx.fillStyle = 'rgba(10,8,20,0.26)';
-  ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.drawImage(sheet, sx, sy, w, h, px - ax * k, py - ay * k, w * k, h * k);
+  ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   ctx.restore();
   return true;
 }
@@ -360,15 +362,15 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
   if (!team || !look?.who || !KIT_SHEETS['bat-back']) return false;
   const sheet = playerSheet('bat-back', team, look, false);
   if (!sheet) return false;
-  const meta = KIT_SHEETS['bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx;
+  const [bh, bw] = buildOf(look), meta = KIT_SHEETS['bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
   const one = (name, alpha) => {
     const [sx, sy, w, h, ax, ay] = meta.frames[POSE_BAT[name] ?? 0];
     ctx.globalAlpha = alpha;
-    ctx.drawImage(sheet, sx, sy, w, h, px - ax * k, py - ay * k, w * k, h * k);
+    ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   };
   ctx.save();
   ctx.fillStyle = 'rgba(10,8,20,0.28)';
-  ctx.beginPath(); ctx.ellipse(px, py, 0.55 * kPerM, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px, py, 0.55 * kPerM * bw, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
   if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 22; }
   if (prev && a < 1) one(prev, (1 - a) * 0.6);
   one(f, 1);

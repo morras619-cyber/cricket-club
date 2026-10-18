@@ -419,6 +419,7 @@ import { loadKitSprites, drawKitSprite } from './kitsprite.js';
 import { loadHair, hairReady, piecesOf, piecesKey, headsOf, dressSheet } from './hair.js';
 import { KIT_LOGOS } from './kitlogos.js';
 import { sheetOf } from './teams.js';
+import { buildOf } from './builds.js';
 const tinted = new Map();
 
 // club crests for the shirts and helmets (the front sheets have a blank badge spot for them)
@@ -627,13 +628,13 @@ export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, vi
   const sheet = sheetFor(view, team);
   const img = peopleSheet(sheet, `${view}-${team?.id}${sheet.crest ? '+crest' : ''}`, look, view, v.img, dressFor(view, v, look)); // skin and hair, from the plain sheet's mask
   const [sx, sy, w, h, ax, ay, s] = v.frames[frame];
-  const k = kPerM * REF_HEIGHT_M / v.refPx * s;
+  const [bh, bw] = buildOf(look), k = kPerM * REF_HEIGHT_M / v.refPx * s * bh, kx = k * bw; // his own build
   ctx.save();
   ctx.fillStyle = 'rgba(10,8,20,0.26)';
-  ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
   ctx.translate(px, py);
   if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(img, sx, sy, w, h, -ax * k, -ay * k, w * k, h * k);
+  ctx.drawImage(img, sx, sy, w, h, -ax * kx, -ay * k, w * kx, h * k);
   ctx.restore();
   return true;
 }
