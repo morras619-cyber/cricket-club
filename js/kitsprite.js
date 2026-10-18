@@ -193,6 +193,81 @@ function sheetView(view, look) {
   return KIT_SHEETS[`spin-back-${key}`] ? `spin-back-${key}` : 'spin-back-bald';
 }
 
+// ---------- premium kit design (mock-up, off for now): darker side panels and a tone-on-tone
+// club pattern printed into the shirt ----------
+export const KIT_DESIGN = { on: false, panel: 0.22, pattern: 0.17 };
+const MOTIF = {
+  // each draws one tile (size T) of the club's pattern in white
+  thunder: (g, T) => { g.beginPath(); g.moveTo(T * 0.55, T * 0.05); g.lineTo(T * 0.3, T * 0.5); g.lineTo(T * 0.48, T * 0.5); g.lineTo(T * 0.38, T * 0.95); g.lineTo(T * 0.72, T * 0.42); g.lineTo(T * 0.54, T * 0.42); g.closePath(); g.fill(); },
+  vipers: (g, T) => { g.lineWidth = T * 0.07; for (const [x, y] of [[0, 0], [T, 0], [T / 2, T / 2], [0, T], [T, T]]) { g.beginPath(); g.arc(x, y, T * 0.42, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); } },
+  royals: (g, T) => { const c = (x, y, k) => { g.beginPath(); g.moveTo(x - k, y + k * 0.6); g.lineTo(x - k, y - k * 0.4); g.lineTo(x - k * 0.5, y); g.lineTo(x, y - k * 0.7); g.lineTo(x + k * 0.5, y); g.lineTo(x + k, y - k * 0.4); g.lineTo(x + k, y + k * 0.6); g.closePath(); g.fill(); }; c(T * 0.25, T * 0.3, T * 0.13); c(T * 0.75, T * 0.8, T * 0.13); },
+  phoenix: (g, T) => { for (const [x, y] of [[0.25, 0.25], [0.75, 0.75]]) { g.beginPath(); g.moveTo(x * T, (y - 0.22) * T); g.quadraticCurveTo((x + 0.16) * T, y * T, x * T, (y + 0.2) * T); g.quadraticCurveTo((x - 0.16) * T, y * T, x * T, (y - 0.22) * T); g.fill(); } },
+  eagles: (g, T) => { g.lineWidth = T * 0.08; for (const y of [0.3, 0.8]) { g.beginPath(); g.moveTo(0, y * T); g.lineTo(T / 2, (y - 0.2) * T); g.lineTo(T, y * T); g.stroke(); } },
+  storm: (g, T) => { g.lineWidth = T * 0.06; for (const o of [0, 0.5]) { g.beginPath(); g.moveTo((o - 0.2) * T, T); g.lineTo((o + 0.5) * T, 0); g.stroke(); } },
+  titans: (g, T) => { g.lineWidth = T * 0.06; g.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; g.lineTo(T / 2 + Math.cos(a) * T * 0.3, T / 2 + Math.sin(a) * T * 0.3); } g.closePath(); g.stroke(); },
+  cyclones: (g, T) => { g.lineWidth = T * 0.06; g.beginPath(); for (let t = 0; t < 12; t += 0.2) g.lineTo(T / 2 + Math.cos(t) * t * T * 0.028, T / 2 + Math.sin(t) * t * T * 0.028); g.stroke(); },
+};
+const patternCache = new Map();
+function patternAlpha(id, W, H, T) {
+  const key = `${id}|${W}|${H}|${T}`;
+  if (patternCache.has(key)) return patternCache.get(key);
+  const tile = document.createElement('canvas'); tile.width = tile.height = T;
+  const tg = tile.getContext('2d'); tg.fillStyle = tg.strokeStyle = '#fff'; tg.lineCap = 'round'; tg.lineJoin = 'round';
+  (MOTIF[id] || MOTIF.thunder)(tg, T);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.fillStyle = g.createPattern(tile, 'repeat');
+  g.save(); g.rotate(-0.12); g.fillRect(-W, -H, W * 3, H * 3); g.restore();
+  const d = g.getImageData(0, 0, W, H).data, a = new Uint8Array(W * H);
+  for (let q = 0; q < a.length; q++) a[q] = d[q * 4 + 3];
+  c.width = 0; tile.width = 0;
+  patternCache.set(key, a);
+  return a;
+}
+// the shirt above the waistband: kit pixels (mask B 255) whose nearest trim band above them has
+// more shirt above it (the belt) are trousers; a collar has the neck above it
+const shirtCache = new WeakMap();
+function shirtOnly(m, W, H) {
+  if (shirtCache.has(m)) return shirtCache.get(m);
+  const out = new Uint8Array(W * H);
+  for (let x = 0; x < W; x++) {
+    // down the column: shirt until a trim band that has shirt just above it (the belt, not the
+    // collar, which has the neck above it); everything after that is trousers
+    let lastShirt = -99, legs = false;
+    for (let y = 0; y < H; y++) {
+      const i = (y * W + x) * 4, b = m[i + 2];
+      if (b === 128) { if (y - lastShirt <= 8) legs = true; continue; }
+      if (b === 255 && m[i + 1] >= 128) { if (!legs) { out[y * W + x] = 1; lastShirt = y; } }
+    }
+  }
+  shirtCache.set(m, out);
+  return out;
+}
+// side panels: shirt pixels within a band of the shirt's left or right edge (per row), darker
+function dressShirt(p, m, W, H, team, meta) {
+  const band = Math.round(meta.refPx * 0.035), T = Math.round(meta.refPx * 0.1);
+  const top = shirtOnly(m, W, H);
+  const pat = patternAlpha(team.id, W, H, T);
+  const dark = lum(...hexRgb(team.suit)) < 0.2 * 255, lift = dark ? -1 : 1; // on black, the pattern is lighter
+  for (let y = 0; y < H; y++) {
+    let run = -1;
+    for (let x = 0; x <= W; x++) {
+      const on = x < W && top[y * W + x] === 1;
+      if (on && run < 0) run = x;
+      if (!on && run >= 0) {
+        const L = x - run;
+        for (let xx = run; xx < x; xx++) {
+          const i = (y * W + xx) * 4, e = Math.min(xx - run, x - 1 - xx);
+          let f = 1;
+          if (L > band * 4 && e < band) f -= KIT_DESIGN.panel * (1 - e / band * 0.35);
+          f -= lift * KIT_DESIGN.pattern * pat[y * W + xx] / 255;
+          for (let k = 0; k < 3; k++) p[i + k] = Math.max(0, Math.min(255, f <= 1 ? p[i + k] * f : p[i + k] + (255 - p[i + k]) * (f - 1)));
+        }
+        run = -1;
+      }
+    }
+  }
+}
+
 const playerCache = new Map();
 function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
@@ -206,7 +281,7 @@ function playerSheet(view, team, look, mirror) {
   const wp = wear && meta.hair?.[wear] ? hairData(view, wear) : null;
   if (hp === undefined || bp === undefined || wp === undefined) return null;
   const name = shirtName(look.who), num = shirtNumber(look);
-  const key = [view, team.id, team.suit, team.trim, sk, hr, style, beard, wear, name, num, mirror].join('|');
+  const key = [view, team.id, team.suit, team.trim, sk, hr, style, beard, wear, name, num, mirror, KIT_DESIGN.on].join('|');
   if (playerCache.has(key)) { const c = playerCache.get(key); playerCache.delete(key); playerCache.set(key, c); return c; }
   if (facing && !crestCanvas(team.id)) return null;
   const kit = teamSheet(view, team);
@@ -240,6 +315,7 @@ function playerSheet(view, team, look, mirror) {
       p[i + 3] = Math.max(p[i + 3], d[i + 3]);
     }
   }
+  if (KIT_DESIGN.on) dressShirt(p, m, W, H, team, meta);
   g.putImageData(img, 0, 0);
   // a left-armer: the whole sheet mirrored (the crest and print are drawn after, so they read right)
   if (mirror) {
