@@ -23,7 +23,7 @@ import json
 import os
 import sys
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 from scipy import ndimage as ndi
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -51,20 +51,77 @@ def masks(a):
 TONE_REF = np.array([[30, 110, 225], [22, 42, 110], [250, 225, 30]], float) / 255
 
 
-def tones(a):
-    """soft class weights (navy, yellow; main = the rest) and lightly smoothed brightness"""
+def coverage(poly, shape, ss=4):
+    """a polygon's anti-aliased coverage (0-1) on a grid of shape"""
+    im = Image.new('L', (shape[1] * ss, shape[0] * ss), 0)
+    ImageDraw.Draw(im).polygon([(x * ss, y * ss) for x, y in poly], fill=255)
+    return np.array(im.resize((shape[1], shape[0]), Image.BOX)).astype(np.float32) / 255
+
+
+def seg_dist(shape, segs):
+    """distance from each grid point to the nearest of the segments"""
+    yy, xx = np.mgrid[:shape[0], :shape[1]].astype(np.float32)
+    d = np.full(shape, 1e9, np.float32)
+    for (x0, y0), (x1, y1) in segs:
+        dx, dy = x1 - x0, y1 - y0
+        t = np.clip(((xx - x0) * dx + (yy - y0) * dy) / (dx * dx + dy * dy), 0, 1)
+        d = np.minimum(d, np.hypot(xx - (x0 + t * dx), yy - (y0 + t * dy)))
+    return d
+
+
+def paint_design(a, design, off, pipe=3.2):
+    """the premium design on a plain sheet: per pose, the shirt outside its main panel is navy, with
+    piping along the panel's edge. design: frame -> {panel: 6 points, top: pipe the top edge too}
+    in sheet pixels (off: the sheet's padding). Returns (navy, piping) weights."""
+    suit = masks(a)[0]
+    H, W = suit.shape
+    lab, _ = ndi.label(a[..., 3] > 0.3)
+    navy = np.zeros((H, W), np.float32); pip = np.zeros((H, W), np.float32)
+    for f in design.values():
+        P = [(x + off, y + off) for x, y in f['panel']]
+        (wrx, wry), (wlx, wly) = P[3], P[4]
+        x0, x1 = max(0, int(min(p[0] for p in P)) - 120), min(W, int(max(p[0] for p in P)) + 120)
+        y0, y1 = max(0, int(min(p[1] for p in P)) - 60), int(max(wry, wly)) + 6
+        sl = (slice(y0, y1), slice(x0, x1))
+        yy, xx = np.mgrid[y0:y1, x0:x1]
+        # the shirt: this pose's kit blue above the belt line
+        above = (yy - wly) * (wrx - wlx) - (xx - wlx) * (wry - wly) < 0
+        cx, cy = int(np.mean([p[0] for p in P])), int(np.mean([p[1] for p in P]))
+        shirt = suit[sl] & above & (lab[sl] == lab[cy, cx])
+        local = [(x - x0, y - y0) for x, y in P]
+        inside = coverage(local, shirt.shape)
+        segs = [(local[1], local[2]), (local[2], local[3]), (local[4], local[5]), (local[5], local[0])] + ([(local[0], local[1])] if f.get('top') else [])
+        p = np.clip(pipe / 2 + 0.5 - seg_dist(shirt.shape, segs), 0, 1) * shirt
+        navy[sl] = np.maximum(navy[sl], shirt * (1 - inside) * (1 - p))
+        pip[sl] = np.maximum(pip[sl], p)
+    return navy, pip
+
+
+def tones(a, design=None, off=0):
+    """soft class weights (navy, yellow; main = the rest) and lightly smoothed brightness. A sheet
+    drawn in the premium kit is read as drawn; a plain one gets the design painted on (design)."""
     H, S, V = hsv(a[..., :3])
     rgb = a[..., :3]
     kit = (a[..., 3] > 0.3) & (((H > 190) & (H < 265) & (S > 0.25)) | ((H > 38) & (H < 72) & (S > 0.45)))
     chroma = lambda c: c / (c.sum(-1, keepdims=True) + 1e-3)
     L = rgb @ LUM
     # the main colour and navy share a hue: told apart by brightness (main L ~ 86, navy ~ 42 of 255)
-    navy = np.clip((72 / 255 - ndi.gaussian_filter(L, 1.2)) / (20 / 255), 0, 1)
     yel = np.clip((0.18 - np.linalg.norm(chroma(rgb) - chroma(TONE_REF[2]), axis=-1)) / 0.08, 0, 1)
+    Ls = ndi.gaussian_filter(L, 0.6)
+    if design:
+        navy, pip = paint_design(a, design, off)
+        pip *= 1 - yel
+        w = np.stack([(1 - yel) * (1 - navy) * (1 - pip), (1 - yel) * navy, np.maximum(yel, pip)], -1)
+        w /= w.sum(-1, keepdims=True) + 1e-6
+        # the painted classes are shaded by the blue cloth under them: navy against the main
+        # colour's brightness, the piping lifted to the drawn yellow's
+        rm = float(np.median(L[kit & (w[..., 0] > 0.8)])); ry = float(np.median(L[kit & (yel > 0.8)]))
+        Ls = Ls * (1 + pip * (ry / rm - 1))
+        return kit, w, Ls, [round(rm, 4), round(rm, 4), round(ry, 4)]
+    navy = np.clip((72 / 255 - ndi.gaussian_filter(L, 1.2)) / (20 / 255), 0, 1)
     w = np.stack([(1 - yel) * (1 - navy), (1 - yel) * navy, yel], -1)
     w = ndi.gaussian_filter(w, (0.8, 0.8, 0))
     w /= w.sum(-1, keepdims=True) + 1e-6
-    Ls = ndi.gaussian_filter(L, 0.6)
     ref = [round(float(np.median(L[kit & (w[..., k] > 0.8)])), 4) for k in range(3)]
     return kit, w, Ls, ref
 
@@ -110,7 +167,7 @@ def frames_of(a, count=10, rowh=600):
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False):
+def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
@@ -119,7 +176,7 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False):
     suit, trim, skin = masks(a)
     L = a[..., :3] @ LUM
     if premium:
-        kit, tw, tL, tref = tones(a)
+        kit, tw, tL, tref = tones(a, design, M)
     lab, frames = frames_of(a, count, rowh)
     # each pixel belongs to the nearest pose (hair close to two poses goes to its own head only)
     dist, (iy, ix) = ndi.distance_transform_edt(lab == 0, return_indices=True)
@@ -211,9 +268,11 @@ def main():
                        if f.startswith('hair-') and f.endswith(f'-{view}.png') and (view.startswith('spin') or '-spin-' not in f)}
     crest = json.load(open('tools/kit/crest-front.json'))['frames']
     prints = json.load(open('tools/kit/shirt-print-back.json'))['frames']
+    # the pace bowler's sheets are drawn in the plain kit: the premium design is painted on
+    design = json.load(open('tools/kit/premium-pace.json'))
     out = {
-        'front': build('front', front, hp('front'), [crest[str(k + 1)] for k in range(10)]),
-        'back': build('back', back, hp('back'), [prints[str(k + 1)]['print'] + prints[str(k + 1)]['name'] + prints[str(k + 1)]['number'] for k in range(10)]),
+        'front': build('front', front, hp('front'), [crest[str(k + 1)] for k in range(10)], premium=True, design=design['front']),
+        'back': build('back', back, hp('back'), [prints[str(k + 1)]['print'] + prints[str(k + 1)]['name'] + prints[str(k + 1)]['number'] for k in range(10)], premium=True, design=design['back']),
     }
     # the spinner, in the premium kit: bald sheets with hair-<style>-spin-front/-spin-back.png layers
     if spin_front:
