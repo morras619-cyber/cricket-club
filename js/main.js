@@ -514,9 +514,25 @@ $('resumeBtn').addEventListener('click', () => { game.paused = false; $('pause')
 $('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
 
 // "🏟 The Snakepit · AWAY · Pitch: Dusty turner"
-const venueLine = (f, me) => { const G = groundOf(f.home || me); return `🏟 ${G.name} · ${f.home === me ? 'HOME' : 'AWAY'} · Pitch: ${G.pitch.name}`; };
 
 // ---------- tournaments ----------
+// The next match: a ribbon with the round, both crests either side of the V, the ground, a line on
+// the opposition and the play button.
+function fixtureCard(f, me, o, about, onPlay) {
+  const card = el('div', 'fixcard');
+  const logos = el('div', 'fixlogos');
+  const la = document.createElement('img'); la.src = `img/logo-${me.id}.webp`; la.alt = me.name;
+  const lb = document.createElement('img'); lb.src = `img/logo-${o.id}.webp`; lb.alt = o.name;
+  const vs = document.createElement('img'); vs.src = 'img/league-vs.webp'; vs.alt = 'v'; vs.className = 'fixvs';
+  logos.append(la, vs, lb);
+  const G = groundOf(f.home || me.id), venue = el('p', 'fixvenue');
+  venue.append(el('i', '', '🏟'), el('b', '', G.name), '\u00a0· ', el('strong', '', f.home === me.id ? 'HOME' : 'AWAY'), '\u00a0· ', el('b', '', `Pitch: ${G.pitch.name}`));
+  const go = el('button', 'playbtn', `Play ${f.label.startsWith('Matchday') ? 'match' : f.label.toLowerCase()}`);
+  go.addEventListener('click', onPlay);
+  card.append(el('div', 'fixribbon', f.label), logos, venue, el('p', 'fixabout', about), go);
+  return card;
+}
+
 function openTournament(kind) {
   const t = profile.tournament;
   if (t && t.kind !== kind && t.stage !== 'done') {
@@ -545,55 +561,65 @@ function renderTournament(notes = []) {
   body.innerHTML = '';
   for (const n of notes) body.append(el('div', 'panel paper notecard', n));
   if (f) {
-    const o = teamById(f.opp), card = el('div', 'panel paper fixture');
-    const logos = el('div', 'fixlogos');
-    const la = document.createElement('img'); la.src = `img/logo-${me.id}.webp`; la.alt = me.name;
-    const lb = document.createElement('img'); lb.src = `img/logo-${o.id}.webp`; lb.alt = o.name;
-    logos.append(la, el('b', '', 'V'), lb);
-    card.append(el('div', 'eyebrow', f.label.toUpperCase()), logos,
-      el('p', 'venue', venueLine(f, me.id)),
-      el('p', '', `${o.name} · ${o.style.tag}: ${o.style.desc} Their star: ${heroById(o.star).name}.`));
-    body.append(card);
+    const o = teamById(f.opp);
+    body.append(fixtureCard(f, me, o, `${o.name} · ${o.style.tag}: ${o.style.desc} Their star: ${heroById(o.star).name}.`, () => startMatch({ mode: t.kind })));
   } else if (place) {
     const prize = (league ? LEAGUE_PRIZE : CUP_PRIZE)[place];
     body.append(el('div', 'panel paper notecard big', place === 'champion' ? `🏆 Champions! +${prize} coins` : place === 'runnerUp' ? `🥈 Runners-up · +${prize} coins` : place === 'semi' ? `Semi-finalists · +${prize} coins` : 'Better luck next time'));
   }
   body.append(...leaguePanels(t));
-  $('leagueGo').hidden = !f;
-  $('leagueGo').textContent = f ? `Play ${f.label.split(' ')[0] === 'Matchday' ? 'match' : f.label.toLowerCase()}` : 'Play';
+  $('leagueGo').hidden = true; // (the play button is on the fixture card)
   $('leagueQuit').hidden = !f;
 }
+// a dark panel's heading: the title in yellow, a note after it in pink, speed stripes on the right
+const lpHead = (title, note) => {
+  const h = el('h3', 'lp-head');
+  h.append(el('b', '', title));
+  if (note) h.append(el('span', '', `· ${note}`));
+  h.append(el('i', 'lp-streaks'));
+  return h;
+};
 // The table, the knockout bracket and your results: shared by the cup and the career league.
 function leaguePanels(t) {
   const out = [];
   const league = t.kind === 'league';
   if (league) {
-    const tb = el('div', 'panel paper statcard');
-    tb.append(el('h3', '', t.stage === 'group' ? `Table · after ${t.round} of ${t.rounds.length}` : 'Final table'));
-    const wrap = el('div', 'tablewrap'), tab = el('table', 'herotable leaguetable'), head = el('tr');
+    const tb = el('div', 'lpanel');
+    tb.append(lpHead('Table', t.stage === 'group' ? `after ${t.round} of ${t.rounds.length}` : 'final'));
+    const tab = el('table', 'ltable'), head = el('tr');
     for (const h of ['#', 'Team', 'P', 'W', 'L', 'Pts', 'NRR']) head.append(el('th', '', h));
     tab.append(head);
     table(t).forEach((r, i) => {
-      const tr = el('tr', r.id === t.team ? 'mine' : i < 4 ? 'top4' : '');
-      const team = teamById(r.id);
-      for (const v of [i + 1, team.name, r.p, r.w, r.l, r.pts, (r.nrr >= 0 ? '+' : '') + r.nrr.toFixed(2)]) tr.append(el('td', '', String(v)));
+      const tr = el('tr', r.id === t.team ? 'mine' : '');
+      const team = teamById(r.id), logo = document.createElement('img');
+      logo.src = `img/logo-${r.id}.webp`; logo.alt = '';
+      const pos = el('td'), name = el('td', 'lt-team');
+      pos.append(el('b', i < 4 ? 'lt-pos top' : 'lt-pos', String(i + 1)));
+      name.append(logo, el('span', '', team.name));
+      tr.append(pos, name);
+      for (const v of [r.p, r.w, r.l, r.pts]) tr.append(el('td', '', String(v)));
+      tr.append(el('td', r.nrr >= 0 ? 'lt-up' : 'lt-down', (r.nrr >= 0 ? '+' : '') + r.nrr.toFixed(2)));
       tab.append(tr);
     });
-    wrap.append(tab); tb.append(wrap, el('p', 'sheetnote', 'Top four go through: 1st v 4th and 2nd v 3rd in the semi-finals. Win 2 points, tie 1.'));
+    const note = el('div', 'lnote');
+    note.append(el('i', '', '🏆'), el('span', '', 'Top four go through: 1st v 4th and 2nd v 3rd in the semi-finals. Win 2 points, tie 1.'));
+    const inner = el('div', 'lp-body');
+    inner.append(tab, note);
+    tb.append(inner);
     out.push(tb);
   }
   // the knockout bracket so far
   if (t.ko.length) {
-    const kb = el('div', 'panel paper statcard');
-    kb.append(el('h3', '', 'Knockouts'));
+    const kb = el('div', 'lpanel'), kin = el('div', 'lp-body lp-list');
+    kb.append(lpHead('Knockouts'), kin);
     for (const k of t.ko) {
       const label = { qf: 'Quarter-finals', semi: 'Semi-finals', final: 'Final' }[k.stage];
-      kb.append(el('b', 'kostage', label));
+      kin.append(el('b', 'kostage', label));
       k.ties.forEach(([a, b2], i) => {
         const w = k.winners?.[i];
         const row = el('div', 'kotie' + (a === t.team || b2 === t.team ? ' mine' : ''));
         row.append(el('span', w === a ? 'won' : '', teamById(a).name), el('i', '', 'v'), el('span', w === b2 ? 'won' : '', teamById(b2).name));
-        kb.append(row);
+        kin.append(row);
       });
     }
     out.push(kb);
@@ -601,11 +627,14 @@ function leaguePanels(t) {
   // your results
   const mine = t.results.filter(r => r.player);
   if (mine.length) {
-    const rb = el('div', 'panel paper statcard');
-    rb.append(el('h3', '', 'Your results'));
+    const rb = el('div', 'lpanel'), rin = el('div', 'lp-body lp-list');
+    rb.append(lpHead('Your results'), rin);
     for (const r of mine) {
       const o = r.a === t.team ? r.b : r.a;
-      rb.append(el('div', 'kotie', `${r.winner === t.team ? 'W' : r.winner ? 'L' : 'T'} · v ${teamById(o).name} · ${r.mine.runs}/${r.mine.wkts} v ${r.theirs.runs}/${r.theirs.wkts}`));
+      const res = r.winner === t.team ? 'W' : r.winner ? 'L' : 'T', row = el('div', 'lres'), logo = document.createElement('img');
+      logo.src = `img/logo-${o}.webp`; logo.alt = '';
+      row.append(el('b', `lres-${res}`, res), logo, el('span', '', `v ${teamById(o).name}`), el('em', '', `${r.mine.runs}/${r.mine.wkts} v ${r.theirs.runs}/${r.theirs.wkts}`));
+      rin.append(row);
     }
     out.push(rb);
   }
@@ -765,20 +794,11 @@ function careerSeason(c, body) {
   const f = nextFixture(c.league);
   const me = teamById(c.club);
   if (f) {
-    const o = teamById(f.opp), card = el('div', 'panel paper fixture');
-    const logos = el('div', 'fixlogos');
-    const la = document.createElement('img'); la.src = `img/logo-${me.id}.webp`; la.alt = me.name;
-    const lb = document.createElement('img'); lb.src = `img/logo-${o.id}.webp`; lb.alt = o.name;
-    logos.append(la, el('b', '', 'V'), lb);
+    const o = teamById(f.opp);
     const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
     const best = [...theirs].sort((a, b) => ovr(b) - ovr(a))[0];
-    card.append(el('div', 'eyebrow', f.label.toUpperCase()), logos,
-      el('p', 'venue', venueLine(f, me.id)),
-      el('p', '', `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`));
-    const go = el('button', 'bigbtn primary', `Play ${f.label.startsWith('Matchday') ? 'match' : f.label.toLowerCase()}`);
-    go.addEventListener('click', () => startMatch({ mode: 'career' }));
-    card.append(go);
-    body.append(card);
+    body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
+      () => startMatch({ mode: 'career' })));
   }
   body.append(...leaguePanels(c.league));
 }
