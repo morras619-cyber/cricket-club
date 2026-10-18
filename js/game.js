@@ -307,6 +307,7 @@ export class Game {
         this.newCharge(carry);
         await this.bowlingInnings(second);
       }
+      if (this.innings.length === 2 && this.innings[0].runs === this.innings[1].runs) await this.tiebreaks(script);
       return this.summary();
     } catch (e) {
       if (e instanceof Cancel) return null;
@@ -405,7 +406,7 @@ export class Game {
       const att = this.mySide.attack, overs = inn.oversBy(), last = this.lastBowlerId;
       const ok = att.filter(b => canBowl(b, overs, last));
       const choices = ok.length ? ok : att.filter(b => b.id !== last).length ? att.filter(b => b.id !== last) : att;
-      const left = CFG.balls / 6 - over;
+      const left = inn.maxBalls / 6 - over;
       // the bot (and a lone choice) picks itself; otherwise you choose
       if (this.bot || choices.length === 1 || this.mode === 'tutorial') p = choices[0];
       else {
@@ -492,6 +493,39 @@ export class Game {
     await this.sleepReal(this.bot ? 200 : 2300);
   }
 
+  // Matches can't end level: a super over each (6 balls, 2 wickets; the side that batted second
+  // goes first), then, while it's still level, six-hitting shoot-outs (6 balls each, only sixes count)
+  async tiebreaks(script) {
+    this.tiebreakRounds = [];
+    let kind = 'super', round = 0;
+    const firstSide = this.innings[1].side;
+    for (;;) {
+      round++;
+      const opt = kind === 'super' ? { balls: 6, wkts: 2, kind } : { balls: 6, wkts: 99, sixes: true, kind };
+      const head = kind === 'super' ? 'SUPER OVER!' : round === 2 ? 'SIX-HITTING SHOOT-OUT!' : `SHOOT-OUT ROUND ${round - 1}`;
+      const prev = this.tiebreakRounds[this.tiebreakRounds.length - 1];
+      const why = !prev ? `Tied on ${this.innings[0].runs}! 6 balls each, 2 wickets. Most runs wins.`
+        : 'Still level! 6 balls each: only sixes count, getting out costs nothing. Most sixes wins.';
+      this.ui.banner(head, why, 3000);
+      sfx.crowd(1.3);
+      await this.sleepReal(this.bot ? 150 : 3000);
+      const a = new Innings(firstSide, null, opt);
+      a.intro = [kind === 'super' ? 'SUPER OVER' : head, firstSide === 'player' ? (kind === 'super' ? 'Your 6 balls: set the target' : 'Your 6 balls: hit as many sixes as you can') : (kind === 'super' ? 'Their 6 balls: keep it tight' : 'Their 6 balls: stop the sixes')];
+      await this.playTiebreak(a, script);
+      const b = new Innings(firstSide === 'player' ? 'ai' : 'player', a.score + 1, opt);
+      b.intro = [kind === 'super' ? 'SUPER OVER' : head, b.side === 'player' ? (kind === 'super' ? `${a.score + 1} to win off 6 balls` : `${a.score + 1} sixes to win`) : (kind === 'super' ? `Defend ${a.score}` : `Keep them under ${a.score + 1} sixes`)];
+      await this.playTiebreak(b, script);
+      this.tiebreakRounds.push({ kind, innings: [a, b] });
+      if (a.score !== b.score) return;
+      kind = 'sixes';
+    }
+  }
+  async playTiebreak(inn, script) {
+    this.innings.push(inn);
+    if (inn.side === 'player') { await this.introBanner(...inn.intro); await this.battingInnings(inn, script); }
+    else await this.bowlingInnings(inn);
+  }
+
   summary() {
     const [a, b] = this.innings;
     let result;
@@ -502,9 +536,9 @@ export class Game {
     } else if (this.mode === 'daily') {
       const o = dailyOutcome(this.scenario, a);
       result = { outcome: o.won ? 'win' : o.tied ? 'tie' : 'loss', text: o.line, daily: o };
-    } else result = matchResult(a, b);
+    } else result = matchResult(a, b, this.tiebreakRounds || []);
     const sorted = [...this.moments].sort((x, y) => y.score - x.score);
-    return { mode: this.mode, innings: this.innings, result, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats, myTeam: this.myTeam, oppTeam: this.oppTeam, captain: this.captain, scenario: this.scenario || null, levels: this.levels };
+    return { mode: this.mode, innings: this.innings.slice(0, 2), tiebreaks: this.tiebreakRounds || [], result, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats, myTeam: this.myTeam, oppTeam: this.oppTeam, captain: this.captain, scenario: this.scenario || null, levels: this.levels };
   }
 
   addMoment(kind, title, word, hero, opts = {}) {
@@ -605,9 +639,12 @@ export class Game {
 
   // ---------- HUD ----------
   hud(inn) {
-    const ball = Math.min(CFG.balls, inn.balls + 1);
+    const ball = Math.min(inn.maxBalls, inn.balls + 1);
     let need;
-    if (inn.target != null) {
+    if (inn.sixes) {
+      const n = inn.target == null ? null : inn.target - inn.sixesHit, s = inn.sixesHit;
+      need = n == null ? `${s} six${s === 1 ? '' : 'es'} · ${inn.ballsLeft} balls left` : inn.side === 'player' ? `Need ${n} six${n === 1 ? '' : 'es'} off ${inn.ballsLeft}` : `They need ${n} six${n === 1 ? '' : 'es'} off ${inn.ballsLeft}`;
+    } else if (inn.target != null) {
       const n = inn.target - inn.runs;
       need = inn.side === 'player'
         ? (n > 0 ? `Need ${n} off ${inn.ballsLeft}` : 'Target reached!')
@@ -623,7 +660,7 @@ export class Game {
 
   phaseBanner(ballNo) {
     if (ballNo === 13) this.ui.banner('MIDDLE BATTLE', 'Full field is back. Bank or spend?', 1600);
-    if (ballNo === 25) this.ui.banner('SUPER OVER FINALE', 'Every power costs 20% less', 1800);
+    if (ballNo === 25) this.ui.banner('FINAL OVER', 'Every power costs 20% less', 1800);
   }
 
   ballRng(ballNo) { return makeRng((this.seed * 31 + ballNo * 7919 + this.innings.length * 104729 + (this.rebowls || 0) * 15485863) >>> 0); }
@@ -1051,7 +1088,7 @@ export class Game {
       sfx.crowd(this.home === this.myTeam.id ? 1 : 0.8);
       this.addMoment('four', 'FOUR!', 'FOUR!', this.heroFor('bat'), { ballNo });
     } else if (runs === 0) this.charge.dot();
-    if (inn.target != null && inn.runs >= inn.target) {
+    if (inn.reached()) {
       this.addMoment('lastBallWin', 'WINNING HIT!', runs >= 4 ? 'DHOOM!' : 'YES!', this.heroFor('bat'), { ballNo, detail: `chased it with ${inn.ballsLeft} balls left` });
     }
   }
@@ -1278,13 +1315,14 @@ export class Game {
     this.lastBowlerId = null;
     this.fillCrease(inn);
     this.hud(inn);
-    await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `${this.myTeam.name} v ${this.oppTeam.name} · keep them quiet` : `Defend ${inn.target - 1}`);
+    if (inn.intro) await this.introBanner(...inn.intro);
+    else await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `${this.myTeam.name} v ${this.oppTeam.name} · keep them quiet` : `Defend ${inn.target - 1}`);
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
       if (inn.balls % 6 === 0 && this.overStarted !== inn.balls) { this.overStarted = inn.balls; await this.startOver(inn); }
       this.hud(inn);
       this.phaseBanner(ballNo);
-      if (ballNo === 7 && !this.scouted) {
+      if (ballNo === 7 && !this.scouted && inn.kind === 'main') {
         this.scouted = true;
         const b = this.batterOf(inn);
         this.ui.banner('SCOUTING REPORT', `${b.name} ${b.ai.label}. The weak spot is now marked on the pitch.`, 2600);
@@ -1338,7 +1376,8 @@ export class Game {
 
     // the AI batter may power up
     this.aiBatPower = null; this.clash = false;
-    const need = inn.target != null ? inn.target - inn.runs : Math.max(12, 48 - inn.runs); // batting first, the AI paces itself to a par score
+    // batting first, the AI paces itself to a par score; in a super over or the shoot-out it swings
+    const need = inn.kind !== 'main' ? 6 * inn.ballsLeft : inn.target != null ? inn.target - inn.runs : Math.max(12, 48 - inn.runs);
     if (!opt.scripted && this.aiPowerBalls.has(ballNo) && striker.id === this.rival.bat?.id && need / Math.max(1, inn.ballsLeft) > 1.0) {
       this.aiPowerBalls.delete(ballNo);
       const k = this.rival.bat.power.kind;
@@ -1482,7 +1521,7 @@ export class Game {
     const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * this.pitch.ai * aiHome / (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1) / this.pitch.bat };
-    let ai = aiBat(d, { skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: CFG.wickets - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods, freeHit: this.freeHit }, rng);
+    let ai = aiBat(d, { skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods, freeHit: this.freeHit }, rng);
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;

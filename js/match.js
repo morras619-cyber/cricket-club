@@ -6,9 +6,15 @@ const freshFig = p => ({ id: p.id, name: p.name, nation: p.nation || null, short
 export const oversText = balls => `${Math.floor(balls / 6)}.${balls % 6}`;
 
 export class Innings {
-  constructor(side, target = null) {
+  // opt (tie-breaks): { balls, wkts, sixes } — a super over is 6 balls and 2 wickets; in the
+  // six-hitting shoot-out only sixes count (target: sixes to beat) and getting out costs nothing
+  constructor(side, target = null, opt = {}) {
     this.side = side; // 'player' | 'ai' — who is batting
     this.target = target;
+    this.maxBalls = opt.balls || CFG.balls;
+    this.maxWkts = opt.wkts || CFG.wickets;
+    this.sixes = !!opt.sixes;
+    this.kind = opt.kind || 'main';
     this.runs = 0; this.wkts = 0; this.balls = 0;
     this.log = []; // per legal ball: '0' '1' '4' '6' 'W' ...
     this.noBalls = []; // legal balls bowled when each no-ball came (for the over strip)
@@ -43,8 +49,12 @@ export class Innings {
     for (const f of Object.values(this.figs)) o[f.id] = Math.ceil(f.balls / 6);
     return o;
   }
-  get ballsLeft() { return CFG.balls - this.balls; }
-  get need() { return this.target == null ? null : Math.max(0, this.target - this.runs); }
+  get ballsLeft() { return this.maxBalls - this.balls; }
+  get sixesHit() { return this.log.filter(r => r === '6').length; }
+  // what the innings is scored on: runs, or sixes in the shoot-out
+  get score() { return this.sixes ? this.sixesHit : this.runs; }
+  get need() { return this.target == null ? null : Math.max(0, this.target - this.score); }
+  reached() { return this.target != null && this.score >= this.target; }
   get overs() { return `${Math.floor(this.balls / 6)}.${this.balls % 6}`; }
 
   extra(runs, noBall = false) {
@@ -54,6 +64,7 @@ export class Innings {
   }
 
   ball({ runs = 0, wicket = false, runOut = false }) {
+    if (this.sixes) wicket = false; // (out doesn't count in the shoot-out: the ball just isn't a six)
     this.balls++;
     this.runs += runs;
     if (wicket) this.wkts++;
@@ -76,7 +87,7 @@ export class Innings {
     // they crossed: 1, 3 or 5 runs puts the other man on strike (a wicket brings the new man in on strike)
     else if (runs % 2 === 1) this.swapStrike();
     // end of the over: the bowling switches ends, so the other batter faces
-    if (this.balls % 6 === 0 && this.balls < CFG.balls) this.swapStrike();
+    if (this.balls % 6 === 0 && this.balls < this.maxBalls) this.swapStrike();
   }
 
   // Every stint, including the unbeaten one at the end.
@@ -99,15 +110,24 @@ export class Innings {
   bowlingCard() { return Object.values(this.figs).filter(f => f.balls > 0); }
 
   done() {
-    return this.balls >= CFG.balls || this.wkts >= CFG.wickets || (this.target != null && this.runs >= this.target);
+    return this.balls >= this.maxBalls || this.wkts >= this.maxWkts || this.reached();
   }
 }
 
-// Result of a two-innings match from the player's point of view.
-export function matchResult(first, second) {
+// Result of a two-innings match from the player's point of view. A tie goes to the tie-breaks
+// (rounds: [{ kind: 'super'|'sixes', innings: [a, b] }]): the last round decides it.
+export function matchResult(first, second, rounds = []) {
   const player = first.side === 'player' ? first : second;
   const ai = first.side === 'player' ? second : first;
-  if (player.runs === ai.runs) return { outcome: 'tie', text: 'Match tied!' };
+  if (player.runs === ai.runs) {
+    const last = rounds[rounds.length - 1];
+    if (!last) return { outcome: 'tie', text: 'Match tied!' };
+    const mine = last.innings.find(i => i.side === 'player'), theirs = last.innings.find(i => i.side === 'ai');
+    if (mine.score === theirs.score) return { outcome: 'tie', text: 'Match tied!' };
+    const won = mine.score > theirs.score, how = last.kind === 'super' ? 'the Super Over' : 'the six-hitting shoot-out';
+    const line = last.kind === 'super' ? `${mine.runs}/${mine.wkts} v ${theirs.runs}/${theirs.wkts}` : `${mine.sixesHit} six${mine.sixesHit === 1 ? '' : 'es'} to ${theirs.sixesHit}`;
+    return { outcome: won ? 'win' : 'loss', text: `Tied on ${player.runs}. ${won ? 'You won' : 'You lost'} ${how}, ${line}`, tiebreak: last.kind };
+  }
   const playerWon = player.runs > ai.runs;
   const chaser = second;
   const chaserWon = chaser.runs > first.runs;

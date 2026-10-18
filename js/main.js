@@ -614,7 +614,7 @@ function leaguePanels(t) {
       tab.append(tr);
     });
     const note = el('div', 'lnote');
-    note.append(el('i', '', '🏆'), el('span', '', 'Top four go through: 1st v 4th and 2nd v 3rd in the semi-finals. Win 2 points, tie 1.'));
+    note.append(el('i', '', '🏆'), el('span', '', 'Top four go through: 1st v 4th and 2nd v 3rd in the semi-finals. A win is 2 points; a tie is settled by a super over.'));
     const inner = el('div', 'lp-body');
     inner.append(tab, note);
     tb.append(inner);
@@ -1212,6 +1212,15 @@ function showResult(summary) {
     const c = el('div', 'panel card');
     const who = inn.side === 'player' ? `You · ${summary.myTeam?.name || ''}` : `${summary.oppTeam?.name || 'Opponents'}`;
     c.append(el('div', 'eyebrow', who.toUpperCase()), el('div', 'score', `${inn.runs}/${inn.wkts}`), el('div', 'sub', `${inn.overs} overs`));
+    cards.append(c);
+  }
+  // the super over and any shoot-outs that settled a tie
+  for (const r of summary.tiebreaks || []) {
+    const mine = r.innings.find(i => i.side === 'player'), theirs = r.innings.find(i => i.side === 'ai');
+    const c = el('div', 'panel card');
+    c.append(el('div', 'eyebrow', r.kind === 'super' ? 'SUPER OVER' : 'SIX-HITTING SHOOT-OUT'),
+      el('div', 'score', r.kind === 'super' ? `${mine.runs}/${mine.wkts} v ${theirs.runs}/${theirs.wkts}` : `${mine.sixesHit} v ${theirs.sixesHit}`),
+      el('div', 'sub', r.kind === 'super' ? 'You v them' : 'Sixes: you v them'));
     cards.append(c);
   }
   const extra = [];

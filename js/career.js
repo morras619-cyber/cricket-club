@@ -285,7 +285,7 @@ export function simCareerMatch(c, a, b, rng) {
   const ia = simInnings(c, a, b, rng), ib = simInnings(c, b, a, rng, ia.runs + 1);
   const la = lineupOf(c, a), lb = lineupOf(c, b);
   played(c, [...la.order, ...la.attack, ...lb.order, ...lb.attack].filter(Boolean).map(p => p.id));
-  const winner = ib.runs > ia.runs ? b : ib.runs < ia.runs ? a : ia.boundaries === ib.boundaries ? null : ia.boundaries > ib.boundaries ? a : b;
+  const winner = ib.runs > ia.runs ? b : ib.runs < ia.runs ? a : rng.chance(0.5) ? a : b; // (a tie goes to a super over)
   return { a, b, ia, ib, winner };
 }
 function lineupOf(c, teamId) {

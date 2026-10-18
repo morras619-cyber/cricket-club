@@ -66,7 +66,8 @@ function simInnings(batId, bowlId, rng, target = null) {
 export function simMatch(a, b, rng) {
   const ia = simInnings(a, b, rng);
   const ib = simInnings(b, a, rng, ia.runs + 1);
-  return { a, b, ia, ib, winner: ib.runs > ia.runs ? b : ib.runs < ia.runs ? a : decider(a, b, ia, ib) };
+  // a tie is settled by a super over (and shoot-outs): no match ends level
+  return { a, b, ia, ib, winner: ib.runs > ia.runs ? b : ib.runs < ia.runs ? a : rng.chance(0.5) ? a : b };
 }
 // a tie is settled by boundary count (the old rule), then by the toss
 function decider(a, b, ia, ib) {
