@@ -2,7 +2,7 @@ import { drawFigure, POSES } from './figure.js';
 import { heroById } from './heroes.js';
 import { INK, FONT_DISPLAY, FONT_BODY, halftonePattern } from './fx.js';
 
-const LINES = ['Bowler ko ghar bhejo!', 'Ek number shot!', 'Kya baat hai!', 'Shabash, hero!', 'Picture abhi baaki hai!', 'Aasmaan tak!'];
+const LINES = ['Send the bowler home!', 'Shot of the day!', 'What a hit!', 'Well played, hero!', 'The show\'s not over yet!', 'Sky high!'];
 
 function panel(g, x, y, w, h, fill) {
   g.fillStyle = INK; g.fillRect(x + 10, y + 10, w, h);

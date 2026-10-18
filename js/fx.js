@@ -80,8 +80,8 @@ export class FX {
     this.words.push({ text, x, y, size, color, stroke, dur, rot, t: 0 });
   }
   bubble(text, x, y, { dur = 1600, side = 1 } = {}) {
-    this.bubbles = this.bubbles.filter(b => b.text !== text);
-    this.bubbles.push({ text, x, y, dur, side, t: 0 });
+    // one speaker at a time: a new line replaces whatever was being said
+    this.bubbles = [{ text, x, y, dur, side, t: 0 }];
   }
   // the hand-drawn impact burst at (x, y), `size` px across at full blast; hue turns the gold
   blast(x, y, { size = 260, hue = 0, dur = 420 } = {}) { this.blasts.push({ x, y, size, hue, dur, t: 0 }); }

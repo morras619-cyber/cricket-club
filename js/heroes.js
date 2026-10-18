@@ -4,7 +4,7 @@ export const HEROES = [
   {
     id: 'raja', name: 'Thunder Raja', slot: 'bat', role: 'Power batter', emblem: 'bolt',
     look: { suit: '#1f6fe0', trim: '#ffd23f', cape: '#0b2f80', skin: '#a8714f', hair: '#1b1410', mask: '#ffd23f' , style: 'spiky' },
-    quote: 'Aasmaan tak!',
+    quote: 'Sky high!',
     ai: { weak: { lengths: ['yorker'], lanes: ['stumps', 'leg'] }, label: 'can\'t dig out yorkers on the stumps', honesty: 0.85, fire: 0.55, rattle: 0.3 },
     power: { kind: 'thunder', name: 'Thunderclap Six', cost: 60, word: 'KRAKOOOM!',
       desc: 'Next Good-or-better shot is a six. A mistimed shot still goes for four.' },
@@ -20,7 +20,7 @@ export const HEROES = [
   {
     id: 'comet', name: 'Captain Comet', slot: 'bat', role: 'Finisher', emblem: 'star',
     look: { suit: '#e2541b', trim: '#ffe066', cape: '#7a1d0c', skin: '#9c6546', hair: '#d9d9d9', mask: '#ffe066' , style: 'fins' },
-    quote: 'Picture abhi baaki hai!',
+    quote: 'The show\'s not over yet!',
     ai: { weak: { lengths: ['good', 'full'], lanes: ['wideoff'] }, label: 'chases wide ones outside off', honesty: 0.7, fire: 0.35, rattle: 0.45 },
     power: { kind: 'meteor', name: 'Meteor Six', cost: 100, ultimate: true, word: 'BOOOOM!',
       desc: 'Ultimate. Tap as the ring closes: Perfect 8, Good 6, Miss 4.' },
@@ -35,7 +35,7 @@ export const HEROES = [
   {
     id: 'babar', name: 'Mystic Babar Bhai', slot: 'bowl', role: 'Spin bowler', emblem: 'eye', bowls: 'spin',
     look: { suit: '#1d8a4e', trim: '#ffd23f', cape: '#0c4a28', skin: '#a8714f', hair: '#f2f2f2', mask: '#ffd23f' , style: 'beard' },
-    quote: 'Beta, the ball has its own mind.',
+    quote: 'Son, the ball has its own mind.',
     power: { kind: 'maya', name: 'Maya Ball', cost: 60, word: 'POOF!',
       desc: 'The ball splits in two. Pick the fake and you\'re out.' },
   },
@@ -49,7 +49,7 @@ export const HEROES = [
   {
     id: 'rani', name: 'Rubber Rocket Rani', slot: 'field', role: 'Wicket-keeper', emblem: 'spring',
     look: { suit: '#e0245e', trim: '#ffe14d', cape: '#7d0f33', skin: '#c48a64', hair: '#2a1a14', mask: '#ffe14d' , style: 'bun' },
-    quote: 'Arre, try harder!',
+    quote: 'Oh, try harder!',
     power: { kind: 'elastic', name: 'Elastic Grab', cost: 60, word: 'BOING!',
       desc: 'Keeper reach doubles and the catch window grows to 600 ms for 2 chances.' },
     ultimate: { kind: 'freeze', name: 'Time-Freeze Stumping', cost: 100, word: 'FREEZE!',
@@ -58,7 +58,7 @@ export const HEROES = [
   {
     id: 'bilal', name: 'Blur Bilal', slot: 'field', role: 'Outfielder', emblem: 'wing',
     look: { suit: '#f2b705', trim: '#1b1b1b', cape: '#8a5a00', skin: '#9c6546', hair: '#1b1410', mask: '#1b1b1b' , style: 'swept' },
-    quote: 'Already there, bhai.',
+    quote: 'Already there, brother.',
     power: { kind: 'relay', name: 'Lightning Relay', cost: 60, word: 'ZZZAP!',
       desc: 'Your next run-out throw homes in. The aim zone is 3× wider.' },
   },

@@ -258,7 +258,7 @@ export class Game {
     this.rebowls = 0;
     this.stats = { fieldingWins: 0, perfects: 0, powers: 0, longestSix: 0 };
     this.recordSix = opts.records?.longestSix || 0; // career longest six going into the match
-    this.lastBanterBall = -99;
+    this.lastBanterBall = -99; this.lastBatBanter = -99; this.thinks = null;
     this.bowlChoice = { field: opts.field?.preset || 'balanced', custom: opts.field?.custom || null };
     this.bowlHistory = []; this.batterMood = { state: 'calm', balls: 0 };
     this.scouted = false; this.revenge = false; this.playerRevenge = false;
@@ -770,6 +770,7 @@ export class Game {
 
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
+    this.fx.bubbles = [];
     if (!this.bot && !opt.hint) this.fx.word(`${Math.round(spec.kmh)} KM/H · ${String(spec.type || '').toUpperCase()}`, this.W / 2, this.H * 0.2, { size: 24, color: '#fff4da', stroke: INK, rot: 0, dur: 1100 });
     S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
     if (aiPower === 'maya') S.maya = { real: rng.chance(0.5) ? 1 : -1, picked: 0 };
@@ -921,10 +922,15 @@ export class Game {
         return;
       }
     }
-    if (runs >= 4 && rng.chance(0.4)) {
+    // the bowler speaks now and then, not every ball
+    const balls = inn.balls;
+    if (!wicketFell && balls - (this.lastBatBanter ?? -99) < 4) return;
+    if (runs >= 4 && rng.chance(0.25)) {
+      this.lastBatBanter = balls;
       this.fx.bubble(line(rng.chance(0.5) ? 'bowlerCompliment' : 'bowlerAfterBoundary', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1700 });
       await this.sleepReal(this.bot ? 50 : 700);
-    } else if ((beaten || wicketFell) && rng.chance(0.45)) {
+    } else if ((beaten || wicketFell) && rng.chance(0.3)) {
+      this.lastBatBanter = balls;
       this.fx.bubble(line('bowlerSledge', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1800 });
       if (!wicketFell || inn.wkts < CFG.wickets) {
         this.playerRevenge = true;
@@ -1397,8 +1403,7 @@ export class Game {
     const exp = opt.scripted ? null : planExpectation(this.bowlHistory, profile, rng);
     if (exp && !this.bot) {
       const moodTxt = mood.state === 'rattled' ? ' (rattled)' : mood.state === 'fired' ? ' (fired up)' : '';
-      const h = this.batterHead();
-      this.fx.bubble(`Thinks: ${LENGTH_LABEL[exp.shown].toLowerCase()} one coming…${moodTxt}`, h.x, h.y, { dur: 2800 });
+      this.thinks = `HE EXPECTS: ${LENGTH_LABEL[exp.shown].toUpperCase()}${moodTxt.toUpperCase()}`;
     }
 
     this.powerLock = false;
@@ -1421,7 +1426,8 @@ export class Game {
     this.powerLock = true;
     this.refreshPowers();
     this.ui.hint(null);
-    if (stance === 'charge') this.fx.bubble('Charging down!', this.batterHead().x, this.batterHead().y, { dur: 1100 });
+    this.thinks = null;
+    if (stance === 'charge') this.fx.word('CHARGING DOWN!', this.W / 2, this.H * 0.22, { size: 30, color: '#fff4da', stroke: INK, rot: 0, dur: 900 });
 
     let rg = G.hesitated ? 'loose' : G.grade;
     if (this.armed.pinpoint) { rg = 'perfect'; this.armed.pinpoint = false; }
@@ -1474,6 +1480,7 @@ export class Game {
     // release, then aftertouch: drag sideways while the ball is in the air to bend it late
     const d0 = makeDelivery(spec);
     S.delivery = d0; S.ballT0 = this.gameTime; S.afterOff = 0;
+    this.fx.bubbles = [];
     S.bowler.pose = POSES.bowl(1); S.bowler.followT0 = this.realTime; S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
     if (fxFlags.maya) S.maya = { real: 1, picked: 0 };
     sfx.whoosh();
@@ -1837,7 +1844,8 @@ export class Game {
         await this.sleepReal(this.bot ? 50 : 900);
       } else if (runs >= 4) this.revenge = false;
     }
-    if (runs >= 4 && rng.chance(0.45)) {
+    if (runs >= 4 && inn.balls - this.lastBanterBall >= 4 && rng.chance(0.3)) {
+      this.lastBanterBall = inn.balls;
       this.fx.bubble(line('batterSledge', them.id, rng), bat().x, bat().y, { dur: 2000 });
       this.revenge = true;
       this.ui.banner('THEY\'RE TALKING', 'Dot ball or wicket next = +10 REVENGE', 1800);
@@ -1846,7 +1854,7 @@ export class Game {
     }
     if (!goodBall) return;
     // always after a wicket; after a dot ball at most once an over, and only sometimes
-    if (!wicketFell && (inn.balls - this.lastBanterBall < 6 || !rng.chance(0.4))) return;
+    if (!wicketFell && (inn.balls - this.lastBanterBall < 6 || !rng.chance(0.3))) return;
     this.lastBanterBall = inn.balls;
     const choice = await this.banterChoice();
     if (choice === 'smack') {
@@ -2058,7 +2066,7 @@ export class Game {
       this.hitStop(120); sfx.glove(); buzz(60);
       this.fx.burst(hs.x, hs.y, { color: '#ffe14d', r: 220 });
       this.fx.word('SNAFFLED!', hs.x, hs.y - 40, { size: 60 });
-      this.fx.bubble(this.team.field?.id === 'rani' ? 'Arre, try harder!' : 'Got it!', this.W * 0.55, this.H * 0.55);
+      this.fx.bubble(this.team.field?.id === 'rani' ? 'Oh, try harder!' : 'Got it!', this.W * 0.55, this.H * 0.55);
     } else {
       S.kball.done = false; S.kball.miss = true;
       this.fx.word('BUTTERFINGERS!', this.W / 2, this.H * 0.32, { size: 52 });
@@ -2453,6 +2461,7 @@ export class Game {
     else this.renderIdle();
     ctx.restore();
     this.fx.draw(ctx, W, H);
+    if (this.view === 'bowl' && this.thinks) this.drawThinks(ctx, this.thinks);
     // a full charge bar crackles
     const zap = !document.getElementById('hud').hidden && this.charge?.value >= this.charge?.cfg.max && this.fxSet(this.myTeam);
     this.ui.chargeZap(zap, this.realTime);
@@ -2995,6 +3004,19 @@ export class Game {
 
   // A timing bar across the top of the screen: the marker slides right and reaches the middle
   // of the green zone at the perfect moment. m: { k (0 at the start, 1 = perfect), zone, green, label }
+  // the batter's guess about the next ball: a small tag up top, clear of the pitch
+  drawThinks(ctx, text) {
+    const { W, H } = this, y = Math.max(H * 0.17, 128) + 14;
+    ctx.save();
+    ctx.font = '400 17px "Bangers", "Arial Black", sans-serif';
+    const w = ctx.measureText(text).width + 28;
+    ctx.fillStyle = 'rgba(20,16,24,0.78)';
+    ctx.beginPath(); ctx.roundRect(W / 2 - w / 2, y - 15, w, 30, 15); ctx.fill();
+    ctx.fillStyle = '#fff4da'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, W / 2, y + 1);
+    ctx.restore();
+  }
+
   drawMeter(ctx, m) {
     const w = Math.min(this.W - 48, 360), x0 = (this.W - w) / 2, y = Math.max(this.H * 0.17, 128), h = 26, span = 1.35;
     const xAt = k => x0 + w * clamp(k / span, 0, 1);

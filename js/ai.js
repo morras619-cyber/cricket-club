@@ -140,6 +140,12 @@ export function aiBat(d, ctx, rng) {
   let grade = gradeTiming(errMs, w, d.xt > 0.08);
   if (mods.edgeBoost && ['good', 'early', 'late'].includes(grade) && d.xt > -0.05 && rng.chance(mods.edgeBoost)) grade = 'edge';
   const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder' }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) });
+  // through the gate: a mistimed swing at a full, straight ball can miss it and lose the stumps.
+  // A weaker batter is beaten more often; a yorker on the stumps is the hardest to keep out.
+  if ((grade === 'early' || grade === 'late' || grade === 'edge') && !ctx.freeHit && d.onStumps && ['good', 'full', 'yorker', 'fulltoss'].includes(d.length)) {
+    const p = (d.length === 'yorker' ? 0.4 : d.length === 'fulltoss' ? 0.08 : 0.2) * aiSpread(ctx.skill);
+    if (rng.chance(p)) return { errMs, shot, grade: 'miss', res: { outcome: 'bowled', grade: 'miss' } };
+  }
   if (ctx.fx?.tornado && (grade === 'miss' || res.outcome === 'beaten')) res.outcome = 'bowled';
   if (ctx.stance === 'charge' && res.outcome === 'beaten') res.outcome = 'stumping-chance';
   return { errMs, shot, grade, res };
