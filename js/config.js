@@ -10,6 +10,7 @@ export const CFG = {
 
   // Simulated ball speed = real speed × paceScale, so a 140 km/h ball takes ~1 s to arrive.
   paceScale: 0.5,
+  paceSpread: 1.35,
 
   bowling: { perfect: 35, good: 75, loose: 125, runupMs: 1100 },
 

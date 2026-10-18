@@ -9,13 +9,13 @@ import { flag } from './nations.js';
 // kmh: stock speed range. swing/seam: how much the ball moves in the air / off the pitch (m).
 // turn: spin off the pitch for a right-hander (+ = leg to off). runup: share of a full run-up.
 export const BOWL_TYPES = {
-  express: { id: 'express', name: 'Express pace', short: 'Express', spin: false, kmh: [142, 153], swing: 0.1, seam: 0.07, runup: 1,
+  express: { id: 'express', name: 'Express pace', short: 'Express', spin: false, kmh: [145, 156], swing: 0.1, seam: 0.07, runup: 1,
     stock: ['Seam up', 'Outswinger'], variation: 'Slower bouncer' },
-  swing: { id: 'swing', name: 'Swing bowler', short: 'Swing', spin: false, kmh: [128, 139], swing: 0.27, seam: 0.05, runup: 0.9,
+  swing: { id: 'swing', name: 'Swing bowler', short: 'Swing', spin: false, kmh: [128, 139], swing: 0.38, seam: 0.05, runup: 0.9,
     stock: ['Outswinger', 'Inswinger'], variation: 'Slower ball' },
   seam: { id: 'seam', name: 'Seam & cutters', short: 'Seam', spin: false, kmh: [117, 128], swing: 0.07, seam: 0.16, runup: 0.75,
     stock: ['Leg-cutter', 'Off-cutter'], variation: 'Knuckle ball' },
-  leftpace: { id: 'leftpace', name: 'Left-arm pace', short: 'Left-arm', spin: false, left: true, kmh: [132, 143], swing: 0.2, seam: 0.06, runup: 0.9,
+  leftpace: { id: 'leftpace', name: 'Left-arm pace', short: 'Left-arm', spin: false, left: true, kmh: [132, 143], swing: 0.26, seam: 0.06, runup: 0.9,
     stock: ['Angled across', 'Inswinger'], variation: 'Slower ball' },
   offspin: { id: 'offspin', name: 'Off-spin', short: 'Off-spin', spin: true, kmh: [80, 90], turn: -0.27, runup: 0.35,
     stock: ['Off-break'], variation: 'Arm ball' },

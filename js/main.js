@@ -22,6 +22,7 @@ import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewar
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx } from './audio.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
+import { units } from './units.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -39,6 +40,7 @@ loadBowlSprites(profile.team || 'thunder');
 sound.on = profile.settings.sound;
 sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
+units.speed = profile.settings.units === 'mph' ? 'mph' : 'kmh';
 window.__sixcharge = { game, ui, profile };
 game.onFieldSaved = choice => { profile.field = { preset: choice.field, custom: choice.custom }; saveProfile(profile); };
 
@@ -110,6 +112,7 @@ function renderSettings() {
   state('setSound', sound.on ? 'On' : 'Off', sound.on);
   state('setHaptics', sound.haptics ? 'On' : 'Off', sound.haptics);
   state('setField', { key: 'Key moments', all: 'Every chance', off: 'Auto' }[game.settings.fielding], game.settings.fielding !== 'off');
+  state('setUnits', units.speed === 'mph' ? 'mph' : 'km/h', true);
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
 $('settingsBack').addEventListener('click', () => renderHome());
@@ -120,6 +123,11 @@ $('setField').addEventListener('click', () => {
   const order = ['key', 'all', 'off'];
   game.settings.fielding = order[(order.indexOf(game.settings.fielding) + 1) % 3];
   profile.settings.fielding = game.settings.fielding; saveProfile(profile); renderSettings();
+});
+
+$('setUnits').addEventListener('click', () => {
+  units.speed = units.speed === 'mph' ? 'kmh' : 'mph';
+  profile.settings.units = units.speed; saveProfile(profile); renderSettings();
 });
 
 // ---------- shop: the daily login reward, and gems for coins ----------

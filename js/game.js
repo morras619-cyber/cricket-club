@@ -19,6 +19,7 @@ import { hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, drawEffect, preloadEffects } from './fx.js';
+import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
@@ -394,7 +395,7 @@ export class Game {
   }
   // the hero whose face and colours a slot's buttons use: its hero, else the captain
   heroFor(slot) { return this.team[slot] || this.captain; }
-  typeLine(p) { const T = bowlType(p.bowl); return `${T.name} · ${T.kmh[0]}-${T.kmh[1]} km/h`; }
+  typeLine(p) { const T = bowlType(p.bowl); return `${T.name} · ${speedRange(T.kmh)}`; }
 
   // a new over: the AI follows its plan; you pick from your attack
   async startOver(inn) {
@@ -707,7 +708,7 @@ export class Game {
     const w = { ...CFG.timing };
     const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1);
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? 40 : 0);
-    if (fx.focus) w.perfect += 30;
+    if (fx.focus) { w.perfect += 55; w.good += 45; }
     if (tornado) w.perfect /= 2;
     w.good = Math.max(w.good, w.perfect + 20);
     return w;
@@ -765,13 +766,13 @@ export class Game {
     if (fx.thunder) S.batter.glow = '#5fc8ff';
     if (fx.meteor) S.batter.glow = '#ff7a1a';
     if (fx.mirror) this.fx.flash('#7a3fe0', 0.25);
-    this.timeScale = (opt.slow ?? 1) * (fx.focus ? 0.7 : 1);
+    this.timeScale = (opt.slow ?? 1) * (fx.focus ? 0.6 : 1);
     if (fx.focus) this.fx.speed = 0.6;
 
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
     this.fx.bubbles = [];
-    if (!this.bot && !opt.hint) this.fx.word(`${Math.round(spec.kmh)} KM/H · ${String(spec.type || '').toUpperCase()}`, this.W / 2, this.H * 0.2, { size: 24, color: '#fff4da', stroke: INK, rot: 0, dur: 1100 });
+    if (!this.bot && !opt.hint) this.showTag(`${speedText(d.kmh)} · ${String(spec.type || '').toUpperCase()}`);
     S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
     if (aiPower === 'maya') S.maya = { real: rng.chance(0.5) ? 1 : -1, picked: 0 };
     sfx.whoosh();
@@ -822,6 +823,7 @@ export class Game {
     const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado', skill, bowler.bowlSkill || 75);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
+    if (fx.focus && grade === 'edge') grade = 'late'; // focused: no edges
     // defending is forgiving: anywhere in the wide window keeps the ball out
     if (swing?.defend) grade = Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
     this.lastTiming = { err, grade };
@@ -1430,7 +1432,8 @@ export class Game {
     if (stance === 'charge') this.fx.word('CHARGING DOWN!', this.W / 2, this.H * 0.22, { size: 30, color: '#fff4da', stroke: INK, rot: 0, dur: 900 });
 
     let rg = G.hesitated ? 'loose' : G.grade;
-    if (this.armed.pinpoint) { rg = 'perfect'; this.armed.pinpoint = false; }
+    const pinpoint = !!this.armed.pinpoint;
+    if (pinpoint) { rg = 'perfect'; this.armed.pinpoint = false; }
     if (bowler.ability === 'deathKing' && ballNo >= 25 && (rg === 'loose' || rg === 'bad')) rg = 'good'; // never sprays it at the death
     if (opt.forceRelease) rg = opt.forceRelease(rg);
     // finish the run-up
@@ -1440,8 +1443,9 @@ export class Game {
     S.aim = null; S.trail = []; this.bowlTrail = null;
 
     const words = { perfect: '#ffd23f', good: '#fff4da', loose: '#ff8a8a', bad: '#e8343b' };
-    const label = rg === 'bad' ? 'OVERSTEPPED!' : rg === 'loose' ? (G.hesitated ? 'HESITATED…' : 'SPRAYED IT!') : `${G.type.toUpperCase()} · ${Math.round(G.kmh)} KM/H${rg === 'perfect' ? ' · PERFECT' : ''}`;
-    this.fx.word(label, this.W / 2, this.H * 0.55, { size: rg === 'perfect' ? 38 : 30, color: words[rg], stroke: INK, rot: 0, dur: 1000 });
+    // the release, read out in a tag up top so nothing covers the ball
+    const label = rg === 'bad' ? 'OVERSTEPPED!' : rg === 'loose' ? (G.hesitated ? 'HESITATED…' : 'SPRAYED IT!') : `${G.type.toUpperCase()} · ${speedText(G.kmh * paceFor(bowler.bowlSkill) * (btype.spin ? 1 : this.pitch.kmh))}${rg === 'perfect' ? ' · PERFECT' : ''}`;
+    if (!this.bot) this.showTag(label, words[rg], 1600);
     if (rg === 'perfect') this.charge.award('perfectRelease', 'RELEASE');
     this.charge.timingStreak(rg === 'perfect');
 
@@ -1463,6 +1467,7 @@ export class Game {
       if (spec.bounce != null) { spec.bounce = clamp(spec.bounce + rng.range(-0.4, 0.4), 0.7, 11.5); spec.length = lengthForBounce(spec.bounce); spec.h = heightForBounce(spec.bounce); }
     }
     if (rg === 'perfect') { spec.swing *= 1.15; spec.move *= 1.15; }
+    if (pinpoint) { spec.swing *= 1.5; spec.move *= 1.5; } // the Pinpoint Spark: it moves much more too
     // a better bowler moves it more and bowls quicker
     spec.swing *= movementFor(bowler.bowlSkill); spec.move *= movementFor(bowler.bowlSkill); spec.kmh *= paceFor(bowler.bowlSkill);
     if (bowler.ability === 'swingMaster') { spec.swing *= 1.3; spec.move *= 1.3; }
@@ -1528,7 +1533,7 @@ export class Game {
     const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * this.pitch.ai * aiHome / (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1) / this.pitch.bat };
-    let ai = aiBat(d, { skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods, freeHit: this.freeHit }, rng);
+    let ai = aiBat(d, { skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * 1.6 } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
@@ -2153,7 +2158,10 @@ export class Game {
     };
     if (this.bot) this.sleep((T + makeRng(T * 1000).normal() * 0.05) * 1000).then(() => this.botInput('up', { dx: 0, dy: 0 })).catch(() => {});
     let gap = 99;
+    // the Speed Burst also gives a wider green (read live: it can be fired mid-chance)
+    let perfectMs = F.catchPerfect;
     await this.until(() => {
+      perfectMs = F.catchPerfect * (this.armed.burst ? 1.6 : 1);
       const t = this.gameTime - t0, dt = this.gameTime - last; last = this.gameTime;
       const speed = F.catchRun * (this.armed.burst ? 2 : 1);
       if (t > F.catchReact && t <= T) gap = this.moveFielder(me, L, dt, speed);
@@ -2161,11 +2169,11 @@ export class Game {
       const b = path.ballAt(Math.min(t, T));
       this.O.ball = b;
       const k = clamp((T - t) / T, 0, 1);
-      const green = Math.abs(T - t) * 1000 / 0.6 <= F.catchPerfect;
+      const green = Math.abs(T - t) * 1000 / 0.6 <= perfectMs;
       this.O.ring = { x: L.x, y: L.y, r: 0.5 + 6 * k, color: green ? '#2ecc71' : '#fff4da', w: green ? 5 : 3 };
       this.O.marks = [{ x: L.x, y: L.y }];
       // the timing bar up top, clear of the thumb: tap anywhere while the marker is in the green
-      this.O.meter = { k: t / T, zone: (F.catchPerfect * 0.6 / 1000) / T, green, label: 'TAP ANYWHERE IN THE GREEN!' };
+      this.O.meter = { k: t / T, zone: (perfectMs * 0.6 / 1000) / T, green, label: 'TAP ANYWHERE IN THE GREEN!' };
       this.of.focus([b, me, L]);
       return t >= T && (input || t >= T + 0.45); // room for a swipe that started in time to finish
     });
@@ -2177,7 +2185,7 @@ export class Game {
       // the rule the player sees: touch while the ring is green and it's caught; out of reach, he dives for it
       const diving = gap > F.reach;
       if (diving) me.pose = POSES.dive(Math.sign(L.x - me.x) || 1);
-      if (Math.abs(errReal) <= F.catchPerfect) result = diving ? 'dive' : 'caught';
+      if (Math.abs(errReal) <= perfectMs) result = diving ? 'dive' : 'caught';
       else if (Math.abs(errReal) <= F.catchGood) result = 'juggle';
       else this.fx.word(errReal < 0 ? 'TOO EARLY!' : 'TOO LATE!', this.W / 2, this.H * 0.3, { size: 40 });
       input.isSwipe = diving;
@@ -2226,7 +2234,8 @@ export class Game {
       if (t > F.react) this.moveFielder(me, P, dt, speed);
       this.O.ball = path.ballAt(Math.min(t, ro.t));
       this.O.ring = { x: P.x, y: P.y, r: 0.6 + 4 * clamp((ro.t - t) / ro.t, 0, 1), color: Math.abs(ro.t - t) < 0.14 ? '#2ecc71' : '#fff4da' };
-      this.O.meter = { k: t / ro.t, zone: (F.collectWindow * 0.7 / 1000) / ro.t, green: Math.abs(ro.t - t) * 1000 / 0.7 <= F.collectWindow, label: 'TAP ANYWHERE TO PICK UP' };
+      const win = F.collectWindow * (this.armed.burst ? 1.6 : 1);
+      this.O.meter = { k: t / ro.t, zone: (win * 0.7 / 1000) / ro.t, green: Math.abs(ro.t - t) * 1000 / 0.7 <= win, label: 'TAP ANYWHERE TO PICK UP' };
       this.runBatters(t, ro.attempt);
       this.of.focus([this.O.ball, me, { x: 0, y: 0 }, { x: 0, y: 20 }]);
       return t >= ro.t + 0.25 || (pick && t >= ro.t);
@@ -2234,7 +2243,7 @@ export class Game {
     this.onInput = null; this.ui.hint(null); this.O.meter = null;
     let fumble = 0;
     const pickErr = pick ? Math.abs((pick.tg - (t0 + ro.t)) * 1000) / 0.7 : 999;
-    if (pickErr > F.collectWindow) { fumble = 0.6; this.fx.word('FUMBLE!', this.W / 2, this.H * 0.3, { size: 44 }); }
+    if (pickErr > F.collectWindow * (this.armed.burst ? 1.6 : 1)) { fumble = 0.6; this.fx.word('FUMBLE!', this.W / 2, this.H * 0.3, { size: 44 }); }
     else this.fx.word('CLEAN PICK-UP', this.W / 2, this.H * 0.25, { size: 32, color: '#fff4da', stroke: INK });
     me.x = P.x; me.y = P.y; this.O.ball = { x: P.x, y: P.y, h: 0.8 };
 
@@ -2462,6 +2471,7 @@ export class Game {
     ctx.restore();
     this.fx.draw(ctx, W, H);
     if (this.view === 'bowl' && this.thinks) this.drawThinks(ctx, this.thinks);
+    else if ((this.view === 'bowl' || this.view === 'bat') && this.tag && this.realTime < this.tag.until) this.drawThinks(ctx, this.tag.text, this.tag.color);
     // a full charge bar crackles
     const zap = !document.getElementById('hud').hidden && this.charge?.value >= this.charge?.cfg.max && this.fxSet(this.myTeam);
     this.ui.chargeZap(zap, this.realTime);
@@ -3005,14 +3015,15 @@ export class Game {
   // A timing bar across the top of the screen: the marker slides right and reaches the middle
   // of the green zone at the perfect moment. m: { k (0 at the start, 1 = perfect), zone, green, label }
   // the batter's guess about the next ball: a small tag up top, clear of the pitch
-  drawThinks(ctx, text) {
+  showTag(text, color = '#fff4da', ms = 1500) { this.tag = { text, color, until: this.realTime + ms }; }
+  drawThinks(ctx, text, color = '#fff4da') {
     const { W, H } = this, y = Math.max(H * 0.17, 128) + 14;
     ctx.save();
     ctx.font = '400 17px "Bangers", "Arial Black", sans-serif';
     const w = ctx.measureText(text).width + 28;
     ctx.fillStyle = 'rgba(20,16,24,0.78)';
     ctx.beginPath(); ctx.roundRect(W / 2 - w / 2, y - 15, w, 30, 15); ctx.fill();
-    ctx.fillStyle = '#fff4da'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, W / 2, y + 1);
     ctx.restore();
   }

@@ -66,9 +66,9 @@ export const HEROES = [
 
 // Generic Tier 1 Sparks, one per phase.
 export const SPARKS = {
-  bat: { kind: 'focus', name: 'Focus Spark', cost: 30, word: 'FOCUS!', desc: 'Ball slows 30% and the Perfect window grows by 30 ms.' },
-  bowl: { kind: 'pinpoint', name: 'Pinpoint Spark', cost: 30, word: 'PINPOINT!', desc: 'Your next release is guaranteed Perfect.' },
-  field: { kind: 'burst', name: 'Speed Burst', cost: 30, word: 'ZOOM!', desc: 'Your fielder sprints at double speed in the next outfield chance.' },
+  bat: { kind: 'focus', name: 'Focus Spark', cost: 30, word: 'FOCUS!', desc: 'Next ball comes 40% slower, your timing window is much bigger, and you can\'t edge it.' },
+  bowl: { kind: 'pinpoint', name: 'Pinpoint Spark', cost: 30, word: 'PINPOINT!', desc: 'Next ball: a Perfect release that moves 50% more and is far harder for the batter to time.' },
+  field: { kind: 'burst', name: 'Speed Burst', cost: 30, word: 'ZOOM!', desc: 'Your fielder sprints at double speed, with a much wider window to catch or pick up.' },
 };
 
 export const heroById = id => HEROES.find(h => h.id === id);
