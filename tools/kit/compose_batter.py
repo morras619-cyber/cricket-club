@@ -13,7 +13,7 @@ from PIL import Image
 from scipy import ndimage as ndi
 
 D = os.path.join(os.path.dirname(__file__), 'src', 'bat-sheets')
-SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png', 8: '8-forward-drive.png', 9: '9-cover-drive.png', 10: '10-straight-drive.png', 11: '11-pull.png'}
+SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png', 8: '8-forward-drive.png', 9: '9-cover-drive.png', 10: '10-straight-drive.png', 11: '11-pull.png', 12: '12-cover-drive.png'}
 # the game's frames in sheet order (js/kitsprite.js POSE_BAT): (sheet, pose number in reading order)
 # or (sheet, (x, y)): the pose drawn at that point of the sheet (two poses drawn touching are split)
 PICK = [
@@ -27,14 +27,14 @@ PICK = [
     ('cut1', 5, (110, 800)), ('cut2', 5, (320, 800)), ('cut3', 5, (550, 800)), ('cut4', 5, (850, 850)), ('cut5', 5, (330, 1300)), ('cut6', 5, (720, 1300)),
     ('bowled', 1, 8), ('celebrate', 3, 15),
     ('rsweep1', 2, 4), ('rsweep2', 2, 7), ('rsweep3', 2, 11),
-    # the cover drive (its own sheet: poses 5, 6, 2, 3): bat on the ball, through, up into the finish
     # the straight drive (its own sheet: pose 2 then pose 1): bat through the line, high finish
     ('straight1', 10, 2), ('straight2', 10, 1),
-    ('cover1', 9, (150, 1150)), ('cover2', 9, (380, 1150)), ('cover3', 9, (360, 450)), ('cover4', 9, (600, 480)),
+    # the cover drive (its own sheet: poses 2, 3, 4): lunge onto the ball, through the off side, high finish
+    ('cover1', 12, 2), ('cover2', 12, 3), ('cover3', 12, 4),
 ]
 STAND_PX = 330          # the standing pose (each sheet's first) comes out this tall
 # a sheet with no standing pose: scaled so its pose matches one already sized (sheet, pose, its pose)
-MATCH = {7: (4, 4, 1), 8: (7, 1, 1), 9: (8, 3, (150, 1150)), 10: (8, 3, 2), 11: (8, 3, 2)}  # 9: its contact pose sized as the forward drive's
+MATCH = {7: (4, 4, 1), 8: (7, 1, 1), 9: (8, 3, (150, 1150)), 10: (8, 3, 2), 11: (8, 3, 2), 12: (8, 3, 2)}  # 9: its contact pose sized as the forward drive's
 MAG = np.array([250, 0, 250], np.uint8)
 
 
