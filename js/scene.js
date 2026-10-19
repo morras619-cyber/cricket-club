@@ -730,6 +730,10 @@ function drawPaintedBoard(ctx, cam, t, message) {
   const b = cam.board, { W } = cam;
   const G = groundOf(HOME), T = teamById(HOME);
   ctx.save();
+  // a plain dark LED panel over the board's printed logos, so only the moving words show on it
+  const panel = ctx.createLinearGradient(0, b.y, 0, b.y + b.h);
+  panel.addColorStop(0, shade(T.suit, -0.62)); panel.addColorStop(1, shade(T.suit, -0.82));
+  ctx.fillStyle = panel; ctx.fillRect(0, b.y - 0.5, W, b.h + 1);
   ctx.beginPath(); ctx.rect(0, b.y, W, b.h); ctx.clip();
   ctx.font = `${Math.round(b.h * 0.72)}px ${FONT_DISPLAY}`; ctx.textBaseline = 'middle';
   ctx.fillStyle = message ? '#fffbe8' : '#ffd23f';
@@ -742,6 +746,8 @@ function drawPaintedBoard(ctx, cam, t, message) {
   ctx.fillStyle = 'rgba(0,10,40,0.28)';
   for (let x = 0; x < W; x += 3) ctx.fillRect(x, b.y, 1, b.h);
   ctx.restore();
+  ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0, b.y); ctx.lineTo(W, b.y); ctx.moveTo(0, b.y + b.h); ctx.lineTo(W, b.y + b.h); ctx.stroke();
 }
 
 const ropeColour = () => teamById(HOME).suit;
