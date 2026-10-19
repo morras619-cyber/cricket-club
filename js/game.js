@@ -34,8 +34,9 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-// slow motion while you field a catch / a run-out pick-up (the timing bar crosses at this pace)
-const CATCH_SLOW = 0.8, PICK_SLOW = 0.85;
+// the game's pace while you field a catch / a run-out pick-up (the timing bar crosses at this pace; the
+// green stays as many ms of real time whatever it is)
+const CATCH_SLOW = 1.1, PICK_SLOW = 1.1;
 // a spinner's approach, as a share of the time it used to take
 const SPIN_RUNUP = 0.75;
 // and its ball through the air, quicker than its km/h alone would make it (the speed shown stays)
@@ -2292,7 +2293,7 @@ export class Game {
     const pOut = m => Math.round(100 / (1 + Math.exp(m * 5)));
     this.O.ends = [{ id: 'striker', ...ENDS.striker, pct: pOut(margins.striker) }, { id: 'bowler', ...ENDS.bowler, pct: pOut(margins.bowler) }];
     this.O.ring = null;
-    this.timeScale = 0.25;
+    this.timeScale = 0.4;
     this.fx.speed = 0.8;
     this.ui.hint('TAP THE STUMPS TO THROW!');
     let sw = null;
