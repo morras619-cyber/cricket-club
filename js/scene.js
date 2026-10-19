@@ -74,6 +74,7 @@ function loadArt(team) {
   const files = { far: 'far', near: 'near', pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
   // a ground built in Blender: one finished background per camera (tools/blender)
   for (const v of Object.keys(meta.views || {})) files['view-' + v] = 'view-' + v;
+  if (meta.top) files.topView = 'view-top';
   let left = Object.keys(files).length + 1;
   const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
   for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${team}/${f}.webp`; a[k] = im; }
@@ -901,16 +902,27 @@ export class OutfieldView {
     const { W, H, k } = this;
     ctx.fillStyle = '#1b1838'; ctx.fillRect(0, 0, W, H);
     const c = this.to(0, CY);
-    // the stands: a ring of crowd around the rope
-    if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(ctx); this.crowdFor = HOME; }
+    const art = artFor(), top = art?.meta.top && art.topView;
+    if (top) {
+      // a ground built in Blender: the stadium rendered from this very angle (tools/blender, view
+      // 'top': top.px pixels a metre, the pitch centre at top.c), the stands, boards and lights
+      // around the grass the game draws below
+      const t = art.meta.top, s = k / t.px;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(top, c.x - t.c[0] * s, c.y - t.c[1] * s, t.w * s, t.h * s);
+    } else {
+      // the stands: a ring of crowd around the rope
+      if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(ctx); this.crowdFor = HOME; }
+      ctx.save();
+      ctx.fillStyle = this.crowd;
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 26) * k, (R + 26) * k * 0.78, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#0d0a24'; ctx.lineWidth = 4; ctx.stroke();
+      ctx.restore();
+    }
     ctx.save();
-    ctx.fillStyle = this.crowd;
-    ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 26) * k, (R + 26) * k * 0.78, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#0d0a24'; ctx.lineWidth = 4; ctx.stroke();
-    ctx.restore();
-    const art = artFor();
-    ctx.save();
-    ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 4) * k, (R + 4) * k * 0.78, 0, 0, Math.PI * 2);
+    // (with the rendered stadium the grass stops just past the rope: its boards stand beyond)
+    const gr = top ? R + 1.9 : R + 4;
+    ctx.beginPath(); ctx.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2);
     if (art) {
       // the painted grass right up to the stands, its stripes along the pitch as in the match
       // views: whole tiles with drawImage (pattern transforms are unreliable on iPhone Safari)

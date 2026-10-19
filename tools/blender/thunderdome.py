@@ -316,15 +316,37 @@ VIEWS = {
     'bowl':   dict(pos=(0.20, 34.0, 2.6), dir=-1, f=2400, ax=0.50, above=0.24, below=0.40),
     'keeper': dict(pos=(0.55, -9.0, 4.6), dir=1, f=1200, ax=1.05, above=0.40, below=1.02),
 }
-V = VIEWS[VIEW]
-Wi = int(2 * V['ax'] * V['f']); Hi = int((V['above'] + V['below']) * V['f'])
-bpy.ops.object.camera_add(location=V['pos'])
-cam = bpy.context.active_object; sc.camera = cam
-cam.rotation_euler = (math.pi / 2, 0, 0 if V['dir'] > 0 else math.pi)
-cd = cam.data; cd.sensor_fit = 'HORIZONTAL'; cd.sensor_width = 36
-cd.lens = V['f'] * 36 / Wi
-cd.shift_y = -(Hi / 2 - V['above'] * V['f']) / max(Wi, Hi)
-cd.clip_end = 3000
+if VIEW == 'top':
+    # The outfield view (js/scene.js OutfieldView): looking down on the ground, tilted so the ground's
+    # length reads at 0.78 of its width (cos 38.7°): an orthographic camera, TOP_PX pixels a metre,
+    # the pitch centre in the middle of the picture. The game draws its own grass, pitch and rope
+    # inside the boundary, so only what's outside them shows: the apron, boards, stands, roof, lights.
+    TOP_PX, HALF = 14, 112
+    th = math.acos(0.78)
+    Wi = int(2 * HALF * TOP_PX); Hi = int((2 * HALF * 0.78 + 34) * TOP_PX)
+    for o in list(sc.objects):
+        # (and the roof: from up here it would hide the near stand's crowd)
+        if o.name.startswith(('skyline', 'cityfoot', 'canopy', 'under')) or (o.type == 'MESH' and o.name.startswith('Torus') and abs(o.location.z - 0.08) < 1e-3):
+            o.hide_render = True
+    bg.inputs['Color'].default_value = (*srgb('#1b1838'), 1)
+    for l in list(wn.links):
+        if l.to_node == bg: wn.links.remove(l)
+    dirv = Vector((0, math.sin(th), -math.cos(th)))
+    bpy.ops.object.camera_add(location=Vector((0, CY, 0)) - dirv * 600)
+    cam = bpy.context.active_object; sc.camera = cam
+    cam.rotation_euler = (th, 0, 0)
+    cd = cam.data; cd.type = 'ORTHO'; cd.ortho_scale = Wi / TOP_PX; cd.sensor_fit = 'HORIZONTAL'
+    cd.clip_end = 3000
+else:
+    V = VIEWS[VIEW]
+    Wi = int(2 * V['ax'] * V['f']); Hi = int((V['above'] + V['below']) * V['f'])
+    bpy.ops.object.camera_add(location=V['pos'])
+    cam = bpy.context.active_object; sc.camera = cam
+    cam.rotation_euler = (math.pi / 2, 0, 0 if V['dir'] > 0 else math.pi)
+    cd = cam.data; cd.sensor_fit = 'HORIZONTAL'; cd.sensor_width = 36
+    cd.lens = V['f'] * 36 / Wi
+    cd.shift_y = -(Hi / 2 - V['above'] * V['f']) / max(Wi, Hi)
+    cd.clip_end = 3000
 
 r = sc.render
 r.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = SAMPLES
