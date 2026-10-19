@@ -1219,6 +1219,9 @@ export class Game {
     await this.until(() => {
       const t = this.gameTime - t0, tb = t * ballK;
       const b = path.ballAt(Math.min(tb, end));
+      // the ball is loose (nobody may be drawn holding it) until it's caught or gathered; a boundary
+      // never is, even when it runs past a fielder diving for it
+      this.O.loose = boundary || tb < end || !(A && (o.caught || sim.intercept || o.saved));
       // a perfect six: everything slows for a beat as it sails over the rope
       if (!slowed && Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR) { slowed = true; slowUntil = this.realTime + 380; }
       if (toRope && tb > end) {
@@ -3183,7 +3186,7 @@ export class Game {
     const b = O.ball;
     const near = b && (b.h ?? 0) < 2.4 && O.fielders.find(f => !f.keeper && Math.hypot(f.x - b.x, f.y - b.y) < 1.1);
     O.holdN = near && near === O.holdC ? (O.holdN || 0) + 1 : 0; O.holdC = near || null;
-    O.holder = O.holdN >= 3 ? near : null;
+    O.holder = O.holdN >= 3 && !O.loose ? near : null;
     V.drawGround(ctx);
     if (O.ring) {
       const p = V.to(O.ring.x, O.ring.y);
