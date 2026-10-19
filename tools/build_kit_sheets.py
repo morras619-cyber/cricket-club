@@ -280,7 +280,7 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
     # each pixel belongs to the nearest pose (hair close to two poses goes to its own head only)
     dist, (iy, ix) = ndi.distance_transform_edt(lab == 0, return_indices=True)
     owner = np.where(dist <= 40, lab[iy, ix], 0)
-    pad, gap, W = 6, 4, 1024
+    pad, gap, W = 6, 4, (2048 if hard else 1024)  # (the batter's many big poses: a wider sheet)
     cells, x, y, rowh = [], gap, gap, 0
     for k, (i, sl) in enumerate(frames):
         me = lab == i

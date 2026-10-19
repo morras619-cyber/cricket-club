@@ -35,7 +35,9 @@ PICK = [
     # the cover drive: the straight-drive sheet's third pose, bat through the off side
     ('cover1', 10, 3),
 ]
-STAND_PX = 330          # the standing pose (each sheet's first) comes out this tall
+# the standing pose (each sheet's first) comes out this tall: the batter at the bowler's resolution
+# (the bowler's sheet has 304 px per metre; the ready stance, 1.72 m in the game, is then ~523 px)
+STAND_PX = 526
 # a sheet with no standing pose: scaled so its pose matches one already sized (sheet, pose, its pose)
 MATCH = {7: (4, 4, 1), 8: (7, 1, 1), 9: (8, 3, (150, 1150)), 10: (8, 3, 2), 11: (8, 3, 2), 12: (8, 3, 2), 13: (8, 3, (680, 450, 'left'))}  # 9: its contact pose sized as the forward drive's
 MAG = np.array([250, 0, 250], np.uint8)
@@ -142,7 +144,7 @@ def main():
         w, h = max(1, round((x1 - x0) * sc)), max(1, round((y1 - y0) * sc))
         cuts.append((name, Image.fromarray(tile).resize((w, h), Image.LANCZOS), alpha.resize((w, h), Image.LANCZOS)))
     # rows of six, tops level (the kit tool sorts poses into rows by their tops), on magenta
-    GAP, ROWH, PER = 40, 520, 6
+    GAP, ROWH, PER = 40, 820, 6
     W = max(sum(c[1].width for c in cuts[i:i + PER]) + GAP * (PER + 1) for i in range(0, len(cuts), PER))
     H = ROWH * ((len(cuts) + PER - 1) // PER) + GAP
     sheet = Image.new('RGB', (W, H), tuple(MAG))
@@ -192,7 +194,15 @@ def print_spot(rgb, m, ox, oy):
     # as big against the back as the bowler's: his back leans toward the camera, so the collar-to-waist
     # drop reads short; 0.8 of it matches the bowler's print against the width of the back
     w = 0.8 * (waist - collar)
-    return [round(float(cx) + ox, 1), round(y + oy, 1), round(float(w), 1), 1, 1, 0, 0, 0, 0, 0]
+    # leaning with him: the print turns with his spine (collar centre to waist centre)
+    span = waist - collar
+    top = panel[collar: collar + max(2, int(span * 0.18))]
+    bot = panel[max(collar, waist - max(2, int(span * 0.25))): waist]
+    tilt = 0.0
+    if top.any() and bot.any():
+        xt = np.nonzero(top)[1].mean(); xb = np.nonzero(bot)[1].mean()
+        tilt = float(np.clip(-np.degrees(np.arctan2(xb - xt, span * 0.8)), -25, 25))
+    return [round(float(cx) + ox, 1), round(y + oy, 1), round(float(w), 1), 1, 1, round(tilt, 1), 0, 0, 0, 0]
 
 
 if __name__ == '__main__':
