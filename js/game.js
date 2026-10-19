@@ -38,6 +38,11 @@ const SHOT_WORDS = ['THWACK!', 'DHOOM!', 'KRAK!', 'BLAM!', 'SMASH!'];
 
 // The opposing side's heroes: their own team's star, in his slot.
 export const pickRivals = oppId => starSquad(oppId);
+// a club with no hero of its own (the lower divisions): its captain stands in on the Spark
+// buttons and the share card, in the club's kit
+function clubCaptain(team) {
+  return { id: `captain-${team.id}`, name: `${team.name} captain`, quote: 'Come on, lads! Our moment!', look: { ...teamLook(team), skin: '#9c6546' }, emblem: null };
+}
 
 const FISH = 0.65;
 function fisheyeTo(L, x, y) {
@@ -235,7 +240,7 @@ export class Game {
     // career squads: whichever heroes each club owns ({ bat, bowl, field }), else the team's own star
     this.rival = opts.rival || pickRivals(this.oppTeam.id);
     // the captain's face goes on the Spark buttons when a slot has no hero
-    this.captain = heroById(this.myTeam.star) || Object.values(this.team).find(Boolean);
+    this.captain = heroById(this.myTeam.star) || Object.values(this.team).find(Boolean) || clubCaptain(this.myTeam);
     this.oppStyle = this.oppTeam.style || {};
     // the home ground: its look, and how its pitch plays
     this.home = opts.home || homeFromSeed(this.seed, this.myTeam.id, this.oppTeam.id);
