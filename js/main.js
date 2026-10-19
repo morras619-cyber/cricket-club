@@ -20,13 +20,14 @@ import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
-import { sound, unlockAudio, sfx } from './audio.js';
+import { sound, unlockAudio, sfx, buzz } from './audio.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
+import { TossAnim, loadToss } from './toss.js';
 import { loadKitSprites, drawKitFielder } from './kitsprite.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
@@ -37,6 +38,8 @@ const ui = new UI();
 const game = new Game(ui);
 const profile = loadProfile();
 // Uncle Dev remembers what he has told you (never during the automated test runs)
+// the coin toss art loads in the background, ready for the first match
+setTimeout(loadToss, 1500);
 initCoach({
   seen: k => !!window.__SIXCHARGE_BOT || !!profile.coachSeen?.[k],
   mark: k => { profile.coachSeen = { ...profile.coachSeen, [k]: 1 }; saveProfile(profile); },
@@ -1530,45 +1533,50 @@ function awardAchievements(ctx) {
 }
 
 // ---------- coin toss ----------
+let tossAnim = null;
 function coinToss(opp, home) {
   return new Promise(resolve => {
     ui.show('toss');
-    const coin = $('coin'), text = $('tossText');
-    coin.className = 'coin';
-    $('tossCall').hidden = false; $('tossChoose').hidden = true; $('tossGo').hidden = true;
+    const text = $('tossText'), bot = !!window.__SIXCHARGE_BOT;
+    tossAnim = tossAnim || new TossAnim($('tossCanvas'));
+    tossAnim.reset(); tossAnim.start();
+    const btns = [...$('tossCall').querySelectorAll('button')];
+    $('tossCall').hidden = false; $('tossCall').classList.remove('called'); $('tossChoose').hidden = true; $('tossGo').hidden = true;
+    for (const b of btns) { b.disabled = false; b.classList.remove('on'); b.querySelector('img').src = `img/toss/btn-${b.dataset.call}.webp`; }
     const G = groundOf(home);
     text.textContent = `You v ${opp.name} at ${G.name} (${home === opp.id ? 'away' : 'home'}). Pitch: ${G.pitch.name}. Call it in the air!`;
+    const done = choice => { tossAnim.stop(); resolve(choice); };
     const call = side => {
-      $('tossCall').hidden = true;
+      // your call lights up; the coin goes up
+      for (const b of btns) { b.disabled = true; const on = b.dataset.call === side; b.classList.toggle('on', on); if (on) b.querySelector('img').src = `img/toss/btn-${side}-on.webp`; }
+      $('tossCall').classList.add('called');
       const result = Math.random() < 0.5 ? 'heads' : 'tails';
-      coin.style.setProperty('--end', result === 'heads' ? '1800deg' : '1980deg');
-      void coin.offsetWidth;
-      coin.classList.add('flipping');
-      sfx.whoosh();
+      sfx.whoosh(); buzz(20);
       text.textContent = 'It\'s in the air…';
-      setTimeout(() => {
-        coin.style.transition = 'none';
-        coin.classList.remove('flipping');
-        coin.classList.toggle('show-tails', result === 'tails');
-        void coin.offsetWidth;
-        coin.style.transition = '';
-        sfx.dhol();
+      tossAnim.flip(result, bot ? 250 : 1700).then(() => {
+        sfx.dhol(); buzz([30, 30, 50]);
+        $('tossCall').hidden = true;
         if (side === result) {
           text.textContent = `${result.toUpperCase()}! You won the toss. What will you do?`;
           $('tossChoose').hidden = false;
-          if (window.__SIXCHARGE_BOT) setTimeout(() => resolve(Math.random() < 0.5 ? 'bat' : 'bowl'), 100);
+          if (bot) setTimeout(() => done(Math.random() < 0.5 ? 'bat' : 'bowl'), 100);
         } else {
           const aiBats = Math.random() < 0.4;
-          text.textContent = `${result.toUpperCase()}. ${opp.name} won the toss and will ${aiBats ? 'bat' : 'bowl'} first — you ${aiBats ? 'bowl' : 'bat'} first.`;
+          text.textContent = `${result.toUpperCase()}. ${opp.name} won the toss and will ${aiBats ? 'bat' : 'bowl'} first: you ${aiBats ? 'bowl' : 'bat'} first.`;
           $('tossGo').hidden = false;
-          $('tossGo').onclick = () => resolve(aiBats ? 'bowl' : 'bat');
-          if (window.__SIXCHARGE_BOT) setTimeout(() => resolve(aiBats ? 'bowl' : 'bat'), 100);
+          $('tossGo').onclick = () => done(aiBats ? 'bowl' : 'bat');
+          if (bot) setTimeout(() => done(aiBats ? 'bowl' : 'bat'), 100);
         }
-      }, window.__SIXCHARGE_BOT ? 300 : 1350);
+      });
     };
-    for (const b of $('tossCall').querySelectorAll('button')) b.onclick = () => call(b.dataset.call);
-    for (const b of $('tossChoose').querySelectorAll('button')) b.onclick = () => resolve(b.dataset.choose);
-    if (window.__SIXCHARGE_BOT) setTimeout(() => call(Math.random() < 0.5 ? 'heads' : 'tails'), 100);
+    for (const b of btns) {
+      b.onclick = () => call(b.dataset.call);
+      // pressed: the button's pushed-in picture
+      b.onpointerdown = () => { if (!b.disabled) b.querySelector('img').src = `img/toss/btn-${b.dataset.call}-down.webp`; };
+      b.onpointerleave = b.onpointercancel = () => { if (!b.disabled) b.querySelector('img').src = `img/toss/btn-${b.dataset.call}.webp`; };
+    }
+    for (const b of $('tossChoose').querySelectorAll('button')) b.onclick = () => done(b.dataset.choose);
+    if (bot) setTimeout(() => call(Math.random() < 0.5 ? 'heads' : 'tails'), 100);
   });
 }
 

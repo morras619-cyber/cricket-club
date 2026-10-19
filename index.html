@@ -322,19 +322,19 @@ vs a random team</small></button>
   </section>
 
   <section id="toss" class="screen" hidden>
-    <div class="screen-inner">
-      <h2 class="title">Coin toss</h2>
-      <p class="lede" id="tossText">Call it in the air!</p>
-      <div class="coinwrap"><div class="coin" id="coin"><div class="face heads">HEADS</div><div class="face tails">TAILS</div></div></div>
-      <div class="menu row" id="tossCall">
-        <button class="bigbtn" data-call="heads">Heads</button>
-        <button class="bigbtn" data-call="tails">Tails</button>
+    <div class="tz">
+      <h2 class="tz-title">Coin toss</h2>
+      <p class="tz-info" id="tossText">Call it in the air!</p>
+      <canvas class="tz-coin" id="tossCanvas" aria-label="The coin"></canvas>
+      <div class="tz-btns" id="tossCall">
+        <button class="tz-btn" data-call="heads" aria-label="Heads"><img src="img/toss/btn-heads.webp" alt=""></button>
+        <button class="tz-btn" data-call="tails" aria-label="Tails"><img src="img/toss/btn-tails.webp" alt=""></button>
       </div>
-      <div class="menu row" id="tossChoose" hidden>
-        <button class="bigbtn primary" data-choose="bat">Bat first</button>
-        <button class="bigbtn" data-choose="bowl">Bowl first</button>
+      <div class="tz-pick" id="tossChoose" hidden>
+        <button class="pt-btn go" data-choose="bat">Bat first</button>
+        <button class="pt-btn ghost" data-choose="bowl">Bowl first</button>
       </div>
-      <button class="bigbtn primary" id="tossGo" hidden>Let's play</button>
+      <button class="pt-btn go tz-go" id="tossGo" hidden>Let's play</button>
     </div>
   </section>
 
