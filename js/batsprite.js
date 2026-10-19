@@ -31,12 +31,12 @@ const FRAMES = {
 };
 
 // the frames the kit sheet has and the old per-team sheets (and the batter seen from the front) don't
-export const OLD_FRAME = { drive4: 'drive3', drive5: 'drive3', pull4: 'pull3', pull5: 'pull3', cut4: 'cut3', cut5: 'cut3', cut6: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3' };
+export const OLD_FRAME = { drive4: 'drive3', pull4: 'pull3', pull5: 'pull3', cut4: 'cut3', cut5: 'cut3', cut6: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3' };
 
 // frame, ms on screen. The swing starts when the finger lifts, which is the moment of contact,
 // so the downswing is brief and the contact frame lands almost at once.
 const SEQ = {
-  drive: [['drive1', 25], ['drive2', 30], ['drive3', 110], ['drive4', 120], ['drive5', Infinity]],
+  drive: [['drive1', 25], ['drive2', 35], ['drive3', 150], ['drive4', Infinity]],
   pull: [['pull0', 20], ['pull1', 30], ['pull2', 100], ['pull3', 90], ['pull4', 110], ['pull5', Infinity]],
   cut: [['cut1', 25], ['cut2', 30], ['cut3', 100], ['cut4', 90], ['cut5', 110], ['cut6', Infinity]],
   rsweep: [['rsweep1', 60], ['rsweep2', 130], ['rsweep3', Infinity]], // down on one knee, swept fine on the off side

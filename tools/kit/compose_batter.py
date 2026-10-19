@@ -13,13 +13,13 @@ from PIL import Image
 from scipy import ndimage as ndi
 
 D = os.path.join(os.path.dirname(__file__), 'src', 'bat-sheets')
-SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png'}
+SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png', 8: '8-forward-drive.png'}
 # the game's frames in sheet order (js/kitsprite.js POSE_BAT): (sheet, pose number in reading order)
 # or (sheet, (x, y)): the pose drawn at that point of the sheet (two poses drawn touching are split)
 PICK = [
     ('ready', 7, 1), ('leave1', 7, 2), ('leave2', 7, 3), ('backlift', 7, 4),
-    # the cover drive: down through the line, contact, follow-through, high finish
-    ('drive1', 1, (290, 850)), ('drive2', 1, (500, 850)), ('drive3', 1, (80, 1300)), ('drive4', 1, (700, 1300)), ('drive5', 1, (900, 1300)),
+    # the forward drive (its own sheet): stance, stride and backlift, through the line, high finish
+    ('drive1', 8, 1), ('drive2', 8, 2), ('drive3', 8, 3), ('drive4', 8, 4),
     # the pull: bat cocked, swung across to leg, contact, through, wrapped round the shoulder
     ('pull0', 6, (920, 300)), ('pull1', 6, (330, 830)), ('pull2', 6, (620, 830)), ('pull3', 6, (880, 830)), ('pull4', 6, (120, 1300)), ('pull5', 6, (520, 1300)),
     ('def1', 3, 7), ('def2', 3, 9), ('def3', 3, 10),
@@ -30,7 +30,7 @@ PICK = [
 ]
 STAND_PX = 330          # the standing pose (each sheet's first) comes out this tall
 # a sheet with no standing pose: scaled so its pose matches one already sized (sheet, pose, its pose)
-MATCH = {7: (4, 4, 1)}
+MATCH = {7: (4, 4, 1), 8: (7, 1, 1)}
 MAG = np.array([250, 0, 250], np.uint8)
 
 
@@ -106,7 +106,7 @@ def main():
             box = ps[0][1]
             scale[s] = STAND_PX / (box[0].stop - box[0].start)
     hgt = lambda s, k: cache[s][1][k - 1][1][0].stop - cache[s][1][k - 1][1][0].start
-    for s, (rs, rk, k) in MATCH.items():
+    for s, (rs, rk, k) in sorted(MATCH.items()):
         scale[s] = scale[rs] * hgt(rs, rk) / hgt(s, k)
     cuts = []
     for name, s, k in PICK:
