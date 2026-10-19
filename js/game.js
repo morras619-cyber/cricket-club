@@ -2579,21 +2579,27 @@ export class Game {
     // your partner at the bowler's end: behind his crease, on the side away from the bowler's arm
     if (kind === 'bat' && S.nonStriker?.team) {
       const nx = S.bowler.left ? 1.35 : -1.35, nz = 19.4;
-      // he waits in his own way (leaning on the bat, hand on hip...), then ready with both hands on the
-      // handle as the bowler runs in; the old drawn figure backs up a step if his sheet isn't in
-      const spr = S.bowler.spr, live = spr?.anim === 'run' || spr?.anim === 'deliver';
+      // he waits in his own way (leaning on the bat, hand on hip...), then walks in towards us as the
+      // bowler nears the crease and on through the delivery, his steps keeping pace with the ground he
+      // covers; the old drawn figure if his sheet isn't in
+      const spr = S.bowler.spr;
       const idle = ['ns_lean', 'ns_hip', 'ns_chin', 'ns_wait'][(Math.imul(this.ballNo(), 2654435761) >>> 16) % 4];
-      let frame = 'ns1', fwd = 0;
-      if (spr?.anim === 'run') frame = spr.p < 0.45 ? 'ns2' : spr.p < 0.7 ? 'ns3' : spr.p < 0.85 ? 'ns4' : 'ns5';
-      else if (spr?.anim === 'deliver') {
+      let frame = 'ns1', fwd = 0, walk = 0;
+      if (spr?.anim === 'run') {
+        frame = spr.p < 0.45 ? 'ns2' : spr.p < 0.7 ? 'ns3' : spr.p < 0.85 ? 'ns4' : 'ns5';
+        walk = 0.5 * clamp((spr.p - 0.6) / 0.4, 0, 1);
+      } else if (spr?.anim === 'deliver') {
         const t = this.gameTime - spr.t0;
         frame = t < 0.12 ? 'ns6' : t < 0.26 ? 'ns7' : t < 0.4 ? 'ns8' : t < 0.55 ? 'ns9' : 'ns10';
         fwd = 0.7 * clamp(t / 0.55, 0, 1);
+        walk = 0.5 + 1.7 * clamp(t / 1.1, 0, 1);
       }
-      push(nz, () => {
-        const p = cam.project(nx, 0, nz);
+      // (a cycle of eight drawn frames is two steps, about 1.5 m)
+      const kit = walk <= 0 ? idle : walk >= 2.2 ? 'ns_wait' : 'walk' + (1 + Math.floor(walk / 0.19) % 8);
+      push(nz - walk, () => {
+        const p = cam.project(nx, 0, nz - walk);
         // (his bat hangs on the side away from the stumps)
-        if (p && drawKitFielder(ctx, p.x, p.y, p.k, live ? 'ns_wait' : idle, S.nonStriker.team, S.nonStriker.people, nx < 0)) return;
+        if (p && drawKitFielder(ctx, p.x, p.y, p.k, kit, S.nonStriker.team, S.nonStriker.people, nx < 0)) return;
         const q = cam.project(nx, 0, nz - fwd);
         if (q && !drawBowlSprite(ctx, q.x, q.y, q.k, frame, S.nonStriker.team, false, 'nonstriker', S.nonStriker.people))
           drawBowlSprite(ctx, q.x, q.y, q.k, 'leave2', S.nonStriker.team, false, 'batfront', S.nonStriker.people);

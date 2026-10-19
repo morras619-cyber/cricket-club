@@ -17,14 +17,16 @@ from compose_batter import poses, drop_balls, print_spot, MAG  # noqa: E402
 
 D = os.path.join(os.path.dirname(__file__), 'src', 'field-sheets')
 SHEETS = {1: '1-ready.png', 2: '2-run-away.png', 3: '3-run-side.png', 4: '4-run-turn.png', 5: '5-dive.png', 6: '6-catch.png',
-          7: '7-keeper-front.png', 8: '8-keeper-back.png', 9: '9-nonstriker.png'}
+          7: '7-keeper-front.png', 8: '8-keeper-back.png', 9: '9-nonstriker.png',
+          10: '10-walk.png'}
 # per sheet: its cap against the running-away sheet's, then all to 304 px per metre (a 1.85 m
 # player stands ~640 px on the running-away sheet)
 G = 562 / 640
 SCALE = {1: 0.82 * G, 2: 1.0 * G, 3: 1.11 * G, 4: 0.92 * G, 5: 0.87 * G, 6: 0.95 * G,
          # the keeper's helmet against the cap; the non-striker stands 1.85 m
-         7: 0.92 * G, 8: 0.92 * G, 9: 0.92 * G}
-NO_BALL = {7, 8, 9}
+         7: 0.92 * G, 8: 0.92 * G, 9: 0.92 * G,
+         10: 1.13 * G}  # (drawn smaller: the same 1.85 m as the non-striker)
+NO_BALL = {7, 8, 9, 10}
 # the game's fielder frames (js/kitsprite.js POSE_FIELD): (name, sheet, pose, back view: name and number)
 PICK = [
     ('ready_front', 1, 1, False), ('ready_side', 1, 2, False), ('ready_back', 1, 3, True),
@@ -40,6 +42,8 @@ PICK = [
     ('kb_ready', 8, 1, True), ('kb_rise', 8, 2, True), ('kb_reach', 8, 3, True), ('kb_dive', 8, 4, False),
     # the non-striker waiting with his bat: hands on the handle, leaning on it, hand on hip, hand on chin
     ('ns_wait', 9, 1, False), ('ns_lean', 9, 2, False), ('ns_hip', 9, 3, False), ('ns_chin', 9, 4, False),
+    # the non-striker walking in towards us, bat in hand: one full cycle (two steps)
+    *[(f'walk{k}', 10, k, False) for k in range(1, 9)],
 ]
 
 
@@ -78,8 +82,10 @@ def main():
             prints[str(i + 1)] = [x, y, 0, 1, 1, 0, 0, 0, 0, 0]  # (no print on a front or side view)
         hips.append(round(x + hip_x(np.asarray(tile).astype(int), np.asarray(mask) > 127), 1))
     sheet.save(os.path.join(os.path.dirname(__file__), 'src', 'fielder.png'))
+    # the rows from the first pose with a bat down: only there is tan read as willow, not skin
+    bat_from = GAP + ROWH * ([p[0] for p in PICK].index('ns_wait') // PER)
     json.dump({'_note': 'Where the name and number sit on each fielder pose (tools/kit/compose_fielder.py): [x, y, width, 1, 1, tilt, 0, 0, 0, 0] in fielder.png pixels; width 0 = none (front and side views).',
-               'rowh': ROWH, 'frames': [p[0] for p in PICK], 'hips': hips, **prints},
+               'rowh': ROWH, 'batFrom': bat_from, 'frames': [p[0] for p in PICK], 'hips': hips, **prints},
               open(os.path.join(os.path.dirname(__file__), 'field-print.json'), 'w'), indent=1)
     print('sheet', sheet.size, 'poses', len(cuts))
 

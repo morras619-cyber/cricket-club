@@ -40,7 +40,16 @@ def hsv(a):
     return h[..., 0] * 360, h[..., 1], h[..., 2]
 
 
-def masks(a, bat=False):
+def elongation(m):
+    """how many times longer than wide a patch is (along its own axis, so a leaning bat counts)"""
+    ys, xs = np.nonzero(m)
+    if len(xs) < 3:
+        return 1.0
+    lo, hi = np.linalg.eigvalsh(np.cov(np.vstack([xs, ys])))
+    return float(np.sqrt(hi / max(lo, 1e-6)))
+
+
+def masks(a, bat=False, bat_from=0):
     H, S, V = hsv(a[..., :3])
     op = a[..., 3] > 0.3
     suit = op & (H > 195) & (H < 255) & (S > 0.3)
@@ -54,7 +63,16 @@ def masks(a, bat=False):
         lab, n = ndi.label(skin)
         if n:
             frac = ndi.mean(wood, lab, range(1, n + 1))
-            skin = skin & ~np.isin(lab, 1 + np.nonzero(frac > 0.5)[0])
+            is_wood = frac > 0.5
+            if bat == 'upright':
+                # (the fielder sheet's bats, only on its rows from bat_from down, hang long and straight: a pale forearm is as yellow as the
+                # willow but at most about three times as long as wide, a bat four and more; a long thin
+                # strip is the bat's shaded edge, whatever its colour. Small bits keep the colour rule.)
+                el = np.array([elongation(lab[sl] == k + 1) for k, sl in enumerate(ndi.find_objects(lab))])
+                size = ndi.sum(skin, lab, range(1, n + 1))
+                is_wood = ((frac > 0.5) & (size < 900)) | ((frac > 0.3) & (el > 4.4)) | ((el > 7) & (size > 300))
+                is_wood &= np.array([sl[0].start >= bat_from for sl in ndi.find_objects(lab)])
+            skin = skin & ~np.isin(lab, 1 + np.nonzero(is_wood)[0])
     skin = ndi.binary_fill_holes(ndi.binary_closing(skin, iterations=1)) & op & ~trim & ~suit
     return suit, trim, skin
 
@@ -256,7 +274,7 @@ def frames_of(a, count=10, rowh=600):
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False, hard=False, bat=False, hips=None):
+def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False, hard=False, bat=False, hips=None, bat_from=0):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
@@ -271,7 +289,7 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
         a[pale, :3] = np.array([20, 16, 24]) / 255
     hairs = {st: clean_hair(np.pad(np.array(Image.open(hp).convert('RGBA')).astype(np.float32) / 255, ((M, M), (M, M), (0, 0)))) for st, hp in hairpaths.items()}
     hair_any = np.max([h[..., 3] for h in hairs.values()], axis=0) if hairs else np.zeros(a.shape[:2])
-    suit, trim, skin = masks(a, bat=bat)
+    suit, trim, skin = masks(a, bat=bat, bat_from=bat_from + M)
     L = a[..., :3] @ LUM
     if premium:
         kit, tw, tL, tref = tones(a, design, M, marks, hard=hard)
@@ -430,7 +448,7 @@ def build_field():
     pr = json.load(open('tools/kit/field-print.json'))
     n = len(pr['frames'])
     return build('field', 'tools/kit/src/fielder.png', {}, [pr[str(k + 1)] for k in range(n)], n, pr['rowh'],
-                 premium=True, place_abs=True, hard=True, bat=True, hips=pr['hips'])
+                 premium=True, place_abs=True, hard=True, bat='upright', hips=pr['hips'], bat_from=pr['batFrom'])
 
 
 def write_sheets(out):

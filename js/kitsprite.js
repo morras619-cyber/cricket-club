@@ -35,7 +35,8 @@ const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
 // a catch straight to him (hands ready, taken overhead, held at the chest)
 const POSE_FIELD = Object.fromEntries(['ready_front', 'ready_side', 'ready_back', 'away1', 'away2', 'away3', 'away4',
   'side1', 'side2', 'side3', 'reach', 'toward', 'turn', 'away3q', 'awayB', 'dive1', 'dive2', 'dive3', 'dive4', 'catch1', 'catch2', 'catch3',
-  'kf_ready', 'kf_hands', 'kf_catch', 'kf_dive', 'kb_ready', 'kb_rise', 'kb_reach', 'kb_dive', 'ns_wait', 'ns_lean', 'ns_hip', 'ns_chin'].map((n, i) => [n, i]));
+  'kf_ready', 'kf_hands', 'kf_catch', 'kf_dive', 'kb_ready', 'kb_rise', 'kb_reach', 'kb_dive', 'ns_wait', 'ns_lean', 'ns_hip', 'ns_chin',
+  'walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6', 'walk7', 'walk8'].map((n, i) => [n, i]));
 const FIELD_PX_PER_M = 304; // the sheet's scale: the bowler's
 const FIELD_KEEP = 0.5;     // each player's frames are kept at half size (a whole team is on screen at once)
 const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }
