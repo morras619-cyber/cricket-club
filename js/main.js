@@ -24,6 +24,7 @@ import { sound, unlockAudio, sfx } from './audio.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
+import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -32,6 +33,19 @@ const $ = id => document.getElementById(id);
 const ui = new UI();
 const game = new Game(ui);
 const profile = loadProfile();
+// Uncle Dev remembers what he has told you (never during the automated test runs)
+initCoach({
+  seen: k => !!window.__SIXCHARGE_BOT || !!profile.coachSeen?.[k],
+  mark: k => { profile.coachSeen = { ...profile.coachSeen, [k]: 1 }; saveProfile(profile); },
+});
+// a quick match: his next tip, now and then once he has given them all
+game.coach = key => coachOnce(key, DEV[key]);
+async function quickTip() {
+  if (window.__SIXCHARGE_BOT) return;
+  const next = QUICK_TIPS.find(([k]) => !profile.coachSeen?.[k]);
+  if (next) return coachOnce(next[0], [next[1]]);
+  if (Math.random() < 0.25) return coachSay([QUICK_TIPS[Math.floor(Math.random() * QUICK_TIPS.length)][1]]);
+}
 // heroes already picked before unlocks existed stay unlocked (signed)
 for (const id of Object.values(profile.squad || {})) if (id && !profile.unlocked.includes(id)) profile.unlocked.push(id);
 // careers saved before players had countries
@@ -197,7 +211,7 @@ $('passBack').addEventListener('click', () => renderHome());
 $('btnQuick').addEventListener('click', () => {
   unlockAudio();
   renderPickTeam({
-    teams: TEAMS, start: profile.team || 'thunder', squads: rosters(), go: 'Start match',
+    teams: TEAMS, start: profile.team || 'thunder', squads: rosters(), go: 'Start match', coach: 'quickTeam',
     onBack: renderHome,
     onGo: id => { profile.team = id; saveProfile(profile); loadBowlSprites(id); sfx.dhol(); startMatch({ mode: 'quick' }); },
   });
@@ -333,6 +347,7 @@ function renderPickTeam(o) {
     return b;
   });
   pickShow();
+  if (o.coach) coachOnce(o.coach, DEV[o.coach]);
 }
 function pickGo(i) {
   const n = pick.cards.length;
@@ -369,6 +384,8 @@ function pickShow() {
   $('ptGo').textContent = why ? '🔒 Locked' : pick.go;
 }
 $('ptPrev').addEventListener('click', () => pickGo(pick.idx - 1));
+$('ptCoach').addEventListener('click', () => coachSay(DEV[pick.coach || 'quickTeam']));
+$('rgCoach').addEventListener('click', () => coachSay(DEV.region));
 $('ptNext').addEventListener('click', () => pickGo(pick.idx + 1));
 $('ptBack').addEventListener('click', () => pick.onBack());
 $('ptBack2').addEventListener('click', () => pick.onBack());
@@ -545,6 +562,7 @@ function squad(teamId = profile.team || 'thunder', oppId = null) {
 // ---------- tutorial cover ----------
 function showCover() {
   ui.show('cover');
+  coachOnce('welcome', DEV.welcome);
   const p = $('coverPanel');
   p.innerHTML = '<div class="issue">ISSUE #1</div><h2>THE FINAL OVER</h2>';
   p.append(portrait(heroById('raja'), 140, 'bat'));
@@ -601,6 +619,7 @@ async function startMatch(opts) {
   home = home || homeFromSeed(seed, team, opp);
   const order = ['quick', 'league', 'cup', 'career', 'war', 'warmup'].includes(mode) ? await coinToss(teamById(opp), home) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
+  if (mode === 'quick') await quickTip();
   const summary = await game.runMatch({
     mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
     records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
@@ -608,6 +627,7 @@ async function startMatch(opts) {
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
+  if (mode === 'tutorial') coachOnce('tutDone', DEV.tutDone);
 }
 
 $('btnPause').addEventListener('pointerdown', e => {
@@ -933,6 +953,10 @@ $('btnLeague').addEventListener('click', () => {
 $('careerHome').addEventListener('click', () => { if (careerView === 'squad') { careerView = 'hub'; renderCareer(); } else renderHome(); });
 $('careerSquad').addEventListener('click', () => { careerView = careerView === 'squad' ? 'hub' : 'squad'; renderCareer(); });
 $('careerRecords').addEventListener('click', () => renderRecords());
+$('careerCoach').addEventListener('click', () => {
+  const c = career();
+  coachSay(DEV[{ pick: 'leagueTeam', auction: 'auction', season: 'season', done: 'seasonEnd' }[c.phase]]);
+});
 // start the Super League again from season 1: a fresh league, a fresh auction (nothing else is touched)
 confirmTap($('careerRestart'), 'Tap again to restart from season 1', () => {
   profile.career = newCareer(randomSeed());
@@ -972,6 +996,7 @@ function renderRegion() {
     grid.append(b);
   }
   regionShow();
+  coachOnce('region', DEV.region);
 }
 // the chosen region: lit on the map and tagged; only an open region's league can be entered
 function regionShow() {
@@ -995,7 +1020,7 @@ $('rgGo').addEventListener('click', () => { if (!REGIONS.find(r => r.id === regi
 function careerPick(c, body) {
   const order = [...TEAMS].sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
   renderPickTeam({
-    teams: order, start: c.club || order.find(t => careerUnlocked(t, c.season))?.id, go: 'To the auction',
+    teams: order, start: c.club || order.find(t => careerUnlocked(t, c.season))?.id, go: 'To the auction', coach: 'leagueTeam',
     squads: Object.fromEntries(order.map(t => [t.id, clubPool(c, t.id)])),
     locked: t => (careerUnlocked(t, c.season) ? null : `Unlocks in season ${unlockSeason(t)}`),
     note: c.season === 1 ? 'Pick your club. The giants unlock in later seasons.'
@@ -1009,6 +1034,10 @@ function careerPick(c, body) {
 function careerAuction(c, body) {
   const lot = currentLot(c);
   const mine = clubPlayers(c, c.club);
+  coachOnce('auction', DEV.auction).then(shown => {
+    // short of players with the money running out: once a season
+    if (!shown && lot && mine.length < MIN_SQUAD - 2 && c.money < 0.8) coachOnce(`auctionLow-${c.season}`, DEV.auctionLow);
+  });
   const status = el('div', 'panel paper notecard', `${teamById(c.club).name} · squad ${mine.length}/${MAX_SQUAD} · ${money(c.money)} to spend`);
   body.append(status);
   if (!lot) {
@@ -1066,6 +1095,11 @@ function careerAuction(c, body) {
 function careerSeason(c, body) {
   const f = nextFixture(c.league);
   const me = teamById(c.club);
+  coachOnce('season', DEV.season).then(shown => {
+    // two defeats running: a word of advice (once a season)
+    const mineR = (c.league.results || []).filter(r => r.player), last2 = mineR.slice(-2);
+    if (!shown && last2.length === 2 && last2.every(r => r.winner && r.winner !== c.club)) coachOnce(`slump-${c.season}`, DEV.slump);
+  });
   if (f) {
     const o = teamById(f.opp);
     const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
@@ -1079,6 +1113,7 @@ function careerSeason(c, body) {
 // the season is over
 function careerDone(c, body) {
   const h = c.history.at(-1);
+  coachOnce(`done-${h.season}`, h.champion === c.club ? DEV.champion : DEV.seasonEnd);
   const card = el('div', 'panel paper fixture');
   card.append(el('div', 'eyebrow', `SEASON ${h.season} · FINAL STANDINGS`),
     el('h3', '', h.champion === c.club ? '🏆 CHAMPIONS!' : `You finished ${ordinal(h.pos)}`),

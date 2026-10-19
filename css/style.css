@@ -751,3 +751,25 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .rg .pt-title { font-size: clamp(20px, 6.6vw, 36px); }
 .rgcard.locked.on img { filter: saturate(.85) brightness(.95); }
 .pt-btn.go:disabled { font-size: 22px; }
+
+/* ---------- Uncle Dev, the coach: slides up from the bottom with his advice ---------- */
+#coach { position: absolute; inset: 0; z-index: 90; background: rgba(4, 6, 24, 0.45); display: flex; align-items: flex-end; justify-content: center; }
+.coach-card { position: relative; width: min(100%, 520px); display: flex; align-items: flex-end; padding: 0 var(--gut-r) calc(var(--safe-b) + 14px) 0;
+  transform: translateY(105%); transition: transform .28s cubic-bezier(.2, .9, .3, 1.15); }
+#coach.up .coach-card { transform: none; }
+.coach-face { flex: none; width: min(36vw, 170px); margin-bottom: -14px; filter: drop-shadow(3px 0 0 var(--ink)) drop-shadow(-2px 0 0 var(--ink)); }
+.coach-bubble { position: relative; flex: 1; min-width: 0; margin: 0 0 6px -6px; padding: 10px 12px 10px; background: var(--paper); color: var(--ink);
+  border: 3px solid var(--ink); border-radius: 16px; box-shadow: 4px 5px 0 var(--ink); }
+.coach-bubble::before { content: ''; position: absolute; left: -14px; bottom: 28px; border: 9px solid transparent; border-right: 14px solid var(--ink); }
+.coach-bubble::after { content: ''; position: absolute; left: -8px; bottom: 30px; border: 7px solid transparent; border-right: 10px solid var(--paper); }
+.coach-name { display: inline-block; margin: -22px 0 4px; padding: 3px 10px 1px; background: #1f5fd6; color: var(--bolt); font-family: var(--display); font-weight: 400; font-size: 17px; letter-spacing: 1px;
+  border: 2.5px solid var(--ink); border-radius: 8px; transform: rotate(-2deg); text-transform: uppercase; }
+.coach-bubble p { margin: 0 0 8px; font-size: 16px; line-height: 1.32; font-weight: 600; }
+.coach-btns { display: flex; justify-content: flex-end; gap: 8px; }
+.coach-btns button { min-width: 74px; height: 38px; padding: 0 12px; border-radius: 10px; border: 2.5px solid var(--ink); background: #e8e0c8; color: var(--ink);
+  font-family: var(--display); font-size: 18px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 2px 3px 0 var(--ink); }
+.coach-btns button.go { background: var(--bolt); }
+.coachbtn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px 0 3px; border-radius: 19px; border: 2.5px solid var(--ink); background: var(--paper); color: var(--ink);
+  font-family: var(--display); font-size: 16px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 2px 3px 0 var(--ink); }
+.coachbtn img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; object-position: 50% 12%; background: #1f5fd6; border: 2px solid var(--ink); }
+.pt-coach { display: flex; justify-content: center; margin: 6px 0 0; }

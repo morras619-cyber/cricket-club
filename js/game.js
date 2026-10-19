@@ -2384,6 +2384,7 @@ export class Game {
     this.hud(inn);
     this.ui.banner('ISSUE #1', `${this.team.bat.name} needs 14 off the last 3 balls`, 2200);
     await this.sleepReal(this.bot ? 100 : 2200);
+    await this.coach?.('tutBat');
     const straight = { x: 0.02, length: 'full', kmh: 128, swing: 0.02, move: 0, type: 'Half-volley' };
     const assistHit = (res, grade) => {
       if (res.outcome === 'hit' || grade === 'perfect' || grade === 'good' || grade === 'early' || grade === 'late') {
@@ -2414,6 +2415,7 @@ export class Game {
     }
     // ball 3: the power
     if (this.charge.value < 60) this.charge.add(60 - this.charge.value, 'CROWD ROAR');
+    await this.coach?.('tutPower');
     this.ui.banner('THE METER IS FULL ENOUGH!', `Tap ${this.team.bat.name} to fire ${this.team.bat.power.name}`, 0);
     await this.batBall(inn, inn.balls + 1, straight, {
       extra: 120,
@@ -2439,6 +2441,7 @@ export class Game {
     this.hud(def);
     this.ui.banner('NOW DEFEND IT!', 'They need 4 off the last ball', 2000);
     await this.sleepReal(this.bot ? 100 : 2000);
+    await this.coach?.('tutBowl');
     for (let attempt = 0; attempt < 3; attempt++) {
       const before = { balls: def.balls, runs: def.runs, wkts: def.wkts };
       const r = await this.bowlBall(def, 30, {
