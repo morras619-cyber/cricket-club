@@ -56,10 +56,6 @@ for name, box in {'swirl': (8, 13, 515, 338), 'swirl2': (539, 8, 987, 288), 'rin
                   'star': (991, 72, 1101, 191), 'streak': (14, 330, 460, 450), 'dust': (831, 376, 1126, 481),
                   'burst': (180, 545, 400, 676), 'pad': (1090, 500, 1272, 540), 'rays': (1296, 512, 1520, 628)}.items():
     sizes[name] = cut('fx.png', box, 230, 'fx-' + name)
-# the buttons: plain, pressed, and lit up (the call you made)
-for name, box in {'heads': (20, 690, 392, 824), 'heads-down': (748, 696, 1067, 822), 'heads-on': (1062, 680, 1446, 832),
-                  'tails': (18, 833, 392, 973), 'tails-down': (749, 841, 1068, 972), 'tails-on': (1062, 832, 1446, 990)}.items():
-    sizes[name] = cut('fx.png', box, 120 if not name.endswith('on') else 200, 'btn-' + name, one=True)
 # the stadium
 Image.open(os.path.join(SRC, 'bg.png')).convert('RGB').save(os.path.join(OUT, 'bg.webp'), quality=86, method=6)
 for k, v in sizes.items(): print(k, v)

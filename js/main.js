@@ -1542,13 +1542,13 @@ function coinToss(opp, home) {
     tossAnim.reset(); tossAnim.start();
     const btns = [...$('tossCall').querySelectorAll('button')];
     $('tossCall').hidden = false; $('tossCall').classList.remove('called'); $('tossChoose').hidden = true; $('tossGo').hidden = true;
-    for (const b of btns) { b.disabled = false; b.classList.remove('on'); b.querySelector('img').src = `img/toss/btn-${b.dataset.call}.webp`; }
+    for (const b of btns) { b.disabled = false; b.classList.remove('on'); }
     const G = groundOf(home);
     text.textContent = `You v ${opp.name} at ${G.name} (${home === opp.id ? 'away' : 'home'}). Pitch: ${G.pitch.name}. Call it in the air!`;
     const done = choice => { tossAnim.stop(); resolve(choice); };
     const call = side => {
       // your call lights up; the coin goes up
-      for (const b of btns) { b.disabled = true; const on = b.dataset.call === side; b.classList.toggle('on', on); if (on) b.querySelector('img').src = `img/toss/btn-${side}-on.webp`; }
+      for (const b of btns) { b.disabled = true; b.classList.toggle('on', b.dataset.call === side); }
       $('tossCall').classList.add('called');
       const result = Math.random() < 0.5 ? 'heads' : 'tails';
       sfx.whoosh(); buzz(20);
@@ -1569,12 +1569,7 @@ function coinToss(opp, home) {
         }
       });
     };
-    for (const b of btns) {
-      b.onclick = () => call(b.dataset.call);
-      // pressed: the button's pushed-in picture
-      b.onpointerdown = () => { if (!b.disabled) b.querySelector('img').src = `img/toss/btn-${b.dataset.call}-down.webp`; };
-      b.onpointerleave = b.onpointercancel = () => { if (!b.disabled) b.querySelector('img').src = `img/toss/btn-${b.dataset.call}.webp`; };
-    }
+    for (const b of btns) b.onclick = () => call(b.dataset.call);
     for (const b of $('tossChoose').querySelectorAll('button')) b.onclick = () => done(b.dataset.choose);
     if (bot) setTimeout(() => call(Math.random() < 0.5 ? 'heads' : 'tails'), 100);
   });

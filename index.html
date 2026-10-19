@@ -323,12 +323,16 @@ vs a random team</small></button>
 
   <section id="toss" class="screen" hidden>
     <div class="tz">
-      <h2 class="tz-title">Coin toss</h2>
+      <header class="pt-head">
+        <div class="tz-gap"></div>
+        <h2 class="pt-title"><span>Coin</span> <em>toss</em></h2>
+        <div class="tz-gap"></div>
+      </header>
       <p class="tz-info" id="tossText">Call it in the air!</p>
       <canvas class="tz-coin" id="tossCanvas" aria-label="The coin"></canvas>
       <div class="tz-btns" id="tossCall">
-        <button class="tz-btn" data-call="heads" aria-label="Heads"><img src="img/toss/btn-heads.webp" alt=""></button>
-        <button class="tz-btn" data-call="tails" aria-label="Tails"><img src="img/toss/btn-tails.webp" alt=""></button>
+        <button class="pt-btn go tz-btn" data-call="heads"><img src="img/toss/coin-heads.webp" alt="">Heads</button>
+        <button class="pt-btn ghost tz-btn" data-call="tails"><img src="img/toss/coin-tails.webp" alt="">Tails</button>
       </div>
       <div class="tz-pick" id="tossChoose" hidden>
         <button class="pt-btn go" data-choose="bat">Bat first</button>
