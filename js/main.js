@@ -1,7 +1,7 @@
 import { UI } from './ui.js';
 import { Game } from './game.js';
 import { SPARKS, HEROES, heroById, heroesFor } from './heroes.js';
-import { TEAMS, teamById, rivalTeam, teamOfHero } from './teams.js';
+import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero } from './teams.js';
 import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
@@ -11,7 +11,7 @@ import { futCard, portraitFace } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts } from './career.js';
+  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -103,6 +103,7 @@ function renderHome() {
   $('leagueSub').textContent = !c ? lines('Pick a club', 'Win the auction', 'Build a dynasty')
     : c.phase === 'pick' ? lines(`Season ${c.season}`, 'Pick your club')
       : c.phase === 'scouts' ? lines(`Season ${c.season} · ${club}`, 'Your scouts are home', `${money(c.money)} to spend`)
+      : c.phase === 'playoff' ? lines(`Season ${c.season} · ${club}`, 'Relegation play-off!')
       : c.phase === 'auction' ? lines(`Season ${c.season} · ${club}`, 'Auction', `${money(c.money)} to spend`)
         : c.phase === 'done' ? lines(`Season ${c.season} over · ${club}`, `${money(c.money)} in the bank`)
           : lines(`Season ${c.season} · ${club}`, (f => f && `${f.label} v ${teamById(f.opp).name}`)(nextFixture(c.league)), `${money(c.money)} in the bank`);
@@ -614,7 +615,7 @@ async function startMatch(opts) {
     if (mode === 'career') {
       // the club's own squad from the career: heroes it bought at the auction give it its powers
       const c = profile.career;
-      const f = nextFixture(c.league);
+      const f = c.phase === 'playoff' ? c.playoff : nextFixture(c.league);
       team = c.club; opp = f.opp; home = f.home;
       pools = { mine: clubPool(c, team), opp: clubPool(c, opp) };
       lineup = c.lineup;
@@ -947,7 +948,7 @@ function renderCareer(notes = careerNotes) {
   $('careerTitle').textContent = `Season ${c.season}`;
   const club = c.club ? teamById(c.club) : null;
   $('careerLede').textContent = club
-    ? `${club.name} · ${money(c.money)} to spend · rating ${clubRating(c, c.club)}`
+    ? `${club.name} · ${divisionName(divisionOf(c, c.club))} · ${money(c.money)} to spend · rating ${clubRating(c, c.club)}`
     : `Super League career · ${money(c.money)} to spend`;
   $('careerSquad').hidden = !club || c.phase === 'pick';
   const body = $('careerBody');
@@ -955,7 +956,10 @@ function renderCareer(notes = careerNotes) {
   for (const n of notes) body.append(el('div', 'panel paper notecard', n));
   if (careerView === 'squad' && club) return careerSquad(c, body);
   careerView = 'hub';
-  ({ pick: careerPick, scouts: careerScouts, auction: careerAuction, season: careerSeason, done: careerDone })[c.phase](c, body);
+  if (c.news?.length && (c.phase === 'scouts' || c.phase === 'auction') && !c.auction?.results?.length) {
+    const n = el('div', 'panel paper statcard'); n.append(el('h3', '', 'Off-season news')); for (const x of c.news) n.append(el('div', 'kotie', x)); body.append(n);
+  }
+  ({ pick: careerPick, scouts: careerScouts, auction: careerAuction, season: careerSeason, playoff: careerPlayoff, done: careerDone })[c.phase](c, body);
   saveProfile(profile);
 }
 $('btnLeague').addEventListener('click', () => {
@@ -968,7 +972,7 @@ $('careerSquad').addEventListener('click', () => { careerView = careerView === '
 $('careerRecords').addEventListener('click', () => renderRecords());
 $('careerCoach').addEventListener('click', () => {
   const c = career();
-  coachSay(c.phase === 'season' ? [...DEV.season, ...DEV.scoutTip] : DEV[{ pick: 'leagueTeam', scouts: 'scoutSign', auction: 'auction', done: 'seasonEnd' }[c.phase]]);
+  coachSay(c.phase === 'season' ? [...DEV.season, ...DEV.scoutTip] : DEV[{ pick: 'leagueTeam', scouts: 'scoutSign', auction: 'auction', playoff: 'playoff', done: 'seasonEnd' }[c.phase]]);
 });
 // start the Super League again from season 1: a fresh league, a fresh auction (nothing else is touched)
 confirmTap($('careerRestart'), 'Tap again to restart from season 1', () => {
@@ -1031,13 +1035,12 @@ $('rgGo').addEventListener('click', () => { if (!REGIONS.find(r => r.id === regi
 
 // pick (or keep) a club for the season
 function careerPick(c, body) {
-  const order = [...TEAMS].sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+  // every career starts in Division 3
+  const order = c.divisions.d3.map(teamById).sort((a, b) => a.name.localeCompare(b.name));
   renderPickTeam({
-    teams: order, start: c.club || order.find(t => careerUnlocked(t, c.season))?.id, go: 'To the auction', coach: 'leagueTeam',
+    teams: order, start: order[0].id, go: 'To the auction', coach: 'leagueTeam',
     squads: Object.fromEntries(order.map(t => [t.id, clubPool(c, t.id)])),
-    locked: t => (careerUnlocked(t, c.season) ? null : `Unlocks in season ${unlockSeason(t)}`),
-    note: c.season === 1 ? 'Pick your club. The giants unlock in later seasons.'
-      : `Season ${c.season}: stay with ${teamById(c.club).name} or move. Your money comes with you.${c.news.length ? ` ${c.news.join(' ')}` : ''}`,
+    note: 'Every career starts in Division 3. Win it to go up, win Division 2 to reach the Asian Super League.',
     onBack: () => (c.season === 1 && !c.club ? renderRegion() : renderHome()),
     onGo: id => { if (chooseClub(c, id)) { sfx.dhol(); saveProfile(profile); renderCareer(); } },
   });
@@ -1108,6 +1111,7 @@ function careerAuction(c, body) {
 function careerSeason(c, body) {
   const f = nextFixture(c.league);
   const me = teamById(c.club);
+  body.append(divisionCard(c));
   coachOnce('season', DEV.season).then(async shown => {
     // send a scout abroad; then, once one has found someone, what happens next
     if (!Object.keys(c.scouting || {}).length) shown = (await coachOnce('scoutTip', DEV.scoutTip)) || shown;
@@ -1178,19 +1182,52 @@ function careerScouts(c, body) {
 // the season is over
 function careerDone(c, body) {
   const h = c.history.at(-1);
-  coachOnce(`done-${h.season}`, h.champion === c.club ? DEV.champion : DEV.seasonEnd);
+  coachOnce(`done-${h.season}`, h.promoted ? DEV.promoted : h.relegated ? DEV.relegated : h.champion === c.club ? DEV.champion : DEV.seasonEnd);
   const card = el('div', 'panel paper fixture');
-  card.append(el('div', 'eyebrow', `SEASON ${h.season} · FINAL STANDINGS`),
-    el('h3', '', h.champion === c.club ? '🏆 CHAMPIONS!' : `You finished ${ordinal(h.pos)}`),
+  card.append(el('div', 'eyebrow', `SEASON ${h.season} · ${divisionName(h.div || 'asl').toUpperCase()} · FINAL STANDINGS`),
+    el('h3', '', h.promoted ? '⬆️ PROMOTED!' : h.relegated ? '⬇️ RELEGATED' : h.champion === c.club ? '🏆 CHAMPIONS!' : `You finished ${ordinal(h.pos)}`),
     el('p', '', `Champions: ${teamById(h.champion).name} · Runners-up: ${teamById(h.runnerUp).name}`));
+  if (h.promoted) card.append(el('p', '', `Next season ${teamById(c.club).name} play in ${divisionName(h.promoted)}.`));
+  if (h.relegated) card.append(el('p', '', `Next season ${teamById(c.club).name} play in ${divisionName(h.relegated)}.`));
+  if (h.playoff) card.append(el('p', '', h.playoff.won ? `🛡️ Survived the play-off against ${teamById(h.playoff.opp).name}.` : `Lost the play-off to ${teamById(h.playoff.opp).name}.`));
   if (h.orange) card.append(el('p', '', `🟠 Most runs: ${playerName(c, h.orange.pid)} (${h.orange.runs})`));
   if (h.purple) card.append(el('p', '', `🟣 Most wickets: ${playerName(c, h.purple.pid)} (${h.purple.wkts})`));
-  const next = TEAMS.filter(t => t.tier === c.season + 1);
-  if (next.length) card.append(el('p', 'sheetnote', `Unlocking next season: ${next.map(t => t.name).join(', ')}`));
   const go = el('button', 'bigbtn primary', `On to season ${c.season + 1}`);
   go.addEventListener('click', () => { nextSeason(c); saveProfile(profile); renderCareer(); });
   card.append(go);
-  body.append(card, ...leaguePanels(c.league));
+  body.append(card);
+  // the whole ladder: who went up, who came down
+  if (c.moveNews?.length || h.champions) {
+    const m = el('div', 'panel paper statcard');
+    m.append(el('h3', '', 'Across the divisions'));
+    if (h.champions) for (const d of ['asl', 'd2', 'd3']) m.append(el('div', 'kotie', `🏆 ${divisionName(d)}: ${teamById(h.champions[d]).name}`));
+    for (const x of c.moveNews || []) m.append(el('div', 'kotie', x));
+    body.append(m);
+  }
+  body.append(...leaguePanels(c.league));
+}
+
+// the division you're in, and what it takes to move up (or stay up)
+function divisionCard(c) {
+  const d = divisionOf(c, c.club);
+  const box = el('div', 'panel paper divcard');
+  const rungs = el('div', 'divladder');
+  for (const x of ['asl', 'd2', 'd3']) rungs.append(el('span', x === d ? 'on' : '', divisionName(x)));
+  box.append(rungs, el('p', 'sheetnote', {
+    d3: 'Win Division 3 (the final, after the semis) to be promoted to Division 2.',
+    d2: 'Win Division 2 to reach the Asian Super League. Finish bottom of the table and you go back down to Division 3.',
+    asl: 'The top flight. Finish 7th or 8th and you play off to stay up: the loser goes down to Division 2.',
+  }[d]));
+  return box;
+}
+
+// 7th or 8th in the Super League: one match to stay up
+function careerPlayoff(c, body) {
+  coachOnce(`playoff-${c.season}`, DEV.playoff);
+  const me = teamById(c.club), o = teamById(c.playoff.opp);
+  body.append(divisionCard(c));
+  body.append(fixtureCard({ ...c.playoff, label: 'Relegation play-off' }, me, o, `Win and you stay in the Asian Super League. Lose and ${me.name} go down to Division 2.`, () => startMatch({ mode: 'career' })));
+  body.append(...leaguePanels(c.league));
 }
 
 // your squad: who you've got, how good they could be, and the line-up
@@ -1271,7 +1308,7 @@ function renderRecords() {
   body.append(board('Most sixes', top('all', 'sixes', p => `${fname(p)} (${team(p)}) · ${p.stats.all.sixes}`)));
   body.append(board('Highest scores', c.records.hs.slice(0, 10).map(r => ({ p: c.players[r.pid], text: `${fname(c.players[r.pid])} · ${r.runs}${r.out ? '' : '*'} (${r.balls}) · ${teamById(r.team || 'thunder').name} · S${r.season}` }))));
   body.append(board('Best bowling', c.records.bb.slice(0, 10).map(r => ({ p: c.players[r.pid], text: `${fname(c.players[r.pid])} · ${r.w}/${r.r} · ${teamById(r.team || 'thunder').name} · S${r.season}` }))));
-  const clubs = TEAMS.map(t => ({ t, titles: c.titles[t.id] || 0, finals: c.history.filter(h => h.runnerUp === t.id).length })).sort((a, b) => b.titles - a.titles || b.finals - a.finals);
+  const clubs = CLUBS.map(t => ({ t, titles: c.titles[t.id] || 0, finals: c.history.filter(h => h.runnerUp === t.id).length })).sort((a, b) => b.titles - a.titles || b.finals - a.finals);
   body.append(board('Most Super League titles', clubs.filter(x => x.titles || x.finals).map(x => `${x.t.name} · ${x.titles} title${x.titles === 1 ? '' : 's'}${x.finals ? `, ${x.finals} runner-up` : ''}`)));
   body.append(board('Season by season', c.history.map(h => `S${h.season}: ${teamById(h.champion).name} champions · you: ${teamById(h.club).name} (${ordinal(h.pos)})${h.orange ? ` · most runs ${playerName(c, h.orange.pid)} ${h.orange.runs}` : ''}`)));
   const reset = el('button', 'chipbtn ghostchip', 'Start a brand-new career');
@@ -1424,10 +1461,11 @@ function showResult(summary) {
   if (mode === 'warmup') notes = ['A warm-up: no points. Your Weekend War match counts from Saturday.'];
   if (mode === 'career') {
     const c = profile.career;
-    notes = afterLeagueMatch(c, summary);
+    notes = c.phase === 'playoff' ? afterPlayoff(c, summary) : afterLeagueMatch(c, summary);
     careerNotes = notes;
-    if (c.phase === 'done' && c.league.champion === c.club) {
-      profile.trophies = [...(profile.trophies || []), { kind: 'league', team: c.club, season: c.season, date: new Date().toISOString().slice(0, 10), unbeaten: unbeaten(c.league) }];
+    if (c.phase === 'done' && c.league.champion === c.club && !c.history.at(-1).trophy) {
+      c.history.at(-1).trophy = true;
+      profile.trophies = [...(profile.trophies || []), { kind: 'league', div: c.league.div || 'asl', team: c.club, season: c.season, date: new Date().toISOString().slice(0, 10), unbeaten: unbeaten(c.league) }];
       events.push('league');
       if (unbeaten(c.league)) events.push('unbeaten');
     }

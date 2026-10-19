@@ -2,8 +2,8 @@
 // how a side rotates its bowlers. Pure data and functions (no DOM), fixed by ids and seeds.
 import { makeRng } from './rng.js';
 import { HEROES, heroById } from './heroes.js';
-import { teamById, teamOfHero, TEAMS, NATIONAL } from './teams.js';
-import { flag } from './nations.js';
+import { teamById, teamOfHero, TEAMS, NATIONAL, LEAGUE_CLUBS } from './teams.js';
+import { flag, NATIONS } from './nations.js';
 
 // ---------- bowler types ----------
 // kmh: stock speed range. swing/seam: how much the ball moves in the air / off the pitch (m).
@@ -177,11 +177,39 @@ function nationalRoster(team) {
   return [...bats, keeper, ...alls, ...pace, ...(spinner && bowlers.includes(spinner) ? [spinner] : [])]
     .filter(Boolean).map(p => ({ ...p, team: team.id, ai: { ...p.ai } }));
 }
+// A lower-division club's ten (made up, the same for everyone): mostly from the Asian nations,
+// a notch below the Super League sides in Division 2 and another notch in Division 3.
+const CLUB_NATIONS = ['IN', 'IN', 'IN', 'PK', 'PK', 'BD', 'BD', 'LK', 'LK', 'AF', 'EN', 'AU', 'ZA', 'NZ', 'WI'];
+const CLUB_NICKS = ['Rock', 'Dash', 'Flash', 'Tank', 'Hawk', 'Ace', 'Blaze', 'Chief', 'Bolt', 'Viper', 'Tiger', 'Shadow', 'Storm', 'Gun', 'Wall', 'Jet', 'Spin', 'Spark', 'Boss', 'Ghost'];
+const CLUB_SHAPE = [
+  ['bat', 'Opener', null], ['bat', 'Opener', null], ['bat', 'No. 3', null], ['bat', 'Middle order', null], ['wk', 'Keeper-batter', null],
+  ['all', 'Pace all-rounder', 'pace'], ['all', 'Spin all-rounder', 'spin'], ['bowl', 'Fast bowler', 'pace'], ['bowl', 'Seam bowler', 'seam'], ['bowl', 'Spinner', 'spin'],
+];
+const CLUB_TRAITS = { bat: ['Grafts for every run', 'Loves the pull', 'Strong off the back foot', 'Hits straight'], wk: ['Safe hands'], all: ['Bowls tight, hits clean', 'Useful with bat and ball'], bowl: ['Hits the deck hard', 'Nags away on a length', 'Turns it a mile'] };
+function clubRoster(team) {
+  const rng = makeRng(hashStr(`club-${team.id}`));
+  const base = team.div === 'd2' ? 63 : 57;
+  const used = new Set();
+  return CLUB_SHAPE.map(([role, label, kind], i) => {
+    let name, nation;
+    do { nation = rng.pick(CLUB_NATIONS); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+    used.add(name);
+    const bowl = kind === 'pace' ? rng.pick(['express', 'swing', 'leftpace']) : kind === 'seam' ? 'seam' : kind === 'spin' ? rng.pick(['offspin', 'legspin']) : null;
+    const bat = role === 'bowl' ? rng.int(12, 24) : role === 'all' ? base - 6 + rng.int(-3, 4) : base + rng.int(-3, 6);
+    return {
+      id: `${team.id}-${i}`, name, nick: rng.pick(CLUB_NICKS), short: name.split(' ').slice(1).join(' '), role, label, team: team.id,
+      trait: rng.pick(CLUB_TRAITS[role]), hero: false, bowl, nation, bat, bowlSkill: bowl ? base + (role === 'bowl' ? 3 : -2) + rng.int(-3, 5) : 0,
+      ai: { ...WEAK[rng.int(0, WEAK.length - 1)], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) },
+    };
+  });
+}
 // A team's ten regulars, in squad order. Ids are stable (`<team>-<index>`) so saved line-ups keep.
 export function roster(teamId) {
   if (rosterCache.has(teamId)) return rosterCache.get(teamId);
   const nat = NATIONAL.find(t => t.id === teamId);
   if (nat) { const list = nationalRoster(nat); rosterCache.set(teamId, list); return list; }
+  const lc = LEAGUE_CLUBS.find(t => t.id === teamId);
+  if (lc) { const list = clubRoster(lc); rosterCache.set(teamId, list); return list; }
   const rng = makeRng(hashStr(teamId));
   // the giants have better players than the underdogs
   const off = TIER_OFFSET[teamById(teamId).tier] || 0;

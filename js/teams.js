@@ -23,6 +23,39 @@ export const TEAMS = [
 ];
 export const teamOfHero = heroId => TEAMS.find(t => t.star === heroId);
 
+// The Super League's lower divisions (career only): sixteen clubs without a hero of their own.
+// div: where they start (the eight teams above are the Asian Super League). sheet: the club
+// whose drawn sheets they borrow (repainted in their own colours); emblem: their crest
+// (tools/build_club_logos.py); ground: their home ground's name.
+const club = (id, div, name, suit, trim, sheet, emblem, ground, tag, desc, style = {}) =>
+  ({ id, div, tier: 0, name, suit, trim, star: null, sheet, emblem, ground, style: { tag, desc, loft: 0, sigma: 1, ...style } });
+export const LEAGUE_CLUBS = [
+  club('monsoon', 'd2', 'Monsoon Mavericks', '#0f8a8a', '#ffffff', 'cyclones', 'wave', 'Monsoon Park', 'Rain makers', 'Seamers who love a damp deck.', { loft: -0.04 }),
+  club('falcons', 'd2', 'Desert Falcons', '#c8913a', '#3a2412', 'eagles', 'wing', 'Dune Stadium', 'Hunters', 'Quick bowlers who swoop on any loose shot.', { loft: 0.06 }),
+  club('bengal', 'd2', 'Bengal Blasters', '#f26b1d', '#14234f', 'phoenix', 'tiger', 'Riverside Arena', 'Blasters', 'They try to hit every ball out of the ground.', { loft: 0.14, sigma: 1.04 }),
+  club('lotus', 'd2', 'Lotus Lancers', '#d63c8a', '#1a5c3a', 'royals', 'lotus', 'Lotus Lake Oval', 'Graceful', 'Wristy batters and loopy spin.', { sigma: 0.96 }),
+  club('hawks', 'd2', 'Himalaya Hawks', '#5fb4e8', '#ffffff', 'thunder', 'mountain', 'Summit Ground', 'High flyers', 'Bounce and carry from tall quicks.', { loft: 0.04 }),
+  club('iron', 'd2', 'Indus Ironmen', '#8b1c24', '#b8bec6', 'titans', 'anvil', 'Foundry Field', 'Hard as iron', 'Dogged batting, nagging seam.', { loft: -0.12, sigma: 0.92 }),
+  club('comets', 'd2', 'Coral Comets', '#ff6f61', '#16285a', 'phoenix', 'comet', 'Reef Oval', 'Quick starters', 'They go hard in the first over.', { loft: 0.08 }),
+  club('tempest', 'd2', 'Tiger Tempest', '#ffb000', '#111111', 'eagles', 'claw', 'Jungle Bowl', 'Ferocious', 'Big hitters and fiery pace.', { loft: 0.1 }),
+  club('harbour', 'd3', 'Harbour Hurricanes', '#123a7a', '#5ec8f2', 'thunder', 'anchor', 'Harbour Ground', 'Workmanlike', 'A gritty side of harbour workers.', { loft: -0.02 }),
+  club('jaguars', 'd3', 'Jungle Jaguars', '#4d6b1f', '#ffd23f', 'cyclones', 'jaguar', 'Canopy Park', 'Prowlers', 'Patient, then they pounce.', { loft: 0.02 }),
+  club('sultans', 'd3', 'Spice Sultans', '#7a1f2b', '#f2c14e', 'vipers', 'crescent', 'Bazaar Oval', 'Spin merchants', 'Slow bowlers and slower pitches.', { loft: -0.06, sigma: 0.96 }),
+  club('lagoon', 'd3', 'Lagoon Lightning', '#19b3b0', '#ffe14d', 'cyclones', 'bolt', 'Lagoon Field', 'Livewires', 'Sharp in the field, quick between the wickets.', { field: 1.06 }),
+  club('kites', 'd3', 'Kite Riders', '#e8262b', '#ffffff', 'vipers', 'kite', 'Windy Common', 'Flyers', 'Everything goes in the air.', { loft: 0.12, sigma: 1.05 }),
+  club('elephants', 'd3', 'Ember Elephants', '#5c5f66', '#ff8a1c', 'titans', 'tusk', 'Elephant Fields', 'Heavy hitters', 'Slow to start, then they stampede.', { late: 0.25 }),
+  club('rockets', 'd3', 'Rickshaw Rockets', '#9bd12a', '#151515', 'cyclones', 'rocket', 'Market Square', 'Zippy', 'Quick singles and quicker scoring.', { loft: 0.04 }),
+  club('lanterns', 'd3', 'Lantern Knights', '#a3172f', '#fff1c9', 'phoenix', 'lantern', 'Festival Ground', 'Night fighters', 'At their best under lights.', { loft: 0 }),
+];
+// every club in the career, the eight teams first
+export const CLUBS = [...TEAMS, ...LEAGUE_CLUBS];
+export const DIVISIONS = [
+  { id: 'asl', name: 'Asian Super League', short: 'Super League' },
+  { id: 'd2', name: 'Division 2', short: 'Division 2' },
+  { id: 'd3', name: 'Division 3', short: 'Division 3' },
+];
+export const divisionName = id => DIVISIONS.find(d => d.id === id)?.name || '';
+
 // The national sides for the Weekend War (not in the clubs' leagues). sheet: the club whose drawn
 // batter and back-view sheets they borrow (the same colours); heroes: their countrymen among the
 // heroes, one per slot.
@@ -34,7 +67,7 @@ export const NATIONAL = [
     heroes: { bat: 'meher', bowl: 'babar', field: 'bilal' },
     style: { tag: 'Pace and mystery', desc: 'Raw pace, wrist spin and the unexpected.', loft: 0.05, sigma: 1.02 } },
 ];
-export const teamById = id => TEAMS.find(t => t.id === id) || NATIONAL.find(t => t.id === id) || TEAMS[0];
+export const teamById = id => TEAMS.find(t => t.id === id) || LEAGUE_CLUBS.find(t => t.id === id) || NATIONAL.find(t => t.id === id) || TEAMS[0];
 // the club whose drawn sheets a side uses (its own, or the one a national side borrows)
 export const sheetOf = id => teamById(id).sheet || id;
 

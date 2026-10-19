@@ -95,11 +95,12 @@ export const DEV = {
   ],
   region: [
     "So, the Super League! Every region of the world will have its own league. Asia's is the first one open.",
-    "It's home to the Thunder Strikers, the Green Cyclones, the Volt Vipers and more. Tap Asia and let's go.",
+    "Asia has three divisions. At the top, the Asian Super League: the Thunder Strikers, the Green Cyclones, the Volt Vipers and the rest. Tap Asia and let's go.",
   ],
   leagueTeam: [
-    "Now choose your club. The big clubs are locked for now. You earn your way up to them season by season.",
-    "My advice? Take an underdog. A small club that wins the league is worth more to me than a giant that was expected to.",
+    "Every great story starts at the bottom, beta. Your career begins in Division 3.",
+    "Win Division 3 and you go up to Division 2. Win that, and you're in the Asian Super League with the big names.",
+    "It's a grind. Pick the club you believe in: you'll be with them all the way up.",
   ],
   auction: [
     "Auction day! Every player goes under the hammer. Bid against the other clubs, or pass if the price runs too high.",
@@ -133,6 +134,18 @@ export const DEV = {
     "Check your batting order and bowling attack in the squad screen. Sometimes one change is all it takes.",
   ],
   champion: ["Champions! I always knew you had it in you. Enjoy it, then let's do it again next season."],
+  promoted: [
+    "PROMOTED! Beta, I'm so proud. We're going up!",
+    "The next division is tougher: better players, bigger crowds. Strengthen the squad at the auction and send your scouts out.",
+  ],
+  relegated: [
+    "Relegated. It hurts, I know. Every great club has been down before.",
+    "We rebuild, we learn, and we come back stronger. Chin up, beta.",
+  ],
+  playoff: [
+    "This is it, beta. One match to stay in the Asian Super League.",
+    "Lose, and we drop to Division 2. Win, and we're safe. No pressure... play your game!",
+  ],
   seasonEnd: [
     "The season's over. Win or lose, every match teaches you something.",
     "Players with good form improve, and new clubs unlock. Spend wisely at the next auction.",

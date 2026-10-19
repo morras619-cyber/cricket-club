@@ -21,12 +21,13 @@ export function roundRobin(ids) {
   return rounds;
 }
 
-export function newLeague(teamId, seed) {
+// ids: the clubs in it (the eight teams unless a career division says otherwise)
+export function newLeague(teamId, seed, clubs = TEAMS.map(t => t.id)) {
   const rng = makeRng(seed);
-  const ids = TEAMS.map(t => t.id);
+  const ids = [...clubs];
   // shuffle so the player's fixtures aren't always in the same order
   for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rng.next() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
-  return { kind: 'league', team: teamId, seed, round: 0, rounds: roundRobin(ids), results: [], ko: [], stage: 'group', champion: null, started: Date.now() };
+  return { kind: 'league', team: teamId, seed, teams: [...clubs], round: 0, rounds: roundRobin(ids), results: [], ko: [], stage: 'group', champion: null, started: Date.now() };
 }
 
 export function newCup(teamId, seed) {
@@ -92,7 +93,7 @@ export function playerResult(state, summary) {
 // Net run rate: runs per over scored minus runs per over conceded; a side bowled out
 // counts as having faced its full 5 overs.
 export function table(state) {
-  const rows = new Map(TEAMS.map(t => [t.id, { id: t.id, p: 0, w: 0, l: 0, t: 0, pts: 0, rf: 0, of: 0, ra: 0, oa: 0 }]));
+  const rows = new Map((state.teams || TEAMS.map(t => t.id)).map(id => [id, { id, p: 0, w: 0, l: 0, t: 0, pts: 0, rf: 0, of: 0, ra: 0, oa: 0 }]));
   const overs = inn => (inn.wkts >= CFG.wickets ? CFG.balls : inn.balls) / 6;
   for (const m of state.results.filter(r => r.stage === 'group')) {
     const A = rows.get(m.a), B = rows.get(m.b);
@@ -191,6 +192,20 @@ function finishWithoutPlayer(state, rng, notes, sim = simMatch) {
     });
   }
   state.eliminated = true;
+}
+
+// A whole league with no player in it (the career's other divisions): every group match, then
+// the semi-finals and the final. Returns the finished state (champion, results, table()).
+export function simLeague(clubs, seed, sim = simMatch) {
+  const state = newLeague(null, seed, clubs), rng = makeRng((seed ^ 0x5bd1e995) >>> 0);
+  for (; state.round < state.rounds.length; state.round++) {
+    for (const [a, b] of state.rounds[state.round]) state.results.push({ ...sim(a, b, rng), stage: 'group', round: state.round });
+  }
+  const t = table(state).map(r => r.id);
+  state.ko.push({ stage: 'semi', ties: [[t[0], t[3]], [t[1], t[2]]] });
+  state.stage = 'semi';
+  finishWithoutPlayer(state, rng, [], sim);
+  return state;
 }
 
 // Where the player finished: 'champion' | 'runnerUp' | 'semi' | 'out'.

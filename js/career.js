@@ -7,10 +7,10 @@
 import { PORTRAIT_AGE } from './portraits-list.js';
 import { CFG } from './config.js';
 import { makeRng } from './rng.js';
-import { TEAMS, teamById } from './teams.js';
+import { TEAMS, CLUBS, LEAGUE_CLUBS, teamById, divisionName } from './teams.js';
 import { HEROES, heroById } from './heroes.js';
 import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating, WEAK, BOWL_TYPES } from './squads.js';
-import { newLeague, advance, playerResult, table, finish } from './tournament.js';
+import { newLeague, simLeague, advance, playerResult, table, finish } from './tournament.js';
 import { NATIONS, pickNation } from './nations.js';
 import { randomLook } from './looks.js';
 
@@ -22,6 +22,10 @@ export const WIN_BONUS = 0.4;          // $M per league win
 export const PRIZE = [10, 7, 5, 4.5, 3.5, 3, 2.5, 2]; // $M by final position
 export const STAR_OVR = 86;            // a regular who gets here becomes a star
 const AI_BUDGET = { 1: 6, 2: 8, 3: 10, 4: 13 };
+// the three divisions, top to bottom: prize money and income shrink the lower you go
+export const DIV_ORDER = ['asl', 'd2', 'd3'];
+const DIV_MONEY = { asl: 1, d2: 0.55, d3: 0.35 };
+const START_BUDGET = { d2: 4.5, d3: 3 };
 const AI_INCOME = 3;
 const LOTS = 16;                       // lots you bid on yourself; the rest are settled quickly
 
@@ -39,8 +43,10 @@ function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c
 const blankStats = () => ({ m: 0, inns: 0, runs: 0, balls: 0, hs: 0, fours: 0, sixes: 0, outs: 0, wkts: 0, bballs: 0, bruns: 0, bb: null });
 
 // ---------- players ----------
-export const isUnlocked = (team, season) => team.tier <= season;
-export const unlockSeason = team => team.tier;
+// Every career starts in Division 3: the clubs you can pick are the ones there now.
+export const divisionOf = (c, teamId) => DIV_ORDER.find(d => c.divisions?.[d]?.includes(teamId)) || 'asl';
+export const isUnlocked = (c, team) => divisionOf(c, team.id) === 'd3';
+export { divisionName };
 const primary = p => (p.role === 'bowl' ? ['bowlSkill'] : p.role === 'all' ? ['bat', 'bowlSkill'] : ['bat']);
 
 // What a player is worth in $M: rating above all, young potential adds, age takes away.
@@ -65,18 +71,9 @@ function newPlayer(base, extra) {
 export function newCareer(seed = Date.now() >>> 0) {
   const rng = makeRng(seed);
   const c = { nations: true, seed, season: 1, phase: 'pick', club: null, money: START_MONEY, players: {}, league: null, auction: null,
-    budgets: {}, titles: {}, history: [], records: { hs: [], bb: [] }, news: [], lineup: null, youthNo: 0 };
-  for (const t of TEAMS) {
-    c.budgets[t.id] = AI_BUDGET[t.tier];
-    for (const r of roster(t.id)) {
-      const pr = makeRng(hashStr(r.id) ^ seed);
-      const age = lookAge(r) ?? pr.int(19, 35);
-      const main = Math.max(...primary(r).map(k => r[k]));
-      const pot = Math.min(95, main + (age <= 22 ? pr.int(6, 16) : age <= 26 ? pr.int(2, 6) : age < PEAK_AGE ? pr.int(0, 2) : 0));
-      const { hero, ...rest } = r;
-      c.players[r.id] = newPlayer(rest, { age, pot, team: t.id, contract: pr.int(1, 3) });
-    }
-  }
+    budgets: {}, titles: {}, history: [], records: { hs: [], bb: [] }, news: [], lineup: null, youthNo: 0,
+    divisions: startDivisions() };
+  for (const t of CLUBS) addClub(c, t);
   for (const h of HEROES) {
     const { hero, ...rest } = heroPlayer(h);
     const main = Math.max(...primary(rest).map(k => rest[k]));
@@ -86,6 +83,21 @@ export function newCareer(seed = Date.now() >>> 0) {
   c.lookAges = {};
   for (const p of Object.values(c.players)) { const a = lookAge(p); if (a != null) c.lookAges[p.id] = a; }
   return c;
+}
+function startDivisions() {
+  return { asl: TEAMS.map(t => t.id), d2: LEAGUE_CLUBS.filter(t => t.div === 'd2').map(t => t.id), d3: LEAGUE_CLUBS.filter(t => t.div === 'd3').map(t => t.id) };
+}
+// a club's regulars join the career, with its budget
+function addClub(c, t) {
+  c.budgets[t.id] = t.div ? START_BUDGET[t.div] : AI_BUDGET[t.tier];
+  for (const r of roster(t.id)) {
+    const pr = makeRng(hashStr(r.id) ^ c.seed);
+    const age = lookAge(r) ?? pr.int(19, 35);
+    const main = Math.max(...primary(r).map(k => r[k]));
+    const pot = Math.min(95, main + (age <= 22 ? pr.int(6, 16) : age <= 26 ? pr.int(2, 6) : age < PEAK_AGE ? pr.int(0, 2) : 0));
+    const { hero, ...rest } = r;
+    c.players[r.id] = newPlayer(rest, { age, pot, team: t.id, contract: pr.int(1, 3) });
+  }
 }
 // a player with a painted portrait is as old as he looks in it
 const portraitKey = name => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -226,6 +238,12 @@ export function finishScouts(c) { if (c.phase === 'scouts') startAuction(c); }
 // nations from the squads, heroes get theirs, and older academy graduates get one.
 export function migrateCareer(c) {
   if (!c) return c;
+  // careers from before the divisions: the eight are the Super League (where a club already
+  // chosen stays), and the sixteen lower-division clubs join with their squads
+  if (!c.divisions) {
+    c.divisions = startDivisions();
+    for (const t of LEAGUE_CLUBS) addClub(c, t);
+  }
   // painted players get the age they look (as of season 1, older by the seasons since)
   c.lookAges = c.lookAges || {};
   for (const p of Object.values(c.players)) {
@@ -266,7 +284,8 @@ export const clubRating = (c, teamId) => teamRating(clubPool(c, teamId));
 // ---------- choosing a club ----------
 export function chooseClub(c, teamId) {
   const t = teamById(teamId);
-  if (!isUnlocked(t, c.season)) return false;
+  // (a new career picks from Division 3; after that you stay with your club and climb)
+  if (c.club ? teamId !== c.club : !isUnlocked(c, t)) return false;
   if (c.club !== teamId) c.lineup = null;
   c.club = teamId;
   // your scouts' finds come first, at their set price; then the auction
@@ -280,7 +299,7 @@ const squadSize = (c, teamId) => clubPlayers(c, teamId).length;
 function aiMaxes(c, p) {
   const rng = makeRng(hashStr(`${c.seed}-${c.season}-${p.id}`));
   const out = {};
-  for (const t of TEAMS) {
+  for (const t of CLUBS) {
     if (t.id === c.club) continue;
     const n = squadSize(c, t.id);
     if (n >= MAX_SQUAD) { out[t.id] = 0; continue; }
@@ -361,7 +380,7 @@ export function finishAuction(c) {
     if (p.heroId && !p.team && p.home && squadSize(c, p.home) < MAX_SQUAD && p.home !== c.club) sign(c, p, p.home, 0);
   }
   // every club needs at least MIN_SQUAD players: the cheapest free agents, then fresh youth
-  for (const t of TEAMS) {
+  for (const t of CLUBS) {
     while (squadSize(c, t.id) < MIN_SQUAD) {
       let p = Object.values(c.players).filter(x => !x.team && !x.retired && !x.heroId).sort((a, b) => value(a) - value(b))[0];
       if (!p) p = youthIntake(c, rng, 1)[0];
@@ -375,7 +394,8 @@ export function finishAuction(c) {
 // ---------- the season ----------
 export function startSeason(c) {
   c.phase = 'season';
-  c.league = newLeague(c.club, hashStr(`${c.seed}-league-${c.season}`));
+  c.league = newLeague(c.club, hashStr(`${c.seed}-league-${c.season}`), c.divisions[divisionOf(c, c.club)]);
+  c.league.div = divisionOf(c, c.club);
   c.league.season = c.season;
   for (const p of Object.values(c.players)) p.stats.season = blankStats();
 }
@@ -512,19 +532,42 @@ export function finalOrder(L) {
   return [...top2, ...semis, ...t.filter(x => !top2.includes(x) && !semis.includes(x))];
 }
 export function endSeason(c) {
-  const L = c.league, order = finalOrder(L);
+  const L = c.league, myDiv = divisionOf(c, c.club), order = finalOrder(L);
   const notes = [];
-  order.forEach((id, i) => {
-    const prize = PRIZE[i];
-    if (id === c.club) { c.money = round2(c.money + prize + SPONSOR); notes.push(`You finished ${i + 1}${['st', 'nd', 'rd'][i] || 'th'}: ${money(prize)} prize money + ${money(SPONSOR)} sponsorship`); }
-    else c.budgets[id] = round2(c.budgets[id] + prize + AI_INCOME);
-  });
-  c.titles[L.champion] = (c.titles[L.champion] || 0) + 1;
+  // the other two divisions play their seasons too
+  const leagues = { [myDiv]: L };
+  for (const d of DIV_ORDER) if (d !== myDiv) leagues[d] = simLeague(c.divisions[d], hashStr(`${c.seed}-${d}-${c.season}`), (a, b, rng) => simCareerMatch(c, a, b, rng));
+  for (const d of DIV_ORDER) {
+    const ord = d === myDiv ? order : finalOrder(leagues[d]), k = DIV_MONEY[d];
+    ord.forEach((id, i) => {
+      const prize = round2(PRIZE[i] * k);
+      if (id === c.club) { c.money = round2(c.money + prize + SPONSOR); notes.push(`You finished ${i + 1}${['st', 'nd', 'rd'][i] || 'th'} in ${divisionName(d)}: ${money(prize)} prize money + ${money(SPONSOR)} sponsorship`); }
+      else c.budgets[id] = round2((c.budgets[id] || 0) + prize + AI_INCOME * k);
+    });
+  }
+  c.titles[leagues.asl.champion] = (c.titles[leagues.asl.champion] || 0) + 1;
   const season = Object.values(c.players);
   const top = (f) => season.filter(p => p.stats.season.m).sort((a, b) => f(b) - f(a))[0];
   const orange = top(p => p.stats.season.runs), purple = top(p => p.stats.season.wkts * 1000 - p.stats.season.bruns);
-  c.history.push({ season: c.season, champion: L.champion, runnerUp: order[1], club: c.club, pos: order.indexOf(c.club) + 1,
+  c.history.push({ season: c.season, div: myDiv, champion: L.champion, runnerUp: order[1], club: c.club, pos: order.indexOf(c.club) + 1,
+    champions: Object.fromEntries(DIV_ORDER.map(d => [d, leagues[d].champion])),
     orange: orange && { pid: orange.id, runs: orange.stats.season.runs }, purple: purple && { pid: purple.id, wkts: purple.stats.season.wkts } });
+  // promotion and relegation: Division 3's champion up and Division 2's bottom club down; Division 2's
+  // champion up and the loser of the Super League's play-off (7th v 8th) down
+  const groupTable = d => table(leagues[d]).map(r => r.id);
+  const asl = groupTable('asl');
+  c.moves = { d3up: leagues.d3.champion, d2down: groupTable('d2').at(-1), d2up: leagues.d2.champion, playoff: [asl[6], asl[7]], aslDown: null };
+  if (c.moves.playoff.includes(c.club)) {
+    // you're in it: the play-off is yours to play
+    const opp = c.moves.playoff.find(id => id !== c.club);
+    c.playoff = { opp, home: asl[6], label: 'Relegation play-off' };
+    c.phase = 'playoff';
+    notes.push(`You finished ${asl.indexOf(c.club) + 1}th: a play-off against ${teamById(opp).name} to stay in the Super League!`);
+  } else {
+    const m = simCareerMatch(c, asl[6], asl[7], makeRng(hashStr(`${c.seed}-playoff-${c.season}`)));
+    c.moves.aslDown = m.winner === asl[6] ? asl[7] : asl[6];
+    applyMoves(c, notes);
+  }
   // a scout sent out late still comes home with two names
   for (const [region, sc] of Object.entries(c.scouting || {})) {
     if (sc.season !== c.season) continue;
@@ -534,6 +577,34 @@ export function endSeason(c) {
       notes.push(`🔎 Your scout in ${SCOUT_REGIONS[region].name} comes home with ${p.name}, ${p.label.toLowerCase()}`);
     }
   }
+  if (c.phase !== 'playoff') c.phase = 'done';
+  return notes;
+}
+
+// the season's movements between the divisions, and what they mean for you
+function applyMoves(c, notes) {
+  const M = c.moves, D = c.divisions;
+  const move = (id, from, to) => { D[from] = D[from].filter(x => x !== id); D[to] = [...D[to], id]; };
+  move(M.d3up, 'd3', 'd2'); move(M.d2down, 'd2', 'd3');
+  move(M.d2up, 'd2', 'asl'); move(M.aslDown, 'asl', 'd2');
+  const h = c.history.at(-1);
+  if (M.d3up === c.club || M.d2up === c.club) { h.promoted = divisionOf(c, c.club); notes.push(`⬆️ PROMOTED! Next season ${teamById(c.club).name} play in ${divisionName(h.promoted)}.`); }
+  if (M.d2down === c.club || M.aslDown === c.club) { h.relegated = divisionOf(c, c.club); notes.push(`⬇️ Relegated. Next season ${teamById(c.club).name} play in ${divisionName(h.relegated)}.`); }
+  c.moveNews = [
+    `⬆️ ${teamById(M.d2up).name} are promoted to the Asian Super League`, `⬇️ ${teamById(M.aslDown).name} lose the play-off and go down to Division 2`,
+    `⬆️ ${teamById(M.d3up).name} are promoted to Division 2`, `⬇️ ${teamById(M.d2down).name} finish bottom and go down to Division 3`,
+  ];
+}
+// your relegation play-off, played: the winner stays up
+export function afterPlayoff(c, summary) {
+  const notes = recordPlayerMatch(c, summary);
+  const r = playerResult({ team: c.club, stage: 'playoff' }, summary);
+  const won = r.winner === c.club;
+  c.moves.aslDown = won ? c.playoff.opp : c.club;
+  c.history.at(-1).playoff = { opp: c.playoff.opp, won };
+  notes.push(won ? `🛡️ You win the play-off: ${teamById(c.club).name} stay in the Super League!` : `The play-off is lost.`);
+  applyMoves(c, notes);
+  c.playoff = null;
   c.phase = 'done';
   return notes;
 }
@@ -542,7 +613,7 @@ export function endSeason(c) {
 // contracts end (those players go into the auction), and new teenagers arrive.
 export function nextSeason(c) {
   const rng = makeRng(hashStr(`${c.seed}-off-${c.season}`));
-  c.news = [];
+  c.news = [...(c.moveNews || [])]; c.moveNews = null;
   for (const p of Object.values(c.players)) {
     if (p.retired) continue;
     p.age++;
@@ -559,8 +630,9 @@ export function nextSeason(c) {
   const kids = youthIntake(c, rng, 7);
   c.news.push(`🎓 ${kids.length} academy graduates join the auction`);
   c.season++;
-  c.phase = 'pick';
   c.league = null; c.auction = null;
+  // you stay with your club: on to your scouts' finds, then the auction
+  if (c.club) { if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c); } else c.phase = 'pick';
 }
 
 // ---------- leaderboards ----------

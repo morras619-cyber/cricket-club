@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as C from '../js/career.js';
-import { TEAMS, teamById } from '../js/teams.js';
+import { TEAMS, CLUBS, teamById } from '../js/teams.js';
 import { nextFixture } from '../js/tournament.js';
 import { ovr } from '../js/squads.js';
 import { makeRng } from '../js/rng.js';
@@ -15,21 +15,23 @@ function playSeason(c, k = 0) {
   }
 }
 
-test('a new career: everyone signed up, heroes and youngsters in the auction, giants locked', () => {
+test('a new career: everyone signed up, heroes and youngsters in the auction, you start in Division 3', () => {
   const c = C.newCareer(7);
-  for (const t of TEAMS) assert.equal(C.clubPlayers(c, t.id).length, 10);
+  for (const t of CLUBS) assert.equal(C.clubPlayers(c, t.id).length, 10);
+  for (const d of C.DIV_ORDER) assert.equal(c.divisions[d].length, 8);
   const free = Object.values(c.players).filter(p => !p.team);
   assert.equal(free.filter(p => p.heroId).length, 8);
   assert.ok(free.some(p => p.youth && p.age <= 20));
-  assert.equal(C.chooseClub(c, 'thunder'), false); // tier 4: season 4
-  assert.equal(C.chooseClub(c, 'royals'), true);
+  assert.equal(C.chooseClub(c, 'thunder'), false); // the Super League: earned by promotion
+  assert.equal(C.chooseClub(c, 'monsoon'), false); // Division 2
+  assert.equal(C.chooseClub(c, 'harbour'), true);
   assert.equal(c.phase, 'auction');
-  assert.ok(C.clubRating(c, 'thunder') > C.clubRating(c, 'royals'));
+  assert.ok(C.clubRating(c, 'thunder') > C.clubRating(c, 'monsoon') && C.clubRating(c, 'monsoon') > C.clubRating(c, 'harbour'));
 });
 
 test('the auction: you can be outbid, you can win, and every club ends with a full squad', () => {
   const c = C.newCareer(8);
-  C.chooseClub(c, 'titans');
+  C.chooseClub(c, 'kites');
   let won = 0, outbid = 0;
   while (C.currentLot(c)) {
     let r = C.bid(c);
@@ -41,37 +43,37 @@ test('the auction: you can be outbid, you can win, and every club ends with a fu
   assert.ok(won > 0, 'you should be able to afford a youngster');
   assert.ok(c.money >= 0);
   C.finishAuction(c);
-  for (const t of TEAMS) assert.ok(C.clubPlayers(c, t.id).length >= C.MIN_SQUAD && C.clubPlayers(c, t.id).length <= C.MAX_SQUAD, t.id);
+  for (const t of CLUBS) assert.ok(C.clubPlayers(c, t.id).length >= C.MIN_SQUAD && C.clubPlayers(c, t.id).length <= C.MAX_SQUAD, t.id);
   assert.equal(c.phase, 'season');
 });
 
 test('a season pays prize money by position and goes into the records', () => {
   const c = C.newCareer(9);
-  C.chooseClub(c, 'eagles'); C.finishAuction(c);
+  C.chooseClub(c, 'jaguars'); C.finishAuction(c);
   const before = c.money;
   playSeason(c);
   assert.equal(c.phase, 'done');
   const h = c.history[0];
   assert.ok(h.pos >= 1 && h.pos <= 8);
-  assert.ok(c.money >= before + C.PRIZE[h.pos - 1] + C.SPONSOR - 0.001);
+  assert.equal(h.div, 'd3');
+  assert.ok(c.money >= before + C.PRIZE[h.pos - 1] * 0.35 + C.SPONSOR - 0.01);
   assert.equal(Object.values(c.titles).reduce((a, b) => a + b, 0), 1);
   assert.ok(C.leaders(c, 'all', 'runs', 1)[0].stats.all.runs > 50);
   assert.ok(C.leaders(c, 'all', 'wkts', 1)[0].stats.all.wkts > 3);
   assert.ok(c.records.hs.length && c.records.bb.length);
 });
 
-test('the off-season: a year older, contracts end, youngsters arrive, giants unlock', () => {
+test('the off-season: a year older, contracts end, youngsters arrive, you stay with your club', () => {
   const c = C.newCareer(10);
-  C.chooseClub(c, 'eagles'); C.finishAuction(c); playSeason(c);
+  C.chooseClub(c, 'jaguars'); C.finishAuction(c); playSeason(c);
   const p = Object.values(c.players).find(x => !x.retired && x.age < 30);
   const age = p.age, count = Object.keys(c.players).length;
   C.nextSeason(c);
-  assert.equal(c.season, 2); assert.equal(c.phase, 'pick');
+  assert.equal(c.season, 2); assert.equal(c.phase, 'auction'); assert.equal(c.club, 'jaguars');
   assert.equal(c.players[p.id].age, age + 1);
   assert.equal(Object.keys(c.players).length, count + 7);
-  assert.ok(C.isUnlocked(teamById('vipers'), 2) && !C.isUnlocked(teamById('cyclones'), 2));
   const runs = c.players[C.leaders(c, 'all', 'runs', 1)[0].id].stats.all.runs;
-  C.chooseClub(c, 'vipers'); C.finishAuction(c); playSeason(c, 5);
+  C.finishAuction(c); playSeason(c, 5);
   assert.ok(C.leaders(c, 'all', 'runs', 1)[0].stats.all.runs >= runs, 'all-time stats keep growing');
 });
 
@@ -107,7 +109,7 @@ test('painted players are as old as they look, in new and saved careers', async 
 
 test('travelling scouts: finds during the season, signed at a set price before the next auction', () => {
   const c = C.newCareer(11);
-  C.chooseClub(c, 'royals'); C.finishAuction(c);
+  C.chooseClub(c, 'lanterns'); C.finishAuction(c);
   const money0 = c.money;
   assert.equal(C.sendScout(c, 'africa'), true);
   assert.equal(C.sendScout(c, 'africa'), false); // already out there
@@ -119,17 +121,53 @@ test('travelling scouts: finds during the season, signed at a set price before t
   assert.ok(found.length >= 4 && found.length <= 6, `found ${found.length}`);
   for (const p of found.filter(p => p.scouted.region === 'africa')) assert.ok(p.age <= 20 && ['ZA', 'ZW', 'KE', 'NA', 'UG'].includes(p.nation));
   C.nextSeason(c);
-  C.chooseClub(c, 'royals');
   assert.equal(c.phase, 'scouts');
   const finds = C.scoutFinds(c);
   assert.equal(finds.length, found.length);
   c.money = 50;
   const pick = finds[0], price = pick.scouted.price;
   assert.equal(C.signFind(c, pick.id), true);
-  assert.equal(pick.team, 'royals');
+  assert.equal(pick.team, 'lanterns');
   assert.equal(c.money, Math.round((50 - price) * 100) / 100);
   C.finishScouts(c);
   assert.equal(c.phase, 'auction');
   // the rest go under the hammer
   for (const p of finds.slice(1)) assert.ok(c.auction.lots.includes(p.id));
+});
+
+test('promotion and relegation: one club up and one down between each pair of divisions', () => {
+  const c = C.newCareer(21);
+  C.chooseClub(c, 'rockets'); C.finishAuction(c);
+  const before = JSON.parse(JSON.stringify(c.divisions));
+  playSeason(c, 7);
+  // (if you were in the play-off it would wait for you; in Division 3 you never are)
+  assert.equal(c.phase, 'done');
+  const M = c.moves;
+  for (const d of C.DIV_ORDER) assert.equal(c.divisions[d].length, 8, d);
+  assert.ok(before.d3.includes(M.d3up) && c.divisions.d2.includes(M.d3up));
+  assert.ok(before.d2.includes(M.d2down) && c.divisions.d3.includes(M.d2down));
+  assert.ok(before.d2.includes(M.d2up) && c.divisions.asl.includes(M.d2up));
+  assert.ok(M.playoff.includes(M.aslDown) && c.divisions.d2.includes(M.aslDown));
+  assert.equal(c.history[0].promoted ? c.club === M.d3up : c.club !== M.d3up, true);
+});
+
+test('the Super League play-off: yours to play when you finish 7th or 8th', () => {
+  const c = C.newCareer(23);
+  C.chooseClub(c, 'rockets'); C.finishAuction(c);
+  // put your club in the Super League in place of the Royals
+  c.divisions.asl = c.divisions.asl.map(id => (id === 'royals' ? 'rockets' : id));
+  c.divisions.d3 = c.divisions.d3.map(id => (id === 'rockets' ? 'royals' : id));
+  C.startSeason(c);
+  // lose every match: bottom of the table
+  let f, n = 0;
+  while ((f = nextFixture(c.league)) && n++ < 12) {
+    const m = { ia: { runs: 40, wkts: 3, balls: 30 }, ib: { runs: 41, wkts: 0, balls: 20 } };
+    C.afterLeagueMatch(c, { innings: [fakeInn('player', m.ia), fakeInn('ai', m.ib)], result: { outcome: 'loss' }, oppTeam: { id: f.opp } });
+  }
+  assert.equal(c.phase, 'playoff');
+  assert.ok(c.playoff.opp && c.playoff.opp !== 'rockets');
+  C.afterPlayoff(c, { innings: [fakeInn('player', { runs: 60, wkts: 1, balls: 30 }), fakeInn('ai', { runs: 30, wkts: 3, balls: 30 })], result: { outcome: 'win' }, oppTeam: { id: c.playoff.opp } });
+  assert.equal(c.phase, 'done');
+  assert.ok(c.divisions.asl.includes('rockets'), 'won the play-off: stays up');
+  assert.ok(c.history.at(-1).playoff.won);
 });

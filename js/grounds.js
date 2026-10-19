@@ -1,3 +1,4 @@
+import { LEAGUE_CLUBS } from './teams.js';
 // Every club's home ground: how it looks (sky, crowd, landmark, outfield) and how its pitch
 // plays. A match is played at the home side's ground; the painter in scene.js reads this.
 //
@@ -55,6 +56,24 @@ export const GROUNDS = {
     pitch: { id: 'quick', name: 'Lightning outfield', report: 'A true pitch and a glass-fast outfield: the ball races to the rope.', field: 0.92 },
   },
 };
+// the lower-division clubs' grounds: smaller, simpler places (no landmark), each with its own
+// light and a pitch that suits the way the club plays
+const LOOKS = [
+  { time: 'day', sky: ['#4aa3e0', '#8fcbf0', '#dff2ff'], skyline: '#6f8297', windows: [] },
+  { time: 'evening', sky: ['#1d1b4a', '#4a3a86', '#f0a46a'], skyline: '#2a2346', windows: ['#ffe9a8'] },
+  { time: 'sunset', sky: ['#3a1534', '#b8462a', '#ffbe5c'], skyline: '#3b1a1a', windows: ['#ffd36b'] },
+  { time: 'overcast', sky: ['#6f7a86', '#9aa6b1', '#c9d1d6'], skyline: '#4c5a52', windows: [] },
+];
+const PITCHES = [
+  { id: 'flat', name: 'Flat deck', report: 'Good for batting: the ball comes on nicely.', bat: 1.04 },
+  { id: 'swing', name: 'Damp and green', report: 'Some moisture early on: the new ball will move.', swing: 1.25, seam: 1.15 },
+  { id: 'turner', name: 'Dry and dusty', report: 'It will grip and turn as the game goes on.', turn: 1.3 },
+  { id: 'slow', name: 'Slow and low', report: 'Hard to time: work the ones and twos.', kmh: 0.96, bat: 0.98 },
+];
+LEAGUE_CLUBS.forEach((t, i) => {
+  const L = LOOKS[i % LOOKS.length];
+  GROUNDS[t.id] = { name: t.ground, landmark: null, ...L, grass: ['#24803f', '#31994d'], pitchCol: '#d9b97a', pitch: PITCHES[(i * 3) % PITCHES.length] };
+});
 // the national sides' grounds: a club's ground and pitch under its own name
 GROUNDS.india = { ...GROUNDS.thunder, name: 'Blue Lights Stadium' };
 GROUNDS.pakistan = { ...GROUNDS.cyclones, name: 'Crescent Park' };
