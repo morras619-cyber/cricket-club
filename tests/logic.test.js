@@ -245,3 +245,12 @@ test('ratings are felt: a 94 hits it 100 m, a 64 barely clears the short side', 
   assert.ok(timingFor(94) > timingFor(75) && timingFor(75) > timingFor(64));
   assert.ok(aiSpread(94) < aiSpread(75) && aiSpread(75) < aiSpread(64));
 });
+
+test('each swipe direction plays its own shot', async () => {
+  const { shotAnim } = await import('../js/batsprite.js');
+  const d = deg => shotAnim({ kind: 'drive', angle: deg * Math.PI / 180 });
+  assert.equal(d(0), 'straight'); assert.equal(d(10), 'straight'); assert.equal(d(-10), 'straight');
+  assert.equal(d(35), 'cover'); assert.equal(d(80), 'cut'); assert.equal(d(140), 'rsweep');
+  assert.equal(d(-35), 'drive'); assert.equal(d(-80), 'pull'); assert.equal(d(-150), 'pull');
+  assert.equal(shotAnim({ kind: 'block', angle: 0 }), 'block');
+});

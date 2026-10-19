@@ -31,12 +31,13 @@ const FRAMES = {
 };
 
 // the frames the kit sheet has and the old per-team sheets (and the batter seen from the front) don't
-export const OLD_FRAME = { drive4: 'drive3', pull4: 'pull3', pull5: 'pull3', cut4: 'cut3', cut5: 'cut3', cut6: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3', cover1: 'drive2', cover2: 'drive3', cover3: 'drive3', cover4: 'drive3' };
+export const OLD_FRAME = { drive4: 'drive3', pull4: 'pull3', pull5: 'pull3', cut4: 'cut3', cut5: 'cut3', cut6: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3', cover1: 'drive2', cover2: 'drive3', cover3: 'drive3', cover4: 'drive3', straight1: 'drive2', straight2: 'drive3' };
 
 // frame, ms on screen. The swing starts when the finger lifts, which is the moment of contact,
 // so the downswing is brief and the contact frame lands almost at once.
 const SEQ = {
   drive: [['drive1', 25], ['drive2', 35], ['drive3', 150], ['drive4', Infinity]],
+  straight: [['straight1', 160], ['straight2', Infinity]], // bat through the line, high finish
   cover: [['cover1', 140], ['cover2', 90], ['cover3', 90], ['cover4', Infinity]], // bat on the ball, up into the finish
   pull: [['pull0', 20], ['pull1', 30], ['pull2', 100], ['pull3', 90], ['pull4', 110], ['pull5', Infinity]],
   cut: [['cut1', 25], ['cut2', 30], ['cut3', 100], ['cut4', 90], ['cut5', 110], ['cut6', Infinity]],
@@ -47,17 +48,22 @@ const SEQ = {
 };
 const BLEND_MS = 40;
 
-// which animation a swipe plays: the forward drive (straight and to leg), the cover drive, pulls to leg, cuts to off, the reverse
-// sweep fine behind square on the off side
+// Which animation a swipe plays: each direction its own shot, so the bat goes where the ball goes.
+// angle: 0 straight back past the bowler, + toward the off side (right of the screen), − leg side.
+//   straight ±15°  ·  cover drive 15–55° off  ·  cut 55–110° off  ·  reverse sweep beyond 110° off
+//   on-drive 15–55° leg (for now the forward drive)  ·  pull beyond 55° leg (fine leg too, for now)
+const DEG = Math.PI / 180;
 export function shotAnim(shot) {
   if (!shot) return 'drive';
   if (shot.kind === 'block') return 'block';
   if (shot.kind === 'leave') return 'leave';
-  if (shot.angle < -0.55) return 'pull';
-  if (shot.angle > 1.9) return 'rsweep'; // behind square on the off side
-  if (shot.angle > 0.95) return 'cut';
-  if (shot.angle > 0.35) return 'cover'; // through the off side
-  return 'drive';
+  const a = shot.angle;
+  if (a > 110 * DEG) return 'rsweep';
+  if (a > 55 * DEG) return 'cut';
+  if (a > 15 * DEG) return 'cover';
+  if (a >= -15 * DEG) return 'straight';
+  if (a >= -55 * DEG) return 'drive';
+  return 'pull';
 }
 
 const atlases = new Map(); // team id -> { img, ready }
