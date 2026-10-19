@@ -53,7 +53,7 @@ export function aiBowlingScript(seed, kind, powerKind) {
   return out;
 }
 
-function applyPower(d, powerKind) {
+export function applyPower(d, powerKind) {
   d.power = powerKind;
   if (powerKind === 'tornado') Object.assign(d, { length: 'yorker', lane: 'stumps', x: 0, kmh: 160, swing: 0.05, move: 0, type: 'Tornado Yorker', slower: false });
   if (powerKind === 'shatter') Object.assign(d, { length: 'good', lane: 'off', x: 0.2, move: 0.3, type: 'Shatter Seam', slower: false });

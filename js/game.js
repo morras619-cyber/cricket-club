@@ -6,7 +6,7 @@ import { teamById, rivalTeam, teamLook } from './teams.js';
 import { makeDelivery } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
 import { simulateHit, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
-import { aiBowlingScript, aiBat, aiStance } from './ai.js';
+import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
@@ -1544,6 +1544,7 @@ export class Game {
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
+    if (opt.findHit) { const r = this.findHit(opt.findHit, field); if (r) ai = { ...ai, grade: 'good', res: r }; }
 
     await this.until(() => this.gameTime - S.ballT0 >= d.tContact);
     if (ai.res.outcome !== 'leave') { S.batter.swingT0 = this.realTime; if (ai.res.outcome !== 'defend') this.swingArc(this.oppTeam, 'bowl'); }
@@ -1912,7 +1913,7 @@ export class Game {
   noteEvent(ballNo) { this.fieldState.events++; this.fieldState.lastEventBall = ballNo; }
 
   async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit) {
-    const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field * fieldSpeed(this.sideRating(this.mySide)) });
+    const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field * fieldSpeed(this.sideRating(this.mySide)), riskyRun: res.risky ? 1 : undefined });
     const ctl = ch => playerControls(ch, this.fieldState, ballNo);
 
     if (sim.catch) {
@@ -1984,9 +1985,27 @@ export class Game {
     if (sim.runs === 0) { this.charge.award('dot', 'DOT'); this.charge.dot(); }
   }
 
+  // A shot that gives your field a chance (the tutorial): 'catch', a skier that comes down to a
+  // fielder; 'runout', a push into the field and a risky single to a fielder close by.
+  findHit(kind, field) {
+    const speed = this.pitch.field * fieldSpeed(this.sideRating(this.mySide));
+    const catching = kind === 'catch';
+    for (const v of catching ? [26, 24, 28, 22, 30] : [13, 15, 11, 17, 19])
+      for (const deg of catching ? [44, 50, 38] : [3])
+        for (let a = 0.25; a < 1.3; a += 0.03) for (const ang of [a, -a]) {
+          const res = { outcome: 'hit', angle: ang, loft: catching, launchDeg: deg, v, risky: !catching };
+          const sim = simulateHit(res, field, makeRng(17), { aiBatting: true, speed, riskyRun: catching ? undefined : 1 });
+          if (catching && sim.catch && sim.catch.p > 0.85 && sim.catch.t > 2.2) return res;
+          const ro = sim.runOut;
+          if (!catching && ro && !sim.catch && ro.t > 1 && Math.hypot(ro.fielder.x - ro.point.x, ro.fielder.y - ro.point.y) <= 8) return res;
+        }
+    return null;
+  }
+
   // ---------- Wicket-Keeper Mode ----------
   async keeperEvent(kind, d, offset, opt = {}) {
     const S = this.S;
+    if (this.mode === 'tutorial') await this.coach?.('tutKeeper');
     this.view = 'keeper';
     this.phase = 'keeper';
     this.refreshPowers();
@@ -2152,6 +2171,7 @@ export class Game {
   async catchEvent(sim, field) {
     const c = sim.catch, path = sim.path, L = c.point, T = path.T;
     const me = this.startEvent(field, c.fielder.id);
+    if (this.mode === 'tutorial') await this.coach?.('tutCatch');
     this.fx.word('CATCH IT!', this.W / 2, this.H * 0.2, { size: 50, dur: 1000 });
     this.timeScale = 0.6;
     const t0 = this.gameTime;
@@ -2229,6 +2249,7 @@ export class Game {
   async runOutEvent(sim, field) {
     const ro = sim.runOut, path = sim.path;
     const me = this.startEvent(field, ro.fielder.id);
+    if (this.mode === 'tutorial') await this.coach?.('tutRunOut');
     this.fx.word('RUN OUT CHANCE!', this.W / 2, this.H * 0.2, { size: 46, dur: 1000 });
     this.timeScale = 0.7;
     const t0 = this.gameTime, P = ro.point;
@@ -2377,12 +2398,12 @@ export class Game {
   // ---------- Issue #1: the tutorial over ----------
   async runTutorial() {
     const inn = new Innings('player', 14);
-    inn.balls = 27; inn.runs = 0; inn.log = [];
+    inn.balls = 26; inn.runs = 0; inn.log = [];
     this.innings.push(inn);
     this.phase = 'bat';
     this.charge.value = 40; this.ui.charge(40);
     this.hud(inn);
-    this.ui.banner('ISSUE #1', `${this.team.bat.name} needs 14 off the last 3 balls`, 2200);
+    this.ui.banner('ISSUE #1', `${this.team.bat.name} needs 14 off the last 4 balls`, 2200);
     await this.sleepReal(this.bot ? 100 : 2200);
     await this.coach?.('tutBat');
     const straight = { x: 0.02, length: 'full', kmh: 128, swing: 0.02, move: 0, type: 'Half-volley' };
@@ -2393,27 +2414,38 @@ export class Game {
       }
       return null;
     };
-    // balls 1 and 2: assisted, replayed once if missed
-    for (const [i, slow, extra] of [[1, 0.5, 120], [2, 1, 60]]) {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const before = inn.balls;
-        const runsBefore = inn.runs;
-        const curBefore = { ...inn.cur }, otherBefore = { ...inn.other }, stintsBefore = [...inn.stints];
-        const out = { v: false };
-        await this.batBall(inn, inn.balls + 1, straight, {
-          slow, extra, assist: assistHit, onOut: () => { out.v = true; },
-          hint: i === 1 ? 'HOLD · SWIPE UP · LIFT ON THE RING' : 'SAME AGAIN — TIME IT!',
-        });
-        if (inn.runs > runsBefore || attempt === 1) break;
-        // can't be lost: undo the miss and replay once
-        inn.balls = before; inn.runs = runsBefore; inn.log.pop(); if (out.v) inn.wkts--;
-        inn.cur = curBefore; inn.other = otherBefore; inn.stints = stintsBefore;
-        this.ui.banner(`${this.team.bat.name.toUpperCase()} GOT LUCKY!`, 'Try that one again', 1400);
+    // a ball the player can't lose: a miss is undone and bowled again (up to `tries` times)
+    const fair = async (spec, opt, tries = 2, again = 'Try that one again') => {
+      for (let attempt = 0; attempt < tries; attempt++) {
+        const keep = { balls: inn.balls, runs: inn.runs, wkts: inn.wkts, cur: { ...inn.cur }, other: { ...inn.other }, stints: [...inn.stints], log: inn.log.length };
+        await this.batBall(inn, inn.balls + 1, spec, opt(attempt));
+        const ok = opt(attempt).ok ? opt(attempt).ok(keep) : inn.runs > keep.runs;
+        if (ok || attempt === tries - 1) break;
+        Object.assign(inn, { balls: keep.balls, runs: keep.runs, wkts: keep.wkts, cur: keep.cur, other: keep.other, stints: keep.stints });
+        inn.log.length = keep.log;
+        this.ui.banner(`${this.team.bat.name.toUpperCase()} GOT LUCKY!`, again, 1400);
         await this.sleepReal(this.bot ? 100 : 1400);
       }
       this.hud(inn);
+    };
+    // ball 1: assisted
+    await fair(straight, () => ({ slow: 0.5, extra: 120, assist: assistHit, hint: 'HOLD · SWIPE UP · LIFT ON THE RING' }));
+    // ball 2: their star bowler powers up. Block it, or (if you dare) go for it
+    // (their own star if he bowls; else Mystic Babar Bhai and his Maya Ball)
+    if (!this.rival.bowl?.power) this.rival = { ...this.rival, bowl: heroById('babar') };
+    const star = this.rival.bowl;
+    if (star?.power) {
+      const special = { ...straight, power: star.power.kind };
+      applyPower(special, star.power.kind);
+      await fair(special, () => ({
+        extra: 60, hint: 'TAP TO DEFEND · OR GO FOR IT!',
+        waitPower: () => this.coach?.('tutBlock'),
+        ok: keep => inn.wkts === keep.wkts, // survive it and it's done, whatever it scored
+      }), 3, 'He never saw that no-ball. Again!');
     }
-    // ball 3: the power
+    // ball 3: assisted
+    await fair(straight, () => ({ extra: 60, assist: assistHit, hint: 'SAME AGAIN — TIME IT!' }));
+    // ball 4: the power
     if (this.charge.value < 60) this.charge.add(60 - this.charge.value, 'CROWD ROAR');
     await this.coach?.('tutPower');
     this.ui.banner('THE METER IS FULL ENOUGH!', `Tap ${this.team.bat.name} to fire ${this.team.bat.power.name}`, 0);
@@ -2430,35 +2462,51 @@ export class Game {
     });
     this.hud(inn);
 
-    // the defence: one ball, they need 4
+    // the defence: three balls, they need 10. A catch, a run out, then the keeper
     this.phase = 'bowl';
-    const def = new Innings('ai', 5);
-    def.balls = 29; def.runs = 1; def.log = [];
+    const def = new Innings('ai', 10);
+    def.balls = 27; def.runs = 0; def.log = [];
     this.innings.push(def);
     this.bowlHistory = []; this.aiPowerBalls = new Set(); this.freeHit = false;
     this.fieldState.setting = 'all';
     this.tutorialKeeper = { window: 600, approach: 1100 };
     this.hud(def);
-    this.ui.banner('NOW DEFEND IT!', 'They need 4 off the last ball', 2000);
+    this.ui.banner('NOW DEFEND IT!', 'They need 10 off the last 3 balls', 2000);
     await this.sleepReal(this.bot ? 100 : 2000);
     await this.coach?.('tutBowl');
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const before = { balls: def.balls, runs: def.runs, wkts: def.wkts };
-      const r = await this.bowlBall(def, 30, {
-        scripted: true, stance: 'normal', glow: { lane: 'stumps', length: 'yorker' },
-        hint: attempt ? 'SWIPE UP TO THE GLOWING ZONE' : 'SWIPE FROM YOUR BOWLER UP TO THE GLOWING ZONE',
-        forceRelease: rg => (rg === 'bad' ? 'loose' : rg),
-        spec: { length: 'yorker', bounce: 1.1, h: 0.14, x: 0 },
-        forceAi: (d, ai) => (attempt < 2
-          ? { ...ai, res: { outcome: 'edge', grade: 'edge', offset: { x: attempt ? 0.3 : 1.0, y: 0.7 } } }
-          : { ...ai, res: { outcome: 'bowled', grade: 'miss' } }),
-      });
-      if (r?.rebowl) continue;
-      if (def.wkts > before.wkts) break;
-      Object.assign(def, before); def.log = [];
-      this.ui.banner(attempt ? 'ONE LAST CHANCE' : `${this.team.field?.id === 'rani' ? 'RANI' : 'THE KEEPER'} GETS ANOTHER GO!`, 'Same ball again', 1500);
-      await this.sleepReal(this.bot ? 100 : 1500);
-    }
+    // each one until the wicket falls (a miss is undone: this over can't be lost)
+    const take = async (ballNo, opt, tries, again) => {
+      for (let attempt = 0; attempt < tries; attempt++) {
+        const before = { balls: def.balls, runs: def.runs, wkts: def.wkts, log: def.log.length, cur: { ...def.cur }, other: { ...def.other }, stints: [...def.stints] };
+        Object.assign(this.fieldState, { events: 0, lastEventBall: -9 }); // (every chance here is yours)
+        const r = await this.bowlBall(def, ballNo, opt(attempt));
+        if (r?.rebowl) continue;
+        if (def.wkts > before.wkts) {
+          if (!def.done()) { await this.newBatter(def); this.prepPlayers(def); }
+          this.hud(def);
+          return;
+        }
+        Object.assign(def, { balls: before.balls, runs: before.runs, wkts: before.wkts, cur: before.cur, other: before.other, stints: before.stints }); def.log.length = before.log;
+        this.hud(def);
+        if (attempt < tries - 1) {
+          this.ui.banner(again[attempt] || again.at(-1), 'Same ball again', 1500);
+          await this.sleepReal(this.bot ? 100 : 1500);
+        }
+      }
+    };
+    const plain = { scripted: true, stance: 'normal', hint: 'SWIPE FROM YOUR BOWLER UP THE PITCH', forceRelease: rg => (rg === 'bad' ? 'loose' : rg) };
+    await take(28, () => ({ ...plain, findHit: 'catch' }), 3, ['HE GOT AWAY WITH IT!']);
+    await take(29, () => ({ ...plain, findHit: 'runout' }), 3, ['THEY MADE IT!']);
+    await this.coach?.('tutYorker');
+    await take(30, attempt => ({
+      scripted: true, stance: 'normal', glow: { lane: 'stumps', length: 'yorker' },
+      hint: attempt ? 'SWIPE UP TO THE GLOWING ZONE' : 'SWIPE FROM YOUR BOWLER UP TO THE GLOWING ZONE',
+      forceRelease: rg => (rg === 'bad' ? 'loose' : rg),
+      spec: { length: 'yorker', bounce: 1.1, h: 0.14, x: 0 },
+      forceAi: (d, ai) => (attempt < 2
+        ? { ...ai, res: { outcome: 'edge', grade: 'edge', offset: { x: attempt ? 0.3 : 1.0, y: 0.7 } } }
+        : { ...ai, res: { outcome: 'bowled', grade: 'miss' } }),
+    }), 3, [`${this.team.field?.id === 'rani' ? 'RANI' : 'THE KEEPER'} GETS ANOTHER GO!`, 'ONE LAST CHANCE']);
     this.tutorialKeeper = null;
     this.ui.banner('YOU WON ISSUE #1!', 'Your first superhero win', 2000);
     sfx.crowd(1.4);

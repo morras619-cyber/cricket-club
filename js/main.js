@@ -567,7 +567,7 @@ function showCover() {
   p.innerHTML = '<div class="issue">ISSUE #1</div><h2>THE FINAL OVER</h2>';
   p.append(portrait(heroById('raja'), 140, 'bat'));
   const t = document.createElement('p');
-  t.textContent = 'Thunder Raja needs 14 off the last 3 balls. Then you defend the final ball.';
+  t.textContent = 'Thunder Raja needs 14 off the last 4 balls. Then you defend the final 3.';
   p.append(t);
 }
 $('coverGo').addEventListener('click', () => startMatch({ mode: 'tutorial' }));

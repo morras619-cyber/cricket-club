@@ -50,19 +50,40 @@ export const DEV = {
   welcome: [
     "Welcome, beta! I'm Uncle Dev. I've watched cricket for fifty years and coached for thirty, so stick with me.",
     "This is Sixcharge: cricket with superheroes. Every player has a power, and your charge meter decides when you can use it.",
-    "Let's start with a final over. You need 14 off the last 3 balls. Don't worry, I'll be right here.",
+    "Let's start with a final over. You need 14 off the last 4 balls. Don't worry, I'll be right here.",
   ],
   tutBat: [
     "Batting is all in the timing. Hold your finger down, swipe up, and lift off when the ring lights up.",
     "Middle it and the ball flies. Mistime it and it doesn't. Watch the ring, not the bowler!",
+  ],
+  tutBlock: [
+    "Uh-oh, beta. Their star bowler has fired his power. This ball is special and it's coming at you hard.",
+    "The safe play is to tap anywhere to defend it. Block it, survive, and we'll score off the next one.",
+    "But if you're feeling really brave... go for it! Time it perfectly and it flies. Your call!",
+  ],
+  tutKeeper: [
+    "Edge! Now you're the wicket-keeper. The ball is flying to you behind the stumps.",
+    "Watch the ring and tap the moment it turns green. If it's wide of you, swipe that way and you'll dive for it.",
+  ],
+  tutCatch: [
+    "He's skied it! Now you're the fielder underneath it.",
+    "Wait for the ring to shrink and turn green, then tap. Too early and it's a drop. Patience, beta!",
+  ],
+  tutRunOut: [
+    "They're going for a quick single. Run-out chance!",
+    "Tap anywhere to pick the ball up when the ring is green, then tap the stumps to throw. Hit them and he's gone!",
+  ],
+  tutYorker: [
+    "Two down! Last ball. Aim for the glowing zone at his feet.",
+    "A yorker there is the hardest ball in cricket to hit. If he gets a nick, it's coming to the keeper. That's you!",
   ],
   tutPower: [
     "See your meter? Good shots and big moments fill it. Full enough means your hero can fire his power.",
     "Tap your hero's card first, then swipe as normal. That's how you win the impossible ones.",
   ],
   tutBowl: [
-    "Now we bowl. They need 4 off one ball. Swipe from your bowler up the pitch to where you want the ball to land.",
-    "Aim for the glowing zone at his feet. A yorker there is the hardest ball in cricket to hit.",
+    "Now we bowl. They need 10 off the last 3 balls. Swipe from your bowler up the pitch to where you want the ball to land.",
+    "Bowl well and they'll make mistakes. When the ball comes to your fielders, I'll tell you what to do.",
   ],
   tutDone: [
     "What did I tell you? A natural!",
