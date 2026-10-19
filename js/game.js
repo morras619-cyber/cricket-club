@@ -264,6 +264,7 @@ export class Game {
     this.bowlChoice = { field: opts.field?.preset || 'balanced', custom: opts.field?.custom || null };
     this.bowlHistory = []; this.batterMood = { state: 'calm', balls: 0 };
     this.scouted = false; this.revenge = false; this.playerRevenge = false;
+    this.scoutEarly = !!opts.scoutEarly; // (your match scout: the report before the first ball)
     this.bowlHints = 3; this.afterHints = 3;
     this.ui.hud(true);
     this.innings = [];
@@ -1336,7 +1337,7 @@ export class Game {
       if (inn.balls % 6 === 0 && this.overStarted !== inn.balls) { this.overStarted = inn.balls; await this.startOver(inn); }
       this.hud(inn);
       this.phaseBanner(ballNo);
-      if (ballNo === 7 && !this.scouted && inn.kind === 'main') {
+      if ((ballNo === 7 || (this.scoutEarly && ballNo === 1)) && !this.scouted && inn.kind === 'main') {
         this.scouted = true;
         const b = this.batterOf(inn);
         this.ui.banner('SCOUTING REPORT', `${b.name} ${b.ai.label}. The weak spot is now marked on the pitch.`, 2600);

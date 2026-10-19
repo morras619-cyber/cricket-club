@@ -11,7 +11,7 @@ import { futCard, portraitFace } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason, migrateCareer } from './career.js';
+  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason, migrateCareer, SCOUTS, hasScout, hireScout } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -592,7 +592,7 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   const mode = opts.mode;
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
-  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null, home = null;
+  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null, home = null, scoutEarly = false;
   if (mode === 'tutorial') {
     team = 'thunder'; home = 'thunder'; sq = { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') }; levels = {};
   } else if (mode === 'war' || mode === 'warmup') {
@@ -616,6 +616,7 @@ async function startMatch(opts) {
       const f = nextFixture(c.league);
       team = c.club; opp = f.opp; home = f.home;
       pools = { mine: clubPool(c, team), opp: clubPool(c, opp) };
+      scoutEarly = hasScout(c, 'match');
       lineup = c.lineup;
     }
     if (mode === 'challenge') {
@@ -633,7 +634,7 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   if (mode === 'quick') await quickTip();
   const summary = await game.runMatch({
-    mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+    mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge, scoutEarly,
     records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
   });
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
@@ -967,7 +968,7 @@ $('careerSquad').addEventListener('click', () => { careerView = careerView === '
 $('careerRecords').addEventListener('click', () => renderRecords());
 $('careerCoach').addEventListener('click', () => {
   const c = career();
-  coachSay(DEV[{ pick: 'leagueTeam', auction: 'auction', season: 'season', done: 'seasonEnd' }[c.phase]]);
+  coachSay(c.phase === 'auction' ? [...DEV.auction, ...DEV.scoutTip] : DEV[{ pick: 'leagueTeam', season: 'season', done: 'seasonEnd' }[c.phase]]);
 });
 // start the Super League again from season 1: a fresh league, a fresh auction (nothing else is touched)
 confirmTap($('careerRestart'), 'Tap again to restart from season 1', () => {
@@ -1046,12 +1047,15 @@ function careerPick(c, body) {
 function careerAuction(c, body) {
   const lot = currentLot(c);
   const mine = clubPlayers(c, c.club);
-  coachOnce('auction', DEV.auction).then(shown => {
+  coachOnce('auction', DEV.auction).then(async shown => {
+    // before the first bid: hire a scout (if you haven't)
+    if (lot && !hasScout(c, 'auction')) shown = (await coachOnce('scoutTip', DEV.scoutTip)) || shown;
     // short of players with the money running out: once a season
     if (!shown && lot && mine.length < MIN_SQUAD - 2 && c.money < 0.8) coachOnce(`auctionLow-${c.season}`, DEV.auctionLow);
   });
   const status = el('div', 'panel paper notecard', `${teamById(c.club).name} · squad ${mine.length}/${MAX_SQUAD} · ${money(c.money)} to spend`);
   body.append(status);
+  if (lot) body.append(scoutsPanel(c, ['auction', 'match']));
   if (!lot) {
     const done = el('div', 'panel paper fixture');
     done.append(el('h3', '', 'The auction is over'), el('p', '', 'Every club needs at least 10 players: any gaps are filled with free agents and academy graduates.'));
@@ -1067,6 +1071,7 @@ function careerAuction(c, body) {
     card.append(futCard(p, { size: Math.min(250, window.innerWidth * 0.62) }));
     card.append(el('p', 'lotmeta', `${ageNote(p)} · bat ${p.bat}${p.bowlSkill ? ` · bowl ${p.bowlSkill}` : ''} · worth ${money(value(p))}`));
     if (p.heroId) card.append(el('div', 'herostat', `${heroById(p.heroId).power.name}: ${heroById(p.heroId).power.desc}`));
+    if (hasScout(c, 'auction')) card.append(scoutReport(c, p, lot));
     const price = el('div', 'lotprice');
     price.append(el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'Opening price'));
     card.append(price);
@@ -1094,6 +1099,7 @@ function careerAuction(c, body) {
     card.append(skip);
     body.append(card);
   }
+  if (lot && hasScout(c, 'auction')) body.append(scoutShortlist(c));
   const res = c.auction.results.slice(-8).reverse();
   if (res.length) {
     const rb = el('div', 'panel paper statcard');
@@ -1101,6 +1107,47 @@ function careerAuction(c, body) {
     for (const r of res) rb.append(el('div', 'kotie' + (r.team === c.club ? ' mine' : ''), `${c.players[r.pid].name} → ${r.team ? `${teamById(r.team).name} · ${money(r.price)}` : 'unsold'}`));
     body.append(rb);
   }
+}
+
+// ---------- scouts ----------
+function scoutsPanel(c, kinds) {
+  const box = el('div', 'panel paper scoutpanel');
+  box.append(el('h3', '', '🔎 Scouts'));
+  for (const k of kinds) {
+    const S = SCOUTS[k], row = el('div', 'scoutrow');
+    const txt = el('div'); txt.append(el('b', '', S.name), el('small', '', S.desc));
+    const btn = el('button', 'chipbtn', hasScout(c, k) ? '✓ Hired' : `Hire · ${money(S.cost)}`);
+    btn.disabled = hasScout(c, k) || c.money < S.cost;
+    btn.addEventListener('click', () => {
+      if (hireScout(c, k)) { sfx.full(); ui.toast(`${S.name} hired for season ${c.season}`); saveProfile(profile); renderCareer(); }
+    });
+    row.append(txt, btn); box.append(row);
+  }
+  box.append(el('p', 'sheetnote', 'Scouts are hired for one season at a time.'));
+  return box;
+}
+// the auction scout on the player under the hammer
+function scoutReport(c, p, lot) {
+  const box = el('div', 'scoutnotes');
+  const worth = value(p), price = lot.price;
+  const verdict = price <= worth * 0.8 ? ['💰 Bargain', `At ${money(price)} he's a bargain: he's worth ${money(worth)}.`]
+    : price <= worth * 1.1 ? ['👍 Fair price', `${money(price)} is about right: he's worth ${money(worth)}.`]
+      : ['⚠️ Overpriced', `He's worth ${money(worth)}. Let him go if the bidding passes ${money(worth * 1.1)}.`];
+  box.append(el('b', '', `🔎 Scout: ${verdict[0]}`), el('div', '', verdict[1]));
+  box.append(el('div', '', `True potential ${p.pot}${p.pot > ovr(p) + 2 ? ` (now ${ovr(p)}: ${p.age <= 22 ? 'he will grow fast' : 'room to grow'})` : ' (close to his best already)'}.`));
+  if (p.ai?.label && p.role !== 'bowl') box.append(el('div', '', `Weak spot: ${p.ai.label}.`));
+  return box;
+}
+// the auction scout's shortlist: the best value among the lots still to come
+function scoutShortlist(c) {
+  const A = c.auction, ahead = A.lots.slice(A.idx + 1, 16).map(id => c.players[id]).filter(Boolean);
+  const box = el('div', 'panel paper statcard');
+  box.append(el('h3', '', "🔎 Scout's shortlist"));
+  const score = p => (ovr(p) + 0.6 * Math.max(0, p.pot - ovr(p))) / Math.max(0.2, value(p));
+  const top = ahead.sort((a, b) => score(b) - score(a)).slice(0, 3);
+  if (!top.length) box.append(el('div', 'kotie', 'Nobody left worth chasing. Spend on the player in front of you.'));
+  for (const p of top) box.append(el('div', 'kotie', `${flagName(p)} · ${ovr(p)} now, potential ${p.pot} · worth ${money(value(p))}`));
+  return box;
 }
 
 // the season: the next fixture, the table and the bracket
@@ -1116,9 +1163,18 @@ function careerSeason(c, body) {
     const o = teamById(f.opp);
     const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
     const best = [...theirs].sort((a, b) => ovr(b) - ovr(a))[0];
-    body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
-      () => startMatch({ mode: 'career' })));
+    const card = fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
+      () => startMatch({ mode: 'career' }));
+    if (hasScout(c, 'match')) {
+      // the match scout's notes: how their best batters get out
+      const notes = el('div', 'scoutnotes');
+      notes.append(el('b', '', '🔎 Scout: their batters'));
+      for (const p of [...theirs].sort((a, b) => b.bat - a.bat).slice(0, 4)) if (p.ai?.label) notes.append(el('div', '', `${flagName(p)} ${p.ai.label}`));
+      card.insertBefore(notes, card.querySelector('.playbtn'));
+    }
+    body.append(card);
   }
+  if (!hasScout(c, 'match')) body.append(scoutsPanel(c, ['match']));
   body.append(...leaguePanels(c.league));
 }
 
