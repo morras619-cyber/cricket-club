@@ -26,6 +26,7 @@ import { sfx, buzz, unlockAudio } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
+import { drawKitFielder } from './kitsprite.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -2534,13 +2535,20 @@ export class Game {
     const items = [];
     const push = (z, fn) => items.push({ d: cam.depth(z), fn });
 
-    for (const f of S.field3d || []) {
+    // the fielders, each with his own skin, name and number (once per field)
+    if (S.field3d && S.field3dPeopleFor !== S.field3d) {
+      S.field3dPeopleFor = S.field3d;
+      S.field3dPeople = this.fieldLooks(S.field3d, kind === 'bat' ? 'ai' : 'player').map(f => f.people);
+    }
+    for (const [fi, f] of (S.field3d || []).entries()) {
       push(f.y, () => {
         const p = kind !== 'keeper' && cam.project(f.x, 0, f.y);
         // bowling view: fielders level with or behind the batter (square, slips, fine leg) face the
         // camera, watching the batter; those between him and the bowler show their backs
         const faceCam = kind === 'bat' || f.y < 3.5;
-        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, 'field', kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0, faceCam ? 'front' : 'back')) return;
+        const team = kind === 'bat' ? this.oppTeam : this.myTeam, people = S.field3dPeople?.[fi];
+        if (p && people && drawKitFielder(ctx, p.x, p.y, p.k, faceCam ? 'ready_front' : 'ready_back', team, people)) return;
+        if (p && drawBowlSprite(ctx, p.x, p.y, p.k, 'field', team, f.x > 0, faceCam ? 'front' : 'back')) return;
         drawFigure3D(ctx, cam, f.x, f.y, teamLook(kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0 ? 1 : 0), POSES.crouch(), { noShadow: false });
       });
     }
@@ -2945,7 +2953,52 @@ export class Game {
     else if (o.face == null && toward) { const q = V.to(toward.x, toward.y); o.face = Math.atan2(q.y - p.y, q.x - p.x); }
     return { p, face: o.face ?? -Math.PI / 2, moving: Math.hypot(dx, dy) > 0.02 };
   }
+  // The drawn fielder (the kit sheet): standing, he faces the pitch (from the front, the side or the
+  // back, by where he is); running, the run that goes his way on screen (away up the screen, across,
+  // toward the camera); reaching for a catch about to drop; the dive; a throw from the side.
+  kitFielder(f, i) {
+    const V = this.of, O = this.O, pose = f.pose?.name;
+    const team = O.side === 'ai' ? this.oppTeam : this.myTeam;
+    if (!f.people) return false;
+    const p = V.to(f.x, f.y), now = this.realTime;
+    const vx = f.x - (f.kx ?? f.x), vy = -(f.y - (f.ky ?? f.y)); // screen direction of travel (y down)
+    f.kx = f.x; f.ky = f.y;
+    const moving = Math.hypot(vx, vy) > 0.015;
+    if (moving) f.vdir = [vx, vy];
+    const c = V.to(0, 10), tx = c.x - p.x, ty = c.y - p.y;
+    let frame, flip = false;
+    const cyc = (list, rate) => list[Math.floor(this.gameTime * rate + i * 0.37) % list.length];
+    if (pose === 'dive') {
+      if (f.diveT0 == null) f.diveT0 = now;
+      const k = Math.min(3, Math.floor((now - f.diveT0) / 110));
+      frame = 'dive' + (k + 1); flip = (f.pose.arg || 1) < 0; f.dived = true;
+    } else if (pose === 'celebrate') {
+      frame = f.dived ? 'dive4' : 'reach'; flip = f.dived ? (f.pose.arg || 1) < 0 : tx < 0;
+    } else if (f.throwT0 != null && now - f.throwT0 < 450) {
+      frame = now - f.throwT0 < 180 ? 'side1' : 'side3'; flip = Math.cos(f.throwFace ?? 0) < 0;
+    } else if (f.ctrl && O.meter && O.meter.k > 0.78 && O.meter.label?.startsWith('TAP ANYWHERE IN')) {
+      frame = 'reach'; flip = (O.ball ? V.to(O.ball.x, O.ball.y).x : c.x) < p.x;
+    } else if (moving || pose === 'run') {
+      const [dx, dy] = f.vdir || [tx, ty];
+      if (Math.abs(dx) > Math.abs(dy) * 0.9) { frame = cyc(['side1', 'side2', 'side3', 'side2'], 9); flip = dx < 0; }
+      else if (dy < 0) frame = cyc(['away1', 'away2', 'away3', 'away4'], 9);
+      else { frame = 'toward'; flip = dx < 0; }
+    } else {
+      f.diveT0 = null;
+      if (Math.abs(tx) > Math.abs(ty) * 1.4) { frame = 'ready_side'; flip = tx < 0; }
+      else frame = ty < 0 ? 'ready_back' : 'ready_front';
+    }
+    const kPerM = Math.max(14, V.k) * (f.ctrl ? 1.15 : 1);
+    // (a running stride bobs a touch)
+    const bob = frame.startsWith('away') || frame.startsWith('side') || frame === 'toward' ? Math.abs(Math.sin(this.gameTime * 14 + i)) * 0.06 * kPerM : 0;
+    if (f.ctrl) {
+      this.ctx.fillStyle = 'rgba(255,210,63,0.35)';
+      this.ctx.beginPath(); this.ctx.ellipse(p.x, p.y, kPerM * 0.9, kPerM * 0.35, 0, 0, Math.PI * 2); this.ctx.fill();
+    }
+    return drawKitFielder(this.ctx, p.x, p.y - bob, kPerM, frame, team, f.people, flip, f.ctrl ? '#ffd23f' : null);
+  }
   topFielder(f, i) {
+    if (!f.keeper && this.kitFielder(f, i)) return true;
     const V = this.of, O = this.O, pose = f.pose?.name, ctx = this.ctx;
     const { p, face, moving } = this.topFace(f, O.ball);
     const team = O.side === 'ai' ? this.oppTeam : this.myTeam; // side 'ai': the AI's team fields
@@ -3046,8 +3099,33 @@ export class Game {
     ctx.restore();
   }
 
+  // Backing up: once the ball is out in the field, the one or two nearest fielders not already on it
+  // (the catcher, the chaser, the diver: anyone the play itself moves) jog in toward it and stop short,
+  // ready for the throw or a misfield; everyone else holds his spot, watching.
+  backUp() {
+    const O = this.O, b = O?.ball, now = this.gameTime, dt = Math.min(0.1, Math.max(0, now - (O?.buT ?? now)));
+    if (!O) return;
+    O.buT = now;
+    for (const f of O.fielders) {
+      if (f.buX != null && (Math.abs(f.x - f.buX) > 1e-6 || Math.abs(f.y - f.buY) > 1e-6)) f.onPlay = true; // moved by the play
+    }
+    const out = b && Math.hypot(b.x, b.y - CFG.ground.centerY) > 9 && Math.hypot(b.x, b.y - CFG.ground.centerY) < CFG.ground.boundaryR;
+    const free = O.fielders.filter(f => !f.keeper && !f.onPlay && !f.ctrl);
+    const near = out ? free.map(f => [f, Math.hypot(f.x - b.x, f.y - b.y)]).filter(([, d]) => d < 32).sort((u, v) => u[1] - v[1]).slice(0, O.fielders.some(f => f.onPlay || f.ctrl) ? 1 : 2) : [];
+    for (const f of free) {
+      const go = near.find(([g]) => g === f);
+      if (go && go[1] > 5) {
+        const s2 = Math.min(go[1] - 5, 5.2 * dt);
+        f.x += (b.x - f.x) / go[1] * s2; f.y += (b.y - f.y) / go[1] * s2;
+        f.pose = POSES.run(now * 12);
+      } else if (f.pose?.name === 'run') f.pose = POSES.crouch();
+      f.buX = f.x; f.buY = f.y;
+    }
+  }
+
   renderOutfield() {
     const ctx = this.ctx, O = this.O, V = this.of;
+    this.backUp();
     V.drawGround(ctx);
     if (O.ring) {
       const p = V.to(O.ring.x, O.ring.y);

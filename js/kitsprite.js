@@ -30,6 +30,12 @@ const POSE_BAT = Object.fromEntries(['ready', 'leave1', 'leave2', 'backlift', 'd
   'pull1', 'pull2', 'def1', 'def2', 'def3', 'cut1', 'cut2', 'cut3', 'cut4',
   'bowled', 'celebrate', 'rsweep1', 'rsweep2', 'rsweep3', 'straight1', 'straight2', 'ondrive1', 'ondrive2', 'cover1'].map((n, i) => [n, i]));
 const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
+// the fielders (19 poses, tools/kit/compose_fielder.py): crouched ready from the front, side and back;
+// running away, across (facing right), toward the camera, turning; reaching up; the dive (to the right)
+const POSE_FIELD = Object.fromEntries(['ready_front', 'ready_side', 'ready_back', 'away1', 'away2', 'away3', 'away4',
+  'side1', 'side2', 'side3', 'reach', 'toward', 'turn', 'away3q', 'awayB', 'dive1', 'dive2', 'dive3', 'dive4'].map((n, i) => [n, i]));
+const FIELD_PX_PER_M = 304; // the sheet's scale: the bowler's
+const FIELD_KEEP = 0.5;     // each player's frames are kept at half size (a whole team is on screen at once)
 const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }
 let fontReady = false;
 const crestImgs = new Map();
@@ -42,7 +48,7 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'bat-back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(id)) crestImgs.set(id, image(`img/logo-${id}.webp`));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -334,6 +340,87 @@ function playerSheet(view, team, look, mirror) {
   playerCache.set(key, c);
   while (playerCache.size > 4) { const [k, old] = playerCache.entries().next().value; playerCache.delete(k); old.width = 0; old.height = 0; }
   return c;
+}
+
+// One fielder's frame in his club's kit, with his skin and (from behind) his name and number, at
+// half the sheet's size. Each player-frame is made once and kept (a few hundred fit in a few MB).
+const fieldCache = new Map();
+function fielderFrame(team, look, idx) {
+  const meta = KIT_SHEETS.field, data = viewData('field');
+  if (!meta || !data || !fontReady) return null;
+  const sk = skinHex(look), name = shirtName(look.who), num = shirtNumber(look);
+  const key = [team.id, sk, name, num, idx].join('|');
+  if (fieldCache.has(key)) return fieldCache.get(key);
+  const kit = teamSheet('field', team);
+  if (!kit) return null;
+  const [sx, sy, w, h] = meta.frames[idx], [W] = meta.size;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(kit, sx, sy, w, h, 0, 0, w, h);
+  let img = g.getImageData(0, 0, w, h), p = img.data;
+  const m = data.mask, st = hexRgb(sk), sref = meta.skin * 255;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, mi = ((sy + y) * W + sx + x) * 4;
+    if (m[mi] > 127 && p[i + 3]) {
+      const r = lum(p[i], p[i + 1], p[i + 2]) / sref;
+      for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
+    }
+  }
+  const [px, py, pw, psx, psy, ang] = meta.place[idx];
+  if (pw > 0) {
+    // the name and number, as on the bowler's back (see playerSheet)
+    const layer = document.createElement('canvas');
+    layer.width = w; layer.height = h;
+    const lg = layer.getContext('2d', { willReadFrequently: true });
+    const tr = hexRgb(team.trim), su = hexRgb(team.suit), dark = lum(...tr) < 0.2 * 255, mixK = dark ? 0.42 : 0.12;
+    const fill = `rgb(${tr.map((v, k) => Math.round(v + (su[k] * (dark ? 0.45 : 1) - v) * mixK)).join(',')})`;
+    const edge = Math.abs(lum(...tr) - lum(...su)) <= 0.35 * 255 ? `rgb(${su.map(x => Math.round(x * 0.35)).join(',')})` : null;
+    const hb = BLOCK.name + BLOCK.gap + BLOCK.num;
+    for (const [text, cap, cy] of [[name, BLOCK.name, -hb / 2 + BLOCK.name / 2], [String(num), BLOCK.num, hb / 2 - BLOCK.num / 2]]) {
+      lg.save();
+      lg.translate(px - sx, py - sy); lg.rotate(ang * Math.PI / 180); lg.scale(pw / BLOCK.w * psx, pw / BLOCK.w * psy);
+      printLine(lg, text, cap, cy, fill, edge);
+      lg.restore();
+    }
+    const lp = lg.getImageData(0, 0, w, h).data, ref = lum(...premiumOf(team)[0]) || 1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4, mi = ((sy + y) * W + sx + x) * 4;
+      if (!lp[i + 3] || m[mi + 1] < 128) continue;
+      const a = lp[i + 3] / 255, f = Math.max(0.55, Math.min(1.15, lum(p[i], p[i + 1], p[i + 2]) / ref));
+      for (let k = 0; k < 3; k++) p[i + k] = p[i + k] * (1 - a) + Math.min(255, lp[i + k] * f) * a;
+    }
+    layer.width = 0; layer.height = 0;
+  }
+  g.putImageData(img, 0, 0);
+  const out = document.createElement('canvas');
+  out.width = Math.max(1, Math.round(w * FIELD_KEEP)); out.height = Math.max(1, Math.round(h * FIELD_KEEP));
+  const og = out.getContext('2d');
+  og.imageSmoothingQuality = 'high';
+  og.drawImage(c, 0, 0, out.width, out.height);
+  c.width = 0; c.height = 0;
+  fieldCache.set(key, out);
+  while (fieldCache.size > 240) { const [k0, old] = fieldCache.entries().next().value; fieldCache.delete(k0); old.width = 0; old.height = 0; }
+  return out;
+}
+
+// A fielder, feet at (px, py), kPerM pixels per metre; flip mirrors him (the sheet's side views face
+// right). False until the sheet is in (the old sprite is drawn instead).
+export function drawKitFielder(ctx, px, py, kPerM, frame, team, look, flip = false, glow = null) {
+  if (!team || !look?.who || !KIT_SHEETS.field) return false;
+  const idx = POSE_FIELD[frame] ?? 0, img = fielderFrame(team, look, idx);
+  if (!img) return false;
+  const [, , w, h, ax, ay] = KIT_SHEETS.field.frames[idx], [bh, bw] = buildOf(look);
+  const k = kPerM / FIELD_PX_PER_M * bh, kx = k * bw;
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,8,20,0.28)';
+  ctx.beginPath(); ctx.ellipse(px, py, Math.max(w * 0.32, 60) * kx, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 14; }
+  ctx.translate(px, py);
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(img, -ax * kx, -ay * k, w * kx, h * k);
+  ctx.restore();
+  return true;
 }
 
 // The bowler in the plain kit, feet at (px, py). False if it isn't ready (the old sprite is drawn).

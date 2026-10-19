@@ -3,6 +3,7 @@
 
 usage: python3 tools/build_kit_sheets.py FRONT.png BACK.png HAIRDIR [SPIN_FRONT.png [SPIN_BACK.png]]
        python3 tools/build_kit_sheets.py --bat   (the batter only)
+       python3 tools/build_kit_sheets.py --field (the fielders only)
 
 SPIN_FRONT / SPIN_BACK: the spinner's bald sheets in the premium kit (15 poses, three rows of
 five; blue with a navy yoke and side panels and yellow piping), repainted in three club colours
@@ -255,7 +256,7 @@ def frames_of(a, count=10, rowh=600):
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False, hard=False):
+def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False, hard=False, bat=False):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
@@ -270,7 +271,7 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
         a[pale, :3] = np.array([20, 16, 24]) / 255
     hairs = {st: clean_hair(np.pad(np.array(Image.open(hp).convert('RGBA')).astype(np.float32) / 255, ((M, M), (M, M), (0, 0)))) for st, hp in hairpaths.items()}
     hair_any = np.max([h[..., 3] for h in hairs.values()], axis=0) if hairs else np.zeros(a.shape[:2])
-    suit, trim, skin = masks(a, bat=hard)
+    suit, trim, skin = masks(a, bat=bat)
     L = a[..., :3] @ LUM
     if premium:
         kit, tw, tL, tref = tones(a, design, M, marks, hard=hard)
@@ -383,6 +384,7 @@ def main():
                                  [sp[str(k + 1)]['print'] + sp[str(k + 1)]['name'] + sp[str(k + 1)]['number'] for k in range(15)], 15, 500, premium=True,
                                  marks={k: v for k, v in json.load(open('tools/kit/premium-spin-back.json')).items() if not k.startswith('_')})
     out['bat-back'] = build_bat()
+    out['field'] = build_field()
     write_sheets(out)
 
 
@@ -417,6 +419,15 @@ def build_bat():
     pr = json.load(open('tools/kit/bat-back-print.json'))
     n = len(pr['frames'])
     return build('bat-back', 'tools/kit/src/batter-back.png', {}, [pr[str(k + 1)] for k in range(n)], n, pr['rowh'],
+                 premium=True, place_abs=True, hard=True, bat=True)
+
+
+def build_field():
+    """the fielders (tools/kit/compose_fielder.py makes the sheet): read as drawn and shaded like
+    the bowler, a name and number on the back views"""
+    pr = json.load(open('tools/kit/field-print.json'))
+    n = len(pr['frames'])
+    return build('field', 'tools/kit/src/fielder.png', {}, [pr[str(k + 1)] for k in range(n)], n, pr['rowh'],
                  premium=True, place_abs=True, hard=True)
 
 
@@ -431,11 +442,14 @@ def write_sheets(out):
 
 
 if __name__ == '__main__':
-    if sys.argv[1:] == ['--bat']:
-        # only the batter: the other views as they were
+    if sys.argv[1:] in (['--bat'], ['--field']):
+        # only the batter (or the fielders): the other views as they were
         src = open('js/kitsheets.js').read()
         out = json.loads(src[src.index('= ') + 2:src.rindex(';')])
-        out['bat-back'] = build_bat()
+        if sys.argv[1] == '--bat':
+            out['bat-back'] = build_bat()
+        else:
+            out['field'] = build_field()
         write_sheets(out)
     else:
         main()
