@@ -13,10 +13,10 @@ from PIL import Image
 from scipy import ndimage as ndi
 
 D = os.path.join(os.path.dirname(__file__), 'src', 'bat-sheets')
-SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png'}
+SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png'}
 # the game's frames in sheet order (js/kitsprite.js POSE_BAT): (sheet, pose number in reading order)
 PICK = [
-    ('ready', 4, 4), ('leave1', 3, 12), ('leave2', 3, 14), ('backlift', 1, 5),
+    ('ready', 7, 1), ('leave1', 7, 2), ('leave2', 7, 3), ('backlift', 7, 4),
     ('drive1', 1, 7), ('drive2', 1, 10), ('drive3', 1, 13),
     ('pull0', 6, 4), ('pull1', 6, 5), ('pull2', 6, 6), ('pull3', 6, 8),
     ('def1', 3, 7), ('def2', 3, 9), ('def3', 3, 10),
@@ -25,6 +25,8 @@ PICK = [
     ('rsweep1', 2, 4), ('rsweep2', 2, 7), ('rsweep3', 2, 11),
 ]
 STAND_PX = 330          # the standing pose (each sheet's first) comes out this tall
+# a sheet with no standing pose: scaled so its pose matches one already sized (sheet, pose, its pose)
+MATCH = {7: (4, 4, 1)}
 MAG = np.array([250, 0, 250], np.uint8)
 
 
@@ -73,8 +75,12 @@ def main():
     for s, f in SHEETS.items():
         rgb, ps = poses(os.path.join(D, f))
         cache[s] = (rgb, ps)
-        box = ps[0][1]
-        scale[s] = STAND_PX / (box[0].stop - box[0].start)
+        if s not in MATCH:
+            box = ps[0][1]
+            scale[s] = STAND_PX / (box[0].stop - box[0].start)
+    hgt = lambda s, k: cache[s][1][k - 1][1][0].stop - cache[s][1][k - 1][1][0].start
+    for s, (rs, rk, k) in MATCH.items():
+        scale[s] = scale[rs] * hgt(rs, rk) / hgt(s, k)
     cuts = []
     for name, s, k in PICK:
         rgb, ps = cache[s]
