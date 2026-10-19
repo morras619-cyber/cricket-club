@@ -30,12 +30,15 @@ const FRAMES = {
   bowled: [755, 954, 215, 238, 107.5, 237, 0.976],
 };
 
+// the frames the kit sheet has and the old per-team sheets (and the batter seen from the front) don't
+export const OLD_FRAME = { drive4: 'drive3', drive5: 'drive3', pull4: 'pull3', pull5: 'pull3', cut4: 'cut3', cut5: 'cut3', cut6: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3' };
+
 // frame, ms on screen. The swing starts when the finger lifts, which is the moment of contact,
 // so the downswing is brief and the contact frame lands almost at once.
 const SEQ = {
-  drive: [['drive1', 45], ['drive2', 120], ['drive3', Infinity]],
-  pull: [['pull0', 35], ['pull1', 45], ['pull2', 110], ['pull3', Infinity]],
-  cut: [['cut1', 45], ['cut2', 120], ['cut3', Infinity]],
+  drive: [['drive1', 25], ['drive2', 30], ['drive3', 110], ['drive4', 120], ['drive5', Infinity]],
+  pull: [['pull0', 20], ['pull1', 30], ['pull2', 100], ['pull3', 90], ['pull4', 110], ['pull5', Infinity]],
+  cut: [['cut1', 25], ['cut2', 30], ['cut3', 100], ['cut4', 90], ['cut5', 110], ['cut6', Infinity]],
   rsweep: [['rsweep1', 60], ['rsweep2', 130], ['rsweep3', Infinity]], // down on one knee, swept fine on the off side
   block: [['def1', 60], ['def2', 220], ['def3', Infinity]],
   leave: [['leave1', 170], ['leave2', Infinity]],
@@ -125,7 +128,7 @@ export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   const img = peopleSheet(atlas.img, `batter-${sheet}`, b.people); // the batter's own skin and hair
   const k = kPerM * REF_HEIGHT_M / REF_HEIGHT_PX;
   // (the old sheets have no celebration or reverse sweep)
-  const old = n => (n === 'celebrate' ? 'drive3' : n?.startsWith('rsweep') ? 'cut' + n.slice(6) : n);
+  const old = n => (n === 'celebrate' ? 'drive3' : OLD_FRAME[n] || n);
   const { a = 1 } = fr, f = old(fr.f), prev = old(fr.prev);
   ctx.save();
   // ground shadow
