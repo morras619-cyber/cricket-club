@@ -71,7 +71,9 @@ function loadArt(team) {
   const meta = GROUND_ART[team];
   if (!meta || ART[team]) return;
   const a = (ART[team] = { meta, ready: false });
-  const files = { far: 'far', near: 'near', pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
+  const files = { pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
+  // the painted stands (a ground built in Blender for every camera needs none)
+  if (meta.far) Object.assign(files, { far: 'far', near: 'near' });
   // a ground built in Blender: one finished background per camera (tools/blender)
   for (const v of Object.keys(meta.views || {})) files['view-' + v] = 'view-' + v;
   if (meta.top) files.topView = 'view-top';

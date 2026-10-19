@@ -1,6 +1,7 @@
-# The Thunderdome, built in game units (Blender X = game x, Y = game z along the pitch, Z = height).
-# Renders the background for one game camera: bat | bowl | keeper.
-#   python thunderdome.py -- <view> <out.png> [samples]
+# A club's ground, built in game units (Blender X = game x, Y = game z along the pitch, Z = height):
+# the Thunderdome, or another club's ground from its painted pieces (CLUB=cyclones; see CLUBS below).
+# Renders the background for one game camera: bat | bowl | keeper | top.
+#   CLUB=<club> python thunderdome.py -- <view> <out.png> [samples]
 import bpy, math, sys
 from mathutils import Vector
 
@@ -8,7 +9,21 @@ args = sys.argv[sys.argv.index('--') + 1:]
 VIEW, OUT = args[0], args[1]
 SAMPLES = int(args[2]) if len(args) > 2 else 32
 import os
-TEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tex') + '/'  # made by prep_textures.py
+CLUB = os.environ.get('CLUB', 'thunder')
+TEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tex', '' if CLUB == 'thunder' else CLUB) + '/'  # made by prep_textures.py
+# each ground's look: stand colours, boards, the painted crowd strip (u_len: metres one copy covers),
+# the backdrop on the far cylinder (heights, copies round), the sky and the light
+CLUBS = {
+    'thunder': dict(wall='#0b1f5c', fascia='#9fb0cc', canopy='#0b1f5c', dark='#0a0f24', track='#16264f', rope='#ffd23f',
+                    board=('#0b2a6e', '#1c5ad6'), screen='#071447', crowd_len=155, sky=(30, 112, 1), foot='#0b1640',
+                    world=[(0.0, '#1a3384'), (0.6, '#03061f')], sun=(0.25, (0.6, 0.7, 1.0), 0.526), flood=1.0, top_bg='#1b1838', turbines=False),
+    # Cyclone Park: an overcast afternoon in the hills; a green bowl under a white roof, the floodlights on
+    'cyclones': dict(wall='#0d3a1e', fascia='#1e7a32', canopy='#e9edf0', dark='#0a1a10', track='#1d3b26', rope='#ffd21f',
+                     board=('#0b3d1b', '#1e7a32'), screen='#0b2414', crowd_len=6 * 2167 / 726 * 5, sky=(18, 268, 2), foot='#3a5a33',
+                     world=[(0.0, '#c9d1d6'), (0.35, '#8e9aa6'), (1.0, '#5b6673')], sun=(2.2, (1.0, 0.98, 0.94), 35), flood=0.25,
+                     top_bg='#4a6a40', turbines=True),
+}
+C = CLUBS[CLUB]
 CY = 10.0          # pitch centre (game centerY)
 ROPE = 62.0        # boundary rope (game boundaryR)
 
@@ -110,6 +125,12 @@ def pitch_color(nt):
     nt.nodes['Image Texture'] if False else None
     return t.outputs['Color']
 pm = shaded('pitch', pitch_color, emit=0.62)
+# (see-through where the painting is: past its ends and along its grassy edges the outfield shows)
+_nt = pm.node_tree; _t = [n for n in _nt.nodes if n.type == 'TEX_IMAGE'][0]; _o = _nt.nodes['Material Output']
+_add = _o.inputs[0].links[0].from_node
+_tr = _nt.nodes.new('ShaderNodeBsdfTransparent'); _mx = _nt.nodes.new('ShaderNodeMixShader')
+_nt.links.new(_t.outputs['Alpha'], _mx.inputs[0]); _nt.links.new(_tr.outputs[0], _mx.inputs[1]); _nt.links.new(_add.outputs[0], _mx.inputs[2])
+_nt.links.new(_mx.outputs[0], _o.inputs[0])
 mesh('pitch', [(-PX, PZ0, 0.006), (PX, PZ0, 0.006), (PX, PZ1, 0.006), (-PX, PZ1, 0.006)], [(0, 1, 2, 3)],
      uvs=[(0.04, 0), (0.96, 0), (0.96, 1), (0.04, 1)], mat=pm, inked=False)  # (no ink edge: the strip meets the grass)
 
@@ -136,7 +157,7 @@ for i in range(N):
     strip(27 * math.cos(a0), CY + 27 * math.sin(a0), 27 * math.cos(a1), CY + 27 * math.sin(a1), w=0.14, mat=dash)
 
 # the rope
-rope = flat('rope', '#ffd23f', 0.5)
+rope = flat('rope', C['rope'], 0.5)
 bpy.ops.mesh.primitive_torus_add(location=(0, CY, 0.08), major_radius=ROPE, minor_radius=0.08, major_segments=256, minor_segments=8)
 r = bpy.context.active_object; r.data.materials.append(rope)
 for p in r.data.polygons: p.use_smooth = True
@@ -179,7 +200,7 @@ def board_mat(name, logo, bg, logo_w):  # logo_w: share of the board's width the
     nt.links.new(mix.outputs[2], e.inputs['Color']); nt.links.new(e.outputs[0], out.inputs[0])
     return m
 BR, BH, BW = 63.8, 0.95, 7.0
-mats = [board_mat('bA', 'logo-sixcharge.png', '#0b2a6e', 2.85 / BW), board_mat('bB', 'logo-thunder.png', '#1c5ad6', 0.95 / BW)]
+mats = [board_mat('bA', 'logo-sixcharge.png', C['board'][0], 2.85 / BW), board_mat('bB', f'logo-{CLUB}.png', C['board'][1], 0.95 / BW)]
 nb = int(2 * math.pi * BR / BW)
 for i in range(nb):
     a0 = 2 * math.pi * i / nb; a1 = 2 * math.pi * (i + 1) / nb
@@ -194,18 +215,19 @@ for i in range(nb):
     mesh('board', verts, faces, uvs=uv, mat=mats[i % 2], inked=True)
 
 # ---------- the stands ----------
-navy = flat('navy', '#0b1f5c', 0.45)
-fascia = flat('fascia', '#9fb0cc', 0.5)
-dark = flat('dark', '#0a0f24', 0.4)
+navy = flat('navy', C['wall'], 0.45)
+fascia = flat('fascia', C['fascia'], 0.5)
+dark = flat('dark', C['dark'], 0.4)
+canopy = flat('canopy', C['canopy'], 0.45)
 crowd = picture('crowd', 'crowd.png', 1.0)
 # the stands sit well back from the rope, past a grass apron and a perimeter track, so the night
 # sky and the city show above them
-track = flat('track', '#16264f', 0.45)
+track = flat('track', C['track'], 0.45)
 ring_surface('track', [(76, 0.01), (79, 0.01)], track)
 ring_surface('wall', [(79, 0), (79, 1.4)], navy, inked=True)
 ring_surface('walltop', [(79, 1.4), (79.6, 1.4)], navy)
 # the crowd, raked back: the painted crowd tiled three rows high (5 m a tile)
-ring_surface('crowd', [(79.6, 1.4), (99, 12.0)], crowd, u_len=155, v_rep=3)
+ring_surface('crowd', [(79.6, 1.4), (99, 12.0)], crowd, u_len=C['crowd_len'], v_rep=3)
 ring_surface('back', [(99, 12.0), (99, 13.6)], dark)
 # the roof: a light fascia, a dark underside dotted with lamps, the canopy on top
 ring_surface('fascia', [(94, 13.2), (94, 14.4)], fascia, inked=True)
@@ -220,14 +242,14 @@ nt.links.new(lt.outputs[0], mix.inputs[0])
 e = nt.nodes.new('ShaderNodeEmission'); e.inputs['Strength'].default_value = 1.2
 nt.links.new(mix.outputs[2], e.inputs['Color']); nt.links.new(e.outputs[0], o_.inputs[0])
 ring_surface('under', [(94, 13.2), (99, 13.6)], under)
-ring_surface('canopy', [(94, 14.4), (104, 15.4)], navy, inked=True)
+ring_surface('canopy', [(94, 14.4), (104, 15.4)], canopy, inked=True)
 
 # the big screens, one behind each end, showing the game's logo
 def screen(a, r=83.5, w=13, h0=3.6, h1=10.1):
     c, s = math.cos(a), math.sin(a)
     t = Vector((-s, c, 0))           # along the stand
     base = Vector((r * c, CY + r * s, 0))
-    pic = picture('scr', 'logo-sixcharge.png', 1.0, alpha_over='#071447', extension='CLIP')
+    pic = picture('scr', 'logo-sixcharge.png', 1.0, alpha_over=C['screen'], extension='CLIP')
     # the logo sits in the middle half of the screen
     q = [base - t * w / 2 + Vector((0, 0, h0)), base + t * w / 2 + Vector((0, 0, h0)), base + t * w / 2 + Vector((0, 0, h1)), base - t * w / 2 + Vector((0, 0, h1))]
     lw = 0.8; lh = lw * (w / 3) / (h1 - h0)   # logo is 3:1
@@ -283,30 +305,62 @@ for side in (-1, 1):
                 p = head.location + off + fwd * 0.45
                 bpy.ops.mesh.primitive_uv_sphere_add(location=p, radius=0.78, segments=16, ring_count=8)
                 l = bpy.context.active_object; l.data.materials.append(lamp); l.visible_shadow = False
-        halo(head.location + fwd * 2.5, 6.5)
+        if C['flood'] >= 0.5: halo(head.location + fwd * 2.5, 6.5)
         # the light itself, pointed at the pitch
         bpy.ops.object.light_add(type='SPOT', location=head.location + fwd * 2)
-        L = bpy.context.active_object; L.data.energy = 2.2e5; L.data.spot_size = math.radians(70); L.data.spot_blend = 0.6
+        L = bpy.context.active_object; L.data.energy = 2.2e5 * C['flood']; L.data.spot_size = math.radians(70); L.data.spot_blend = 0.6
         L.data.shadow_soft_size = 3; L.data.color = (1, 0.96, 0.88)
         L.rotation_euler = (Vector((0, CY, 0)) - L.location).to_track_quat('-Z', 'Y').to_euler()
 
 # the city behind: the painted skyline on a far cylinder, the gap below filled with its shade
 sky_pic = picture('skyline', 'skyline.png', 1.0)
 R2 = 430
-ring_surface('skyline', [(R2, 30), (R2, 112)], sky_pic, u_len=2 * math.pi * R2 / 1.0, v_rep=1, u_off=math.radians(45))
-ring_surface('cityfoot', [(R2, -5), (R2, 30.2)], glow('cityfoot', srgb('#0b1640'), 1.0))
+h0, h1, copies = C['sky']
+ring_surface('skyline', [(R2, h0), (R2, h1)], sky_pic, u_len=2 * math.pi * R2 / copies, v_rep=1, u_off=math.radians(45))
+ring_surface('cityfoot', [(R2, -5), (R2, h0 + 0.2)], glow('cityfoot', srgb(C['foot']), 1.0))
+
+# Cyclone Park's landmark: wind turbines on the hills just past the stands, behind each end
+if C['turbines']:
+    white = flat('turbine', '#eef1f2', 0.55)
+    def turbine(a, r, hub, blade, spin):
+        x, y = r * math.cos(a), CY + r * math.sin(a)
+        bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=1.6, radius2=0.8, depth=hub, location=(x, y, hub / 2))
+        o = bpy.context.active_object; o.data.materials.append(white); sc.collection.objects.unlink(o); ink.objects.link(o)
+        face = math.atan2(CY - y, -x)                     # the rotor faces the ground
+        fwd = Vector((math.cos(face), math.sin(face), 0))
+        bpy.ops.mesh.primitive_cube_add(location=(x, y, hub), scale=(2.6, 1.3, 1.3))
+        o = bpy.context.active_object; o.rotation_euler = (0, 0, face); o.data.materials.append(white); sc.collection.objects.unlink(o); ink.objects.link(o)
+        c = Vector((x, y, hub)) + fwd * 2.8
+        for k in range(3):
+            ang = spin + k * 2 * math.pi / 3
+            # a blade: a long thin slab from the hub outwards, in the plane facing the ground
+            side = Vector((-fwd.y, fwd.x, 0))
+            d = side * math.cos(ang) + Vector((0, 0, 1)) * math.sin(ang)
+            mid = c + d * (blade / 2 + 0.8)
+            # (tapering from the hub to the tip)
+            bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=1.1, radius2=0.18, depth=blade, location=mid)
+            o = bpy.context.active_object; o.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
+            o.data.materials.append(white); sc.collection.objects.unlink(o); ink.objects.link(o)
+        bpy.ops.mesh.primitive_uv_sphere_add(location=c, radius=1.3, segments=16, ring_count=8)
+        o = bpy.context.active_object; o.data.materials.append(white); sc.collection.objects.unlink(o); ink.objects.link(o)
+    for end, sgn in ((math.pi / 2, 1), (-math.pi / 2, -1)):
+        # (placed in the gaps either side of the big screen and the floodlights, clear of the roof)
+        for off, r, spin in ((-0.36, 360, 0.3), (0.05, 400, 1.4), (0.42, 340, 0.9)):
+            turbine(end + off * sgn, r, 58, 20, spin)
 
 # ---------- world ----------
 w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True
 wn = w.node_tree; bg = wn.nodes['Background']; bg.inputs['Strength'].default_value = 1.0
 tcw = wn.nodes.new('ShaderNodeTexCoord'); sw = wn.nodes.new('ShaderNodeSeparateXYZ'); wn.links.new(tcw.outputs['Generated'], sw.inputs[0])
 rw = wn.nodes.new('ShaderNodeValToRGB'); cr_ = rw.color_ramp
-cr_.elements[0].position = 0.0; cr_.elements[0].color = (*srgb('#1a3384'), 1)
-cr_.elements[1].position = 0.6; cr_.elements[1].color = (*srgb('#03061f'), 1)
+for k, (pos, col) in enumerate(C['world']):
+    el = cr_.elements[k] if k < len(cr_.elements) else cr_.elements.new(pos)
+    el.position = pos; el.color = (*srgb(col), 1)
 wn.links.new(sw.outputs['Z'], rw.inputs[0]); wn.links.new(rw.outputs[0], bg.inputs['Color'])
 # ambient fill so shaded sides stay readable at night
-bpy.ops.object.light_add(type='SUN'); s = bpy.context.active_object; s.data.energy = 0.25
-s.rotation_euler = Vector((0.2, 1, -1)).to_track_quat('-Z', 'Y').to_euler(); s.data.color = (0.6, 0.7, 1.0)
+bpy.ops.object.light_add(type='SUN'); s = bpy.context.active_object; s.data.energy = C['sun'][0]
+s.rotation_euler = Vector((0.2, 1, -1)).to_track_quat('-Z', 'Y').to_euler(); s.data.color = C['sun'][1]
+s.data.angle = math.radians(C['sun'][2])  # (an overcast sun: soft-edged shadows)
 
 # ---------- the camera: the game's own (Cam3D in js/scene.js) ----------
 # game: screen x = W/2 + dir·(x − cx)·f/d,  y = hy + (cy − y)·f/d. A level pinhole camera, the
@@ -326,9 +380,10 @@ if VIEW == 'top':
     Wi = int(2 * HALF * TOP_PX); Hi = int((2 * HALF * 0.78 + 34) * TOP_PX)
     for o in list(sc.objects):
         # (and the roof: from up here it would hide the near stand's crowd)
-        if o.name.startswith(('skyline', 'cityfoot', 'canopy', 'under')) or (o.type == 'MESH' and o.name.startswith('Torus') and abs(o.location.z - 0.08) < 1e-3):
+        # (the turbines too: they stand far outside the picture)
+        if o.name.startswith(('skyline', 'cityfoot', 'canopy', 'under')) or (o.location - Vector((0, CY, 0))).length > 200 or (o.type == 'MESH' and o.name.startswith('Torus') and abs(o.location.z - 0.08) < 1e-3):
             o.hide_render = True
-    bg.inputs['Color'].default_value = (*srgb('#1b1838'), 1)
+    bg.inputs['Color'].default_value = (*srgb(C['top_bg']), 1)
     for l in list(wn.links):
         if l.to_node == bg: wn.links.remove(l)
     dirv = Vector((0, math.sin(th), -math.cos(th)))
