@@ -34,6 +34,12 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+// slow motion while you field a catch / a run-out pick-up (the timing bar crosses at this pace)
+const CATCH_SLOW = 0.8, PICK_SLOW = 0.85;
+// a spinner's approach, as a share of the time it used to take
+const SPIN_RUNUP = 0.75;
+// and its ball through the air, quicker than its km/h alone would make it (the speed shown stays)
+const SPIN_FLIGHT = 1.3;
 const SHOT_WORDS = ['THWACK!', 'DHOOM!', 'KRAK!', 'BLAM!', 'SMASH!'];
 
 // The opposing side's heroes: their own team's star, in his slot.
@@ -337,7 +343,7 @@ export class Game {
   pitched(spec, type) {
     const P = this.pitch, dew = P.dew && this.innings.length >= 2;
     const out = { ...spec };
-    if (type?.spin) out.move = (out.move || 0) * P.turn;
+    if (type?.spin) { out.move = (out.move || 0) * P.turn; out.flight = SPIN_FLIGHT; }
     else { out.swing = (out.swing || 0) * P.swing * (dew ? 0.8 : 1); out.move = (out.move || 0) * P.seam; out.kmh = (out.kmh || 0) * P.kmh; }
     return out;
   }
@@ -759,7 +765,7 @@ export class Game {
     let prog = 0, last = this.gameTime;
     await this.until(() => {
       const dt = this.gameTime - last; last = this.gameTime;
-      if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / (850 * (0.55 + 0.45 * btype.runup));
+      if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / (850 * (0.55 + 0.45 * btype.runup) * (btype.spin ? SPIN_RUNUP : 1));
       const p = Math.min(1, prog);
       S.bowler.z = 20.6 + 6.9 * btype.runup * (1 - p); S.bowler.pose = POSES.run(p * 13); S.bowler.spr = { anim: 'run', p };
       return p >= 1;
@@ -1013,15 +1019,15 @@ export class Game {
       if (set) this.electricHit(set, at); else this.fx.burst(at.x, at.y, { color: '#ffd23f' });
       this.fx.word('PERFECT!', this.W / 2, this.H * 0.3, { size: 54 });
       this.fx.word(SHOT_WORDS[Math.floor(Math.random() * SHOT_WORDS.length)], at.x, at.y - 30, { size: 64, color: '#fff4da', stroke: '#e8343b' });
-      this.fx.shake(10); sfx.bat('perfect'); buzz(35);
+      this.fx.shake(10); sfx.bat('perfect'); buzz(45);
     } else if (grade === 'defend') {
       this.fx.word('DEFENDED', this.W / 2, this.H * 0.3, { size: 42, color: '#fff4da', stroke: INK, rot: 0 });
-      sfx.bat('good'); buzz(10);
+      this.fx.shake(3); sfx.bat('good'); buzz(15);
     } else if (grade === 'good') {
       this.hitStop(40); this.fx.word('NICE!', this.W / 2, this.H * 0.3, { size: 46, color: '#3ec6ff', stroke: INK });
-      this.fx.sparks(at.x, at.y, 10); sfx.bat('good'); buzz(15);
+      this.fx.sparks(at.x, at.y, 10); this.fx.shake(6); sfx.bat('good'); buzz(25);
     } else {
-      sfx.thin(); this.fx.bubble('Oops!', at.x, at.y - 10, { dur: 900 });
+      sfx.thin(); this.fx.shake(2); buzz(10); this.fx.bubble('Oops!', at.x, at.y - 10, { dur: 900 });
       this.timingBar(err, grade);
     }
   }
@@ -1472,7 +1478,7 @@ export class Game {
     }
 
     // the delivery the swipe describes
-    const spec = { x: G.x, length: G.length, bounce: G.bounce, h: G.h, kmh: G.kmh, swing: G.swing, move: G.move, loop: G.loop, rx: btype.left ? -0.3 : 0.3 };
+    const spec = { x: G.x, length: G.length, bounce: G.bounce, h: G.h, kmh: G.kmh, swing: G.swing, move: G.move, loop: G.loop, rx: btype.left ? -0.3 : 0.3, flight: btype.spin ? SPIN_FLIGHT : 1 };
     // where you draw is where it lands: no random scatter, only a little spray on a flick that was too fast
     if (rg === 'loose') {
       spec.x = clamp(spec.x + rng.range(-0.06, 0.06), -1.0, 1.0);
@@ -1500,7 +1506,7 @@ export class Game {
     this.fx.bubbles = [];
     S.bowler.pose = POSES.bowl(1); S.bowler.followT0 = this.realTime; S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
     if (fxFlags.maya) S.maya = { real: 1, picked: 0 };
-    sfx.whoosh();
+    sfx.whoosh(); buzz(rg === 'perfect' ? 30 : 18);
     const budget = rg === 'perfect' ? 0.32 : rg === 'good' ? 0.24 : 0.14;
     const winEnd = d0.bounceT != null ? d0.bounceT : d0.tContact * 0.55;
     const scale = this.H / 844;
@@ -2178,7 +2184,7 @@ export class Game {
     const me = this.startEvent(field, c.fielder.id);
     if (this.mode === 'tutorial') await this.coach?.('tutCatch');
     this.fx.word('CATCH IT!', this.W / 2, this.H * 0.2, { size: 50, dur: 1000 });
-    this.timeScale = 0.6;
+    this.timeScale = CATCH_SLOW;
     const t0 = this.gameTime;
     let last = this.gameTime, input = null;
     this.onInput = (type, g) => {
@@ -2202,11 +2208,11 @@ export class Game {
       const b = path.ballAt(Math.min(t, T));
       this.O.ball = b;
       const k = clamp((T - t) / T, 0, 1);
-      const green = Math.abs(T - t) * 1000 / 0.6 <= perfectMs;
+      const green = Math.abs(T - t) * 1000 / CATCH_SLOW <= perfectMs;
       this.O.ring = { x: L.x, y: L.y, r: 0.5 + 6 * k, color: green ? '#2ecc71' : '#fff4da', w: green ? 5 : 3 };
       this.O.marks = [{ x: L.x, y: L.y }];
       // the timing bar up top, clear of the thumb: tap anywhere while the marker is in the green
-      this.O.meter = { k: t / T, zone: (perfectMs * 0.6 / 1000) / T, green, label: 'TAP ANYWHERE IN THE GREEN!' };
+      this.O.meter = { k: t / T, zone: (perfectMs * CATCH_SLOW / 1000) / T, green, label: 'TAP ANYWHERE IN THE GREEN!' };
       this.of.focus([b, me, L]);
       return t >= T && (input || t >= T + 0.45); // room for a swipe that started in time to finish
     });
@@ -2214,7 +2220,7 @@ export class Game {
     gap = dist(me, L);
     let result = 'dropped';
     if (input) {
-      const errReal = ((input.tg - (t0 + T)) * 1000) / 0.6;
+      const errReal = ((input.tg - (t0 + T)) * 1000) / CATCH_SLOW;
       // the rule the player sees: touch while the ring is green and it's caught; out of reach, he dives for it
       const diving = gap > F.reach;
       if (diving) me.pose = POSES.dive(Math.sign(L.x - me.x) || 1);
@@ -2256,7 +2262,7 @@ export class Game {
     const me = this.startEvent(field, ro.fielder.id);
     if (this.mode === 'tutorial') await this.coach?.('tutRunOut');
     this.fx.word('RUN OUT CHANCE!', this.W / 2, this.H * 0.2, { size: 46, dur: 1000 });
-    this.timeScale = 0.7;
+    this.timeScale = PICK_SLOW;
     const t0 = this.gameTime, P = ro.point;
     let last = this.gameTime;
     let pick = null;
@@ -2269,14 +2275,14 @@ export class Game {
       this.O.ball = path.ballAt(Math.min(t, ro.t));
       this.O.ring = { x: P.x, y: P.y, r: 0.6 + 4 * clamp((ro.t - t) / ro.t, 0, 1), color: Math.abs(ro.t - t) < 0.14 ? '#2ecc71' : '#fff4da' };
       const win = F.collectWindow * (this.armed.burst ? 1.6 : 1);
-      this.O.meter = { k: t / ro.t, zone: (win * 0.7 / 1000) / ro.t, green: Math.abs(ro.t - t) * 1000 / 0.7 <= win, label: 'TAP ANYWHERE TO PICK UP' };
+      this.O.meter = { k: t / ro.t, zone: (win * PICK_SLOW / 1000) / ro.t, green: Math.abs(ro.t - t) * 1000 / PICK_SLOW <= win, label: 'TAP ANYWHERE TO PICK UP' };
       this.runBatters(t, ro.attempt);
       this.of.focus([this.O.ball, me, { x: 0, y: 0 }, { x: 0, y: 20 }]);
       return t >= ro.t + 0.25 || (pick && t >= ro.t);
     });
     this.onInput = null; this.ui.hint(null); this.O.meter = null;
     let fumble = 0;
-    const pickErr = pick ? Math.abs((pick.tg - (t0 + ro.t)) * 1000) / 0.7 : 999;
+    const pickErr = pick ? Math.abs((pick.tg - (t0 + ro.t)) * 1000) / PICK_SLOW : 999;
     if (pickErr > F.collectWindow * (this.armed.burst ? 1.6 : 1)) { fumble = 0.6; this.fx.word('FUMBLE!', this.W / 2, this.H * 0.3, { size: 44 }); }
     else this.fx.word('CLEAN PICK-UP', this.W / 2, this.H * 0.25, { size: 32, color: '#fff4da', stroke: INK });
     me.x = P.x; me.y = P.y; this.O.ball = { x: P.x, y: P.y, h: 0.8 };

@@ -65,8 +65,26 @@ export const sfx = {
   wicket() { this.stumps(); [659, 784, 988].forEach((f, i) => tone(f, 0.18, { type: 'square', gain: 0.1, delay: 0.15 + i * 0.1 })); },
 };
 
-export function buzz(pattern) {
-  if (sound.haptics && navigator.vibrate) {
-    try { navigator.vibrate(pattern); } catch { /* not allowed here */ }
+// A buzz: pattern is ms (or [on, off, on, ...]). iPhones have no navigator.vibrate, but Safari
+// (iOS 18 on) gives a haptic tick when a switch is toggled: one tick for each 'on' in the pattern.
+let iosSwitch = null;
+function iosTick() {
+  if (!iosSwitch) {
+    const label = document.createElement('label'), box = document.createElement('input');
+    box.type = 'checkbox'; box.setAttribute('switch', ''); box.tabIndex = -1;
+    label.setAttribute('aria-hidden', 'true');
+    label.style.cssText = 'position:fixed;left:-99px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden';
+    label.append(box); document.body.append(label);
+    iosSwitch = label;
   }
+  iosSwitch.click();
+}
+export function buzz(pattern) {
+  if (!sound.haptics) return;
+  try {
+    if (navigator.vibrate) { navigator.vibrate(pattern); return; }
+    const p = Array.isArray(pattern) ? pattern : [pattern];
+    let t = 0;
+    p.forEach((ms, i) => { if (i % 2 === 0) setTimeout(iosTick, t); t += ms; });
+  } catch { /* not allowed here */ }
 }

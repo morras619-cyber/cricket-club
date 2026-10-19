@@ -37,7 +37,7 @@ export function makeDelivery(opts) {
   const h = opts.h ?? L.h;
   // sped up or slowed down from 120 km/h more than in proportion, so a 140 km/h quick and an 88 km/h
   // spinner feel clearly different (CFG.paceSpread 1 would be plain scaling)
-  const v = (120 / 3.6) * CFG.paceScale * Math.pow(Math.max(40, opts.kmh) / 120, CFG.paceSpread);
+  const v = (120 / 3.6) * CFG.paceScale * Math.pow(Math.max(40, opts.kmh) / 120, CFG.paceSpread) * (opts.flight || 1); // (flight: a spinner's ball hurried along)
   const rx = opts.rx ?? 0.3;
   const swing = opts.swing || 0;
   const loop = opts.loop ?? 0.5;
