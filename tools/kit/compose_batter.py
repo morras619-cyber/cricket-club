@@ -161,27 +161,36 @@ def main():
 
 
 def print_spot(rgb, m, ox, oy):
-    """the name and number on the back: centred on the shirt a third of the way up from the
-    waistband to the top of the helmet, about half the shirt's width there"""
+    """the name and number on the back, laid out as on the bowler's (tools/kit/shirt-print-back.json):
+    centred across the back panel (the blue between the piping), 42% of the way down from the collar
+    to the waistband, 0.62 of that collar-to-waist drop wide"""
     im = Image.fromarray(rgb.astype(np.uint8)).convert('HSV')
     hsv = np.asarray(im).astype(float)
     H, S, V = hsv[..., 0] * 360 / 255, hsv[..., 1] / 255, hsv[..., 2] / 255
     yellow = m & (H > 40) & (H < 70) & (S > 0.5) & (V > 0.5)
     blue = m & (H > 195) & (H < 255) & (S > 0.3)
+    main = blue & (V > 0.62)                  # the panel's blue (the navy sleeves and helmet are darker)
+    top = np.nonzero(blue.any(1))[0].min()
     ys = np.nonzero(m.any(1))[0]
-    top = np.nonzero(blue.any(1))[0].min()   # the helmet's top (a bat held up goes higher)
     rows = yellow.sum(1)
-    upper = rows[: top + int((ys.max() - top) * 0.6)]
-    belt = int(np.argmax(upper))          # the widest band of yellow in the top 60%: the waistband
-    y = int(top + (belt - top) * 0.62)
-    band = blue[max(0, y - 6): y + 6]
-    xs = np.nonzero(band.any(0))[0]
-    if len(xs) < 4:
-        xs = np.nonzero(m[y])[0]
-    cx = float(np.median(np.nonzero(band)[1])) if band.any() else float(xs.mean())
-    # half the shirt's width there, kept to a back's size (an arm across the shirt widens the row)
-    w = float(np.clip((xs.max() - xs.min()) * 0.5, 40, 50))
-    return [round(cx + ox, 1), round(y + oy, 1), round(float(w), 1), 1, 1, 0, 0, 0, 0, 0]
+    belt = top + int(np.argmax(rows[top: top + int((ys.max() - top) * 0.6)]))   # the waistband
+    # the back panel: the biggest patch of the shirt's blue above the waistband
+    up = main.copy(); up[belt:] = False
+    up = ndi.binary_opening(up, iterations=2)
+    lab, n = ndi.label(up)
+    if n:
+        k = 1 + int(np.argmax(ndi.sum(up, lab, range(1, n + 1))))
+        panel = lab == k
+    else:
+        panel = up
+    py, px = np.nonzero(panel)
+    collar, waist = py.min(), belt
+    y = int(collar + 0.42 * (waist - collar))
+    band = panel[max(0, y - 4): y + 5]
+    bx = np.nonzero(band.any(0))[0]
+    cx = (bx.min() + bx.max()) / 2 if len(bx) else float(px.mean())
+    w = 0.62 * (waist - collar)
+    return [round(float(cx) + ox, 1), round(y + oy, 1), round(float(w), 1), 1, 1, 0, 0, 0, 0, 0]
 
 
 if __name__ == '__main__':

@@ -39,12 +39,20 @@ def hsv(a):
     return h[..., 0] * 360, h[..., 1], h[..., 2]
 
 
-def masks(a):
+def masks(a, bat=False):
     H, S, V = hsv(a[..., :3])
     op = a[..., 3] > 0.3
     suit = op & (H > 195) & (H < 255) & (S > 0.3)
     trim = op & (H > 40) & (H < 70) & (S > 0.5) & (V > 0.45)
     skin = op & (H > 5) & (H < 40) & (S > 0.2) & (V > 0.3) & ~trim
+    if bat:
+        # the batter's willow is drawn close to his skin: paler and yellower (hue 34-41, saturation
+        # under 0.55; skin is 24-32, 0.6-0.85). Each tan patch goes the way most of it reads.
+        wood = skin & (H >= 33.5) & (S < 0.57)
+        lab, n = ndi.label(skin)
+        if n:
+            frac = ndi.mean(wood, lab, range(1, n + 1))
+            skin = skin & ~np.isin(lab, 1 + np.nonzero(frac > 0.5)[0])
     skin = ndi.binary_fill_holes(ndi.binary_closing(skin, iterations=1)) & op & ~trim & ~suit
     return suit, trim, skin
 
@@ -160,7 +168,7 @@ def rework_yoke(a, kit, w, Ls, ref, marks, off, pipe=3.2):
     return w, Ls, kit
 
 
-def tones(a, design=None, off=0, marks=None):
+def tones(a, design=None, off=0, marks=None, hard=False):
     """soft class weights (navy, yellow; main = the rest) and lightly smoothed brightness. A sheet
     drawn in the premium kit is read as drawn; a plain one gets the design painted on (design)."""
     H, S, V = hsv(a[..., :3])
@@ -186,8 +194,18 @@ def tones(a, design=None, off=0, marks=None):
         Ls = np.where(conv, Ls0 * rm / ry, Ls)
         return kit, w, Ls, [round(rm, 4), round(rm, 4), round(ry, 4)]
     navy = np.clip((72 / 255 - ndi.gaussian_filter(L, 1.2)) / (20 / 255), 0, 1)
+    if hard:
+        # clean panels like the bowler's painted ones: each pixel is the main colour, navy or yellow,
+        # decided once (shadows in the blue cloth stay blue), with only a pixel of blend at the edges
+        nv = kit & ndi.binary_opening(ndi.gaussian_filter(L, 2.0) < 62 / 255, iterations=2)
+        nv = ndi.binary_closing(nv, iterations=2) & kit
+        lab, n = ndi.label(nv)
+        if n:
+            nv = np.isin(lab, 1 + np.nonzero(ndi.sum(nv, lab, range(1, n + 1)) >= 120)[0])
+        yl = kit & ndi.binary_closing(yel > 0.45, iterations=1)
+        navy, yel = nv.astype(float) * ~yl, yl.astype(float)
     w = np.stack([(1 - yel) * (1 - navy), (1 - yel) * navy, yel], -1)
-    w = ndi.gaussian_filter(w, (0.8, 0.8, 0))
+    w = ndi.gaussian_filter(w, (0.8, 0.8, 0) if not hard else (0.6, 0.6, 0))
     w /= w.sum(-1, keepdims=True) + 1e-6
     ref = [round(float(np.median(L[kit & (w[..., k] > 0.8)])), 4) for k in range(3)]
     if marks:
@@ -236,16 +254,16 @@ def frames_of(a, count=10, rowh=600):
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False):
+def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False, hard=False):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
     hairs = {st: clean_hair(np.pad(np.array(Image.open(hp).convert('RGBA')).astype(np.float32) / 255, ((M, M), (M, M), (0, 0)))) for st, hp in hairpaths.items()}
     hair_any = np.max([h[..., 3] for h in hairs.values()], axis=0) if hairs else np.zeros(a.shape[:2])
-    suit, trim, skin = masks(a)
+    suit, trim, skin = masks(a, bat=hard)
     L = a[..., :3] @ LUM
     if premium:
-        kit, tw, tL, tref = tones(a, design, M, marks)
+        kit, tw, tL, tref = tones(a, design, M, marks, hard=hard)
     lab, frames = frames_of(a, count, rowh)
     # each pixel belongs to the nearest pose (hair close to two poses goes to its own head only)
     dist, (iy, ix) = ndi.distance_transform_edt(lab == 0, return_indices=True)
@@ -362,7 +380,7 @@ def build_bat():
     pr = json.load(open('tools/kit/bat-back-print.json'))
     n = len(pr['frames'])
     return build('bat-back', 'tools/kit/src/batter-back.png', {}, [pr[str(k + 1)] for k in range(n)], n, pr['rowh'],
-                 premium=True, place_abs=True)
+                 premium=True, place_abs=True, hard=True)
 
 
 def write_sheets(out):
