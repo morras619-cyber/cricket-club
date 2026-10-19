@@ -103,7 +103,7 @@ test('achievements unlock once and pay their coins', () => {
 });
 
 test('players come from all the cricket nations, and every team is a mix', async () => {
-  const { NATIONS } = await import('../js/nations.js');
+  const { NATIONS, NATION_WEIGHTS } = await import('../js/nations.js');
   const { newCareer } = await import('../js/career.js');
   const seen = new Set();
   for (const t of TEAMS) {
@@ -111,7 +111,8 @@ test('players come from all the cricket nations, and every team is a mix', async
     assert.ok(ns.size >= 3, `${t.id} has only ${[...ns]}`);
     for (const n of ns) { assert.ok(NATIONS[n], n); seen.add(n); }
   }
-  assert.equal(seen.size, Object.keys(NATIONS).length);
+  // (every academy nation: the ones only the travelling scouts visit aren't in the clubs' squads)
+  for (const n of Object.keys(NATION_WEIGHTS)) assert.ok(seen.has(n), n);
   const c = newCareer(5);
   assert.ok(Object.values(c.players).every(p => NATIONS[p.nation]), 'everyone in the career has a country');
 });

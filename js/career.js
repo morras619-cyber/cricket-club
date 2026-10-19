@@ -123,6 +123,105 @@ export function youthIntake(c, rng, n) {
   return out;
 }
 
+// ---------- travelling scouts ----------
+// Send a scout to a region for the season: every second match he finds a player there (up to
+// three). At the start of next season you can sign his finds at a set price before the auction;
+// anyone you don't sign goes into the auction for every club to bid on.
+export const SCOUT_FEE = 0.2;
+export const SCOUT_REGIONS = {
+  africa: { name: 'Africa', nations: ['ZA', 'ZW', 'KE', 'NA', 'UG'], tag: 'Raw talent' },
+  europe: { name: 'Europe', nations: ['EN', 'IE', 'SC', 'NL'], tag: 'Accurate bowlers' },
+  namerica: { name: 'North America', nations: ['US', 'CA', 'WI'], tag: 'Power hitters' },
+  samerica: { name: 'South America', nations: ['AR', 'BR'], tag: 'Unpredictable talent' },
+  oceania: { name: 'Oceania', nations: ['AU', 'NZ', 'PG'], tag: 'Fast bowlers' },
+};
+const FINDS = 3, EVERY = 2;
+export const scoutOut = (c, region) => c.scouting?.[region]?.season === c.season;
+export function sendScout(c, region) {
+  if (scoutOut(c, region) || c.money < SCOUT_FEE || c.phase !== 'season') return false;
+  c.money = round2(c.money - SCOUT_FEE);
+  c.scouting = { ...c.scouting, [region]: { season: c.season, matches: 0, finds: [] } };
+  return true;
+}
+// what each region's players are like
+function scoutPlayer(c, region, rng) {
+  const R = SCOUT_REGIONS[region];
+  const used = new Set(Object.values(c.players).map(p => p.name));
+  let name, nation;
+  do { nation = rng.pick(R.nations); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+  const pace = () => rng.pick(['express', 'swing', 'seam', 'leftpace']);
+  let role, label, bat, bowl = null, bowlSkill = 0, age, pot, ability = null;
+  if (region === 'africa') {
+    // young and raw: low now, a lot later
+    [role, label] = rng.pick([['bat', 'Raw batting talent'], ['bowl', 'Raw pace talent'], ['all', 'Raw all-round talent']]);
+    age = rng.int(17, 20);
+    bat = role === 'bowl' ? rng.int(14, 26) : rng.int(46, 58);
+    if (role !== 'bat') { bowl = pace(); bowlSkill = rng.int(48, 60); }
+    pot = rng.next() < 0.35 ? rng.int(86, 94) : rng.int(76, 86);
+  } else if (region === 'europe') {
+    // tidy, accurate bowlers and the odd correct batter
+    [role, label] = rng.pick([['bowl', 'Accurate seamer'], ['bowl', 'Swing specialist'], ['bat', 'Technically correct batter']]);
+    age = rng.int(22, 28);
+    if (role === 'bowl') { bat = rng.int(14, 28); bowl = label.startsWith('Swing') ? 'swing' : 'seam'; bowlSkill = rng.int(64, 76); } else bat = rng.int(62, 72);
+    pot = Math.min(92, Math.max(bat, bowlSkill) + rng.int(2, 8));
+  } else if (region === 'namerica') {
+    // big hitters
+    [role, label] = rng.pick([['bat', 'Power hitter'], ['bat', 'Six machine'], ['all', 'Big-hitting all-rounder']]);
+    age = rng.int(20, 27);
+    bat = rng.int(62, 74);
+    if (role === 'all') { bowl = pace(); bowlSkill = rng.int(50, 62); }
+    pot = Math.min(93, bat + rng.int(3, 10));
+  } else if (region === 'samerica') {
+    // anything can happen: some arrive with a special ability
+    [role, label] = rng.pick([['bat', 'Unorthodox batter'], ['bowl', 'Mystery spinner'], ['all', 'Maverick all-rounder']]);
+    age = rng.int(19, 26);
+    bat = role === 'bowl' ? rng.int(14, 30) : rng.int(54, 68);
+    if (role !== 'bat') { bowl = role === 'bowl' ? rng.pick(['offspin', 'legspin']) : pace(); bowlSkill = rng.int(56, 68); }
+    pot = Math.min(93, Math.max(bat, bowlSkill) + rng.int(4, 14));
+    if (rng.next() < 0.4) ability = role === 'bat' ? rng.pick(['eagleEye', 'finisher']) : role === 'bowl' ? 'mystery' : rng.pick(['eagleEye', 'swingMaster']);
+  } else {
+    // quick bowlers and athletes
+    [role, label] = rng.pick([['bowl', 'Tearaway quick'], ['bowl', 'Left-arm quick'], ['all', 'Athletic all-rounder']]);
+    age = rng.int(19, 26);
+    bat = role === 'bowl' ? rng.int(16, 30) : rng.int(52, 64);
+    bowl = label.startsWith('Left') ? 'leftpace' : 'express'; bowlSkill = rng.int(62, 74);
+    pot = Math.min(93, bowlSkill + rng.int(3, 10));
+  }
+  const id = `s${c.season}-${region}-${(c.scoutNo = (c.scoutNo || 0) + 1)}`;
+  const w = rng.int(0, WEAK.length - 1);
+  const p = newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), role, label, bat, bowl, bowlSkill,
+    trait: `Scouted in ${R.name}`, hero: false,
+    ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
+  { age, pot, team: null, contract: 0, app: randomLook(nation, rng) });
+  p.ability = ability;
+  p.scouted = { region, season: c.season, price: Math.max(0.1, round2(value(p) * 0.8)) };
+  c.players[id] = p;
+  return p;
+}
+const findFor = (c, region, n) => scoutPlayer(c, region, makeRng(hashStr(`${c.seed}-${c.season}-${region}-${n}`)));
+// after each of your league matches: the scouts out this season report back
+function scoutReports(c) {
+  const notes = [];
+  for (const [region, s] of Object.entries(c.scouting || {})) {
+    if (s.season !== c.season) continue;
+    s.matches++;
+    if (s.matches % EVERY || s.finds.length >= FINDS) continue;
+    const p = findFor(c, region, s.finds.length);
+    s.finds.push(p.id);
+    notes.push(`🔎 Your scout in ${SCOUT_REGIONS[region].name} has found ${p.name} (${p.age}), ${p.label.toLowerCase()}. You can sign him before next season's auction.`);
+  }
+  return notes;
+}
+// the finds you can sign now, before this season's auction
+export const scoutFinds = c => Object.values(c.players).filter(p => p.scouted && p.scouted.season === c.season - 1 && !p.team && !p.retired);
+export function signFind(c, id) {
+  const p = c.players[id];
+  if (!p?.scouted || p.team || c.money < p.scouted.price || clubPlayers(c, c.club).length >= MAX_SQUAD) return false;
+  sign(c, p, c.club, p.scouted.price);
+  return true;
+}
+export function finishScouts(c) { if (c.phase === 'scouts') startAuction(c); }
+
 // Careers saved before players had countries: the regulars take their new names and
 // nations from the squads, heroes get theirs, and older academy graduates get one.
 export function migrateCareer(c) {
@@ -170,7 +269,8 @@ export function chooseClub(c, teamId) {
   if (!isUnlocked(t, c.season)) return false;
   if (c.club !== teamId) c.lineup = null;
   c.club = teamId;
-  startAuction(c);
+  // your scouts' finds come first, at their set price; then the auction
+  if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c);
   return true;
 }
 
@@ -397,6 +497,7 @@ export function recordPlayerMatch(c, summary) {
 // After your league match: play the rest of the round, and close the season when it's over.
 export function afterLeagueMatch(c, summary) {
   const notes = recordPlayerMatch(c, summary);
+  notes.push(...scoutReports(c));
   notes.push(...advance(c.league, playerResult(c.league, summary), (a, b, rng) => simCareerMatch(c, a, b, rng)));
   if (finish(c.league)) notes.push(...endSeason(c));
   return notes;
@@ -424,6 +525,15 @@ export function endSeason(c) {
   const orange = top(p => p.stats.season.runs), purple = top(p => p.stats.season.wkts * 1000 - p.stats.season.bruns);
   c.history.push({ season: c.season, champion: L.champion, runnerUp: order[1], club: c.club, pos: order.indexOf(c.club) + 1,
     orange: orange && { pid: orange.id, runs: orange.stats.season.runs }, purple: purple && { pid: purple.id, wkts: purple.stats.season.wkts } });
+  // a scout sent out late still comes home with two names
+  for (const [region, sc] of Object.entries(c.scouting || {})) {
+    if (sc.season !== c.season) continue;
+    while (sc.finds.length < 2) {
+      const p = findFor(c, region, sc.finds.length);
+      sc.finds.push(p.id);
+      notes.push(`🔎 Your scout in ${SCOUT_REGIONS[region].name} comes home with ${p.name}, ${p.label.toLowerCase()}`);
+    }
+  }
   c.phase = 'done';
   return notes;
 }

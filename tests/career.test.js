@@ -104,3 +104,32 @@ test('painted players are as old as they look, in new and saved careers', async 
   p.age += 1; migrateCareer(c); // not reset again after that
   assert.equal(p.age, PORTRAIT_AGE['rakibul-karim'] + 3);
 });
+
+test('travelling scouts: finds during the season, signed at a set price before the next auction', () => {
+  const c = C.newCareer(11);
+  C.chooseClub(c, 'royals'); C.finishAuction(c);
+  const money0 = c.money;
+  assert.equal(C.sendScout(c, 'africa'), true);
+  assert.equal(C.sendScout(c, 'africa'), false); // already out there
+  assert.equal(C.sendScout(c, 'samerica'), true);
+  assert.equal(Math.round((money0 - c.money) * 100) / 100, 0.4);
+  playSeason(c, 3);
+  assert.equal(c.phase, 'done');
+  const found = Object.values(c.players).filter(p => p.scouted);
+  assert.ok(found.length >= 4 && found.length <= 6, `found ${found.length}`);
+  for (const p of found.filter(p => p.scouted.region === 'africa')) assert.ok(p.age <= 20 && ['ZA', 'ZW', 'KE', 'NA', 'UG'].includes(p.nation));
+  C.nextSeason(c);
+  C.chooseClub(c, 'royals');
+  assert.equal(c.phase, 'scouts');
+  const finds = C.scoutFinds(c);
+  assert.equal(finds.length, found.length);
+  c.money = 50;
+  const pick = finds[0], price = pick.scouted.price;
+  assert.equal(C.signFind(c, pick.id), true);
+  assert.equal(pick.team, 'royals');
+  assert.equal(c.money, Math.round((50 - price) * 100) / 100);
+  C.finishScouts(c);
+  assert.equal(c.phase, 'auction');
+  // the rest go under the hammer
+  for (const p of finds.slice(1)) assert.ok(c.auction.lots.includes(p.id));
+});

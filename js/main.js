@@ -11,7 +11,7 @@ import { futCard, portraitFace } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason, migrateCareer } from './career.js';
+  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, unlockSeason, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -102,6 +102,7 @@ function renderHome() {
   const club = c?.club ? teamById(c.club).name : '';
   $('leagueSub').textContent = !c ? lines('Pick a club', 'Win the auction', 'Build a dynasty')
     : c.phase === 'pick' ? lines(`Season ${c.season}`, 'Pick your club')
+      : c.phase === 'scouts' ? lines(`Season ${c.season} · ${club}`, 'Your scouts are home', `${money(c.money)} to spend`)
       : c.phase === 'auction' ? lines(`Season ${c.season} · ${club}`, 'Auction', `${money(c.money)} to spend`)
         : c.phase === 'done' ? lines(`Season ${c.season} over · ${club}`, `${money(c.money)} in the bank`)
           : lines(`Season ${c.season} · ${club}`, (f => f && `${f.label} v ${teamById(f.opp).name}`)(nextFixture(c.league)), `${money(c.money)} in the bank`);
@@ -954,7 +955,7 @@ function renderCareer(notes = careerNotes) {
   for (const n of notes) body.append(el('div', 'panel paper notecard', n));
   if (careerView === 'squad' && club) return careerSquad(c, body);
   careerView = 'hub';
-  ({ pick: careerPick, auction: careerAuction, season: careerSeason, done: careerDone })[c.phase](c, body);
+  ({ pick: careerPick, scouts: careerScouts, auction: careerAuction, season: careerSeason, done: careerDone })[c.phase](c, body);
   saveProfile(profile);
 }
 $('btnLeague').addEventListener('click', () => {
@@ -967,7 +968,7 @@ $('careerSquad').addEventListener('click', () => { careerView = careerView === '
 $('careerRecords').addEventListener('click', () => renderRecords());
 $('careerCoach').addEventListener('click', () => {
   const c = career();
-  coachSay(DEV[{ pick: 'leagueTeam', auction: 'auction', season: 'season', done: 'seasonEnd' }[c.phase]]);
+  coachSay(c.phase === 'season' ? [...DEV.season, ...DEV.scoutTip] : DEV[{ pick: 'leagueTeam', scouts: 'scoutSign', auction: 'auction', done: 'seasonEnd' }[c.phase]]);
 });
 // start the Super League again from season 1: a fresh league, a fresh auction (nothing else is touched)
 confirmTap($('careerRestart'), 'Tap again to restart from season 1', () => {
@@ -1107,7 +1108,10 @@ function careerAuction(c, body) {
 function careerSeason(c, body) {
   const f = nextFixture(c.league);
   const me = teamById(c.club);
-  coachOnce('season', DEV.season).then(shown => {
+  coachOnce('season', DEV.season).then(async shown => {
+    // send a scout abroad; then, once one has found someone, what happens next
+    if (!Object.keys(c.scouting || {}).length) shown = (await coachOnce('scoutTip', DEV.scoutTip)) || shown;
+    if (Object.values(c.scouting || {}).some(s => s.season === c.season && s.finds.length)) shown = (await coachOnce('scoutFound', DEV.scoutFound)) || shown;
     // two defeats running: a word of advice (once a season)
     const mineR = (c.league.results || []).filter(r => r.player), last2 = mineR.slice(-2);
     if (!shown && last2.length === 2 && last2.every(r => r.winner && r.winner !== c.club)) coachOnce(`slump-${c.season}`, DEV.slump);
@@ -1119,7 +1123,56 @@ function careerSeason(c, body) {
     body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
       () => startMatch({ mode: 'career' })));
   }
+  body.append(scoutsPanel(c));
   body.append(...leaguePanels(c.league));
+}
+
+// ---------- travelling scouts ----------
+function scoutsPanel(c) {
+  const box = el('div', 'panel paper scoutpanel');
+  box.append(el('h3', '', '🔎 Travelling scouts'));
+  box.append(el('p', 'sheetnote', `Send a scout abroad for the season (${money(SCOUT_FEE)} a region). He finds a player every two matches, up to three, and you can sign them at a set price before next season's auction.`));
+  for (const [id, R] of Object.entries(SCOUT_REGIONS)) {
+    const row = el('div', 'scoutrow');
+    const im = document.createElement('img'); im.src = `img/region/card-${id}.webp`; im.alt = '';
+    const txt = el('div');
+    const out = scoutOut(c, id), finds = out ? c.scouting[id].finds.map(pid => c.players[pid]) : [];
+    txt.append(el('b', '', R.name), el('small', '', out
+      ? (finds.length ? `Found: ${finds.map(p => `${flag(p)} ${p.name}`).join(', ')}` : 'Out scouting: his first report comes after two matches')
+      : R.tag));
+    const btn = el('button', 'chipbtn', out ? `✓ ${finds.length}/3 found` : `Send · ${money(SCOUT_FEE)}`);
+    btn.disabled = out || c.money < SCOUT_FEE;
+    btn.addEventListener('click', () => {
+      if (sendScout(c, id)) { sfx.full(); ui.toast(`Your scout is off to ${R.name}`); saveProfile(profile); renderCareer(); }
+    });
+    row.append(im, txt, btn); box.append(row);
+  }
+  return box;
+}
+// the start of a season: your scouts' finds, yours to sign at a set price before the auction
+function careerScouts(c, body) {
+  coachOnce('scoutSign', DEV.scoutSign);
+  const finds = scoutFinds(c), mine = clubPlayers(c, c.club);
+  body.append(el('div', 'panel paper notecard', `🔎 Your scouts are home · ${teamById(c.club).name} · squad ${mine.length}/${MAX_SQUAD} · ${money(c.money)} to spend`));
+  const grid = el('div', 'scoutfinds');
+  for (const p of finds) {
+    const card = el('div', 'panel paper lotcard');
+    card.append(el('div', 'eyebrow', `SCOUTED IN ${SCOUT_REGIONS[p.scouted.region].name.toUpperCase()}`));
+    card.append(futCard(p, { size: Math.min(200, window.innerWidth * 0.46) }));
+    card.append(el('p', 'lotmeta', `${p.label} · ${ageNote(p)} · bat ${p.bat}${p.bowlSkill ? ` · bowl ${p.bowlSkill}` : ''}`));
+    const btn = el('button', 'bigbtn primary', `Sign · ${money(p.scouted.price)}`);
+    btn.disabled = c.money < p.scouted.price || mine.length >= MAX_SQUAD;
+    btn.addEventListener('click', () => {
+      if (signFind(c, p.id)) { sfx.full(); ui.toast(`${p.name} signs for ${teamById(c.club).name}!`); saveProfile(profile); renderCareer(); }
+    });
+    card.append(btn);
+    grid.append(card);
+  }
+  if (!finds.length) grid.append(el('div', 'panel paper notecard', 'All signed. On to the auction!'));
+  body.append(grid);
+  const go = el('button', 'bigbtn primary', 'To the auction');
+  go.addEventListener('click', () => { finishScouts(c); sfx.dhol(); saveProfile(profile); renderCareer(); });
+  body.append(go, el('p', 'sheetnote', 'Anyone you leave goes into the auction, where every club can bid for him.'));
 }
 
 // the season is over

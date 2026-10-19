@@ -115,6 +115,19 @@ export const DEV = {
     "Before each match, check the opposition card. It tells you who their danger man is.",
     "And set your line-up in the squad screen. Your best batters near the top, your best bowlers in the attack.",
   ],
+  scoutTip: [
+    "One more thing, beta. The best clubs don't only shop at the auction. They send scouts around the world.",
+    "Send a scout to a region and he'll find you players there: raw talent in Africa, accurate bowlers in Europe, big hitters in North America, mavericks in South America, quicks in Oceania.",
+    "Next season you can sign his finds at a set price, before the auction even starts. No bidding war!",
+  ],
+  scoutFound: [
+    "Your scout has sent his first report! Have a look under Travelling scouts.",
+    "He'll keep searching all season. When the new season begins, his players are yours to sign first.",
+  ],
+  scoutSign: [
+    "Your scouts are home, beta, and look what they've brought back!",
+    "These players are yours to sign at a set price, before the other clubs even see them. Anyone you leave goes into the auction.",
+  ],
   slump: [
     "Two defeats in a row. It happens to every team, beta.",
     "Check your batting order and bowling attack in the squad screen. Sometimes one change is all it takes.",
