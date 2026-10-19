@@ -19,12 +19,12 @@ SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.
 PICK = [
     ('ready', 7, 1), ('leave1', 7, 2), ('leave2', 7, 3), ('backlift', 7, 4),
     # the forward drive (its own sheet): stance, stride and backlift, through the line, high finish
-    ('drive1', 8, 1), ('drive2', 8, 2), ('drive3', 8, 3), ('drive4', 8, 4),
+    ('drive1', 8, 1), ('drive2', 8, 2), ('drive3', 8, 3),
     # the pull (its own sheet: poses 2, 3, 4): bat swung across to leg, through, wrapped round the shoulder
-    ('pull1', 11, 2), ('pull2', 11, 3), ('pull3', 11, 4),
+    ('pull1', 11, 2), ('pull2', 11, 3),
     ('def1', 3, 7), ('def2', 3, 9), ('def3', 3, 10),
     # the cut: rocking back, the bat across, contact square on the off side, through, finish
-    ('cut1', 5, (110, 800)), ('cut2', 5, (320, 800)), ('cut3', 5, (550, 800)), ('cut4', 5, (850, 850)), ('cut5', 5, (330, 1300)), ('cut6', 5, (720, 1300)),
+    ('cut1', 5, (110, 800)), ('cut2', 5, (320, 800)), ('cut3', 5, (550, 800)), ('cut4', 5, (850, 850)),
     ('bowled', 1, 8), ('celebrate', 3, 15),
     ('rsweep1', 2, 4), ('rsweep2', 2, 7), ('rsweep3', 2, 11),
     # the straight drive (its own sheet: pose 2 then pose 1): bat through the line, high finish
@@ -33,7 +33,7 @@ PICK = [
     # (the two bats touch: split along the gap between them, not by nearest body)
     ('ondrive1', 13, (680, 450, 'left')), ('ondrive2', 13, (1230, 450, 'right')),
     # the cover drive (its own sheet: poses 2, 3, 4): lunge onto the ball, through the off side, high finish
-    ('cover1', 12, 2), ('cover2', 12, 3), ('cover3', 12, 4),
+    ('cover1', 12, 2), ('cover2', 12, 3),
 ]
 STAND_PX = 330          # the standing pose (each sheet's first) comes out this tall
 # a sheet with no standing pose: scaled so its pose matches one already sized (sheet, pose, its pose)
