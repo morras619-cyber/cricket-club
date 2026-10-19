@@ -21,7 +21,7 @@ def save(level, name, im, lossless):
 src = open(os.path.join(ROOT, 'js', 'groundart.js')).read()
 head, body = src.split('export const GROUND_ART = ', 1)
 ART = json.loads(body.rstrip().rstrip(';'))
-for L in (1, 2, 3):
+for L in [int(x) for x in os.environ.get('LEVELS', '1,2,3').split(',')]:
     out = os.path.join(ROOT, 'img', 'ground', f'own{L}'); os.makedirs(out, exist_ok=True)
     for f in ('pitch', 'grass', 'stumps', 'stumps-broken'):
         shutil.copy(os.path.join(ROOT, 'img', 'ground', 'thunder', f + '.webp'), os.path.join(out, f + '.webp'))
