@@ -34,7 +34,8 @@ const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
 // running away, across (facing right), toward the camera, turning; reaching up; the dive (to the right);
 // a catch straight to him (hands ready, taken overhead, held at the chest)
 const POSE_FIELD = Object.fromEntries(['ready_front', 'ready_side', 'ready_back', 'away1', 'away2', 'away3', 'away4',
-  'side1', 'side2', 'side3', 'reach', 'toward', 'turn', 'away3q', 'awayB', 'dive1', 'dive2', 'dive3', 'dive4', 'catch1', 'catch2', 'catch3'].map((n, i) => [n, i]));
+  'side1', 'side2', 'side3', 'reach', 'toward', 'turn', 'away3q', 'awayB', 'dive1', 'dive2', 'dive3', 'dive4', 'catch1', 'catch2', 'catch3',
+  'kf_ready', 'kf_hands', 'kf_catch', 'kf_dive', 'kb_ready', 'kb_rise', 'kb_reach', 'kb_dive', 'ns_wait', 'ns_lean', 'ns_hip', 'ns_chin'].map((n, i) => [n, i]));
 const FIELD_PX_PER_M = 304; // the sheet's scale: the bowler's
 const FIELD_KEEP = 0.5;     // each player's frames are kept at half size (a whole team is on screen at once)
 const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }
@@ -346,11 +347,13 @@ function playerSheet(view, team, look, mirror) {
 // One fielder's frame in his club's kit, with his skin and (from behind) his name and number, at
 // half the sheet's size. Each player-frame is made once and kept (a few hundred fit in a few MB).
 const fieldCache = new Map();
-function fielderFrame(team, look, idx) {
+// mirror: the frame will be drawn flipped, so the name and number are printed mirrored to read right
+function fielderFrame(team, look, idx, mirror = false) {
   const meta = KIT_SHEETS.field, data = viewData('field');
   if (!meta || !data || !fontReady) return null;
   const sk = skinHex(look), name = shirtName(look.who), num = shirtNumber(look);
-  const key = [team.id, sk, name, num, idx].join('|');
+  mirror = mirror && KIT_SHEETS.field.place[idx][2] > 0;
+  const key = [team.id, sk, name, num, idx, mirror ? 'm' : ''].join('|');
   if (fieldCache.has(key)) return fieldCache.get(key);
   const kit = teamSheet('field', team);
   if (!kit) return null;
@@ -380,7 +383,7 @@ function fielderFrame(team, look, idx) {
     const hb = BLOCK.name + BLOCK.gap + BLOCK.num;
     for (const [text, cap, cy] of [[name, BLOCK.name, -hb / 2 + BLOCK.name / 2], [String(num), BLOCK.num, hb / 2 - BLOCK.num / 2]]) {
       lg.save();
-      lg.translate(px - sx, py - sy); lg.rotate(ang * Math.PI / 180); lg.scale(pw / BLOCK.w * psx, pw / BLOCK.w * psy);
+      lg.translate(px - sx, py - sy); lg.rotate(ang * Math.PI / 180); lg.scale(pw / BLOCK.w * psx * (mirror ? -1 : 1), pw / BLOCK.w * psy);
       printLine(lg, text, cap, cy, fill, edge);
       lg.restore();
     }
@@ -406,10 +409,11 @@ function fielderFrame(team, look, idx) {
 }
 
 // A fielder, feet at (px, py), kPerM pixels per metre; flip mirrors him (the sheet's side views face
-// right). False until the sheet is in (the old sprite is drawn instead).
-export function drawKitFielder(ctx, px, py, kPerM, frame, team, look, flip = false, glow = null) {
+// right). lift raises him off his shadow (a keeper's dive). False until the sheet is in (the old
+// sprite is drawn instead).
+export function drawKitFielder(ctx, px, py, kPerM, frame, team, look, flip = false, glow = null, lift = 0) {
   if (!team || !look?.who || !KIT_SHEETS.field) return false;
-  const idx = POSE_FIELD[frame] ?? 0, img = fielderFrame(team, look, idx);
+  const idx = POSE_FIELD[frame] ?? 0, img = fielderFrame(team, look, idx, flip);
   if (!img) return false;
   const [, , w, h, ax, ay] = KIT_SHEETS.field.frames[idx], [bh, bw] = buildOf(look);
   const k = kPerM / FIELD_PX_PER_M * bh, kx = k * bw;
@@ -417,7 +421,7 @@ export function drawKitFielder(ctx, px, py, kPerM, frame, team, look, flip = fal
   ctx.fillStyle = 'rgba(10,8,20,0.28)';
   ctx.beginPath(); ctx.ellipse(px, py, Math.max(w * 0.32, 60) * kx, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
   if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 14; }
-  ctx.translate(px, py);
+  ctx.translate(px, py - lift * kPerM);
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(img, -ax * kx, -ay * k, w * kx, h * k);
   ctx.restore();

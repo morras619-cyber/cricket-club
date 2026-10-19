@@ -1116,6 +1116,8 @@ export class Game {
     let k = 0;
     return list.map(f => (f.id === 'bowler' ? bowler : f.keeper ? keeper : rest[k++ % Math.max(1, rest.length)]) || rest[0]);
   }
+  // your wicket-keeper's own skin, hair and build (the hand-drawn keeper)
+  keeperPeople() { return lookOf(this.fieldingXI([{ keeper: true }], 'player')[0]); }
   fieldLooks(list, side) {
     const xi = this.fieldingXI(list, side);
     return list.map((f, i) => ({
@@ -1376,6 +1378,7 @@ export class Game {
     S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler);
     S.keeper.look = this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
+    S.keeper.people = this.keeperPeople();
     const kind = bowler.bowl || 'swing';
     const profile = striker.ai;
     let field = this.currentField(ballNo);
@@ -2000,7 +2003,7 @@ export class Game {
     S.delivery = null; S.ball = null; S.flight = null;
     S.kball = { from, to, t0: this.realTime, dur: approach, done: false };
     S.reticle = { ...to, needSwipe, elastic, t0: this.realTime, dur: approach };
-    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1), emblem: this.team.field?.id === 'rani' ? this.team.field.emblem : null };
+    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1), emblem: this.team.field?.id === 'rani' ? this.team.field.emblem : null, people: this.keeperPeople() };
     // clear leftover delivery text so nothing covers the target
     this.fx.words = []; this.fx.bubbles = []; this.ui.clearBanner();
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
@@ -2576,8 +2579,10 @@ export class Game {
     // your partner at the bowler's end: behind his crease, on the side away from the bowler's arm
     if (kind === 'bat' && S.nonStriker?.team) {
       const nx = S.bowler.left ? 1.35 : -1.35, nz = 19.4;
-      // he waits, then backs up as the bowler runs in, a step or two down the pitch as the ball goes
-      const spr = S.bowler.spr;
+      // he waits in his own way (leaning on the bat, hand on hip...), then ready with both hands on the
+      // handle as the bowler runs in; the old drawn figure backs up a step if his sheet isn't in
+      const spr = S.bowler.spr, live = spr?.anim === 'run' || spr?.anim === 'deliver';
+      const idle = ['ns_lean', 'ns_hip', 'ns_chin', 'ns_wait'][(Math.imul(this.ballNo(), 2654435761) >>> 16) % 4];
       let frame = 'ns1', fwd = 0;
       if (spr?.anim === 'run') frame = spr.p < 0.45 ? 'ns2' : spr.p < 0.7 ? 'ns3' : spr.p < 0.85 ? 'ns4' : 'ns5';
       else if (spr?.anim === 'deliver') {
@@ -2585,10 +2590,13 @@ export class Game {
         frame = t < 0.12 ? 'ns6' : t < 0.26 ? 'ns7' : t < 0.4 ? 'ns8' : t < 0.55 ? 'ns9' : 'ns10';
         fwd = 0.7 * clamp(t / 0.55, 0, 1);
       }
-      push(nz - fwd, () => {
-        const p = cam.project(nx, 0, nz - fwd);
-        if (p && !drawBowlSprite(ctx, p.x, p.y, p.k, frame, S.nonStriker.team, false, 'nonstriker', S.nonStriker.people))
-          drawBowlSprite(ctx, p.x, p.y, p.k, 'leave2', S.nonStriker.team, false, 'batfront', S.nonStriker.people);
+      push(nz, () => {
+        const p = cam.project(nx, 0, nz);
+        // (his bat hangs on the side away from the stumps)
+        if (p && drawKitFielder(ctx, p.x, p.y, p.k, live ? 'ns_wait' : idle, S.nonStriker.team, S.nonStriker.people, nx < 0)) return;
+        const q = cam.project(nx, 0, nz - fwd);
+        if (q && !drawBowlSprite(ctx, q.x, q.y, q.k, frame, S.nonStriker.team, false, 'nonstriker', S.nonStriker.people))
+          drawBowlSprite(ctx, q.x, q.y, q.k, 'leave2', S.nonStriker.team, false, 'batfront', S.nonStriker.people);
       });
     }
     // batter with swing animation
@@ -2624,6 +2632,7 @@ export class Game {
       const kx = k.x + (k.dx || 0);
       push(k.z, () => {
         const p = cam.project(kx, 0, k.z);
+        if (p && this.kitKeeper(ctx, p, frame, kind === 'keeper')) return;
         // the stumping reach is drawn to his right; from behind, the stumps are on his left
         if (p && drawKeeperSprite(ctx, p.x, p.y, p.k, frame, this.myTeam, kind === 'keeper' ? 'back' : 'front', { flip: kind === 'keeper' && frame === 'stump', lift: k.lift || 0 })) return;
         drawFigure3D(ctx, cam, k.x, k.z, k.look || AI_LOOK, k.pose, { back: kind === 'keeper', emblem: k.emblem }, 1.75);
@@ -2956,6 +2965,22 @@ export class Game {
   // The drawn fielder (the kit sheet): standing, he faces the pitch (from the front, the side or the
   // back, by where he is); running, the run that goes his way on screen (away up the screen, across,
   // toward the camera); reaching for a catch about to drop; the dive; a throw from the side.
+  // the wicket-keeper from his own hand-drawn sheet: facing the bowler's end (front) or from behind
+  // (back), the old drawn keeper's frame read as the nearest pose drawn. His dives and reaches are
+  // drawn to the screen's right: mirrored when the ball is on the other side.
+  kitKeeper(ctx, p, frame, back) {
+    const k = this.S.keeper, team = this.myTeam;
+    if (!k.people) return false;
+    if (back) {
+      // (from behind, the world's left is the screen's left)
+      const left = frame === 'diveL' || (frame !== 'diveR' && (this.S.kball?.to.x ?? k.x) < k.x);
+      const f = { ready: 'kb_ready', diveL: 'kb_dive', diveR: 'kb_dive', stump: 'kb_reach', celebrate: 'kb_ready' }[frame] || 'kb_rise';
+      return drawKitFielder(ctx, p.x, p.y, p.k, f, team, k.people, frame === 'stump' || (frame !== 'celebrate' && left), null, k.lift || 0);
+    }
+    // facing us the world's left is the screen's right, where his dive is drawn
+    const f = { ready: 'kf_ready', rise: 'kf_hands', diveL: 'kf_dive', diveR: 'kf_dive' }[frame] || 'kf_catch';
+    return drawKitFielder(ctx, p.x, p.y, p.k, f, team, k.people, frame === 'diveR', null, k.lift || 0);
+  }
   kitFielder(f, i) {
     const V = this.of, O = this.O, pose = f.pose?.name;
     const team = O.side === 'ai' ? this.oppTeam : this.myTeam;
