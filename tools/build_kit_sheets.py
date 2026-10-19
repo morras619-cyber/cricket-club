@@ -430,7 +430,7 @@ def build_field():
     pr = json.load(open('tools/kit/field-print.json'))
     n = len(pr['frames'])
     return build('field', 'tools/kit/src/fielder.png', {}, [pr[str(k + 1)] for k in range(n)], n, pr['rowh'],
-                 premium=True, place_abs=True, hard=True, hips=pr['hips'])
+                 premium=True, place_abs=True, hard=True, bat=True, hips=pr['hips'])
 
 
 def write_sheets(out):
