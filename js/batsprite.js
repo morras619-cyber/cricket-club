@@ -31,12 +31,13 @@ const FRAMES = {
 };
 
 // the frames the kit sheet has and the old per-team sheets (and the batter seen from the front) don't
-export const OLD_FRAME = { drive4: 'drive3', cut4: 'cut3', cut5: 'cut3', cut6: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3', cover1: 'drive2', cover2: 'drive3', cover3: 'drive3', straight1: 'drive2', straight2: 'drive3' };
+export const OLD_FRAME = { drive4: 'drive3', cut4: 'cut3', cut5: 'cut3', cut6: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3', cover1: 'drive2', cover2: 'drive3', cover3: 'drive3', straight1: 'drive2', straight2: 'drive3', ondrive1: 'drive2', ondrive2: 'drive3' };
 
 // frame, ms on screen. The swing starts when the finger lifts, which is the moment of contact,
 // so the downswing is brief and the contact frame lands almost at once.
 const SEQ = {
   drive: [['drive1', 25], ['drive2', 35], ['drive3', 150], ['drive4', Infinity]],
+  ondrive: [['ondrive1', 160], ['ondrive2', Infinity]], // through the ball, round to the leg side
   straight: [['straight1', 160], ['straight2', Infinity]], // bat through the line, high finish
   cover: [['cover1', 150], ['cover2', 110], ['cover3', Infinity]], // lunge onto the ball, through the off side, finish
   pull: [['pull1', 150], ['pull2', 110], ['pull3', Infinity]], // swung across to leg, through, wrapped round
@@ -51,7 +52,7 @@ const BLEND_MS = 40;
 // Which animation a swipe plays: each direction its own shot, so the bat goes where the ball goes.
 // angle: 0 straight back past the bowler, + toward the off side (right of the screen), − leg side.
 //   straight ±15°  ·  cover drive 15–55° off  ·  cut 55–110° off  ·  reverse sweep beyond 110° off
-//   on-drive 15–55° leg (for now the forward drive)  ·  pull beyond 55° leg (fine leg too, for now)
+//   on-drive 15–55° leg  ·  pull beyond 55° leg (fine leg too, for now)
 const DEG = Math.PI / 180;
 export function shotAnim(shot) {
   if (!shot) return 'drive';
@@ -62,7 +63,7 @@ export function shotAnim(shot) {
   if (a > 55 * DEG) return 'cut';
   if (a > 15 * DEG) return 'cover';
   if (a >= -15 * DEG) return 'straight';
-  if (a >= -55 * DEG) return 'drive';
+  if (a >= -55 * DEG) return 'ondrive';
   return 'pull';
 }
 

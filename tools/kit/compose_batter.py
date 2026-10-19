@@ -13,7 +13,7 @@ from PIL import Image
 from scipy import ndimage as ndi
 
 D = os.path.join(os.path.dirname(__file__), 'src', 'bat-sheets')
-SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png', 8: '8-forward-drive.png', 9: '9-cover-drive.png', 10: '10-straight-drive.png', 11: '11-pull.png', 12: '12-cover-drive.png'}
+SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png', 8: '8-forward-drive.png', 9: '9-cover-drive.png', 10: '10-straight-drive.png', 11: '11-pull.png', 12: '12-cover-drive.png', 13: '13-on-drive.png'}
 # the game's frames in sheet order (js/kitsprite.js POSE_BAT): (sheet, pose number in reading order)
 # or (sheet, (x, y)): the pose drawn at that point of the sheet (two poses drawn touching are split)
 PICK = [
@@ -29,12 +29,15 @@ PICK = [
     ('rsweep1', 2, 4), ('rsweep2', 2, 7), ('rsweep3', 2, 11),
     # the straight drive (its own sheet: pose 2 then pose 1): bat through the line, high finish
     ('straight1', 10, 2), ('straight2', 10, 1),
+    # the on-drive (its own sheet: poses 2, 3): through the ball, finish round to the leg side
+    # (the two bats touch: split along the gap between them, not by nearest body)
+    ('ondrive1', 13, (680, 450, 'left')), ('ondrive2', 13, (1230, 450, 'right')),
     # the cover drive (its own sheet: poses 2, 3, 4): lunge onto the ball, through the off side, high finish
     ('cover1', 12, 2), ('cover2', 12, 3), ('cover3', 12, 4),
 ]
 STAND_PX = 330          # the standing pose (each sheet's first) comes out this tall
 # a sheet with no standing pose: scaled so its pose matches one already sized (sheet, pose, its pose)
-MATCH = {7: (4, 4, 1), 8: (7, 1, 1), 9: (8, 3, (150, 1150)), 10: (8, 3, 2), 11: (8, 3, 2), 12: (8, 3, 2)}  # 9: its contact pose sized as the forward drive's
+MATCH = {7: (4, 4, 1), 8: (7, 1, 1), 9: (8, 3, (150, 1150)), 10: (8, 3, 2), 11: (8, 3, 2), 12: (8, 3, 2), 13: (8, 3, (680, 450, 'left'))}  # 9: its contact pose sized as the forward drive's
 MAG = np.array([250, 0, 250], np.uint8)
 
 
@@ -59,14 +62,24 @@ def poses(path):
     return im.astype(np.uint8), out
 
 
-def at_point(path, x, y):
-    """the pose drawn at (x, y); two poses drawn touching are split, each pixel to the nearer body"""
+# where two poses touch and the nearest-body split goes wrong: the line between them, per sheet.
+# on the on-drive sheet the first pose's bat tip lies below the second's bat handle
+CUTS = {'13-on-drive.png': lambda X, Y: (X <= 927) | ((X <= 940) & (Y >= 190))}
+
+
+def at_point(path, x, y, side=None):
+    """the pose drawn at (x, y); two poses drawn touching are split, each pixel to the nearer body
+    (or, with side 'left' / 'right', along the sheet's own cut in CUTS)"""
     a = np.asarray(Image.open(path).convert('RGB')).astype(int)
     fg = ndi.binary_opening(~((np.minimum(a[..., 0], a[..., 2]) - a[..., 1]) > 110), iterations=1)
     lab, _ = ndi.label(fg)
     ys, xs = np.nonzero(lab)
     i = np.argmin((ys - y) ** 2 + (xs - x) ** 2)
     m = lab == lab[ys[i], xs[i]]
+    if side:
+        Y, X = np.mgrid[:m.shape[0], :m.shape[1]]
+        left = CUTS[os.path.basename(path)](X, Y)
+        return m & (left if side == 'left' else ~left)
     for it in (9, 13, 17, 21, 25):
         core = ndi.binary_erosion(m, iterations=it)
         cl, cn = ndi.label(core)

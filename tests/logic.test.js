@@ -251,6 +251,6 @@ test('each swipe direction plays its own shot', async () => {
   const d = deg => shotAnim({ kind: 'drive', angle: deg * Math.PI / 180 });
   assert.equal(d(0), 'straight'); assert.equal(d(10), 'straight'); assert.equal(d(-10), 'straight');
   assert.equal(d(35), 'cover'); assert.equal(d(80), 'cut'); assert.equal(d(140), 'rsweep');
-  assert.equal(d(-35), 'drive'); assert.equal(d(-80), 'pull'); assert.equal(d(-150), 'pull');
+  assert.equal(d(-35), 'ondrive'); assert.equal(d(-80), 'pull'); assert.equal(d(-150), 'pull');
   assert.equal(shotAnim({ kind: 'block', angle: 0 }), 'block');
 });
