@@ -1,4 +1,4 @@
-// Synthesised sound effects (no audio files to download). Starts on the first user gesture.
+// Synthesised sound effects, plus a few recorded ones (snd/, played by name). Starts on the first user gesture.
 let ac = null, master = null, noiseBuf = null;
 export const sound = { on: true, haptics: true };
 
@@ -16,6 +16,23 @@ export function unlockAudio() {
 }
 
 function ready() { return ac && sound.on; }
+
+// recorded sounds: fetched and decoded once, the first time they're asked for (or preloaded)
+const clips = {};
+export function loadClip(name) {
+  if (!ac) return null;
+  if (!clips[name]) clips[name] = fetch(`snd/${name}.mp3`).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no))).catch(() => null);
+  return clips[name];
+}
+export function playClip(name, gain = 1) {
+  if (!ready()) return;
+  loadClip(name)?.then(buf => {
+    if (!buf || !ready()) return;
+    const src = ac.createBufferSource(), g = ac.createGain();
+    src.buffer = buf; g.gain.value = gain;
+    src.connect(g).connect(master); src.start();
+  });
+}
 
 function tone(freq, dur, { type = 'sine', gain = 0.3, to = null, delay = 0 } = {}) {
   if (!ready()) return;

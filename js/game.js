@@ -22,7 +22,7 @@ import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio } from './audio.js';
+import { sfx, buzz, unlockAudio, playClip, loadClip } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -255,6 +255,7 @@ export class Game {
     this.pitch = pitchOf(this.home);
     preloadEffects('electric');
     setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; });
+    if (this.home === 'thunder') loadClip('thunder-four');
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
     // hero levels: stronger heroes and cheaper signature powers
     this.levels = opts.levels || {};
@@ -348,6 +349,8 @@ export class Game {
     else { out.swing = (out.swing || 0) * P.swing * (dew ? 0.8 : 1); out.move = (out.move || 0) * P.seam; out.kmh = (out.kmh || 0) * P.kmh; }
     return out;
   }
+  // a four by the Thunder at the Thunderdome gets its own crowd (snd/thunder-four.mp3)
+  thunderFour(team) { return this.home === 'thunder' && team?.id === 'thunder'; }
   // timing on this pitch: easier on a road or under the dew, harder on a seamer
   pitchBat() { return this.pitch.bat * (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1); }
 
@@ -1106,7 +1109,7 @@ export class Game {
       this.board('FOUR!');
       this.charge.award('four', 'FOUR');
       if (this.home === this.myTeam.id) this.charge.add(2, 'HOME CROWD');
-      sfx.crowd(this.home === this.myTeam.id ? 1 : 0.8);
+      if (!this.thunderFour(this.myTeam)) sfx.crowd(this.home === this.myTeam.id ? 1 : 0.8);
       this.addMoment('four', 'FOUR!', 'FOUR!', this.heroFor('bat'), { ballNo });
     } else if (runs === 0) this.charge.dot();
     if (inn.reached()) {
@@ -1320,7 +1323,11 @@ export class Game {
           this.fx.word(`${m} METRES`, p.x, p.y + 30, { size: 40, color: '#fff4da', stroke: '#e8343b', rot: 0, dur: 1400 });
           this.board(`${m}m SIX!`);
         }
-        else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
+        else if (sim.kind === 'four' && !o.saved) {
+          this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK });
+          // the Thunderdome's own roar, drums and horns when the Thunder hit one at home
+          if (this.thunderFour(o.side === 'ai' ? this.myTeam : this.oppTeam)) playClip('thunder-four', 0.9);
+        }
         else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); }
         else if (o.runOut !== undefined) { /* the throw says RUN OUT! or SAFE! */ }
         else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * (D ? 0.62 : 0.3), { size: 44, color: '#fff4da', stroke: INK });
