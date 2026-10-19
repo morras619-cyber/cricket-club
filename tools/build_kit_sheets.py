@@ -43,7 +43,8 @@ def masks(a, bat=False):
     H, S, V = hsv(a[..., :3])
     op = a[..., 3] > 0.3
     suit = op & (H > 195) & (H < 255) & (S > 0.3)
-    trim = op & (H > 40) & (H < 70) & (S > 0.5) & (V > 0.45)
+    # (the batter's willow reaches hue 41: his yellow starts above it)
+    trim = op & (H > (44 if bat else 40)) & (H < 70) & (S > 0.5) & (V > 0.45)
     skin = op & (H > 5) & (H < 40) & (S > 0.2) & (V > 0.3) & ~trim
     if bat:
         # the batter's willow is drawn close to his skin: paler and yellower (hue 34-41, saturation
@@ -173,7 +174,7 @@ def tones(a, design=None, off=0, marks=None, hard=False):
     drawn in the premium kit is read as drawn; a plain one gets the design painted on (design)."""
     H, S, V = hsv(a[..., :3])
     rgb = a[..., :3]
-    kit = (a[..., 3] > 0.3) & (((H > 190) & (H < 265) & (S > 0.25)) | ((H > 38) & (H < 72) & (S > 0.45)))
+    kit = (a[..., 3] > 0.3) & (((H > 190) & (H < 265) & (S > 0.25)) | ((H > (44 if hard else 38)) & (H < 72) & (S > 0.45)))
     chroma = lambda c: c / (c.sum(-1, keepdims=True) + 1e-3)
     L = rgb @ LUM
     # the main colour and navy share a hue: told apart by brightness (main L ~ 86, navy ~ 42 of 255)
@@ -202,7 +203,7 @@ def tones(a, design=None, off=0, marks=None, hard=False):
         lab, n = ndi.label(nv)
         if n:
             nv = np.isin(lab, 1 + np.nonzero(ndi.sum(nv, lab, range(1, n + 1)) >= 120)[0])
-        yl = kit & ndi.binary_closing(yel > 0.45, iterations=1)
+        yl = kit & ndi.binary_closing(yel > 0.45, iterations=1) & (H > 44)
         navy, yel = nv.astype(float) * ~yl, yl.astype(float)
     w = np.stack([(1 - yel) * (1 - navy), (1 - yel) * navy, yel], -1)
     w = ndi.gaussian_filter(w, (0.8, 0.8, 0) if not hard else (0.6, 0.6, 0))
@@ -258,12 +259,23 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
+    if hard:
+        # the drawn batter has a pale rim outside his ink line where the kit meets the background;
+        # the bowler has none: it takes the ink colour (not on pads, gloves and shoes, which are white)
+        op = a[..., 3] > 0.3
+        ring = op & ~ndi.binary_erosion(op, iterations=3)
+        H, S, V = hsv(a[..., :3])
+        kitc = op & (((H > 190) & (H < 265) & (S > 0.25)) | ((H > 44) & (H < 72) & (S > 0.45)))
+        pale = ring & (S < 0.3) & (V > 0.7) & ndi.binary_dilation(kitc, iterations=4) & ~ndi.binary_dilation(op & (S < 0.25) & (V > 0.8) & ~ring, iterations=2)
+        a[pale, :3] = np.array([20, 16, 24]) / 255
     hairs = {st: clean_hair(np.pad(np.array(Image.open(hp).convert('RGBA')).astype(np.float32) / 255, ((M, M), (M, M), (0, 0)))) for st, hp in hairpaths.items()}
     hair_any = np.max([h[..., 3] for h in hairs.values()], axis=0) if hairs else np.zeros(a.shape[:2])
     suit, trim, skin = masks(a, bat=hard)
     L = a[..., :3] @ LUM
     if premium:
         kit, tw, tL, tref = tones(a, design, M, marks, hard=hard)
+        if hard:
+            tL = match_bowler(kit, tw, tL, tref)
     lab, frames = frames_of(a, count, rowh)
     # each pixel belongs to the nearest pose (hair close to two poses goes to its own head only)
     dist, (iy, ix) = ndi.distance_transform_edt(lab == 0, return_indices=True)
@@ -372,6 +384,31 @@ def main():
                                  marks={k: v for k, v in json.load(open('tools/kit/premium-spin-back.json')).items() if not k.startswith('_')})
     out['bat-back'] = build_bat()
     write_sheets(out)
+
+
+def match_bowler(kit, w, L, ref):
+    """the batter's cloth shaded like the bowler's: per colour (main, navy, trim), his brightness
+    against that colour's own is remapped to the bowler's spread of it (quantile for quantile), so
+    the heavy folds of his drawing come out as the bowler's clean, even shading"""
+    src = open('js/kitsheets.js').read()
+    bm = json.loads(src[src.index('= ') + 2:src.rindex(';')])['back']['tones']
+    t = np.asarray(Image.open('img/kit/back-tone.png')).astype(np.float32)
+    km = np.asarray(Image.open('img/kit/back-mask.png'))[..., 2] == 255
+    R, G, B = t[..., 0][km] / 255, t[..., 1][km] / 255, t[..., 2][km] / 255
+    bw = [np.clip(1 - R - G, 0, 1), R, G]
+    qs = np.linspace(0, 100, 101)
+    out = L.copy()
+    cls = np.argmax(w, -1)
+    for k in range(3):
+        # (clean cloth only: the blend into the piping would read as bright streaks)
+        target = np.clip(np.percentile(B[bw[k] > 0.97] / bm[k], qs), 0, 1.1 if k < 2 else 1.25)
+        sel = kit & (cls == k)
+        if sel.sum() < 100:
+            continue
+        q = L[sel] / ref[k]
+        mine = np.percentile(q, qs)
+        out[sel] = np.interp(q, mine, target) * ref[k]
+    return out
 
 
 def build_bat():

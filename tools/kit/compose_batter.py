@@ -163,7 +163,7 @@ def main():
 def print_spot(rgb, m, ox, oy):
     """the name and number on the back, laid out as on the bowler's (tools/kit/shirt-print-back.json):
     centred across the back panel (the blue between the piping), 42% of the way down from the collar
-    to the waistband, 0.62 of that collar-to-waist drop wide"""
+    to the waistband, 0.8 of that (foreshortened) drop wide"""
     im = Image.fromarray(rgb.astype(np.uint8)).convert('HSV')
     hsv = np.asarray(im).astype(float)
     H, S, V = hsv[..., 0] * 360 / 255, hsv[..., 1] / 255, hsv[..., 2] / 255
@@ -189,7 +189,9 @@ def print_spot(rgb, m, ox, oy):
     band = panel[max(0, y - 4): y + 5]
     bx = np.nonzero(band.any(0))[0]
     cx = (bx.min() + bx.max()) / 2 if len(bx) else float(px.mean())
-    w = 0.62 * (waist - collar)
+    # as big against the back as the bowler's: his back leans toward the camera, so the collar-to-waist
+    # drop reads short; 0.8 of it matches the bowler's print against the width of the back
+    w = 0.8 * (waist - collar)
     return [round(float(cx) + ox, 1), round(y + oy, 1), round(float(w), 1), 1, 1, 0, 0, 0, 0, 0]
 
 
