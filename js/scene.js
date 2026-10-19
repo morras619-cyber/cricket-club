@@ -3,7 +3,8 @@ import { INK, FONT_DISPLAY, FONT_BODY, halftonePattern } from './fx.js';
 import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
 import { groundOf } from './grounds.js';
-import { teamById } from './teams.js';
+import { teamById, logoSrc } from './teams.js';
+import { paintGround } from './ownground.js';
 import { GROUND_ART } from './groundart.js';
 
 const { boundaryR: R, centerY: CY } = CFG.ground;
@@ -57,7 +58,7 @@ export function setGround(teamId, onChange) {
   groundListener = onChange;
   logo = new Image();
   logo.onload = () => groundListener?.(); // repaint once the club's crest has loaded
-  logo.src = `img/logo-${teamId}.webp`;
+  logo.src = logoSrc(teamId);
   loadArt(teamId);
   onChange?.();
 }
@@ -67,10 +68,14 @@ export function setGround(teamId, onChange) {
 // rest are painted by code below. The pieces load in the background: until they all have, the
 // code-painted ground stands in.
 const ART = {};
+// (your own club's ground: its level's grey build, painted in your colours and crest)
+const artKey = team => { const t = teamById(team); return t.custom ? `${team}|own${t.stadium}|${t.suit}|${t.trim}|${logoSrc(team).length}` : team; };
 function loadArt(team) {
-  const meta = GROUND_ART[team];
-  if (!meta || ART[team]) return;
-  const a = (ART[team] = { meta, ready: false });
+  const T = teamById(team), key = artKey(team), dir = T.custom ? `own${T.stadium}` : team;
+  const meta = GROUND_ART[dir];
+  if (!meta || ART[key]) return;
+  const a = (ART[key] = { meta, ready: false });
+  if (T.custom) return loadOwnArt(team, key, a, dir);
   const files = { pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
   // the painted stands (a ground built in Blender for every camera needs none)
   if (meta.far) Object.assign(files, { far: 'far', near: 'near' });
@@ -81,6 +86,17 @@ function loadArt(team) {
   const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
   for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${team}/${f}.webp`; a[k] = im; }
   a.logo = new Image(); a.logo.onload = done; a.logo.onerror = done; a.logo.src = 'img/menu/logo.webp';
+}
+function loadOwnArt(team, key, a, dir) {
+  const files = { pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
+  let left = Object.keys(files).length + 1;
+  const done = () => { if (--left === 0) { a.ready = true; if (artKey(HOME) === key) groundListener?.(); } };
+  for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${dir}/${f}.webp`; a[k] = im; }
+  a.logo = { naturalWidth: 0 };
+  paintGround(+dir.slice(3), teamById(team), logoSrc(team)).then(v => {
+    a['view-bat'] = v.bat; a['view-bowl'] = v.bowl; a['view-keeper'] = v.keeper; a.topView = v.top;
+    done();
+  }, () => { a.failed = true; });
 }
 // the average colour along the top of a stand picture, for the sky above it
 function skyTop(art, side) {
@@ -96,7 +112,7 @@ function skyTop(art, side) {
   }
   return art.top[side];
 }
-const artFor = () => (ART[HOME]?.ready && !ART[HOME].failed ? ART[HOME] : null);
+const artFor = () => { const a = ART[artKey(HOME)]; return a?.ready && !a.failed ? a : null; };
 
 // The grass tile at halving sizes, so the far outfield is drawn from a small copy (no glitter).
 const TILE_M = 20; // the grass tile covers 20 m: four 5 m mowing stripes

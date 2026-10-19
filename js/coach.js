@@ -111,6 +111,17 @@ export const DEV = {
     "Welcome to the league! Every big club started like this: a few kids, a small ground and a dream.",
     "Your players are young, so their potential matters more than their rating. Keep them and they'll get better every season.",
   ],
+  stadium: [
+    "This is your ground, beta. Small for now, but every home match brings in ticket money.",
+    "Save up and you can build it bigger: a Club Stadium, then one day an Arena. More fans, more money, more noise!",
+  ],
+  stadiumCan: [
+    "You have enough in the bank to build the next level of your ground. More seats means more ticket money every home match.",
+    "But think about it: that money could also buy a player at the auction. Your call, captain.",
+  ],
+  stadiumBuilt: [
+    "Look at it! The fans will remember this day. Now give them something to cheer about.",
+  ],
   auction: [
     "Auction day! Every player goes under the hammer. Bid against the other clubs, or pass if the price runs too high.",
     "Watch your money. You need at least 10 players, so don't spend it all on the first star you see.",

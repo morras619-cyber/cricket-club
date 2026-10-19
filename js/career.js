@@ -10,7 +10,7 @@ import { makeRng } from './rng.js';
 import { TEAMS, CLUBS, LEAGUE_CLUBS, teamById, divisionName, setMyClub } from './teams.js';
 import { HEROES, heroById } from './heroes.js';
 import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating, WEAK, BOWL_TYPES } from './squads.js';
-import { newLeague, simLeague, advance, playerResult, table, finish } from './tournament.js';
+import { newLeague, simLeague, advance, playerResult, table, finish, nextFixture } from './tournament.js';
 import { NATIONS, pickNation } from './nations.js';
 import { randomLook } from './looks.js';
 
@@ -306,9 +306,34 @@ export function createClub(c, spec) {
     p.pot = Math.min(90, main + rng.int(12, 22));
     p.contract = 3;
   }
-  c.custom = { ...spec, base, gone: teamById(base).name };
+  c.custom = { ...spec, base, gone: teamById(base).name, stadium: 1 };
   setMyClub(c.custom);
   return chooseClub(c, base);
+}
+
+// Your club's ground, in three levels: bigger crowds pay more at every home match. The Arena
+// is for clubs out of Division 3.
+export const STADIUMS = [null,
+  { name: 'Community Ground', fans: '4,000', ticket: 0.1 },
+  { name: 'Club Stadium', fans: '18,000', ticket: 0.2, cost: 2.5 },
+  { name: 'Arena', fans: '45,000', ticket: 0.4, cost: 6, needs: 'd2' },
+];
+export const stadiumLevel = c => (c.custom ? c.custom.stadium || 1 : 0);
+// what stops the next level (null: it can be built)
+export function upgradeBlock(c) {
+  const lv = stadiumLevel(c), next = STADIUMS[lv + 1];
+  if (!lv || !next) return 'top';
+  if (next.needs && divisionOf(c, c.club) === 'd3') return 'division';
+  if (c.money < next.cost) return 'money';
+  return null;
+}
+export function upgradeStadium(c) {
+  if (upgradeBlock(c)) return false;
+  const next = STADIUMS[stadiumLevel(c) + 1];
+  c.money = round2(c.money - next.cost);
+  c.custom.stadium = stadiumLevel(c) + 1;
+  setMyClub(c.custom);
+  return true;
 }
 
 // ---------- the auction ----------
@@ -534,7 +559,10 @@ export function recordPlayerMatch(c, summary) {
 }
 // After your league match: play the rest of the round, and close the season when it's over.
 export function afterLeagueMatch(c, summary) {
+  const f = nextFixture(c.league), home = f && f.home === c.club && stadiumLevel(c);
   const notes = recordPlayerMatch(c, summary);
+  // your own ground's gate money
+  if (home) { const tk = STADIUMS[home].ticket; c.money = round2(c.money + tk); notes.push(`🎟️ ${STADIUMS[home].fans} fans at ${c.custom.ground}: +${money(tk)} in ticket money`); }
   notes.push(...scoutReports(c));
   notes.push(...advance(c.league, playerResult(c.league, summary), (a, b, rng) => simCareerMatch(c, a, b, rng)));
   if (finish(c.league)) notes.push(...endSeason(c));

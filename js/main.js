@@ -11,7 +11,7 @@ import { futCard, portraitFace } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub } from './career.js';
+  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -26,6 +26,7 @@ import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
+import { stadiumThumb } from './ownground.js';
 import { loadKitSprites, drawKitFielder } from './kitsprite.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
@@ -1225,8 +1226,42 @@ function careerSeason(c, body) {
     body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
       () => startMatch({ mode: 'career' })));
   }
+  if (c.custom) body.append(stadiumPanel(c));
   body.append(scoutsPanel(c));
   body.append(...leaguePanels(c.league));
+}
+
+// ---------- your own ground: its level, and building the next one ----------
+function stadiumPanel(c) {
+  const lv = stadiumLevel(c), S = STADIUMS[lv], next = STADIUMS[lv + 1], me = teamById(c.club);
+  const box = el('div', 'panel paper stadpanel');
+  box.append(el('h3', '', `🏟️ ${c.custom.ground}`), el('p', 'sheetnote', `${S.name} · ${S.fans} fans · ${money(S.ticket)} ticket money every home match`));
+  const pic = (level, cls) => {
+    const w = el('div', `stadthumb ${cls}`);
+    stadiumThumb(level, me, logoSrc(c.club)).then(cv => w.append(cv), () => {});
+    return w;
+  };
+  box.append(pic(lv, 'now'));
+  coachOnce('stadium', DEV.stadium);
+  if (next) {
+    const why = upgradeBlock(c);
+    const row = el('div', 'stadnext');
+    const txt = el('div');
+    txt.append(el('b', '', `Next: ${next.name}`), el('small', '', `${next.fans} fans · ${money(next.ticket)} a home match${next.needs ? ' · out of Division 3 first' : ''}`));
+    const btn = el('button', 'chipbtn', why === 'division' ? '🔒 Division 2 first' : `Build · ${money(next.cost)}`);
+    btn.disabled = !!why;
+    if (!why) confirmTap(btn, `Tap again: ${money(next.cost)}`, () => {
+      if (!upgradeStadium(c)) return;
+      sfx.dhol(); saveProfile(profile);
+      ui.toast(`🏗️ ${c.custom.ground} is now a ${next.name}!`);
+      renderCareer();
+      coachOnce(`stadium${lv + 1}`, DEV.stadiumBuilt);
+    });
+    row.append(pic(lv + 1, 'next'), txt, btn);
+    box.append(row);
+    if (!why) coachOnce('stadiumCan', DEV.stadiumCan);
+  } else box.append(el('p', 'sheetnote', 'The biggest ground a club can build. The crowd is yours.'));
+  return box;
 }
 
 // ---------- travelling scouts ----------
@@ -1290,6 +1325,7 @@ function careerDone(c, body) {
   if (h.playoff) card.append(el('p', '', h.playoff.won ? `🛡️ Survived the play-off against ${teamById(h.playoff.opp).name}.` : `Lost the play-off to ${teamById(h.playoff.opp).name}.`));
   if (h.orange) card.append(el('p', '', `🟠 Most runs: ${playerName(c, h.orange.pid)} (${h.orange.runs})`));
   if (h.purple) card.append(el('p', '', `🟣 Most wickets: ${playerName(c, h.purple.pid)} (${h.purple.wkts})`));
+  if (c.custom) setTimeout(() => card.after(stadiumPanel(c)));
   const go = el('button', 'bigbtn primary', `On to season ${c.season + 1}`);
   go.addEventListener('click', () => { nextSeason(c); saveProfile(profile); renderCareer(); });
   card.append(go);

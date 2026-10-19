@@ -78,7 +78,9 @@ LEAGUE_CLUBS.forEach((t, i) => {
 GROUNDS.india = { ...GROUNDS.thunder, name: 'Blue Lights Stadium' };
 GROUNDS.pakistan = { ...GROUNDS.cyclones, name: 'Crescent Park' };
 // (your own club plays at the ground it took over, under the name you gave it)
-export const groundOf = teamId => (myClub()?.id === teamId ? { ...GROUNDS[teamId], name: myClub().ground } : GROUNDS[teamId] || GROUNDS.thunder);
+// (your own club plays at the ground it took over, rebuilt as its own: a night ground under its name)
+const OWN_SKY = { time: 'night', sky: ['#03061f', '#0f2363', '#2d4fb3'], skyline: '#0b1640', windows: ['#ffd23f', '#9fd8ff'] };
+export const groundOf = teamId => (myClub()?.id === teamId ? { ...GROUNDS[teamId], ...OWN_SKY, name: myClub().ground } : GROUNDS[teamId] || GROUNDS.thunder);
 export const PITCH_DEFAULT = { swing: 1, seam: 1, turn: 1, kmh: 1, bat: 1, ai: 1, field: 1, dew: false };
 export const pitchOf = teamId => ({ ...PITCH_DEFAULT, ...groundOf(teamId).pitch });
 
