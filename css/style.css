@@ -734,3 +734,17 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .pt-btn.go { background: linear-gradient(180deg, #ffe763, #ffc81a 60%, #f0a800); color: var(--ink); }
 .pt-btn.go:disabled { filter: grayscale(.85) brightness(.8); }
 .pt-btn:active { transform: skewX(-4deg) translate(2px, 3px); box-shadow: 2px 2px 0 var(--ink); }
+
+/* ---------- Choose your region (the Super League's first step) ---------- */
+#region { background: #0a0d3a url(../img/menu/teams-bg.webp) center top / cover no-repeat; overflow: hidden auto; }
+.rg-map { flex: 1 1 auto; display: grid; place-items: center; min-height: 0; margin: 4px calc(-1 * var(--gut-r)) 6px calc(-1 * var(--gut-l)); }
+.rg-map img { width: 100%; max-height: 32vh; object-fit: contain; filter: drop-shadow(0 0 6px rgba(60, 160, 255, 0.4)); }
+.rg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rgcard { position: relative; padding: 0; aspect-ratio: 405 / 222; border-radius: 12px; border: 3px solid var(--ink); overflow: hidden; background: #111;
+  box-shadow: 0 0 0 2.5px var(--rc, #4a7cff), 3px 4px 0 2.5px var(--ink); }
+.rgcard img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.03); display: block; }
+.rgcard.on { box-shadow: 0 0 0 3px var(--bolt), 0 0 0 5.5px var(--ink), 0 0 22px 6px rgba(255, 210, 63, 0.45); }
+.rgcard .sel { position: absolute; right: 6px; top: 5px; padding: 3px 9px 1px; font-family: var(--display); font-size: 14px; letter-spacing: 1px; color: var(--ink); background: var(--bolt); border: 2.5px solid var(--ink); border-radius: 7px; text-transform: uppercase; }
+.rgcard.locked img { filter: saturate(.35) brightness(.72); }
+.rgcard .soon { position: absolute; right: 6px; top: 5px; padding: 3px 9px 1px; font-family: var(--display); font-size: 13px; letter-spacing: 1px; color: #fff; background: rgba(12, 14, 40, 0.9); border: 2px solid #8a93c8; border-radius: 7px; text-transform: uppercase; }
+.rg .pt-title { font-size: clamp(20px, 6.6vw, 36px); }

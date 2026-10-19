@@ -925,7 +925,11 @@ function renderCareer(notes = careerNotes) {
   ({ pick: careerPick, auction: careerAuction, season: careerSeason, done: careerDone })[c.phase](c, body);
   saveProfile(profile);
 }
-$('btnLeague').addEventListener('click', () => { unlockAudio(); careerView = 'hub'; renderCareer(); });
+$('btnLeague').addEventListener('click', () => {
+  unlockAudio(); careerView = 'hub';
+  // a new career starts by choosing the region it's played in
+  if (career().phase === 'pick' && !career().region) renderRegion(); else renderCareer();
+});
 $('careerHome').addEventListener('click', () => { if (careerView === 'squad') { careerView = 'hub'; renderCareer(); } else renderHome(); });
 $('careerSquad').addEventListener('click', () => { careerView = careerView === 'squad' ? 'hub' : 'squad'; renderCareer(); });
 $('careerRecords').addEventListener('click', () => renderRecords());
@@ -935,8 +939,40 @@ confirmTap($('careerRestart'), 'Tap again to restart from season 1', () => {
   careerView = 'hub';
   saveProfile(profile);
   ui.toast('A new Super League career begins');
-  renderCareer();
+  renderRegion();
 });
+
+// ---------- the Super League's first step: choose your region (only Asia's league is running) ----------
+const REGIONS = [
+  { id: 'africa', name: 'Africa', color: '#2fbf3a' }, { id: 'europe', name: 'Europe', color: '#2f7cff' },
+  { id: 'asia', name: 'Asia', color: '#ff3b3b', open: true }, { id: 'namerica', name: 'North America', color: '#9b3bff' },
+  { id: 'samerica', name: 'South America', color: '#ff8a1c' }, { id: 'oceania', name: 'Oceania', color: '#2ec8ff' },
+];
+function renderRegion() {
+  const c = career();
+  ui.show('region');
+  $('rgCoins').textContent = profile.coins;
+  const sel = REGIONS.find(r => r.id === (c.region || 'asia'));
+  $('rgMap').src = `img/region/map-${sel.id}.webp`;
+  const grid = $('rgGrid'); grid.innerHTML = '';
+  for (const r of REGIONS) {
+    const b = el('button', 'rgcard' + (r === sel ? ' on' : '') + (r.open ? '' : ' locked'));
+    b.style.setProperty('--rc', r.color);
+    const im = document.createElement('img'); im.src = `img/region/card-${r.id}.webp`; im.alt = '';
+    b.append(im);
+    if (r === sel) b.append(el('i', 'sel', 'Selected'));
+    if (!r.open) b.append(el('div', 'soon', '🔒 Coming soon'));
+    b.setAttribute('aria-label', `${r.name}${r.open ? '' : ', coming soon'}`);
+    b.addEventListener('click', () => {
+      if (!r.open) { sfx.click(); ui.toast(`${r.name}'s league is coming soon. Asia's Super League is open now.`); return; }
+      sfx.click();
+    });
+    grid.append(b);
+  }
+}
+$('rgBack').addEventListener('click', () => renderHome());
+$('rgBack2').addEventListener('click', () => renderHome());
+$('rgGo').addEventListener('click', () => { const c = career(); c.region = 'asia'; sfx.dhol(); saveProfile(profile); careerView = 'hub'; renderCareer(); });
 
 // pick (or keep) a club for the season
 function careerPick(c, body) {
@@ -947,7 +983,7 @@ function careerPick(c, body) {
     locked: t => (careerUnlocked(t, c.season) ? null : `Unlocks in season ${unlockSeason(t)}`),
     note: c.season === 1 ? 'Pick your club. The giants unlock in later seasons.'
       : `Season ${c.season}: stay with ${teamById(c.club).name} or move. Your money comes with you.${c.news.length ? ` ${c.news.join(' ')}` : ''}`,
-    onBack: renderHome,
+    onBack: () => (c.season === 1 && !c.club ? renderRegion() : renderHome()),
     onGo: id => { if (chooseClub(c, id)) { sfx.dhol(); saveProfile(profile); renderCareer(); } },
   });
 }
