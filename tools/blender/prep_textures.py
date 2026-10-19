@@ -46,40 +46,10 @@ def club(name):
     game = os.path.join(ROOT, 'img', 'ground', name)
     os.makedirs(out, exist_ok=True); os.makedirs(game, exist_ok=True)
     s = lambda f: os.path.join(src, f)
-    # the crowd: the three paintings side by side, each also mirrored, an aisle of steps at every join
-    # and a walkway along the top of each tier (the strip is tiled three tiers up the stand)
-    tiles = [Image.open(s(f'crowd{k}.png')).convert('RGB') for k in (1, 2, 3)]
-    h = tiles[0].height
-    tiles = [t.resize((round(t.width * h / t.height), h)) for t in tiles]
-    seq = [tiles[0], ImageOps.mirror(tiles[1]), tiles[2], ImageOps.mirror(tiles[0]), tiles[1], ImageOps.mirror(tiles[2])]
-    strip = Image.new('RGB', (sum(t.width for t in seq), h))
-    x, joins = 0, []
-    for t in seq:
-        strip.paste(t, (x, 0)); joins.append(x); x += t.width
-    a = np.asarray(strip).astype(float)
-    # (a touch darker and calmer, the back rows of each tier in the stand's shade)
-    shade = np.linspace(0.86, 1.0, h)[:, None, None]
-    a = a * shade
-    grey = a.mean(2, keepdims=True); a = grey + (a - grey) * 1.05
-    strip = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
-    d = ImageDraw.Draw(strip)
-    AW, STEP, WALK = 64, h // 7, 26
-    for j in joins:
-        for x0 in ((j - AW // 2) % strip.width, ):
-            for k in range(0, h, STEP):
-                d.rectangle([x0, k, x0 + AW, k + STEP], fill=(92, 98, 90))
-                d.rectangle([x0, k, x0 + AW, k + STEP // 5], fill=(150, 156, 146))
-                d.line([x0, k + STEP // 5, x0 + AW, k + STEP // 5], fill=(20, 16, 24), width=2)
-            for e in (x0, x0 + AW):
-                d.line([e, 0, e, h], fill=(20, 16, 24), width=4)
-    d.rectangle([0, 0, strip.width, WALK], fill=(52, 60, 52))
-    d.line([0, WALK, strip.width, WALK], fill=(20, 16, 24), width=3)
-    d.line([0, WALK // 2, strip.width, WALK // 2], fill=(255, 210, 31), width=3)
-    strip.save(os.path.join(out, 'crowd.png'))
-    # the skyline: the painting and its mirror, so it wraps round without a seam
-    sk = Image.open(s('skyline.png')).convert('RGB')
-    w2 = Image.new('RGB', (sk.width * 2, sk.height)); w2.paste(sk, (0, 0)); w2.paste(ImageOps.mirror(sk), (sk.width, 0))
-    w2.save(os.path.join(out, 'skyline.png'))
+    if os.path.exists(s('arena.jpg')):
+        arena(s('arena.jpg'), out)
+    else:
+        crowds(s, out)
     # the grass: 4 mowing stripes left to right
     gr = Image.open(s('grass.png')).convert('RGB')
     gr.resize((1024, 1024), Image.LANCZOS).save(os.path.join(out, 'grass.png'))
@@ -125,7 +95,87 @@ def club(name):
     rgba.resize((600, 1950), Image.LANCZOS).save(os.path.join(out, 'pitch.png'))
     rgba.resize((300, 975), Image.LANCZOS).save(os.path.join(game, 'pitch.webp'), quality=90)
     for f in (f'logo-{name}', 'logo-sixcharge'): Image.open(os.path.join(ROOT, f'img/{f}.webp')).save(os.path.join(out, f + '.png'))
-    print('wrote', out, 'crowd', strip.size, 'pitch px/m', round(pxm_z, 1), round(pxm_x, 1))
+    print('wrote', out, 'pitch px/m', round(pxm_z, 1), round(pxm_x, 1))
+
+
+def crowds(s, out):
+    """the daylight crowd: three paintings side by side, and the skyline painting"""
+    # the crowd: the three paintings side by side, each also mirrored, an aisle of steps at every join
+    # and a walkway along the top of each tier (the strip is tiled three tiers up the stand)
+    tiles = [Image.open(s(f'crowd{k}.png')).convert('RGB') for k in (1, 2, 3)]
+    h = tiles[0].height
+    tiles = [t.resize((round(t.width * h / t.height), h)) for t in tiles]
+    seq = [tiles[0], ImageOps.mirror(tiles[1]), tiles[2], ImageOps.mirror(tiles[0]), tiles[1], ImageOps.mirror(tiles[2])]
+    strip = Image.new('RGB', (sum(t.width for t in seq), h))
+    x, joins = 0, []
+    for t in seq:
+        strip.paste(t, (x, 0)); joins.append(x); x += t.width
+    a = np.asarray(strip).astype(float)
+    # (a touch darker and calmer, the back rows of each tier in the stand's shade)
+    shade = np.linspace(0.86, 1.0, h)[:, None, None]
+    a = a * shade
+    grey = a.mean(2, keepdims=True); a = grey + (a - grey) * 1.05
+    strip = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+    d = ImageDraw.Draw(strip)
+    AW, STEP, WALK = 64, h // 7, 26
+    for j in joins:
+        for x0 in ((j - AW // 2) % strip.width, ):
+            for k in range(0, h, STEP):
+                d.rectangle([x0, k, x0 + AW, k + STEP], fill=(92, 98, 90))
+                d.rectangle([x0, k, x0 + AW, k + STEP // 5], fill=(150, 156, 146))
+                d.line([x0, k + STEP // 5, x0 + AW, k + STEP // 5], fill=(20, 16, 24), width=2)
+            for e in (x0, x0 + AW):
+                d.line([e, 0, e, h], fill=(20, 16, 24), width=4)
+    d.rectangle([0, 0, strip.width, WALK], fill=(52, 60, 52))
+    d.line([0, WALK, strip.width, WALK], fill=(20, 16, 24), width=3)
+    d.line([0, WALK // 2, strip.width, WALK // 2], fill=(255, 210, 31), width=3)
+    strip.save(os.path.join(out, 'crowd.png'))
+    # the skyline: the painting and its mirror, so it wraps round without a seam
+    sk = Image.open(s('skyline.png')).convert('RGB')
+    w2 = Image.new('RGB', (sk.width * 2, sk.height)); w2.paste(sk, (0, 0)); w2.paste(ImageOps.mirror(sk), (sk.width, 0))
+    w2.save(os.path.join(out, 'skyline.png'))
+
+
+def arena(path, out):
+    """the night arena painting (the stand at one end, the sky behind, magenta below the boards): its
+    lower-tier crowd straightened into a strip, the sky between the floodlights, the club's sign"""
+    import cv2
+    from scipy import ndimage as ndi
+    im = Image.open(path).convert('RGB'); a = np.asarray(im)
+    W = a.shape[1]
+    # the crowd between the rail (which bows down to the middle) and the boards, each column
+    # stretched to the same height, then the strip and its mirror so it wraps without a seam
+    rail = lambda x: 448 + 56 * (1 - ((x - W / 2) / (W / 2)) ** 2) + 4
+    BOARD, HT = 590, 120
+    band = np.zeros((HT, W, 3), np.uint8)
+    for x in range(W):
+        col = a[int(rail(x)):BOARD, x]
+        band[:, x] = np.asarray(Image.fromarray(col[:, None]).resize((1, HT), Image.BICUBIC))[:, 0]
+    band = Image.fromarray(band)
+    strip = Image.new('RGB', (W * 2, HT)); strip.paste(band, (0, 0)); strip.paste(ImageOps.mirror(band), (W, 0))
+    strip.save(os.path.join(out, 'crowd.png'))
+    # the sign over the big screen: its yellow and green letters and bolts, filled, with the ink round them
+    x0, y0, x1, y1 = 1000, 150, 1580, 380
+    c = a[y0:y1, x0:x1]
+    hsv = cv2.cvtColor(np.ascontiguousarray(c), cv2.COLOR_RGB2HSV).astype(float)
+    H, Sa, V = hsv[..., 0] * 2, hsv[..., 1] / 255, hsv[..., 2] / 255
+    lab, n = ndi.label(ndi.binary_closing((H > 40) & (H < 150) & (Sa > 0.45) & (V > 0.35), iterations=3))
+    big = np.isin(lab, 1 + np.nonzero(ndi.sum(np.ones_like(lab), lab, range(1, n + 1)) > 400)[0])
+    m = ndi.binary_dilation(ndi.binary_fill_holes(ndi.binary_closing(big, iterations=6)), iterations=4)
+    ys, xs = np.nonzero(m)
+    sign = np.dstack([c, (m * 255).astype(np.uint8)])[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    Image.fromarray(sign).save(os.path.join(out, 'sign.png'))
+    # the sky between the floodlights, down to the roof; the sign's top painted out (the 3D sign covers it)
+    sx0, sx1, sy1 = 300, 2280, 215
+    sky = np.ascontiguousarray(a[:sy1, sx0:sx1])
+    hole = np.zeros(sky.shape[:2], np.uint8)
+    hole[max(0, y0 + ys.min() - sy1 + sy1 - 4 - (sy1 - (y0 + ys.min()))):, max(0, x0 + xs.min() - sx0 - 4):x0 + xs.max() - sx0 + 4] = 1
+    hole[:max(0, y0 + ys.min() - 4), :] = 0
+    sky = cv2.inpaint(sky, hole, 9, cv2.INPAINT_TELEA)
+    sk = Image.fromarray(sky)
+    w2 = Image.new('RGB', (sk.width * 2, sk.height)); w2.paste(sk, (0, 0)); w2.paste(ImageOps.mirror(sk), (sk.width, 0))
+    w2.save(os.path.join(out, 'skyline.png'))
+    print('arena: crowd', strip.size, 'sign', sign.shape[1::-1], 'sky', w2.size)
 
 
 if CLUB != 'thunder':

@@ -136,8 +136,8 @@ export const GROUND_ART = {
     "w": 2400,
     "h": 1536,
     "above": 480,
-    "top": "#7996b1",
-    "bottom": "#2f7c18",
+    "top": "#1e364c",
+    "bottom": "#2b7314",
     "board": {
      "r": 63.8,
      "h": 0.95
@@ -152,8 +152,8 @@ export const GROUND_ART = {
     "w": 2400,
     "h": 1536,
     "above": 576,
-    "top": "#88a3bb",
-    "bottom": "#338217",
+    "top": "#2d496f",
+    "bottom": "#2f7914",
     "board": {
      "r": 63.8,
      "h": 0.95
@@ -168,8 +168,8 @@ export const GROUND_ART = {
     "w": 2520,
     "h": 1704,
     "above": 480,
-    "top": "#829db8",
-    "bottom": "#2f7918",
+    "top": "#203745",
+    "bottom": "#2c7114",
     "board": {
      "r": 63.8,
      "h": 0.95

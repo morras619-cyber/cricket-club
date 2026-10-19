@@ -13,10 +13,10 @@ export const GROUNDS = {
     pitch: { id: 'flat', name: 'Flat road', report: 'Rock hard and flat: a batting paradise. Expect sixes.', bat: 1.08, ai: 0.92, swing: 0.8, seam: 0.8, turn: 0.85 },
   },
   cyclones: {
-    name: 'Cyclone Park', time: 'overcast', landmark: 'turbines',
-    sky: ['#6f7a86', '#9aa6b1', '#c9d1d6'], skyline: '#4c5a52', windows: [],
+    name: 'Cyclone Park', time: 'night', landmark: 'turbines',
+    sky: ['#040a1e', '#0b1f45', '#1c4a5a'], skyline: '#0a1a30', windows: ['#ffd21f', '#9fffb0'],
     grass: ['#1e6b36', '#2a8442'], pitchCol: '#cdb27a',
-    pitch: { id: 'swing', name: 'Overcast swinger', report: 'Heavy cloud and a damp breeze: the new ball will hoop around.', swing: 1.45 },
+    pitch: { id: 'swing', name: 'Overcast swinger', report: 'A storm is brewing and the air is heavy: the new ball will hoop around.', swing: 1.45 },
   },
   vipers: {
     name: 'The Snakepit', time: 'dusk', landmark: 'snake',

@@ -16,12 +16,13 @@ TEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tex', '' if CLUB
 CLUBS = {
     'thunder': dict(wall='#0b1f5c', fascia='#9fb0cc', canopy='#0b1f5c', dark='#0a0f24', track='#16264f', rope='#ffd23f',
                     board=('#0b2a6e', '#1c5ad6'), screen='#071447', crowd_len=155, sky=(30, 112, 1), foot='#0b1640',
-                    world=[(0.0, '#1a3384'), (0.6, '#03061f')], sun=(0.25, (0.6, 0.7, 1.0), 0.526), flood=1.0, top_bg='#1b1838', turbines=False),
-    # Cyclone Park: an overcast afternoon in the hills; a green bowl under a white roof, the floodlights on
-    'cyclones': dict(wall='#0d3a1e', fascia='#1e7a32', canopy='#e9edf0', dark='#0a1a10', track='#1d3b26', rope='#ffd21f',
-                     board=('#0b3d1b', '#1e7a32'), screen='#0b2414', crowd_len=6 * 2167 / 726 * 5, sky=(18, 268, 2), foot='#3a5a33',
-                     world=[(0.0, '#c9d1d6'), (0.35, '#8e9aa6'), (1.0, '#5b6673')], sun=(2.2, (1.0, 0.98, 0.94), 35), flood=0.25,
-                     top_bg='#4a6a40', turbines=True),
+                    world=[(0.0, '#1a3384'), (0.6, '#03061f')], sun=(0.25, (0.6, 0.7, 1.0), 0.526), flood=1.0, top_bg='#1b1838', turbines=False, tiers=False, sign=False, beams=None, halo=(1, 0.9, 0.6)),
+    # Cyclone Park: a storm night, a tornado over the city, a two-tier green bowl with the club's swirls
+    # everywhere, its sign on the roof at each end, green beams from the floodlights
+    'cyclones': dict(wall='#0d3a1e', fascia='#cfd8d3', canopy='#0d3a1e', dark='#06140c', track='#10301c', rope='#ffd21f',
+                     board=('#0b3d1b', '#1e7a32'), screen='#06180d', crowd_len=2 * 2576 / 120 * 4.8, sky=(45, 122, 2), foot='#081a2c',
+                     world=[(0.0, '#123056'), (0.5, '#050c24')], sun=(0.25, (0.6, 0.8, 0.9), 0.526), flood=1.0,
+                     top_bg='#0b1a14', turbines=False, tiers=True, sign=True, beams=(0.55, 1.0, 0.35), halo=(0.7, 1, 0.5)),
 }
 C = CLUBS[CLUB]
 CY = 10.0          # pitch centre (game centerY)
@@ -227,8 +228,24 @@ ring_surface('track', [(76, 0.01), (79, 0.01)], track)
 ring_surface('wall', [(79, 0), (79, 1.4)], navy, inked=True)
 ring_surface('walltop', [(79, 1.4), (79.6, 1.4)], navy)
 # the crowd, raked back: the painted crowd tiled three rows high (5 m a tile)
-ring_surface('crowd', [(79.6, 1.4), (99, 12.0)], crowd, u_len=C['crowd_len'], v_rep=3)
-ring_surface('back', [(99, 12.0), (99, 13.6)], dark)
+if C['tiers']:
+    # two tiers: the lower one to a green band of the club's swirls, the upper one back under the roof
+    ring_surface('crowd', [(79.6, 1.4), (88.5, 6.2)], crowd, u_len=C['crowd_len'], v_rep=2)
+    ring_surface('crowd2', [(88.5, 8.0), (99, 13.6)], crowd, u_len=C['crowd_len'] * 1.24, v_rep=2)
+    ring_surface('tierlip', [(88.5, 6.2), (88.6, 6.2)], navy)
+    FW = 6.0
+    swirl = board_mat('swirl', f'logo-{CLUB}.png', '#1e7a32', 1.6 / FW)
+    nf = int(2 * math.pi * 88.5 / FW)
+    for i in range(nf):
+        a0 = 2 * math.pi * i / nf; a1 = 2 * math.pi * (i + 1) / nf
+        pts = [(88.5 * math.cos(a0 + (a1 - a0) * k / 4), CY + 88.5 * math.sin(a0 + (a1 - a0) * k / 4)) for k in range(5)]
+        verts = [(x, y, 6.2) for x, y in pts] + [(x, y, 8.0) for x, y in pts]
+        uv = {k: (1 - k / 4, 0) for k in range(5)}; uv.update({5 + k: (1 - k / 4, 1) for k in range(5)})
+        mesh('facade', verts, [(k, k + 1, 6 + k, 5 + k) for k in range(4)], uvs=uv, mat=swirl, inked=True)
+    ring_surface('back', [(99, 13.6), (99, 14.2)], dark)
+else:
+    ring_surface('crowd', [(79.6, 1.4), (99, 12.0)], crowd, u_len=C['crowd_len'], v_rep=3)
+    ring_surface('back', [(99, 12.0), (99, 13.6)], dark)
 # the roof: a light fascia, a dark underside dotted with lamps, the canopy on top
 ring_surface('fascia', [(94, 13.2), (94, 14.4)], fascia, inked=True)
 under = bpy.data.materials.new('under'); under.use_nodes = True
@@ -278,7 +295,7 @@ def halo(p, rad):
     pw = nt.nodes.new('ShaderNodeMath'); pw.operation = 'POWER'; pw.inputs[1].default_value = 3.0
     inv = nt.nodes.new('ShaderNodeMath'); inv.operation = 'SUBTRACT'; inv.inputs[0].default_value = 1.0
     nt.links.new(lw.outputs['Facing'], inv.inputs[1]); nt.links.new(inv.outputs[0], pw.inputs[0])
-    e = nt.nodes.new('ShaderNodeEmission'); e.inputs['Color'].default_value = (1, 0.9, 0.6, 1); e.inputs['Strength'].default_value = 0.9
+    e = nt.nodes.new('ShaderNodeEmission'); e.inputs['Color'].default_value = (*C['halo'], 1); e.inputs['Strength'].default_value = 0.9
     tr = nt.nodes.new('ShaderNodeBsdfTransparent'); mx = nt.nodes.new('ShaderNodeMixShader')
     nt.links.new(pw.outputs[0], mx.inputs[0]); nt.links.new(tr.outputs[0], mx.inputs[1]); nt.links.new(e.outputs[0], mx.inputs[2])
     nt.links.new(mx.outputs[0], o_.inputs[0])
@@ -311,6 +328,72 @@ for side in (-1, 1):
         L = bpy.context.active_object; L.data.energy = 2.2e5 * C['flood']; L.data.spot_size = math.radians(70); L.data.spot_blend = 0.6
         L.data.shadow_soft_size = 3; L.data.color = (1, 0.96, 0.88)
         L.rotation_euler = (Vector((0, CY, 0)) - L.location).to_track_quat('-Z', 'Y').to_euler()
+
+def cutout(name, path, strength=1.0):
+    """an emissive picture with its own transparency (the sign, the swirl medallions)"""
+    m, nt, out = nodes(name)
+    t = nt.nodes.new('ShaderNodeTexImage'); t.image = img(path); t.extension = 'CLIP'
+    e = nt.nodes.new('ShaderNodeEmission'); e.inputs['Strength'].default_value = strength; nt.links.new(t.outputs['Color'], e.inputs['Color'])
+    tr = nt.nodes.new('ShaderNodeBsdfTransparent'); mx = nt.nodes.new('ShaderNodeMixShader')
+    nt.links.new(t.outputs['Alpha'], mx.inputs[0]); nt.links.new(tr.outputs[0], mx.inputs[1]); nt.links.new(e.outputs[0], mx.inputs[2])
+    nt.links.new(mx.outputs[0], out.inputs[0]); return m
+
+def facing_quad(name, a, r, w, h0, h1, mat):
+    """a picture standing at angle a, radius r, facing the middle, reading left to right from there"""
+    c, s_ = math.cos(a), math.sin(a)
+    t = Vector((-s_, c, 0)); base = Vector((r * c, CY + r * s_, 0))
+    q = [base - t * w / 2 + Vector((0, 0, h0)), base + t * w / 2 + Vector((0, 0, h0)), base + t * w / 2 + Vector((0, 0, h1)), base - t * w / 2 + Vector((0, 0, h1))]
+    return mesh(name, [tuple(p) for p in q], [(0, 1, 2, 3)], uvs=[(1, 0), (0, 0), (0, 1), (1, 1)], mat=mat)
+
+if C['sign']:
+    # a steel truss along the roof, the club's swirls glowing on it, its sign over each big screen
+    steel = flat('steel', '#aeb8c4', 0.5)
+    RT, TB, TT = 95.5, 15.6, 18.6
+    ring_surface('rail1', [(RT, TB), (RT, TB + 0.35)], steel, inked=True)
+    ring_surface('rail2', [(RT, TT - 0.35), (RT, TT)], steel, inked=True)
+    nseg = int(2 * math.pi * RT / 5)
+    for i in range(nseg):
+        a = 2 * math.pi * i / nseg; a2 = 2 * math.pi * (i + 1) / nseg
+        p0 = Vector((RT * math.cos(a), CY + RT * math.sin(a), TB)); p1 = Vector((RT * math.cos(a2), CY + RT * math.sin(a2), TT))
+        for A, B in ((p0, p0 + Vector((0, 0, TT - TB))), (p0, p1)):
+            d = B - A; mid = (A + B) / 2
+            bpy.ops.mesh.primitive_cube_add(location=mid, scale=(0.14, 0.14, d.length / 2))
+            o = bpy.context.active_object; o.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
+            o.data.materials.append(steel); sc.collection.objects.unlink(o); ink.objects.link(o)
+    med = cutout('medal', f'logo-{CLUB}.png', 1.6)
+    for k in range(18):
+        a = 2 * math.pi * (k + 0.5) / 18
+        if min(abs(a - math.pi / 2), abs(a - 3 * math.pi / 2)) < 0.25: continue   # (the sign is there)
+        facing_quad('medal', a, RT - 0.4, 4.6, TB - 0.6, TB + 4.0, med)
+    sg = cutout('sign', 'sign.png', 1.25)
+    for a in (math.pi / 2, -math.pi / 2):
+        facing_quad('sign', a, RT - 0.8, 27, TT - 3.0, TT - 3.0 + 27 * 210 / 494, sg)
+
+if C['beams']:
+    # the floodlights' beams: long soft cones of green light reaching up over the ground
+    bm = bpy.data.materials.new('beam'); bm.use_nodes = True
+    nt = bm.node_tree; nt.nodes.clear(); o_ = nt.nodes.new('ShaderNodeOutputMaterial')
+    tc = nt.nodes.new('ShaderNodeTexCoord'); sep = nt.nodes.new('ShaderNodeSeparateXYZ'); nt.links.new(tc.outputs['Generated'], sep.inputs[0])
+    lw = nt.nodes.new('ShaderNodeLayerWeight'); lw.inputs['Blend'].default_value = 0.6
+    inv = nt.nodes.new('ShaderNodeMath'); inv.operation = 'SUBTRACT'; inv.inputs[0].default_value = 1.0; nt.links.new(lw.outputs['Facing'], inv.inputs[1])
+    near = nt.nodes.new('ShaderNodeMath'); near.operation = 'SUBTRACT'; near.inputs[0].default_value = 1.0; nt.links.new(sep.outputs['Z'], near.inputs[1])
+    along = nt.nodes.new('ShaderNodeMath'); along.operation = 'MULTIPLY'; nt.links.new(near.outputs[0], along.inputs[0]); along.inputs[1].default_value = 0.55
+    f = nt.nodes.new('ShaderNodeMath'); f.operation = 'MULTIPLY'; nt.links.new(inv.outputs[0], f.inputs[0]); nt.links.new(along.outputs[0], f.inputs[1])
+    e = nt.nodes.new('ShaderNodeEmission'); e.inputs['Color'].default_value = (*C['beams'], 1); e.inputs['Strength'].default_value = 1.4
+    tr = nt.nodes.new('ShaderNodeBsdfTransparent'); mx = nt.nodes.new('ShaderNodeMixShader')
+    nt.links.new(f.outputs[0], mx.inputs[0]); nt.links.new(tr.outputs[0], mx.inputs[1]); nt.links.new(e.outputs[0], mx.inputs[2])
+    nt.links.new(mx.outputs[0], o_.inputs[0])
+    for side in (-1, 1):
+        for end in (-1, 1):
+            a = math.pi / 2 * end + side * math.radians(13)
+            head = Vector((108 * math.cos(a), CY + 108 * math.sin(a), 26.2))
+            tgt = Vector((-head.x * 0.35, CY + (head.y - CY) * 0.25, 58))   # (in over the ground, rising)
+            d = tgt - head; L = d.length
+            # (narrow at the lamp, wide and faded out far away: Generated z runs 0 at the lamp to 1 out there)
+            bpy.ops.mesh.primitive_cone_add(vertices=48, radius1=1.5, radius2=16, depth=L, location=head + d / 2, end_fill_type='NOTHING')
+            o = bpy.context.active_object; o.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
+            o.data.materials.append(bm); o.visible_shadow = False
+            for pl in o.data.polygons: pl.use_smooth = True
 
 # the city behind: the painted skyline on a far cylinder, the gap below filled with its shade
 sky_pic = picture('skyline', 'skyline.png', 1.0)
@@ -381,7 +464,10 @@ if VIEW == 'top':
     for o in list(sc.objects):
         # (and the roof: from up here it would hide the near stand's crowd)
         # (the turbines too: they stand far outside the picture)
-        if o.name.startswith(('skyline', 'cityfoot', 'canopy', 'under')) or (o.location - Vector((0, CY, 0))).length > 200 or (o.type == 'MESH' and o.name.startswith('Torus') and abs(o.location.z - 0.08) < 1e-3):
+        if o.name.startswith(('skyline', 'cityfoot', 'canopy', 'under', 'Cone')) or (o.location - Vector((0, CY, 0))).length > 200 or (o.type == 'MESH' and o.name.startswith('Torus') and abs(o.location.z - 0.08) < 1e-3):
+            o.hide_render = True
+        # (the sign at the near end shows its back from up here)
+        if o.name.startswith('sign') and o.data.vertices[0].co.y < CY:
             o.hide_render = True
     bg.inputs['Color'].default_value = (*srgb(C['top_bg']), 1)
     for l in list(wn.links):
