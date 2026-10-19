@@ -30,10 +30,11 @@ const POSE_BAT = Object.fromEntries(['ready', 'leave1', 'leave2', 'backlift', 'd
   'pull1', 'pull2', 'def1', 'def2', 'def3', 'cut1', 'cut2', 'cut3', 'cut4',
   'bowled', 'celebrate', 'rsweep1', 'rsweep2', 'rsweep3', 'straight1', 'straight2', 'ondrive1', 'ondrive2', 'cover1'].map((n, i) => [n, i]));
 const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
-// the fielders (19 poses, tools/kit/compose_fielder.py): crouched ready from the front, side and back;
-// running away, across (facing right), toward the camera, turning; reaching up; the dive (to the right)
+// the fielders (22 poses, tools/kit/compose_fielder.py): crouched ready from the front, side and back;
+// running away, across (facing right), toward the camera, turning; reaching up; the dive (to the right);
+// a catch straight to him (hands ready, taken overhead, held at the chest)
 const POSE_FIELD = Object.fromEntries(['ready_front', 'ready_side', 'ready_back', 'away1', 'away2', 'away3', 'away4',
-  'side1', 'side2', 'side3', 'reach', 'toward', 'turn', 'away3q', 'awayB', 'dive1', 'dive2', 'dive3', 'dive4'].map((n, i) => [n, i]));
+  'side1', 'side2', 'side3', 'reach', 'toward', 'turn', 'away3q', 'awayB', 'dive1', 'dive2', 'dive3', 'dive4', 'catch1', 'catch2', 'catch3'].map((n, i) => [n, i]));
 const FIELD_PX_PER_M = 304; // the sheet's scale: the bowler's
 const FIELD_KEEP = 0.5;     // each player's frames are kept at half size (a whole team is on screen at once)
 const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }

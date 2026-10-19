@@ -2973,18 +2973,23 @@ export class Game {
       const k = Math.min(3, Math.floor((now - f.diveT0) / 110));
       frame = 'dive' + (k + 1); flip = (f.pose.arg || 1) < 0; f.dived = true;
     } else if (pose === 'celebrate') {
-      frame = f.dived ? 'dive4' : 'reach'; flip = f.dived ? (f.pose.arg || 1) < 0 : tx < 0;
+      // a dive ends on the ground with it; one straight to him: taken overhead, then held at the chest
+      if (f.dived) { frame = 'dive4'; flip = (f.pose.arg || 1) < 0; }
+      else { if (f.catchT0 == null) f.catchT0 = now; frame = now - f.catchT0 < 260 ? 'catch2' : 'catch3'; }
     } else if (f.throwT0 != null && now - f.throwT0 < 450) {
       frame = now - f.throwT0 < 180 ? 'side1' : 'side3'; flip = Math.cos(f.throwFace ?? 0) < 0;
     } else if (f.ctrl && O.meter && O.meter.k > 0.78 && O.meter.label?.startsWith('TAP ANYWHERE IN')) {
-      frame = 'reach'; flip = (O.ball ? V.to(O.ball.x, O.ball.y).x : c.x) < p.x;
+      // the ball coming down: under it, hands up and ready; still short of it, reaching as he runs
+      const at = O.ring ? Math.hypot(f.x - O.ring.x, f.y - O.ring.y) : 99;
+      if (at <= CFG.fielding.reach + 0.3) frame = 'catch1';
+      else { frame = 'reach'; flip = (O.ball ? V.to(O.ball.x, O.ball.y).x : c.x) < p.x; }
     } else if (moving || pose === 'run') {
       const [dx, dy] = f.vdir || [tx, ty];
       if (Math.abs(dx) > Math.abs(dy) * 0.9) { frame = cyc(['side1', 'side2', 'side3', 'side2'], 9); flip = dx < 0; }
       else if (dy < 0) frame = cyc(['away1', 'away2', 'away3', 'away4'], 9);
       else { frame = 'toward'; flip = dx < 0; }
     } else {
-      f.diveT0 = null;
+      f.diveT0 = null; f.catchT0 = null;
       if (Math.abs(tx) > Math.abs(ty) * 1.4) { frame = 'ready_side'; flip = tx < 0; }
       else frame = ty < 0 ? 'ready_back' : 'ready_front';
     }

@@ -16,11 +16,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 from compose_batter import poses, drop_balls, print_spot, MAG  # noqa: E402
 
 D = os.path.join(os.path.dirname(__file__), 'src', 'field-sheets')
-SHEETS = {1: '1-ready.png', 2: '2-run-away.png', 3: '3-run-side.png', 4: '4-run-turn.png', 5: '5-dive.png'}
+SHEETS = {1: '1-ready.png', 2: '2-run-away.png', 3: '3-run-side.png', 4: '4-run-turn.png', 5: '5-dive.png', 6: '6-catch.png'}
 # per sheet: its cap against the running-away sheet's, then all to 304 px per metre (a 1.85 m
 # player stands ~640 px on the running-away sheet)
 G = 562 / 640
-SCALE = {1: 0.82 * G, 2: 1.0 * G, 3: 1.11 * G, 4: 0.92 * G, 5: 0.87 * G}
+SCALE = {1: 0.82 * G, 2: 1.0 * G, 3: 1.11 * G, 4: 0.92 * G, 5: 0.87 * G, 6: 0.95 * G}
 # the game's fielder frames (js/kitsprite.js POSE_FIELD): (name, sheet, pose, back view: name and number)
 PICK = [
     ('ready_front', 1, 1, False), ('ready_side', 1, 2, False), ('ready_back', 1, 3, True),
@@ -28,6 +28,8 @@ PICK = [
     ('side1', 3, 1, False), ('side2', 3, 2, False), ('side3', 3, 3, False), ('reach', 3, 4, False),
     ('toward', 4, 1, False), ('turn', 4, 2, False), ('away3q', 4, 3, True), ('awayB', 4, 4, True),
     ('dive1', 5, 1, False), ('dive2', 5, 2, False), ('dive3', 5, 3, False), ('dive4', 5, 4, False),
+    # a catch straight to him: hands up ready, taken above the head, held at the chest
+    ('catch1', 6, 1, False), ('catch2', 6, 2, False), ('catch3', 6, 3, False),
 ]
 
 
