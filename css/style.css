@@ -794,3 +794,31 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .divladder { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
 .divladder span { padding: 5px 10px; border-radius: 8px; border: 2px solid rgba(20, 16, 24, 0.3); font-family: var(--display); letter-spacing: 1px; font-size: 17px; color: rgba(20, 16, 24, 0.45); text-transform: uppercase; }
 .divladder span.on { color: var(--ink); background: var(--bolt); border-color: var(--ink); box-shadow: 2px 3px 0 var(--ink); }
+
+/* ---------- Create your club ---------- */
+.pt-make { align-self: center; margin: 8px 0 0; height: 40px; padding: 0 18px; border-radius: 20px; border: 2.5px solid var(--ink); background: linear-gradient(180deg, #7cf0ff, #2fb6e8); color: var(--ink);
+  font-family: var(--display); font-size: 20px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 3px 4px 0 var(--ink); transform: skewX(-4deg); }
+#makeclub { background: #0a0d3a url(../img/menu/teams-bg.webp) center top / cover no-repeat; overflow: hidden auto; }
+.mk-gap { visibility: hidden; width: 46px; padding: 0; }
+.mk-show { position: relative; margin: 8px 0 0; height: clamp(170px, 26vh, 230px); border-radius: 16px; overflow: hidden; border: 2.5px solid #c9a227; box-shadow: 0 0 0 2px var(--ink), 4px 5px 0 2px var(--ink);
+  background: radial-gradient(ellipse at 50% 120%, var(--suit, #1f5fd6) 0%, #0b1033 70%); }
+.mk-crest { position: absolute; left: 6%; top: 10%; width: 38%; max-width: 170px; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(3px 4px 0 rgba(0, 0, 0, 0.55)); }
+.mk-kit { position: absolute; right: 0; bottom: 18%; width: 60%; height: 82%; }
+.mk-title { position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 10px 6px; background: linear-gradient(0deg, rgba(5, 8, 30, 0.95), rgba(5, 8, 30, 0.55)); text-align: center; }
+.mk-title b { display: block; font-family: var(--display); font-weight: 400; font-size: clamp(22px, 6.4vw, 30px); line-height: 1.05; letter-spacing: 1px; text-transform: uppercase; color: var(--trim, #ffd23f); -webkit-text-stroke: 1.2px var(--ink); paint-order: stroke fill; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mk-title span { display: block; font-size: 13px; color: #dfe4ff; }
+.mk-panel { margin: 10px 0 0; border-radius: 16px; padding: 8px 12px 10px; background: rgba(10, 14, 44, 0.93); border: 2.5px solid #c9a227; box-shadow: 0 0 0 2px var(--ink), 4px 5px 0 2px var(--ink); }
+.mk-field { display: block; min-width: 0; }
+.mk-field small, .mk-sub { display: block; margin: 6px 0 3px; font-family: var(--display); font-size: 15px; letter-spacing: 1.5px; color: #b9c2ff; text-transform: uppercase; }
+.mk-field input { width: 100%; height: 40px; padding: 0 10px; border-radius: 10px; border: 2px solid #2c3770; background: #111842; color: #fff; font: 600 17px/1 system-ui, sans-serif; }
+.mk-field input:focus { outline: none; border-color: var(--bolt); }
+.mk-row2 { display: grid; grid-template-columns: 0.55fr 1fr; gap: 10px; }
+#mkShortIn { text-transform: uppercase; letter-spacing: 2px; }
+.mk-swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.mk-swatches button { aspect-ratio: 1; border-radius: 50%; border: 2.5px solid var(--ink); background: var(--c); box-shadow: 2px 2px 0 var(--ink); padding: 0; }
+.mk-swatches button.on { outline: 3px solid var(--bolt); outline-offset: 2px; }
+.mk-swatches button:disabled { opacity: 0.25; }
+.mk-emblems { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.mk-emblems button { aspect-ratio: 1; padding: 2px; border-radius: 10px; border: 2px solid #2c3770; background: #111842; }
+.mk-emblems button.on { border-color: var(--bolt); background: #26306e; box-shadow: 0 0 8px rgba(255, 210, 63, 0.6); }
+.mk-emblems canvas { width: 100%; height: 100%; display: block; }

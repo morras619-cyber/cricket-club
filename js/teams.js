@@ -67,7 +67,21 @@ export const NATIONAL = [
     heroes: { bat: 'meher', bowl: 'babar', field: 'bilal' },
     style: { tag: 'Pace and mystery', desc: 'Raw pace, wrist spin and the unexpected.', loft: 0.05, sigma: 1.02 } },
 ];
-export const teamById = id => TEAMS.find(t => t.id === id) || LEAGUE_CLUBS.find(t => t.id === id) || NATIONAL.find(t => t.id === id) || TEAMS[0];
+// Your own club (Super League career, create-your-club): it takes a Division 3 club's place,
+// its squad, budget and ground (base), under your name, colours and crest.
+let MINE = null;
+const LOGOS = new Map(); // crests painted in the game, by club id
+export function setMyClub(m) {
+  if (MINE) LOGOS.delete(MINE.id);
+  const base = m?.base && LEAGUE_CLUBS.find(t => t.id === m.base);
+  MINE = base ? { ...base, name: m.name, short: m.short, suit: m.suit, trim: m.trim, emblem: m.emblem, ground: m.ground || base.ground,
+    custom: true, style: { ...base.style, tag: 'Your club', desc: 'Built from nothing. Every run is yours.' } } : null;
+  if (MINE && m.crest) LOGOS.set(MINE.id, m.crest);
+}
+export const myClub = () => MINE;
+export const setLogo = (id, src) => (src ? LOGOS.set(id, src) : LOGOS.delete(id));
+export const logoSrc = id => LOGOS.get(id) || `img/logo-${id}.webp`;
+export const teamById = id => (MINE && id === MINE.id ? MINE : null) || TEAMS.find(t => t.id === id) || LEAGUE_CLUBS.find(t => t.id === id) || NATIONAL.find(t => t.id === id) || TEAMS[0];
 // the club whose drawn sheets a side uses (its own, or the one a national side borrows)
 export const sheetOf = id => teamById(id).sheet || id;
 

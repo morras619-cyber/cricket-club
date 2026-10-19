@@ -7,7 +7,7 @@
 import { PORTRAIT_AGE } from './portraits-list.js';
 import { CFG } from './config.js';
 import { makeRng } from './rng.js';
-import { TEAMS, CLUBS, LEAGUE_CLUBS, teamById, divisionName } from './teams.js';
+import { TEAMS, CLUBS, LEAGUE_CLUBS, teamById, divisionName, setMyClub } from './teams.js';
 import { HEROES, heroById } from './heroes.js';
 import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating, WEAK, BOWL_TYPES } from './squads.js';
 import { newLeague, simLeague, advance, playerResult, table, finish } from './tournament.js';
@@ -291,6 +291,24 @@ export function chooseClub(c, teamId) {
   // your scouts' finds come first, at their set price; then the auction
   if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c);
   return true;
+}
+
+// Your own club: it takes the place of the weakest Division 3 club (its budget and ground), and
+// that club's regulars become a squad of young unknowns: rough now, with room to grow.
+// spec: { name, short, suit, trim, emblem, ground, crest (an image URL) }
+export function createClub(c, spec) {
+  if (c.club) return false;
+  const base = [...c.divisions.d3].sort((a, b) => clubRating(c, a) - clubRating(c, b))[0];
+  const rng = makeRng(hashStr(`mine-${c.seed}`));
+  for (const p of clubPlayers(c, base)) {
+    const main = Math.max(...primary(p).map(k => p[k]));
+    p.age = rng.int(18, 21);
+    p.pot = Math.min(90, main + rng.int(12, 22));
+    p.contract = 3;
+  }
+  c.custom = { ...spec, base, gone: teamById(base).name };
+  setMyClub(c.custom);
+  return chooseClub(c, base);
 }
 
 // ---------- the auction ----------

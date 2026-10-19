@@ -102,6 +102,15 @@ export const DEV = {
     "Win Division 3 and you go up to Division 2. Win that, and you're in the Asian Super League with the big names.",
     "It's a grind. Pick the club you believe in: you'll be with them all the way up.",
   ],
+  makeClub: [
+    "Your own club? Now that's the spirit, beta! Give it a name the crowd can sing.",
+    "Pick two colours that look good together: a bold main colour and a bright trim. Then choose a crest.",
+    "You'll start in Division 3 with a squad of young unknowns. Raw, but they'll grow with you.",
+  ],
+  madeClub: [
+    "Welcome to the league! Every big club started like this: a few kids, a small ground and a dream.",
+    "Your players are young, so their potential matters more than their rating. Keep them and they'll get better every season.",
+  ],
   auction: [
     "Auction day! Every player goes under the hammer. Bid against the other clubs, or pass if the price runs too high.",
     "Watch your money. You need at least 10 players, so don't spend it all on the first star you see.",

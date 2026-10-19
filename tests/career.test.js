@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as C from '../js/career.js';
-import { TEAMS, CLUBS, teamById } from '../js/teams.js';
+import { TEAMS, CLUBS, teamById, logoSrc, setMyClub } from '../js/teams.js';
 import { nextFixture } from '../js/tournament.js';
 import { ovr } from '../js/squads.js';
 import { makeRng } from '../js/rng.js';
@@ -170,4 +170,20 @@ test('the Super League play-off: yours to play when you finish 7th or 8th', () =
   assert.equal(c.phase, 'done');
   assert.ok(c.divisions.asl.includes('rockets'), 'won the play-off: stays up');
   assert.ok(c.history.at(-1).playoff.won);
+});
+
+test('your own club takes the weakest Division 3 place with a young squad', () => {
+  const { newCareer, createClub, clubPlayers } = C;
+  const c = newCareer(7);
+  const before = [...c.divisions.d3];
+  assert.ok(createClub(c, { name: 'Mumbai Meteors', short: 'MUM', suit: '#6a22c4', trim: '#ffcf1a', emblem: 'comet', ground: 'Meteor Park', crest: 'data:x' }));
+  assert.ok(before.includes(c.club));
+  assert.equal(c.custom.base, c.club);
+  assert.equal(teamById(c.club).name, 'Mumbai Meteors');
+  assert.equal(teamById(c.club).suit, '#6a22c4');
+  assert.equal(logoSrc(c.club), 'data:x');
+  for (const p of clubPlayers(c, c.club)) assert.ok(p.age <= 21 && p.pot > ovr(p));
+  assert.equal(createClub(c, { name: 'Again' }), false);
+  setMyClub(null);
+  assert.notEqual(teamById(c.club).name, 'Mumbai Meteors');
 });

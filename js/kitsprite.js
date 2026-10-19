@@ -4,6 +4,7 @@
 import { KIT_SHEETS } from './kitsheets.js';
 import { skinHex, hairHex, hsv, rgb } from './looks.js';
 import { buildOf } from './builds.js';
+import { logoSrc } from './teams.js';
 
 const REF_HEIGHT_M = 1.85;
 // the game's frame names -> the sheet's poses (0-9, left to right, top row first)
@@ -52,7 +53,7 @@ const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
   for (const view of ['front', 'back', 'bat-back', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
-  for (const id of teamIds) if (id && !crestImgs.has(id)) crestImgs.set(id, image(`img/logo-${id}.webp`));
+  for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
   }
@@ -139,7 +140,7 @@ function premiumOf(team) {
 // ---------- the club's kit ----------
 const teamCache = new Map();
 function teamSheet(view, team) {
-  const key = view + '|' + team.id;
+  const key = [view, team.id, team.suit, team.trim].join('|');
   if (teamCache.has(key)) return teamCache.get(key);
   const v = views[view], meta = KIT_SHEETS[view], data = viewData(view);
   const c = document.createElement('canvas');
@@ -203,9 +204,12 @@ export const shirtNumber = look => look.num || (hashStr(look.seed || look.who ||
 
 // the crest with a thin dark rim, so it reads on any kit colour
 const crestCache = new Map();
+const crestKey = id => { const s = logoSrc(id); return s.length + s.slice(-12); };
 function crestCanvas(id) {
-  if (crestCache.has(id)) return crestCache.get(id);
-  const img = crestImgs.get(id);
+  const src = logoSrc(id); // (keyed by the crest itself: your own club's can change)
+  if (crestCache.has(src)) return crestCache.get(src);
+  if (!crestImgs.has(src)) crestImgs.set(src, image(src));
+  const img = crestImgs.get(src);
   if (!loaded(img)) return null;
   const s = 200 / Math.max(img.naturalWidth, img.naturalHeight), w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s), o = 7;
   const sil = document.createElement('canvas'), c = document.createElement('canvas');
@@ -216,7 +220,7 @@ function crestCanvas(id) {
   gs.fillStyle = 'rgba(14,12,24,0.9)'; gs.fillRect(0, 0, sil.width, sil.height);
   for (let a = 0; a < 16; a++) g.drawImage(sil, Math.cos(a * Math.PI / 8) * o, Math.sin(a * Math.PI / 8) * o);
   g.drawImage(img, o, o, w, h);
-  crestCache.set(id, c);
+  crestCache.set(src, c);
   return c;
 }
 
@@ -251,7 +255,7 @@ function playerSheet(view, team, look, mirror) {
   const wp = wear && meta.hair?.[wear] ? hairData(view, wear) : null;
   if (hp === undefined || bp === undefined || wp === undefined) return null;
   const name = shirtName(look.who), num = shirtNumber(look);
-  const key = [view, team.id, team.suit, team.trim, sk, hr, style, beard, wear, name, num, mirror].join('|');
+  const key = [view, team.id, team.suit, team.trim, crestKey(team.id), sk, hr, style, beard, wear, name, num, mirror].join('|');
   if (playerCache.has(key)) { const c = playerCache.get(key); playerCache.delete(key); playerCache.set(key, c); return c; }
   if (facing && !crestCanvas(team.id)) return null;
   const kit = teamSheet(view, team);
@@ -354,7 +358,7 @@ function fielderFrame(team, look, idx, mirror = false) {
   if (!meta || !data || !fontReady) return null;
   const sk = skinHex(look), name = shirtName(look.who), num = shirtNumber(look);
   mirror = mirror && KIT_SHEETS.field.place[idx][2] > 0;
-  const key = [team.id, sk, name, num, idx, mirror ? 'm' : ''].join('|');
+  const key = [team.id, team.suit, team.trim, crestKey(team.id), sk, name, num, idx, mirror ? 'm' : ''].join('|');
   if (fieldCache.has(key)) return fieldCache.get(key);
   const kit = teamSheet('field', team);
   if (!kit) return null;

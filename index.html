@@ -250,6 +250,7 @@ vs a random team</small></button>
         <div class="pt-coins"><img src="img/menu/coin.webp" alt=""><b id="ptCoins">0</b></div>
       </header>
       <p class="pt-note" id="ptNote" hidden></p>
+      <button class="pt-make" id="ptMake" hidden>✨ Create your own club</button>
       <div class="pt-coach"><button class="coachbtn" id="ptCoach"><img src="img/menu/coach-dev.webp" alt="">Ask Uncle Dev</button></div>
       <div class="pt-stage" id="ptStage" aria-roledescription="carousel">
         <div class="pt-track" id="ptTrack"></div>
@@ -265,6 +266,36 @@ vs a random team</small></button>
       <div class="pt-btns">
         <button class="pt-btn ghost" id="ptBack2">Back</button>
         <button class="pt-btn go" id="ptGo">Start match</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="makeclub" class="screen" hidden>
+    <div class="pt mk">
+      <header class="pt-head">
+        <button class="pt-back" id="mkBack" aria-label="Back">‹</button>
+        <h2 class="pt-title"><span>Create</span> <em>your club</em></h2>
+        <div class="pt-coins mk-gap"></div>
+      </header>
+      <div class="pt-coach"><button class="coachbtn" id="mkCoach"><img src="img/menu/coach-dev.webp" alt="">Ask Uncle Dev</button></div>
+      <div class="mk-show" id="mkShow">
+        <img class="mk-crest" id="mkCrest" alt="Your crest">
+        <canvas class="mk-kit" id="mkKit" width="420" height="300" aria-label="Your kit"></canvas>
+        <div class="mk-title"><b id="mkName">Your Club</b><span id="mkGround">Home ground</span></div>
+      </div>
+      <div class="mk-panel">
+        <label class="mk-field"><small>Club name</small><input id="mkNameIn" maxlength="22" autocomplete="off" spellcheck="false"></label>
+        <div class="mk-row2">
+          <label class="mk-field"><small>Short name</small><input id="mkShortIn" maxlength="4" autocomplete="off" spellcheck="false"></label>
+          <label class="mk-field"><small>Home ground</small><input id="mkGroundIn" maxlength="24" autocomplete="off" spellcheck="false"></label>
+        </div>
+        <div class="mk-sub">Main colour</div><div class="mk-swatches" id="mkSuit"></div>
+        <div class="mk-sub">Trim colour</div><div class="mk-swatches" id="mkTrim"></div>
+        <div class="mk-sub">Crest</div><div class="mk-emblems" id="mkEmblems"></div>
+      </div>
+      <div class="pt-btns">
+        <button class="pt-btn ghost" id="mkBack2">Back</button>
+        <button class="pt-btn go" id="mkGo">Found the club</button>
       </div>
     </div>
   </section>

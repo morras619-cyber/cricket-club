@@ -2,7 +2,7 @@ import { CFG, phaseFor } from './config.js';
 import { makeRng } from './rng.js';
 import { Charge } from './charge.js';
 import { SPARKS, heroById, AI_LOOK } from './heroes.js';
-import { teamById, rivalTeam, teamLook } from './teams.js';
+import { teamById, rivalTeam, teamLook, logoSrc } from './teams.js';
 import { makeDelivery } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
 import { simulateHit, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
@@ -662,7 +662,7 @@ export class Game {
     const bat = this.batterOf(inn), bowl = this.bowlerOf(inn);
     if (inn.side === 'player') heroLine = `${short(bat)} ${inn.cur.runs}* (${inn.cur.balls}) · v ${short(bowl)}`;
     else { const b = inn.figs[bowl.id] || { wkts: 0, runs: 0, balls: 0 }; heroLine = `${short(bowl)} ${b.wkts}/${b.runs} · ${Math.floor(b.balls / 6)}.${b.balls % 6} ov · v ${short(bat)}`; }
-    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${bat.name.toUpperCase()}` : `YOU BOWL · ${bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine, logo: this.myTeam ? `img/logo-${this.myTeam.id}.webp` : null });
+    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${bat.name.toUpperCase()}` : `YOU BOWL · ${bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine, logo: this.myTeam ? logoSrc(this.myTeam.id) : null });
   }
 
   phaseBanner(ballNo) {

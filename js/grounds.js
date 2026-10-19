@@ -1,4 +1,4 @@
-import { LEAGUE_CLUBS } from './teams.js';
+import { LEAGUE_CLUBS, myClub } from './teams.js';
 // Every club's home ground: how it looks (sky, crowd, landmark, outfield) and how its pitch
 // plays. A match is played at the home side's ground; the painter in scene.js reads this.
 //
@@ -77,7 +77,8 @@ LEAGUE_CLUBS.forEach((t, i) => {
 // the national sides' grounds: a club's ground and pitch under its own name
 GROUNDS.india = { ...GROUNDS.thunder, name: 'Blue Lights Stadium' };
 GROUNDS.pakistan = { ...GROUNDS.cyclones, name: 'Crescent Park' };
-export const groundOf = teamId => GROUNDS[teamId] || GROUNDS.thunder;
+// (your own club plays at the ground it took over, under the name you gave it)
+export const groundOf = teamId => (myClub()?.id === teamId ? { ...GROUNDS[teamId], name: myClub().ground } : GROUNDS[teamId] || GROUNDS.thunder);
 export const PITCH_DEFAULT = { swing: 1, seam: 1, turn: 1, kmh: 1, bat: 1, ai: 1, field: 1, dew: false };
 export const pitchOf = teamId => ({ ...PITCH_DEFAULT, ...groundOf(teamId).pitch });
 

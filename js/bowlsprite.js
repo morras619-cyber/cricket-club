@@ -420,18 +420,19 @@ import { peopleSheet, peopleFrame, loadPeopleMask, hairHex, skinHex } from './lo
 import { loadKitSprites, drawKitSprite } from './kitsprite.js';
 import { loadHair, hairReady, piecesOf, piecesKey, headsOf, dressSheet } from './hair.js';
 import { KIT_LOGOS } from './kitlogos.js';
-import { sheetOf } from './teams.js';
+import { sheetOf, logoSrc } from './teams.js';
 import { buildOf } from './builds.js';
 const tinted = new Map();
 
 // club crests for the shirts and helmets (the front sheets have a blank badge spot for them)
 const crests = new Map();
 function crestOf(id) {
-  let c = crests.get(id);
+  const src = logoSrc(id);
+  let c = crests.get(src);
   if (!c) {
     c = new Image();
-    c.src = `img/logo-${id}.webp`;
-    crests.set(id, c);
+    c.src = src;
+    crests.set(src, c);
   }
   return c.complete && c.naturalWidth ? c : null;
 }
@@ -528,9 +529,9 @@ function sheetFor(view, team) {
   const same = team.suit === SHEET.suit && team.trim === SHEET.trim;
   if (same && !spots) return atlas;
   const crest = spots ? crestOf(team.id) : null;
-  const key = view + team.id + (crest ? '+crest' : '');
+  const key = view + team.id + team.suit + team.trim + (crest ? '+crest' + crest.src.length + crest.src.slice(-12) : '');
   if (tinted.has(key)) return tinted.get(key);
-  const plainKey = view + team.id; // the copy made before the crest had loaded is no longer needed
+  const plainKey = view + team.id + team.suit + team.trim; // the copy made before the crest had loaded is no longer needed
   if (crest && tinted.has(plainKey)) { const old = tinted.get(plainKey); if (old instanceof HTMLCanvasElement) { old.width = 0; old.height = 0; } tinted.delete(plainKey); }
   const c = document.createElement('canvas');
   c.width = atlas.naturalWidth; c.height = atlas.naturalHeight;

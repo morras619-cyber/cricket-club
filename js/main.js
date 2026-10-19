@@ -1,7 +1,7 @@
 import { UI } from './ui.js';
 import { Game } from './game.js';
 import { SPARKS, HEROES, heroById, heroesFor } from './heroes.js';
-import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero } from './teams.js';
+import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero, logoSrc, setMyClub, setLogo } from './teams.js';
 import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
@@ -11,7 +11,7 @@ import { futCard, portraitFace } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts } from './career.js';
+  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -25,6 +25,8 @@ import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
+import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
+import { loadKitSprites, drawKitFielder } from './kitsprite.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -51,7 +53,7 @@ async function quickTip() {
 // heroes already picked before unlocks existed stay unlocked (signed)
 for (const id of Object.values(profile.squad || {})) if (id && !profile.unlocked.includes(id)) profile.unlocked.push(id);
 // careers saved before players had countries
-if (profile.career) migrateCareer(profile.career);
+if (profile.career) { migrateCareer(profile.career); setMyClub(profile.career.custom); }
 // start downloading the bowler sheets (pace and spin) while the menus are up
 loadBowlSprites(profile.team || 'thunder');
 sound.on = profile.settings.sound;
@@ -79,7 +81,7 @@ function renderHome() {
   $('coins').textContent = profile.coins;
   $('gems').textContent = profile.gems || 0;
   const t = myTeam();
-  $('badgeLogo').src = `img/logo-${t.id}.webp`;
+  $('badgeLogo').src = logoSrc(t.id);
   $('badgeName').textContent = t.name;
   $('badgeStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
   // the shop's dot: today's login reward waiting
@@ -334,13 +336,14 @@ function renderPickTeam(o) {
   ui.show('pickteam');
   $('ptCoins').textContent = profile.coins;
   $('ptNote').hidden = !o.note; $('ptNote').textContent = o.note || '';
+  $('ptMake').hidden = !o.make;
   const track = $('ptTrack'), dots = $('ptDots');
   track.innerHTML = ''; dots.innerHTML = '';
   pick.cards = o.teams.map((t, i) => {
     const b = el('button', 'ptcard');
     b.style.setProperty('--suit', t.suit); b.style.setProperty('--trim', t.trim);
     const face = el('div', 'face');
-    const logo = document.createElement('img'); logo.className = 'logo'; logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
+    const logo = document.createElement('img'); logo.className = 'logo'; logo.src = logoSrc(t.id); logo.alt = '';
     face.append(logo, el('div', 'plate'), el('div', 'name', t.name), el('div', 'tag', t.style.tag));
     b.append(face);
     const why = o.locked?.(t);
@@ -392,6 +395,7 @@ $('ptCoach').addEventListener('click', () => coachSay(DEV[pick.coach || 'quickTe
 $('rgCoach').addEventListener('click', () => coachSay(DEV.region));
 $('ptNext').addEventListener('click', () => pickGo(pick.idx + 1));
 $('ptBack').addEventListener('click', () => pick.onBack());
+$('ptMake').addEventListener('click', () => { sfx.click(); pick.make?.(); });
 $('ptBack2').addEventListener('click', () => pick.onBack());
 $('ptGo').addEventListener('click', () => { const t = pick.teams[pick.idx]; if (!pick.locked?.(t)) pick.onGo(t.id); });
 {
@@ -542,7 +546,7 @@ function teamPicker() {
     b.className = 'team' + (on ? ' on' : '');
     b.setAttribute('aria-pressed', on);
     b.style.setProperty('--suit', t.suit); b.style.setProperty('--trim', t.trim);
-    const logo = document.createElement('img'); logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
+    const logo = document.createElement('img'); logo.src = logoSrc(t.id); logo.alt = '';
     b.append(logo, el('b', '', t.name), el('small', '', t.style.tag));
     if (on) b.append(el('i', 'team-mine', 'YOUR TEAM'));
     b.addEventListener('click', () => {
@@ -661,8 +665,8 @@ $('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
 function fixtureCard(f, me, o, about, onPlay) {
   const card = el('div', 'fixcard');
   const logos = el('div', 'fixlogos');
-  const la = document.createElement('img'); la.src = `img/logo-${me.id}.webp`; la.alt = me.name;
-  const lb = document.createElement('img'); lb.src = `img/logo-${o.id}.webp`; lb.alt = o.name;
+  const la = document.createElement('img'); la.src = logoSrc(me.id); la.alt = me.name;
+  const lb = document.createElement('img'); lb.src = logoSrc(o.id); lb.alt = o.name;
   const vs = document.createElement('img'); vs.src = 'img/league-vs.webp'; vs.alt = 'v'; vs.className = 'fixvs';
   logos.append(la, vs, lb);
   const G = groundOf(f.home || me.id), venue = el('p', 'fixvenue');
@@ -732,7 +736,7 @@ function leaguePanels(t) {
     table(t).forEach((r, i) => {
       const tr = el('tr', r.id === t.team ? 'mine' : '');
       const team = teamById(r.id), logo = document.createElement('img');
-      logo.src = `img/logo-${r.id}.webp`; logo.alt = '';
+      logo.src = logoSrc(r.id); logo.alt = '';
       const pos = el('td'), name = el('td', 'lt-team');
       pos.append(el('b', i < 4 ? 'lt-pos top' : 'lt-pos', String(i + 1)));
       name.append(logo, el('span', '', team.name));
@@ -772,7 +776,7 @@ function leaguePanels(t) {
     for (const r of mine) {
       const o = r.a === t.team ? r.b : r.a;
       const res = r.winner === t.team ? 'W' : r.winner ? 'L' : 'T', row = el('div', 'lres'), logo = document.createElement('img');
-      logo.src = `img/logo-${o}.webp`; logo.alt = '';
+      logo.src = logoSrc(o); logo.alt = '';
       row.append(el('b', `lres-${res}`, res), logo, el('span', '', `v ${teamById(o).name}`), el('em', '', `${r.mine.runs}/${r.mine.wkts} v ${r.theirs.runs}/${r.theirs.wkts}`));
       rin.append(row);
     }
@@ -840,7 +844,7 @@ function renderWar() {
   const board = el('div', 'warboard');
   for (const id of SIDES) {
     const col = el('div', 'wb-side' + (leader(t) === id ? ' lead' : '') + (side === id ? ' mine' : ''));
-    const logo = document.createElement('img'); logo.src = `img/logo-${id}.webp`; logo.alt = '';
+    const logo = document.createElement('img'); logo.src = logoSrc(id); logo.alt = '';
     col.append(logo, el('b', 'wb-name', sideName(id)), el('strong', 'wb-pts', num(t[id])), el('small', '', `${t.players[id]} player${t.players[id] === 1 ? '' : 's'}`));
     board.append(col);
     if (id === 'india') { const v = document.createElement('img'); v.src = 'img/league-vs.webp'; v.alt = 'v'; v.className = 'wb-vs'; board.append(v); }
@@ -855,7 +859,7 @@ function renderWar() {
     const pick = el('div', 'warpick');
     for (const id of SIDES) {
       const b = el('button', 'warpick-btn'); b.style.setProperty('--suit', teamById(id).suit);
-      const logo = document.createElement('img'); logo.src = `img/logo-${id}.webp`; logo.alt = '';
+      const logo = document.createElement('img'); logo.src = logoSrc(id); logo.alt = '';
       b.append(logo, el('b', '', `Play for ${sideName(id)}`));
       confirmTap(b, `Tap again: you'll play for ${sideName(id)} all four weekends`, async () => {
         sfx.dhol?.();
@@ -901,7 +905,7 @@ function renderWar() {
     fp.append(lpHead('Latest', 'live'), fin);
     for (const f of fd) {
       const row = el('div', 'lres'), logo = document.createElement('img');
-      logo.src = `img/logo-${f.country}.webp`; logo.alt = '';
+      logo.src = logoSrc(f.country); logo.alt = '';
       const who = f.id === myId() || f.id === 'me' ? 'You' : warNames[f.id] || 'A player';
       row.append(el('b', f.win ? 'lres-W' : 'lres-L', f.win ? '+1' : '0'), logo, el('span', '', `${who} ${f.win ? 'won' : 'lost'} for ${sideName(f.country)}`), el('em', '', f.line));
       fin.append(row);
@@ -936,8 +940,12 @@ let careerView = 'hub'; // 'hub' | 'squad'
 let careerNotes = [];
 function career() {
   if (!profile.career) { profile.career = newCareer(randomSeed()); saveProfile(profile); }
+  syncMine(profile.career);
   return profile.career;
 }
+// your own club, if this career has one, is known to every screen
+let mineOf = undefined;
+function syncMine(c) { const m = c?.custom || null; if (m !== mineOf) { mineOf = m; setMyClub(m); } }
 const stars = n => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
 const pname = p => `${p.heroId ? '★ ' : p.ability ? '⭐ ' : ''}${flagName(p)}`;
 const fname = p => `${flag(p)} ${p.name}`.trim(); // flag and plain name, for lists
@@ -1043,8 +1051,98 @@ function careerPick(c, body) {
     note: 'Every career starts in Division 3. Win it to go up, win Division 2 to reach the Asian Super League.',
     onBack: () => (c.season === 1 && !c.club ? renderRegion() : renderHome()),
     onGo: id => { if (chooseClub(c, id)) { sfx.dhol(); saveProfile(profile); renderCareer(); } },
+    make: () => renderMakeClub(c),
   });
 }
+
+// ---------- Create your own club: name, colours, crest; it takes a Division 3 place ----------
+const KIT_COLOURS = ['#1f5fd6', '#123a7a', '#5fb4e8', '#0f8a8a', '#1e7a32', '#9bd12a', '#ffcf1a', '#ff8a1c',
+  '#e8262b', '#8b1c24', '#ec2f9a', '#6a22c4', '#1f1f26', '#8f9296', '#ffffff', '#c8913a'];
+let mk = null;
+function renderMakeClub(c) {
+  mk = mk?.c === c ? mk : { c, name: '', short: '', ground: '', groundSet: false, suit: '#e8262b', trim: '#ffcf1a', emblem: 'bolt', n: 0 };
+  ui.show('makeclub');
+  $('mkNameIn').value = mk.name; $('mkShortIn').value = mk.short; $('mkGroundIn').value = mk.ground;
+  $('mkNameIn').placeholder = 'e.g. Mumbai Meteors'; $('mkShortIn').placeholder = 'MUM'; $('mkGroundIn').placeholder = 'e.g. Meteor Park';
+  const sw = (box, key) => {
+    box.innerHTML = '';
+    for (const col of KIT_COLOURS) {
+      const b = el('button'); b.style.setProperty('--c', col); b.dataset.c = col; b.setAttribute('aria-label', col);
+      b.addEventListener('click', () => { mk[key] = col; sfx.click(); mkUpdate(); });
+      box.append(b);
+    }
+  };
+  sw($('mkSuit'), 'suit'); sw($('mkTrim'), 'trim');
+  const em = $('mkEmblems'); em.innerHTML = '';
+  for (const id of EMBLEM_IDS) {
+    const b = el('button'); b.dataset.e = id; b.setAttribute('aria-label', id);
+    const cv = document.createElement('canvas'); cv.width = cv.height = 96; b.append(cv);
+    b.addEventListener('click', () => { mk.emblem = id; sfx.click(); mkUpdate(); });
+    em.append(b);
+  }
+  loadKitSprites();
+  loadCrestMasks().then(() => mkUpdate());
+  mkUpdate();
+  coachOnce('makeClub', DEV.makeClub);
+}
+const mkFirst = () => (mk.name.trim().split(/\s+/)[0] || '');
+const mkGroundName = () => mk.ground.trim() || (mkFirst() ? `${mkFirst()} Park` : 'Community Ground');
+const mkShort = () => (mk.short.trim() || mk.name.replace(/[^A-Za-z]/g, '').slice(0, 3)).toUpperCase();
+function mkUpdate() {
+  if (!mk) return;
+  if (mk.trim === mk.suit) mk.trim = KIT_COLOURS.find(x => x !== mk.suit && x !== '#1f1f26') || '#ffffff';
+  for (const b of $('mkSuit').children) b.classList.toggle('on', b.dataset.c === mk.suit);
+  for (const b of $('mkTrim').children) { b.classList.toggle('on', b.dataset.c === mk.trim); b.disabled = b.dataset.c === mk.suit; }
+  const show = $('mkShow');
+  show.style.setProperty('--suit', mk.suit); show.style.setProperty('--trim', mk.trim);
+  $('mkName').textContent = mk.name.trim() || 'Your Club';
+  $('mkGround').textContent = `${mkShort() || '???'} · ${mkGroundName()}`;
+  const crest = paintCrest(mk.emblem, mk.suit, mk.trim);
+  for (const b of $('mkEmblems').children) {
+    b.classList.toggle('on', b.dataset.e === mk.emblem);
+    const pc = paintCrest(b.dataset.e, mk.suit, mk.trim), cv = b.firstChild, g = cv.getContext('2d');
+    g.clearRect(0, 0, cv.width, cv.height); if (pc) g.drawImage(pc, 0, 0, cv.width, cv.height);
+  }
+  if (!crest) return;
+  mk.crest = crest.toDataURL('image/png');
+  $('mkCrest').src = mk.crest;
+  // the kit: a player from the front and one from behind, in a preview club of these colours
+  const id = `mk${++mk.n}`;
+  setLogo(mk.pid, null); mk.pid = id; setLogo(id, mk.crest);
+  mk.team = { id, name: mk.name, suit: mk.suit, trim: mk.trim, star: null, style: {} };
+  loadKitSprites(id);
+  mkDrawKit();
+}
+function mkDrawKit(tries = 0) {
+  const cv = $('mkKit'), g = cv.getContext('2d'), team = mk?.team;
+  if (!team || $('makeclub').hidden) return;
+  g.clearRect(0, 0, cv.width, cv.height);
+  const look = n => ({ skin: 2, hair: 0, style: n ? 'swept' : 'short', beard: 'none', seed: `mk${n}`, who: n ? `Captain ${mkShort() || 'Club'}` : 'Captain One', num: n ? 10 : 7 });
+  const a = drawKitFielder(g, 130, 285, 140, 'ready_front', team, look(0));
+  const b = drawKitFielder(g, 300, 285, 140, 'ready_back', team, look(1));
+  // (the sheets and the crest load in the background: try again shortly)
+  if ((!a || !b) && tries < 40) setTimeout(() => { if (mk?.team === team) mkDrawKit(tries + 1); }, 150);
+}
+$('mkNameIn').addEventListener('input', e => { mk.name = e.target.value; mkUpdate(); });
+$('mkShortIn').addEventListener('input', e => { mk.short = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase(); e.target.value = mk.short; mkUpdate(); });
+$('mkGroundIn').addEventListener('input', e => { mk.ground = e.target.value; mkUpdate(); });
+$('mkCoach').addEventListener('click', () => coachSay(DEV.makeClub));
+const mkBack = () => { renderCareer(); };
+$('mkBack').addEventListener('click', mkBack);
+$('mkBack2').addEventListener('click', mkBack);
+$('mkGo').addEventListener('click', () => {
+  const name = mk.name.trim().replace(/\s+/g, ' ');
+  if (name.length < 3) { ui.toast('Give your club a name first'); $('mkNameIn').focus(); return; }
+  if (!mk.crest) return;
+  const c = mk.c;
+  if (createClub(c, { name, short: mkShort(), suit: mk.suit, trim: mk.trim, emblem: mk.emblem, ground: mkGroundName(), crest: mk.crest })) {
+    setLogo(mk.pid, null); mk = null;
+    sfx.dhol(); saveProfile(profile);
+    careerNotes = [`🏟️ ${name} are born! They take the place of ${c.custom.gone} in Division 3.`];
+    renderCareer();
+    coachOnce('madeClub', DEV.madeClub);
+  }
+});
 
 // the pre-season auction
 function careerAuction(c, body) {
@@ -1308,7 +1406,7 @@ function renderRecords() {
   body.append(board('Most sixes', top('all', 'sixes', p => `${fname(p)} (${team(p)}) · ${p.stats.all.sixes}`)));
   body.append(board('Highest scores', c.records.hs.slice(0, 10).map(r => ({ p: c.players[r.pid], text: `${fname(c.players[r.pid])} · ${r.runs}${r.out ? '' : '*'} (${r.balls}) · ${teamById(r.team || 'thunder').name} · S${r.season}` }))));
   body.append(board('Best bowling', c.records.bb.slice(0, 10).map(r => ({ p: c.players[r.pid], text: `${fname(c.players[r.pid])} · ${r.w}/${r.r} · ${teamById(r.team || 'thunder').name} · S${r.season}` }))));
-  const clubs = CLUBS.map(t => ({ t, titles: c.titles[t.id] || 0, finals: c.history.filter(h => h.runnerUp === t.id).length })).sort((a, b) => b.titles - a.titles || b.finals - a.finals);
+  const clubs = CLUBS.map(t => ({ t: teamById(t.id), titles: c.titles[t.id] || 0, finals: c.history.filter(h => h.runnerUp === t.id).length })).sort((a, b) => b.titles - a.titles || b.finals - a.finals);
   body.append(board('Most Super League titles', clubs.filter(x => x.titles || x.finals).map(x => `${x.t.name} · ${x.titles} title${x.titles === 1 ? '' : 's'}${x.finals ? `, ${x.finals} runner-up` : ''}`)));
   body.append(board('Season by season', c.history.map(h => `S${h.season}: ${teamById(h.champion).name} champions · you: ${teamById(h.club).name} (${ordinal(h.pos)})${h.orange ? ` · most runs ${playerName(c, h.orange.pid)} ${h.orange.runs}` : ''}`)));
   const reset = el('button', 'chipbtn ghostchip', 'Start a brand-new career');
@@ -1327,8 +1425,8 @@ function renderDaily() {
   const c = $('dailyCard');
   c.innerHTML = '';
   const logos = el('div', 'fixlogos');
-  const la = document.createElement('img'); la.src = `img/logo-${sc.team}.webp`; la.alt = '';
-  const lb = document.createElement('img'); lb.src = `img/logo-${sc.opp}.webp`; lb.alt = '';
+  const la = document.createElement('img'); la.src = logoSrc(sc.team); la.alt = '';
+  const lb = document.createElement('img'); lb.src = logoSrc(sc.opp); lb.alt = '';
   logos.append(la, el('b', '', 'V'), lb);
   c.append(el('div', 'eyebrow', sc.kind === 'chase' ? 'THE CHASE' : 'THE DEFENCE'), el('h3', '', sc.title), logos, el('p', '', sc.text),
     el('p', 'venue', `🏟 ${groundOf(sc.team).name} · Pitch: ${groundOf(sc.team).pitch.name}`),
