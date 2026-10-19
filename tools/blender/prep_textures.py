@@ -20,6 +20,25 @@ if len(sys.argv) > 1:
 else:
     CLUB = 'thunder'
 far = None if CLUB != 'thunder' else Image.open(g('img/ground/thunder/far.webp')).convert('RGB')
+def stand_sections(paths, out, stair=76, crowd_end=1220):
+    """painted stand sections (steps at the left, then the crowd, front row at the bottom, back
+    row at the top: the whole stand in one picture) side by side, then again mirrored, each
+    keeping its steps on the left; the back rows a shade darker under the roof"""
+    secs = []
+    for mirror in (False, True):
+        for path in paths:
+            im = Image.open(path).convert('RGB')
+            st, cr = im.crop((0, 0, stair, im.height)), im.crop((stair, 0, crowd_end, im.height))
+            sec = Image.new('RGB', (crowd_end, im.height)); sec.paste(st, (0, 0)); sec.paste(ImageOps.mirror(cr) if mirror else cr, (stair, 0))
+            secs.append(sec)
+    h = secs[0].height
+    strip = Image.new('RGB', (sum(x.width for x in secs), h)); x = 0
+    for sec in secs: strip.paste(sec, (x, 0)); x += sec.width
+    a = np.asarray(strip).astype(float) * np.linspace(0.8, 1.0, h)[:, None, None]
+    Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).save(os.path.join(out, 'crowd.png'))
+    print('stand strip', strip.size)
+
+
 if CLUB == 'thunder':
     near = Image.open(g('img/ground/thunder/near.webp')).convert('RGB')
     # the crowd: below the lights under the roof, above the boards, either side of the big screen
@@ -180,3 +199,7 @@ def arena(path, out):
 
 if CLUB != 'thunder':
     club(CLUB)
+
+# Thunder's own painted stand sections, when they're there, replace the crowd cut from its ground art
+if CLUB == 'thunder' and os.path.exists(os.path.join(HERE, 'src', 'thunder', 'crowd1.jpg')):
+    stand_sections([os.path.join(HERE, 'src', 'thunder', f'crowd{k}.jpg') for k in (1, 2, 3)], OUT)

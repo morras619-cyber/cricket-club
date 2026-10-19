@@ -15,8 +15,8 @@ TEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tex', '' if CLUB
 # the backdrop on the far cylinder (heights, copies round), the sky and the light
 CLUBS = {
     'thunder': dict(wall='#0b1f5c', fascia='#9fb0cc', canopy='#0b1f5c', dark='#0a0f24', track='#16264f', rope='#ffd23f',
-                    board=('#0b2a6e', '#1c5ad6'), screen='#071447', crowd_len=155, sky=(30, 112, 1), foot='#0b1640',
-                    world=[(0.0, '#1a3384'), (0.6, '#03061f')], sun=(0.25, (0.6, 0.7, 1.0), 0.526), flood=1.0, top_bg='#1b1838', turbines=False, tiers=False, sign=False, beams=None, halo=(1, 0.9, 0.6)),
+                    board=('#0b2a6e', '#1c5ad6'), screen='#071447', crowd_len=155, sky=(48, 140, 1), foot='#0b1640',
+                    world=[(0.0, '#1a3384'), (0.6, '#03061f')], sun=(0.25, (0.6, 0.7, 1.0), 0.526), flood=1.0, top_bg='#1b1838', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.9, 0.6)),
     # Cyclone Park: a storm night, a tornado over the city, a two-tier green bowl with the club's swirls
     # everywhere, its sign on the roof at each end, green beams from the floodlights
     'cyclones': dict(wall='#0d3a1e', fascia='#cfd8d3', canopy='#0d3a1e', dark='#06140c', track='#10301c', rope='#ffd21f',
@@ -243,11 +243,39 @@ if C['tiers']:
         uv = {k: (1 - k / 4, 0) for k in range(5)}; uv.update({5 + k: (1 - k / 4, 1) for k in range(5)})
         mesh('facade', verts, [(k, k + 1, 6 + k, 5 + k) for k in range(4)], uvs=uv, mat=swirl, inked=True)
     ring_surface('back', [(99, 13.6), (99, 14.2)], dark)
+elif C.get('mega'):
+    # the biggest ground in the game: a lower tier, a band of the club's bolts, then a huge upper
+    # tier climbing back under a high roof. The painted stand covers each tier from front row to
+    # back row (the upper tier a little bigger, and turned, so the two never line up)
+    cw, ch = crowd.node_tree.nodes['Image Texture'].image.size
+    for name, prof, turn in (('crowd', [(79.6, 1.4), (97, 10.9)], 0.0), ('crowd2', [(98.5, 12.8), (122, 24.0)], 0.37)):
+        slope = math.hypot(prof[1][0] - prof[0][0], prof[1][1] - prof[0][1])
+        ring_surface(name, prof, crowd, u_len=slope * cw / ch, v_rep=1, u_off=turn)
+    ring_surface('tierlip', [(97, 10.9), (98.5, 10.9)], navy)
+    ring_surface('tierfloor', [(98.5, 10.9), (98.5, 12.8)], dark)
+    FW = 7.0
+    bolts = board_mat('bolts', f'logo-{CLUB}.png', '#0b2a6e', 1.5 / FW)
+    nf = int(2 * math.pi * 97.2 / FW)
+    for i in range(nf):
+        a0 = 2 * math.pi * i / nf; a1 = 2 * math.pi * (i + 1) / nf
+        pts = [(97.2 * math.cos(a0 + (a1 - a0) * k / 4), CY + 97.2 * math.sin(a0 + (a1 - a0) * k / 4)) for k in range(5)]
+        verts = [(x, y, 10.9) for x, y in pts] + [(x, y, 12.8) for x, y in pts]
+        uv = {k: (1 - k / 4, 0) for k in range(5)}; uv.update({5 + k: (1 - k / 4, 1) for k in range(5)})
+        mesh('facade', verts, [(k, k + 1, 6 + k, 5 + k) for k in range(4)], uvs=uv, mat=bolts, inked=True)
+    ring_surface('back', [(122, 24.0), (122, 25.2)], dark)
 else:
-    ring_surface('crowd', [(79.6, 1.4), (99, 12.0)], crowd, u_len=C['crowd_len'], v_rep=3)
+    if C.get('full_stand'):
+        # a painted stand that covers the rake from front row to back row: once up, its own width round
+        cw, ch = crowd.node_tree.nodes['Image Texture'].image.size
+        slope = math.hypot(99 - 79.6, 12.0 - 1.4)
+        ring_surface('crowd', [(79.6, 1.4), (99, 12.0)], crowd, u_len=slope * cw / ch, v_rep=1)
+    else:
+        ring_surface('crowd', [(79.6, 1.4), (99, 12.0)], crowd, u_len=C['crowd_len'], v_rep=3)
     ring_surface('back', [(99, 12.0), (99, 13.6)], dark)
 # the roof: a light fascia, a dark underside dotted with lamps, the canopy on top
-ring_surface('fascia', [(94, 13.2), (94, 14.4)], fascia, inked=True)
+# (the big ground's roof sits high over its upper tier)
+RF, RB, RH0, RH1, RC = (117.5, 122, 24.6, 26.4, 128) if C.get('mega') else (94, 99, 13.2, 14.4, 104)
+ring_surface('fascia', [(RF, RH0), (RF, RH1)], fascia, inked=True)
 under = bpy.data.materials.new('under'); under.use_nodes = True
 nt = under.node_tree; nt.nodes.clear(); o_ = nt.nodes.new('ShaderNodeOutputMaterial')
 tc = nt.nodes.new('ShaderNodeTexCoord'); vor = nt.nodes.new('ShaderNodeTexVoronoi'); vor.feature = 'DISTANCE_TO_EDGE'
@@ -258,8 +286,8 @@ mix = nt.nodes.new('ShaderNodeMix'); mix.data_type = 'RGBA'; mix.inputs[6].defau
 nt.links.new(lt.outputs[0], mix.inputs[0])
 e = nt.nodes.new('ShaderNodeEmission'); e.inputs['Strength'].default_value = 1.2
 nt.links.new(mix.outputs[2], e.inputs['Color']); nt.links.new(e.outputs[0], o_.inputs[0])
-ring_surface('under', [(94, 13.2), (99, 13.6)], under)
-ring_surface('canopy', [(94, 14.4), (104, 15.4)], canopy, inked=True)
+ring_surface('under', [(RF, RH0), (RB, RH0 + 0.4)], under)
+ring_surface('canopy', [(RF, RH1), (RC, RH1 + 1.2)], canopy, inked=True)
 
 # the big screens, one behind each end, showing the game's logo
 def screen(a, r=83.5, w=13, h0=3.6, h1=10.1):
@@ -283,7 +311,8 @@ def screen(a, r=83.5, w=13, h0=3.6, h1=10.1):
     bpy.ops.mesh.primitive_cube_add(location=(base.x + out.x, base.y + out.y, h1 + 0.6), scale=(0.7, w / 2 + 1.5, 0.6))
     o = bpy.context.active_object; o.rotation_euler = (0, 0, a); o.data.materials.append(fr)
     sc.collection.objects.unlink(o); ink.objects.link(o)
-screen(math.pi / 2); screen(-math.pi / 2)
+if C.get('mega'): screen(math.pi / 2, w=16, h0=3.0, h1=11.0); screen(-math.pi / 2, w=16, h0=3.0, h1=11.0)
+else: screen(math.pi / 2); screen(-math.pi / 2)
 
 # floodlights: four towers behind the corners, lamp grids and a glow round each
 lamp = glow('lamp', (1, 0.97, 0.86), 8)
@@ -306,8 +335,8 @@ def halo(p, rad):
 for side in (-1, 1):
     for end in (-1, 1):
         a = math.pi / 2 * end + side * math.radians(13)
-        x, y = 108 * math.cos(a), CY + 108 * math.sin(a)
-        HT = 24.0
+        LR, HT = (138, 36.0) if C.get('mega') else (108, 24.0)
+        x, y = LR * math.cos(a), CY + LR * math.sin(a)
         for dx in (-1, 1):  # a lattice pair of legs
             bpy.ops.mesh.primitive_cube_add(location=(x + dx * 0.9 * math.sin(a), y - dx * 0.9 * math.cos(a), HT / 2), scale=(0.35, 0.35, HT / 2))
             o = bpy.context.active_object; o.data.materials.append(tower); sc.collection.objects.unlink(o); ink.objects.link(o)
@@ -322,10 +351,10 @@ for side in (-1, 1):
                 p = head.location + off + fwd * 0.45
                 bpy.ops.mesh.primitive_uv_sphere_add(location=p, radius=0.78, segments=16, ring_count=8)
                 l = bpy.context.active_object; l.data.materials.append(lamp); l.visible_shadow = False
-        if C['flood'] >= 0.5: halo(head.location + fwd * 2.5, 6.5)
+        if C['flood'] >= 0.5: halo(head.location + fwd * 2.5, 8.5 if C.get('mega') else 6.5)
         # the light itself, pointed at the pitch
         bpy.ops.object.light_add(type='SPOT', location=head.location + fwd * 2)
-        L = bpy.context.active_object; L.data.energy = 2.2e5 * C['flood']; L.data.spot_size = math.radians(70); L.data.spot_blend = 0.6
+        L = bpy.context.active_object; L.data.energy = 2.2e5 * C['flood'] * (1.7 if C.get('mega') else 1); L.data.spot_size = math.radians(70); L.data.spot_blend = 0.6
         L.data.shadow_soft_size = 3; L.data.color = (1, 0.96, 0.88)
         L.rotation_euler = (Vector((0, CY, 0)) - L.location).to_track_quat('-Z', 'Y').to_euler()
 
@@ -449,16 +478,16 @@ s.data.angle = math.radians(C['sun'][2])  # (an overcast sun: soft-edged shadows
 # game: screen x = W/2 + dir·(x − cx)·f/d,  y = hy + (cy − y)·f/d. A level pinhole camera, the
 # horizon at hy. The render covers [−ax, ax]·f across and [−above, below]·f down from the horizon.
 VIEWS = {
-    'bat':    dict(pos=(0.25, -9.5, 4.2), dir=1, f=1600, ax=0.75, above=0.30, below=0.66),
-    'bowl':   dict(pos=(0.20, 34.0, 2.6), dir=-1, f=2400, ax=0.50, above=0.24, below=0.40),
-    'keeper': dict(pos=(0.55, -9.0, 4.6), dir=1, f=1200, ax=1.05, above=0.40, below=1.02),
+    'bat':    dict(pos=(0.25, -9.5, 4.2), dir=1, f=1600, ax=0.75, above=0.36 if C.get('mega') else 0.30, below=0.66),
+    'bowl':   dict(pos=(0.20, 34.0, 2.6), dir=-1, f=2400, ax=0.50, above=0.30 if C.get('mega') else 0.24, below=0.40),
+    'keeper': dict(pos=(0.55, -9.0, 4.6), dir=1, f=1200, ax=1.05, above=0.48 if C.get('mega') else 0.40, below=1.02),
 }
 if VIEW == 'top':
     # The outfield view (js/scene.js OutfieldView): looking down on the ground, tilted so the ground's
     # length reads at 0.78 of its width (cos 38.7°): an orthographic camera, TOP_PX pixels a metre,
     # the pitch centre in the middle of the picture. The game draws its own grass, pitch and rope
     # inside the boundary, so only what's outside them shows: the apron, boards, stands, roof, lights.
-    TOP_PX, HALF = 14, 112
+    TOP_PX, HALF = 14, (142 if C.get('mega') else 112)
     th = math.acos(0.78)
     Wi = int(2 * HALF * TOP_PX); Hi = int((2 * HALF * 0.78 + 34) * TOP_PX)
     for o in list(sc.objects):
