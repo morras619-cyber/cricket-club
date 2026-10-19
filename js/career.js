@@ -33,20 +33,6 @@ export const ABILITIES = {
   mystery: { name: 'Mystery Ball', role: 'bowl', desc: 'Batters find him harder to time' },
 };
 
-// your scouts, hired for a season at a time
-export const SCOUTS = {
-  auction: { name: 'Auction scout', cost: 0.15, desc: "Every player's true potential and weak spot, a verdict on the price, and a shortlist of the best value still to come." },
-  match: { name: 'Match scout', cost: 0.1, desc: "The scouting report before the first ball of every league match, and the opposition batters' weak spots on the fixture card." },
-};
-export const hasScout = (c, kind) => c.scouts?.[kind] === c.season;
-export function hireScout(c, kind) {
-  const s = SCOUTS[kind];
-  if (hasScout(c, kind) || c.money < s.cost) return false;
-  c.money = Math.round((c.money - s.cost) * 100) / 100;
-  c.scouts = { ...c.scouts, [kind]: c.season };
-  return true;
-}
-
 const round2 = x => Math.round(x * 20) / 20; // to $0.05M
 export const money = x => `$${(Math.round(x * 100) / 100).toFixed(x >= 10 ? 1 : 2).replace(/\.?0+$/, '')}M`;
 function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }

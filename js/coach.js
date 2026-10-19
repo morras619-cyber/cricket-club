@@ -106,11 +106,6 @@ export const DEV = {
     "Watch your money. You need at least 10 players, so don't spend it all on the first star you see.",
     "Rating is now, potential is later. A young player with high potential gets better every season you keep him.",
   ],
-  scoutTip: [
-    "One more thing before you bid, beta: hire a scout. Every good club has one.",
-    "An auction scout tells you each player's true potential, his weak spot, and whether the price is a bargain. He even keeps a shortlist.",
-    "A match scout finds the opposition's weak spots before the first ball. Both are cheap. Trust me, they pay for themselves.",
-  ],
   auctionLow: [
     "Careful, beta, the money is running low and your squad is still short.",
     "Look for the bargains now. Solid players that nobody else is bidding on win you plenty of matches.",
