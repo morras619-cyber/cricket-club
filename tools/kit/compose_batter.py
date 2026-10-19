@@ -32,8 +32,8 @@ PICK = [
     # the on-drive (its own sheet: poses 2, 3): through the ball, finish round to the leg side
     # (the two bats touch: split along the gap between them, not by nearest body)
     ('ondrive1', 13, (680, 450, 'left')), ('ondrive2', 13, (1230, 450, 'right')),
-    # the cover drive (its own sheet: poses 2, 3, 4): lunge onto the ball, through the off side, high finish
-    ('cover1', 12, 2), ('cover2', 12, 3),
+    # the cover drive: the straight-drive sheet's third pose, bat through the off side
+    ('cover1', 10, 3),
 ]
 STAND_PX = 330          # the standing pose (each sheet's first) comes out this tall
 # a sheet with no standing pose: scaled so its pose matches one already sized (sheet, pose, its pose)
