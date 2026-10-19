@@ -24,11 +24,11 @@ const POSE_SPIN_BACK = {
   start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 6, frontarm: 7, release: 8,
   follow1: 10, follow2: 11, follow3: 12, finish: 13, field: 14, react: 9, celebrate1: 14, celebrate2: 14,
 };
-// the batter from behind (28 poses, tools/kit/compose_batter.py: ready, leave x2, backlift, drive x4,
-// pull x6, defend x3, cut x6, bowled, celebration, reverse sweep x3), named as batsprite.js names them
+// the batter from behind (32 poses, tools/kit/compose_batter.py: ready, leave x2, backlift, drive x4,
+// pull x6, defend x3, cut x6, bowled, celebration, reverse sweep x3, cover drive x4), named as batsprite.js names them
 const POSE_BAT = Object.fromEntries(['ready', 'leave1', 'leave2', 'backlift', 'drive1', 'drive2', 'drive3', 'drive4',
   'pull0', 'pull1', 'pull2', 'pull3', 'pull4', 'pull5', 'def1', 'def2', 'def3', 'cut1', 'cut2', 'cut3', 'cut4', 'cut5', 'cut6',
-  'bowled', 'celebrate', 'rsweep1', 'rsweep2', 'rsweep3'].map((n, i) => [n, i]));
+  'bowled', 'celebrate', 'rsweep1', 'rsweep2', 'rsweep3', 'cover1', 'cover2', 'cover3', 'cover4'].map((n, i) => [n, i]));
 const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
 const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }
 let fontReady = false;
