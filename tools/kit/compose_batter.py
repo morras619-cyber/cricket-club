@@ -13,15 +13,15 @@ from PIL import Image
 from scipy import ndimage as ndi
 
 D = os.path.join(os.path.dirname(__file__), 'src', 'bat-sheets')
-SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png', 8: '8-forward-drive.png', 9: '9-cover-drive.png', 10: '10-straight-drive.png'}
+SHEETS = {1: '1-cover-drive.png', 2: '2-reverse-sweep.png', 3: '3-defence-leave.png', 4: '4-stance.png', 5: '5-cut.png', 6: '6-pull.png', 7: '7-stance-leave.png', 8: '8-forward-drive.png', 9: '9-cover-drive.png', 10: '10-straight-drive.png', 11: '11-pull.png'}
 # the game's frames in sheet order (js/kitsprite.js POSE_BAT): (sheet, pose number in reading order)
 # or (sheet, (x, y)): the pose drawn at that point of the sheet (two poses drawn touching are split)
 PICK = [
     ('ready', 7, 1), ('leave1', 7, 2), ('leave2', 7, 3), ('backlift', 7, 4),
     # the forward drive (its own sheet): stance, stride and backlift, through the line, high finish
     ('drive1', 8, 1), ('drive2', 8, 2), ('drive3', 8, 3), ('drive4', 8, 4),
-    # the pull: bat cocked, swung across to leg, contact, through, wrapped round the shoulder
-    ('pull0', 6, (920, 300)), ('pull1', 6, (330, 830)), ('pull2', 6, (620, 830)), ('pull3', 6, (880, 830)), ('pull4', 6, (120, 1300)), ('pull5', 6, (520, 1300)),
+    # the pull (its own sheet: poses 2, 3, 4): bat swung across to leg, through, wrapped round the shoulder
+    ('pull1', 11, 2), ('pull2', 11, 3), ('pull3', 11, 4),
     ('def1', 3, 7), ('def2', 3, 9), ('def3', 3, 10),
     # the cut: rocking back, the bat across, contact square on the off side, through, finish
     ('cut1', 5, (110, 800)), ('cut2', 5, (320, 800)), ('cut3', 5, (550, 800)), ('cut4', 5, (850, 850)), ('cut5', 5, (330, 1300)), ('cut6', 5, (720, 1300)),
@@ -34,7 +34,7 @@ PICK = [
 ]
 STAND_PX = 330          # the standing pose (each sheet's first) comes out this tall
 # a sheet with no standing pose: scaled so its pose matches one already sized (sheet, pose, its pose)
-MATCH = {7: (4, 4, 1), 8: (7, 1, 1), 9: (8, 3, (150, 1150)), 10: (8, 3, 2)}  # 9: its contact pose sized as the forward drive's
+MATCH = {7: (4, 4, 1), 8: (7, 1, 1), 9: (8, 3, (150, 1150)), 10: (8, 3, 2), 11: (8, 3, 2)}  # 9: its contact pose sized as the forward drive's
 MAG = np.array([250, 0, 250], np.uint8)
 
 
