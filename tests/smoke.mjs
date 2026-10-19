@@ -54,8 +54,9 @@ await page.screenshot({ path: join(shots, '03-tutorial-result.png'), fullPage: t
 // quick match
 await page.click('#resHome');
 await page.click('#btnQuick');
-await page.screenshot({ path: join(shots, '04-squad.png') });
-await page.click('#squadGo');
+await page.screenshot({ path: join(shots, '04-pickteam.png') });
+await page.click('#ptNext');
+await page.click('#ptGo');
 const qm = await waitResult('05-match', 240000);
 console.log('quick match finished:', qm);
 await page.screenshot({ path: join(shots, '06-result.png') });

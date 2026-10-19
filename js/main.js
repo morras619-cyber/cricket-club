@@ -23,6 +23,7 @@ import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewar
 import { sound, unlockAudio, sfx } from './audio.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
+import { teamStars } from './teamrating.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -193,7 +194,14 @@ $('passClaim').addEventListener('click', () => {
 });
 $('passBack').addEventListener('click', () => renderHome());
 
-$('btnQuick').addEventListener('click', () => { unlockAudio(); pending = { mode: 'quick' }; squadOpen = false; renderSquad(); });
+$('btnQuick').addEventListener('click', () => {
+  unlockAudio();
+  renderPickTeam({
+    teams: TEAMS, start: profile.team || 'thunder', squads: rosters(), go: 'Start match',
+    onBack: renderHome,
+    onGo: id => { profile.team = id; saveProfile(profile); loadBowlSprites(id); sfx.dhol(); startMatch({ mode: 'quick' }); },
+  });
+});
 $('btnChallengeMode').addEventListener('click', () => { unlockAudio(); pending = { mode: 'challenge', challenge }; squadOpen = false; renderSquad(); });
 $('btnCup').addEventListener('click', () => { unlockAudio(); openTournament('cup'); });
 $('btnDaily').addEventListener('click', () => { unlockAudio(); renderDaily(); });
@@ -299,6 +307,84 @@ function heroCard(hero, { on, locked, note, onTap }) {
   if (onTap) b.addEventListener('click', onTap);
   return b;
 }
+// ---------- Choose your team: the clubs as a carousel of cards, their ratings below ----------
+// o: { teams, start (team id), squads ({ id: players }, for the ratings), go (button label),
+//      locked (t => reason or null), note, onGo(id), onBack() }
+let pick = null;
+function renderPickTeam(o) {
+  pick = { ...o, idx: Math.max(0, o.teams.findIndex(t => t.id === o.start)), stars: teamStars(o.squads, o.teams) };
+  ui.show('pickteam');
+  $('ptCoins').textContent = profile.coins;
+  $('ptNote').hidden = !o.note; $('ptNote').textContent = o.note || '';
+  const track = $('ptTrack'), dots = $('ptDots');
+  track.innerHTML = ''; dots.innerHTML = '';
+  pick.cards = o.teams.map((t, i) => {
+    const b = el('button', 'ptcard');
+    b.style.setProperty('--suit', t.suit); b.style.setProperty('--trim', t.trim);
+    const face = el('div', 'face');
+    const logo = document.createElement('img'); logo.className = 'logo'; logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
+    face.append(logo, el('div', 'plate'), el('div', 'name', t.name), el('div', 'tag', t.style.tag));
+    b.append(face);
+    const why = o.locked?.(t);
+    if (why) b.append(el('div', 'lock', `🔒 ${why}`));
+    b.setAttribute('aria-label', `${t.name}, ${t.style.tag}${why ? `, locked: ${why}` : ''}`);
+    b.addEventListener('click', () => { if (i !== pick.idx) pickGo(i); });
+    track.append(b); dots.append(el('i'));
+    return b;
+  });
+  pickShow();
+}
+function pickGo(i) {
+  const n = pick.cards.length;
+  pick.idx = ((i % n) + n) % n; sfx.click(); pickShow();
+}
+function pickShow() {
+  const n = pick.cards.length, t = pick.teams[pick.idx];
+  pick.cards.forEach((c, i) => {
+    let d = i - pick.idx;
+    if (d > n / 2) d -= n; if (d < -n / 2) d += n;   // (round the ends: it's a loop)
+    const a = Math.abs(d);
+    c.style.transform = `translate(-50%, -50%) translateX(${d * 74}%) scale(${a ? 0.78 : 1}) rotateY(${-Math.sign(d) * 24}deg)`;
+    c.style.zIndex = 20 - a; c.style.opacity = a > 1 ? 0 : 1; c.style.pointerEvents = a > 1 ? 'none' : '';
+    c.style.filter = a ? 'brightness(.72)' : '';
+    c.classList.toggle('on', !a);
+    c.querySelector('.mine')?.remove();
+    if (!a && !pick.locked?.(pick.teams[i])) c.append(el('i', 'mine', 'Your team'));
+  });
+  [...$('ptDots').children].forEach((d, i) => d.classList.toggle('on', i === pick.idx));
+  const s = pick.stars[t.id], fill = v => `${(v / 5) * 100}%`;
+  $('ptScore').textContent = s.overall.toFixed(1);
+  $('ptStars').style.setProperty('--fill', fill(s.overall));
+  const grid = $('ptGrid'); grid.innerHTML = '';
+  for (const [k, label] of [['bat', 'Batting'], ['bowl', 'Bowling'], ['field', 'Fielding'], ['power', 'Power']]) {
+    const tile = el('div', 'pt-tile');
+    const ic = document.createElement('img'); ic.src = `img/menu/rate-${k}.webp`; ic.alt = '';
+    const mid = el('div'); const st = el('i', 'pt-stars'); st.style.setProperty('--fill', fill(s[k]));
+    mid.append(el('small', '', label), st);
+    const num = el('b', '', String(s[k])); num.append(el('span', '', '/5'));
+    tile.append(ic, mid, num); grid.append(tile);
+  }
+  const why = pick.locked?.(t);
+  $('ptGo').disabled = !!why;
+  $('ptGo').textContent = why ? '🔒 Locked' : pick.go;
+}
+$('ptPrev').addEventListener('click', () => pickGo(pick.idx - 1));
+$('ptNext').addEventListener('click', () => pickGo(pick.idx + 1));
+$('ptBack').addEventListener('click', () => pick.onBack());
+$('ptBack2').addEventListener('click', () => pick.onBack());
+$('ptGo').addEventListener('click', () => { const t = pick.teams[pick.idx]; if (!pick.locked?.(t)) pick.onGo(t.id); });
+{
+  // a swipe across the cards turns them
+  let x0 = null;
+  $('ptStage').addEventListener('pointerdown', e => { x0 = e.clientX; });
+  $('ptStage').addEventListener('pointerup', e => {
+    if (x0 == null) return;
+    const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) > 40) pickGo(pick.idx + (dx < 0 ? 1 : -1));
+  });
+}
+const rosters = () => Object.fromEntries(TEAMS.map(t => [t.id, roster(t.id)]));
+
 // My Team: the eight clubs on one screen; tap one to pick it and open its page (star, signings,
 // team sheet, squad). squadOpen: that page is showing.
 let squadOpen = false;
@@ -854,27 +940,16 @@ confirmTap($('careerRestart'), 'Tap again to restart from season 1', () => {
 
 // pick (or keep) a club for the season
 function careerPick(c, body) {
-  const intro = el('div', 'panel paper notecard');
-  intro.textContent = c.season === 1
-    ? 'Pick your club. The giants unlock in later seasons: earn prize money, buy players at the auction and build your way up.'
-    : `Season ${c.season}: stay with ${teamById(c.club).name} or move to another club. Your money comes with you.`;
-  body.append(intro);
-  if (c.news.length) { const n = el('div', 'panel paper statcard'); n.append(el('h3', '', 'Off-season news')); for (const x of c.news) n.append(el('div', 'kotie', x)); body.append(n); }
-  const grid = el('div', 'clubgrid');
-  for (const t of [...TEAMS].sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name))) {
-    const open = careerUnlocked(t, c.season), r = clubRating(c, t.id), pool = clubPlayers(c, t.id);
-    const b = el('button', 'clubcard' + (open ? '' : ' locked') + (c.club === t.id ? ' on' : ''));
-    b.style.setProperty('--suit', t.suit);
-    const logo = document.createElement('img'); logo.src = `img/logo-${t.id}.webp`; logo.alt = '';
-    const heroes = pool.filter(p => p.heroId).map(p => heroById(p.heroId).name.split(' ').slice(-1)[0]);
-    b.append(logo, el('b', '', t.name), el('span', 'rate', `${stars(ratingStars(r))} ${r}`),
-      el('small', '', open ? `${t.style.tag} · 🏟 ${groundOf(t.id).name} (${groundOf(t.id).pitch.name.toLowerCase()})${heroes.length ? ` · ★ ${heroes.join(', ')}` : ''}` : `🔒 Unlocks in season ${unlockSeason(t)}`));
-    if (c.club === t.id) b.append(el('em', '', 'Your club'));
-    b.disabled = !open;
-    b.addEventListener('click', () => { if (chooseClub(c, t.id)) { sfx.dhol(); saveProfile(profile); renderCareer(); } });
-    grid.append(b);
-  }
-  body.append(grid);
+  const order = [...TEAMS].sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+  renderPickTeam({
+    teams: order, start: c.club || order.find(t => careerUnlocked(t, c.season))?.id, go: 'To the auction',
+    squads: Object.fromEntries(order.map(t => [t.id, clubPool(c, t.id)])),
+    locked: t => (careerUnlocked(t, c.season) ? null : `Unlocks in season ${unlockSeason(t)}`),
+    note: c.season === 1 ? 'Pick your club. The giants unlock in later seasons.'
+      : `Season ${c.season}: stay with ${teamById(c.club).name} or move. Your money comes with you.${c.news.length ? ` ${c.news.join(' ')}` : ''}`,
+    onBack: renderHome,
+    onGo: id => { if (chooseClub(c, id)) { sfx.dhol(); saveProfile(profile); renderCareer(); } },
+  });
 }
 
 // the pre-season auction
