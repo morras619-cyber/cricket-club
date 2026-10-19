@@ -969,7 +969,7 @@ export class OutfieldView {
     if (art) {
       const a = this.to(-1.52, 22), b = this.to(1.52, -2), pt = art.pitch;
       ctx.drawImage(pt, pt.naturalWidth * 0.04, 0, pt.naturalWidth * 0.92, pt.naturalHeight, a.x, a.y, b.x - a.x, b.y - a.y);
-      ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
       const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);
       ctx.fillStyle = groundOf(HOME).pitchCol; ctx.strokeStyle = 'rgba(20,16,24,0.5)'; ctx.lineWidth = 1.5;
@@ -1022,11 +1022,11 @@ export class OutfieldView {
   shakeRope(x, y) { this.ropeWave = { ang: Math.atan2(y - CY, x), t0: performance.now() }; }
   ball(ctx, b) {
     const sh = this.to(b.x, b.y), p = this.to(b.x, b.y, b.h);
-    // from up here a real ball would be a speck: drawn a touch bigger, still small, a shadow under it
-    const r = Math.max(2.6, 0.045 * this.k * 3);
+    // from up here a real ball would be a speck: drawn a little bigger (about a fielder's fist), a shadow under it
+    const r = Math.max(2, 0.07 * this.k);
     ctx.fillStyle = 'rgba(10,8,20,0.4)';
     ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
-    paintBall(ctx, p.x, p.y, r * (1 + Math.min(0.6, (b.h || 0) * 0.05)), ballSpin(b.x, b.y * 1.1, (b.h || 0) * 0.5));
+    paintBall(ctx, p.x, p.y, r * (1 + Math.min(0.35, (b.h || 0) * 0.025)), ballSpin(b.x, b.y * 1.1, (b.h || 0) * 0.5));
     return p;
   }
   label(ctx, x, y, text, color = '#ffd23f', size = 12) {

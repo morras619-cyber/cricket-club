@@ -111,7 +111,7 @@ def pitch_color(nt):
     return t.outputs['Color']
 pm = shaded('pitch', pitch_color, emit=0.62)
 mesh('pitch', [(-PX, PZ0, 0.006), (PX, PZ0, 0.006), (PX, PZ1, 0.006), (-PX, PZ1, 0.006)], [(0, 1, 2, 3)],
-     uvs=[(0.04, 0), (0.96, 0), (0.96, 1), (0.04, 1)], mat=pm, inked=True)
+     uvs=[(0.04, 0), (0.96, 0), (0.96, 1), (0.04, 1)], mat=pm, inked=False)  # (no ink edge: the strip meets the grass)
 
 # creases: 5 cm white lines
 cr = glow('crease', srgb('#fffdf0'), 1.0)

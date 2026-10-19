@@ -2985,6 +2985,8 @@ export class Game {
       if (f.diveT0 == null) f.diveT0 = now;
       const k = Math.min(3, Math.floor((now - f.diveT0) / 110));
       frame = 'dive' + (k + 1); flip = (f.pose.arg || 1) < 0; f.dived = true;
+    } else if (O.holder === f && pose !== 'celebrate' && !(f.throwT0 != null && now - f.throwT0 < 450)) {
+      frame = 'catch3'; // gathered: the ball in both hands at his chest (not trapped under a boot)
     } else if (pose === 'celebrate') {
       // a dive ends on the ground with it; one straight to him: taken overhead, then held at the chest
       if (f.dived) { frame = 'dive4'; flip = (f.pose.arg || 1) < 0; }
@@ -3011,7 +3013,9 @@ export class Game {
       this.ctx.fillStyle = 'rgba(255,210,63,0.35)';
       this.ctx.beginPath(); this.ctx.ellipse(p.x, p.y, kPerM * 0.9, kPerM * 0.35, 0, 0, Math.PI * 2); this.ctx.fill();
     }
-    return drawKitFielder(this.ctx, p.x, p.y, kPerM, frame, team, f.people, flip, f.ctrl ? '#ffd23f' : null);
+    const ok = drawKitFielder(this.ctx, p.x, p.y, kPerM, frame, team, f.people, flip, f.ctrl ? '#ffd23f' : null);
+    f.holding = ok && ['catch2', 'catch3', 'dive4'].includes(frame); // (the drawing has the ball in his hands)
+    return ok;
   }
   topFielder(f, i) {
     if (!f.keeper && this.kitFielder(f, i)) return true;
@@ -3142,6 +3146,12 @@ export class Game {
   renderOutfield() {
     const ctx = this.ctx, O = this.O, V = this.of;
     this.backUp();
+    // who has the ball: a fielder it has stayed with (low, within a stride) for a few frames. He's
+    // drawn holding it in his hands, and the ball isn't drawn again at his feet.
+    const b = O.ball;
+    const near = b && (b.h ?? 0) < 2.4 && O.fielders.find(f => !f.keeper && Math.hypot(f.x - b.x, f.y - b.y) < 1.1);
+    O.holdN = near && near === O.holdC ? (O.holdN || 0) + 1 : 0; O.holdC = near || null;
+    O.holder = O.holdN >= 3 ? near : null;
     V.drawGround(ctx);
     if (O.ring) {
       const p = V.to(O.ring.x, O.ring.y);
@@ -3175,7 +3185,7 @@ export class Game {
       if (q && Math.hypot(a.x - q.x, a.y - q.y) > 0.5) O.cometAng = Math.atan2(a.y - q.y, a.x - q.x);
       if (O.cometAng != null) this.drawTrail(ctx, O.comet, a, O.cometAng, V.k);
     }
-    if (O.ball) V.ball(ctx, O.ball);
+    if (O.ball && !O.holder?.holding) V.ball(ctx, O.ball);
     if (O.sixCount && O.sixCount.m > 0) {
       // the six's distance ticking up beside the ball
       const q = V.to(O.sixCount.b.x, O.sixCount.b.y, O.sixCount.b.h);
