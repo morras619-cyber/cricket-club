@@ -58,6 +58,12 @@ const fishRadius = (L, r) => L.R * Math.pow(r / CFG.ground.boundaryR, FISH);
 const ABBR = { 'Slip': 'SL', 'Leg slip': 'LS', 'Gully': 'GU', 'Leg gully': 'LG', 'Point': 'PT', 'Deep point': 'DP', 'Backward point': 'BP', 'Cover': 'CV', 'Deep cover': 'DC', 'Mid-off': 'MO', 'Long-off': 'LO', 'Mid-on': 'MN', 'Long-on': 'LN', 'Mid-wicket': 'MW', 'Deep mid-wicket': 'DM', 'Square leg': 'SQ', 'Deep square leg': 'DS', 'Backward square': 'BS', 'Fine leg': 'FL', 'Third man': 'TM' };
 const abbrev = name => ABBR[name] || name.split(/[ -]/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
+// the screen flash each club's effects bring: [a bolt from the sky, a perfect hit]
+const FX_FLASH = {
+  thunder: ['#9fd8ff', '#cfeeff'], cyclones: ['#a8ffb4', '#d8ffdc'], vipers: ['#ff9a9a', '#ffd6d6'], eagles: ['#ffe68a', '#fff4cc'],
+  phoenix: ['#ffbf8a', '#ffe2cc'], titans: ['#dfe6ee', '#f2f5f8'], storm: ['#d2a8ff', '#ecdcff'], royals: ['#ff9fd6', '#ffd8ef'],
+};
+
 export class Game {
   constructor(ui) {
     this.ui = ui;
@@ -241,7 +247,7 @@ export class Game {
     this.home = opts.home || homeFromSeed(this.seed, this.myTeam.id, this.oppTeam.id);
     this.ground = groundOf(this.home);
     this.pitch = pitchOf(this.home);
-    preloadEffects('electric');
+    for (const t of [this.myTeam, this.oppTeam]) { const set = this.fxSet(t); if (set) preloadEffects(set); }
     setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; });
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
     // hero levels: stronger heroes and cheaper signature powers
@@ -957,7 +963,12 @@ export class Game {
   sixDistance(sim) { return Math.round(sim.path?.carry || 80); }
 
   // which painted effect set a team's big moments use (null: the hand-drawn gold bursts)
-  fxSet(team) { return team?.id === 'thunder' ? 'electric' : null; }
+  // (every club's: its painted effects in its own colour; the national sides use their kit's club's)
+  fxSet(team) {
+    const id = team?.sheet || team?.id;
+    return !id ? null : id === 'thunder' ? 'electric' : FX_FLASH[id] ? 'fx-' + id : null;
+  }
+  fxFlash(set) { return FX_FLASH[set === 'electric' ? 'thunder' : set.slice(3)]; }
   // a perfect hit, the painted way: a white-hot star where bat meets ball, a spiky one turning over it
   electricHit(set, at, scale = 1) {
     const r = Math.random() * Math.PI;
@@ -970,7 +981,7 @@ export class Game {
     const bolt = ['bolt2', 'bolt3', 'fork'][Math.floor(Math.random() * 3)];
     this.fx.effect(set, bolt, x, y + 10, { w, h: y + 30, anchor: [0.45, 1], dur: 420, grow: 1, flip: Math.random() < 0.5 });
     this.fx.effect(set, burst, x, y, { w: w * 1.3, anchor: [0.5, burst === 'burst5' ? 0.8 : 0.5], dur: 520 });
-    this.fx.flash('#9fd8ff', 0.35);
+    this.fx.flash(this.fxFlash(set)[0], 0.35);
   }
 
   // stumps knocked over: an explosion where they stood, sparks spraying out
@@ -1004,7 +1015,7 @@ export class Game {
   contactFeedback(grade, at, err) {
     if (grade === 'perfect') {
       const set = this.fxSet(this.myTeam);
-      this.hitStop(80); this.fx.flash(set ? '#cfeeff' : '#fff', 0.55);
+      this.hitStop(80); this.fx.flash(set ? this.fxFlash(set)[1] : '#fff', 0.55);
       if (set) this.electricHit(set, at); else this.fx.burst(at.x, at.y, { color: '#ffd23f' });
       this.fx.word('PERFECT!', this.W / 2, this.H * 0.3, { size: 54 });
       this.fx.word(SHOT_WORDS[Math.floor(Math.random() * SHOT_WORDS.length)], at.x, at.y - 30, { size: 64, color: '#fff4da', stroke: '#e8343b' });

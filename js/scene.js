@@ -719,7 +719,7 @@ export function drawBoard(ctx, cam, t, message) {
   const G = groundOf(HOME), T = teamById(HOME);
   const text = message ? `★ ${message} ★   `.repeat(6) : `★ WELCOME TO ${G.name.toUpperCase()} ★   HOME OF THE ${T.name.toUpperCase()}   ${BOARD_TEXT}`;
   const tw = ctx.measureText(text).width;
-  const off = -((t * 0.025) % tw);
+  const off = -((t * 0.014) % tw);
   for (let x = off; x < W; x += tw) ctx.fillText(text, x, b.y + b.h / 2 + 1);
   ctx.restore();
   ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.strokeRect(-2, b.y, W + 4, b.h);
@@ -740,7 +740,7 @@ function drawPaintedBoard(ctx, cam, t, message) {
   if (quality.high) { ctx.shadowColor = message ? '#fff' : '#ffb000'; ctx.shadowBlur = 8; }
   const text = message ? `★ ${message} ★   `.repeat(6) : `★ WELCOME TO ${G.name.toUpperCase()} ★   HOME OF THE ${T.name.toUpperCase()}   ${BOARD_TEXT}`;
   const tw = ctx.measureText(text).width;
-  const off = -((t * 0.025) % tw);
+  const off = -((t * 0.014) % tw);
   for (let x = off; x < W; x += tw) ctx.fillText(text, x, b.y + b.h / 2 + 1);
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(0,10,40,0.28)';

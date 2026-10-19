@@ -42,10 +42,12 @@ function burstSheet(deg) {
 
 // ---------- painted electric effects (img/fx/<set>.webp, tools/build_effects.py) ----------
 // Glowing pieces added onto the scene (so their dark edges vanish), animated in code: they pop
-// in, flicker and fade. Thunder's set is electric blue.
+// in, flicker and fade. Thunder's set is electric blue; every other club has the same pieces in its own
+// colour (img/fx/fx-<club>.webp, tools/build_fx_colours.py).
 const fxSets = {};
+const atlasOf = set => FX_ATLAS[set] || (set.startsWith('fx-') ? FX_ATLAS.electric : null);
 function fxSheet(set) {
-  if (!FX_ATLAS[set]) return null;
+  if (!atlasOf(set)) return null;
   if (!fxSets[set]) { const im = new Image(); im.src = `img/fx/${set}.webp`; fxSets[set] = im; }
   const im = fxSets[set];
   return im.complete && im.naturalWidth ? im : null;
@@ -54,7 +56,7 @@ export const preloadEffects = set => fxSheet(set);
 // draw one piece now. (x, y) is where its anchor point goes (fractions of the piece: 0.5, 0.5 is
 // its centre); w its width in px (h its height, if given, else in proportion); rot in radians.
 export function drawEffect(ctx, set, name, x, y, { w = 120, h = null, rot = 0, alpha = 1, anchor = [0.5, 0.5], flip = false } = {}) {
-  const im = fxSheet(set), f = FX_ATLAS[set]?.[name];
+  const im = fxSheet(set), f = atlasOf(set)?.[name];
   if (!im || !f || alpha <= 0) return;
   const [sx, sy, sw, sh] = f, dw = w, dh = h ?? (w * sh) / sw;
   ctx.save();
