@@ -1247,7 +1247,7 @@ function stadiumPanel(c) {
     const why = upgradeBlock(c);
     const row = el('div', 'stadnext');
     const txt = el('div');
-    txt.append(el('b', '', `Next: ${next.name}`), el('small', '', `${next.fans} fans · ${money(next.ticket)} a home match${next.needs ? ' · out of Division 3 first' : ''}`));
+    txt.append(el('b', '', `Next: ${next.name}`), el('small', '', `${next.fans} fans · ${money(next.ticket)} a home match`));
     const btn = el('button', 'chipbtn', why === 'division' ? '🔒 Division 2 first' : `Build · ${money(next.cost)}`);
     btn.disabled = !!why;
     if (!why) confirmTap(btn, `Tap again: ${money(next.cost)}`, () => {
