@@ -773,3 +773,6 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
   font-family: var(--display); font-size: 16px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 2px 3px 0 var(--ink); }
 .coachbtn img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; object-position: 50% 12%; background: #1f5fd6; border: 2px solid var(--ink); }
 .pt-coach { display: flex; justify-content: center; margin: 6px 0 0; }
+.covertips { display: flex; margin: 14px auto 0; }
+.covertips[aria-pressed="false"] { background: #c9c3b0; }
+.covertips[aria-pressed="false"] img { filter: grayscale(1); }

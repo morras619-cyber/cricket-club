@@ -39,7 +39,9 @@ initCoach({
   mark: k => { profile.coachSeen = { ...profile.coachSeen, [k]: 1 }; saveProfile(profile); },
 });
 // a quick match: his next tip, now and then once he has given them all
-game.coach = key => coachOnce(key, DEV[key]);
+// in the tutorial he speaks whenever his tips are on (always the first time); elsewhere, once each
+let tutTips = true;
+game.coach = key => (game.mode === 'tutorial' ? (tutTips && !window.__SIXCHARGE_BOT ? coachSay(DEV[key]) : Promise.resolve()) : coachOnce(key, DEV[key]));
 async function quickTip() {
   if (window.__SIXCHARGE_BOT) return;
   const next = QUICK_TIPS.find(([k]) => !profile.coachSeen?.[k]);
@@ -562,6 +564,11 @@ function squad(teamId = profile.team || 'thunder', oppId = null) {
 // ---------- tutorial cover ----------
 function showCover() {
   ui.show('cover');
+  // the first time through, his tips can't be turned off; a replay offers the switch
+  const first = !profile.tutorialDone;
+  tutTips = first || profile.tutTips !== false;
+  $('coverTips').hidden = first;
+  coverTipsShow();
   coachOnce('welcome', DEV.welcome);
   const p = $('coverPanel');
   p.innerHTML = '<div class="issue">ISSUE #1</div><h2>THE FINAL OVER</h2>';
@@ -570,6 +577,11 @@ function showCover() {
   t.textContent = 'Thunder Raja needs 14 off the last 4 balls. Then you defend the final 3.';
   p.append(t);
 }
+function coverTipsShow() {
+  $('coverTips').setAttribute('aria-pressed', String(tutTips));
+  $('coverTipsText').textContent = `Uncle Dev's tips: ${tutTips ? 'On' : 'Off'}`;
+}
+$('coverTips').addEventListener('click', () => { tutTips = !tutTips; profile.tutTips = tutTips; saveProfile(profile); sfx.click(); coverTipsShow(); });
 $('coverGo').addEventListener('click', () => startMatch({ mode: 'tutorial' }));
 
 // ---------- match ----------
@@ -627,7 +639,7 @@ async function startMatch(opts) {
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
-  if (mode === 'tutorial') coachOnce('tutDone', DEV.tutDone);
+  if (mode === 'tutorial' && tutTips && !window.__SIXCHARGE_BOT) coachSay(DEV.tutDone);
 }
 
 $('btnPause').addEventListener('pointerdown', e => {
