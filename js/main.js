@@ -948,31 +948,48 @@ const REGIONS = [
   { id: 'asia', name: 'Asia', color: '#ff3b3b', open: true }, { id: 'namerica', name: 'North America', color: '#9b3bff' },
   { id: 'samerica', name: 'South America', color: '#ff8a1c' }, { id: 'oceania', name: 'Oceania', color: '#2ec8ff' },
 ];
+let regionSel = 'asia';
 function renderRegion() {
   const c = career();
+  regionSel = c.region || 'asia';
   ui.show('region');
   $('rgCoins').textContent = profile.coins;
-  const sel = REGIONS.find(r => r.id === (c.region || 'asia'));
-  $('rgMap').src = `img/region/map-${sel.id}.webp`;
+  // (every region's lit map loaded now, so a tap moves the light at once)
+  for (const r of REGIONS) { const im = new Image(); im.src = `img/region/map-${r.id}.webp`; }
   const grid = $('rgGrid'); grid.innerHTML = '';
   for (const r of REGIONS) {
-    const b = el('button', 'rgcard' + (r === sel ? ' on' : '') + (r.open ? '' : ' locked'));
+    const b = el('button', 'rgcard' + (r.open ? '' : ' locked'));
+    b.dataset.id = r.id;
     b.style.setProperty('--rc', r.color);
     const im = document.createElement('img'); im.src = `img/region/card-${r.id}.webp`; im.alt = '';
     b.append(im);
-    if (r === sel) b.append(el('i', 'sel', 'Selected'));
     if (!r.open) b.append(el('div', 'soon', '🔒 Coming soon'));
     b.setAttribute('aria-label', `${r.name}${r.open ? '' : ', coming soon'}`);
     b.addEventListener('click', () => {
-      if (!r.open) { sfx.click(); ui.toast(`${r.name}'s league is coming soon. Asia's Super League is open now.`); return; }
-      sfx.click();
+      sfx.click(); regionSel = r.id; regionShow();
+      if (!r.open) ui.toast(`${r.name}'s league is coming soon. Asia's Super League is open now.`);
     });
     grid.append(b);
   }
+  regionShow();
+}
+// the chosen region: lit on the map and tagged; only an open region's league can be entered
+function regionShow() {
+  const r = REGIONS.find(x => x.id === regionSel);
+  $('rgMap').src = `img/region/map-${r.id}.webp`;
+  for (const b of $('rgGrid').children) {
+    const on = b.dataset.id === r.id;
+    b.classList.toggle('on', on);
+    b.querySelector('.sel')?.remove();
+    b.querySelector('.soon')?.toggleAttribute('hidden', on);
+    if (on) b.append(el('i', 'sel', REGIONS.find(x => x.id === b.dataset.id).open ? 'Selected' : '🔒 Coming soon'));
+  }
+  $('rgGo').disabled = !r.open;
+  $('rgGo').textContent = r.open ? 'Continue' : '🔒 Coming soon';
 }
 $('rgBack').addEventListener('click', () => renderHome());
 $('rgBack2').addEventListener('click', () => renderHome());
-$('rgGo').addEventListener('click', () => { const c = career(); c.region = 'asia'; sfx.dhol(); saveProfile(profile); careerView = 'hub'; renderCareer(); });
+$('rgGo').addEventListener('click', () => { if (!REGIONS.find(r => r.id === regionSel)?.open) return; const c = career(); c.region = regionSel; sfx.dhol(); saveProfile(profile); careerView = 'hub'; renderCareer(); });
 
 // pick (or keep) a club for the season
 function careerPick(c, body) {
