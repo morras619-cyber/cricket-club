@@ -2961,13 +2961,26 @@ export class Game {
     const team = O.side === 'ai' ? this.oppTeam : this.myTeam;
     if (!f.people) return false;
     const p = V.to(f.x, f.y), now = this.realTime;
-    const vx = f.x - (f.kx ?? f.x), vy = -(f.y - (f.ky ?? f.y)); // screen direction of travel (y down)
+    // his speed, smoothed (the play nudges him a few cm a frame; a raw reading flickers)
+    const dx0 = f.x - (f.kx ?? f.x), dy0 = -(f.y - (f.ky ?? f.y)), step = Math.hypot(dx0, dy0);
     f.kx = f.x; f.ky = f.y;
-    const moving = Math.hypot(vx, vy) > 0.015;
-    if (moving) f.vdir = [vx, vy];
+    const sm = 0.25;
+    f.svx = (f.svx ?? 0) * (1 - sm) + dx0 * sm; f.svy = (f.svy ?? 0) * (1 - sm) + dy0 * sm;
+    const speed = Math.hypot(f.svx, f.svy);
+    // running, with some give: he starts at a clear pace and stops only once he's all but still
+    f.running = f.running ? speed > 0.006 : speed > 0.02;
+    const moving = f.running;
+    f.stride = (f.stride ?? i * 0.37) + step; // metres covered: the legs keep time with the ground
+    // which way he runs: re-decided only when the direction has really changed (no flicker on a diagonal)
+    if (moving) {
+      const ang = Math.atan2(f.svy, f.svx);
+      if (f.vang == null || Math.abs(Math.atan2(Math.sin(ang - f.vang), Math.cos(ang - f.vang))) > 0.5) f.vang = ang;
+      f.vdir = [Math.cos(f.vang), Math.sin(f.vang)];
+    }
     const c = V.to(0, 10), tx = c.x - p.x, ty = c.y - p.y;
     let frame, flip = false;
-    const cyc = (list, rate) => list[Math.floor(this.gameTime * rate + i * 0.37) % list.length];
+    // a full four-frame stride every 3.2 m (two steps)
+    const cyc = list => list[Math.floor(f.stride / 0.8) % list.length];
     if (pose === 'dive') {
       if (f.diveT0 == null) f.diveT0 = now;
       const k = Math.min(3, Math.floor((now - f.diveT0) / 110));
@@ -2985,22 +2998,20 @@ export class Game {
       else { frame = 'reach'; flip = (O.ball ? V.to(O.ball.x, O.ball.y).x : c.x) < p.x; }
     } else if (moving || pose === 'run') {
       const [dx, dy] = f.vdir || [tx, ty];
-      if (Math.abs(dx) > Math.abs(dy) * 0.9) { frame = cyc(['side1', 'side2', 'side3', 'side2'], 9); flip = dx < 0; }
-      else if (dy < 0) frame = cyc(['away1', 'away2', 'away3', 'away4'], 9);
-      else { frame = 'toward'; flip = dx < 0; }
+      if (dy < 0 && Math.abs(dx) < -dy * 1.1) frame = cyc(['away1', 'away2', 'away3', 'away4']); // away from the camera
+      else if (dy > 0 && Math.abs(dx) < dy * 0.35) { frame = 'toward'; flip = Math.floor(f.stride / 1.6) % 2 === 1; } // straight at it: one step each side
+      else { frame = cyc(['side1', 'side2', 'side3', 'side2']); flip = dx < 0; } // across (and diagonally toward)
     } else {
       f.diveT0 = null; f.catchT0 = null;
       if (Math.abs(tx) > Math.abs(ty) * 1.4) { frame = 'ready_side'; flip = tx < 0; }
       else frame = ty < 0 ? 'ready_back' : 'ready_front';
     }
     const kPerM = Math.max(14, V.k) * (f.ctrl ? 1.15 : 1);
-    // (a running stride bobs a touch)
-    const bob = frame.startsWith('away') || frame.startsWith('side') || frame === 'toward' ? Math.abs(Math.sin(this.gameTime * 14 + i)) * 0.06 * kPerM : 0;
     if (f.ctrl) {
       this.ctx.fillStyle = 'rgba(255,210,63,0.35)';
       this.ctx.beginPath(); this.ctx.ellipse(p.x, p.y, kPerM * 0.9, kPerM * 0.35, 0, 0, Math.PI * 2); this.ctx.fill();
     }
-    return drawKitFielder(this.ctx, p.x, p.y - bob, kPerM, frame, team, f.people, flip, f.ctrl ? '#ffd23f' : null);
+    return drawKitFielder(this.ctx, p.x, p.y, kPerM, frame, team, f.people, flip, f.ctrl ? '#ffd23f' : null);
   }
   topFielder(f, i) {
     if (!f.keeper && this.kitFielder(f, i)) return true;

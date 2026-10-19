@@ -256,7 +256,7 @@ def frames_of(a, count=10, rowh=600):
     return lab, [(i + 1, boxes[i]) for i in big]
 
 
-def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False, hard=False, bat=False):
+def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, design=None, marks=None, place_abs=False, hard=False, bat=False, hips=None):
     # (a margin all round, so a pose at the sheet's edge can still be cut with padding)
     M = 60
     a = np.pad(keyed(sheet) / 255, ((M, M), (M, M), (0, 0)))
@@ -328,7 +328,9 @@ def build(view, sheet, hairpaths, place, count=10, rowh=600, premium=False, desi
         # feet: the bottom of the pose, under the planted foot (the lowest 8% of it)
         ys, xs = np.nonzero(me)
         foot = ys >= ys.max() - (ys.max() - ys.min()) * 0.08
-        meta['frames'].append([ax, ay, w, h, round(float(xs[foot].mean()) - x0, 1), int(ys.max()) - y0])
+        # (with hips: his body's x, so a stride doesn't jump the body to the new foot)
+        fx = (hips[k] + M - x0) if hips else float(xs[foot].mean()) - x0
+        meta['frames'].append([ax, ay, w, h, round(float(fx), 1), int(ys.max()) - y0])
         # placements are in tile coordinates: origin = the pose's box left - 40, top
         p = place[k]
         tx, ty = (M - x0 + ax, M - y0 + ay) if place_abs else (sl[1].start - 40 - x0 + ax, sl[0].start - y0 + ay)
@@ -428,7 +430,7 @@ def build_field():
     pr = json.load(open('tools/kit/field-print.json'))
     n = len(pr['frames'])
     return build('field', 'tools/kit/src/fielder.png', {}, [pr[str(k + 1)] for k in range(n)], n, pr['rowh'],
-                 premium=True, place_abs=True, hard=True)
+                 premium=True, place_abs=True, hard=True, hips=pr['hips'])
 
 
 def write_sheets(out):

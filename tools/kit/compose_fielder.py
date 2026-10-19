@@ -49,7 +49,7 @@ def main():
     W = max(sum(c[2].width for c in cuts[i:i + PER]) + GAP * (PER + 1) for i in range(0, len(cuts), PER))
     H = ROWH * ((len(cuts) + PER - 1) // PER) + GAP
     sheet = Image.new('RGB', (W, H), tuple(MAG))
-    prints = {}
+    prints, hips = {}, []
     for i, (name, back, tile, al) in enumerate(cuts):
         row, col = divmod(i, PER)
         x = GAP + sum(c[2].width + GAP for c in cuts[row * PER:i])
@@ -60,11 +60,28 @@ def main():
             prints[str(i + 1)] = print_spot(np.asarray(tile).astype(int), np.asarray(mask) > 127, x, y)
         else:
             prints[str(i + 1)] = [x, y, 0, 1, 1, 0, 0, 0, 0, 0]  # (no print on a front or side view)
+        hips.append(round(x + hip_x(np.asarray(tile).astype(int), np.asarray(mask) > 127), 1))
     sheet.save(os.path.join(os.path.dirname(__file__), 'src', 'fielder.png'))
     json.dump({'_note': 'Where the name and number sit on each fielder pose (tools/kit/compose_fielder.py): [x, y, width, 1, 1, tilt, 0, 0, 0, 0] in fielder.png pixels; width 0 = none (front and side views).',
-               'rowh': ROWH, 'frames': [p[0] for p in PICK], **prints},
+               'rowh': ROWH, 'frames': [p[0] for p in PICK], 'hips': hips, **prints},
               open(os.path.join(os.path.dirname(__file__), 'field-print.json'), 'w'), indent=1)
     print('sheet', sheet.size, 'poses', len(cuts))
+
+
+def hip_x(rgb, m):
+    """where his body is across the frame: the middle of his waistband (the widest yellow band in his
+    top 60%), so a stride swaps feet under a still body instead of the body jumping to the new foot"""
+    hsv = np.asarray(Image.fromarray(rgb.astype(np.uint8)).convert('HSV')).astype(float)
+    H, S, V = hsv[..., 0] * 360 / 255, hsv[..., 1] / 255, hsv[..., 2] / 255
+    yellow = m & (H > 40) & (H < 70) & (S > 0.5) & (V > 0.5)
+    ys = np.nonzero(m.any(1))[0]
+    rows = yellow.sum(1)
+    top = ys.min()
+    belt = top + int(np.argmax(rows[top: top + int((ys.max() - top) * 0.6)]))
+    band = yellow[max(0, belt - 5): belt + 6]
+    if band.sum() < 10:
+        return float(np.nonzero(m)[1].mean())
+    return float(np.nonzero(band)[1].mean())
 
 
 if __name__ == '__main__':
