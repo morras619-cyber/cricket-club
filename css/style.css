@@ -759,7 +759,8 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .coach-card { position: relative; width: min(100%, 520px); display: flex; align-items: flex-end; padding: 0 var(--gut-r) calc(var(--safe-b) + 14px) 0;
   transform: translateY(105%); transition: transform .28s cubic-bezier(.2, .9, .3, 1.15); }
 #coach.up .coach-card { transform: none; }
-.coach-face { flex: none; width: min(36vw, 170px); margin-bottom: -14px; filter: drop-shadow(3px 0 0 var(--ink)) drop-shadow(-2px 0 0 var(--ink)); }
+/* Diagnostic: temporarily remove coach-image filters to test the horizontal rendering artefact on mobile Safari. */
+.coach-face { flex: none; width: min(36vw, 170px); margin-bottom: -14px; filter: none; }
 .coach-bubble { position: relative; flex: 1; min-width: 0; margin: 0 0 6px -6px; padding: 10px 12px 10px; background: var(--paper); color: var(--ink);
   border: 3px solid var(--ink); border-radius: 16px; box-shadow: 4px 5px 0 var(--ink); }
 .coach-bubble::before { content: ''; position: absolute; left: -14px; bottom: 28px; border: 9px solid transparent; border-right: 14px solid var(--ink); }
