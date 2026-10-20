@@ -91,6 +91,16 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/ui.js`, `js/main.js` | HUD, menus, squad picker and team sheet, the over-by-over bowler picker, results and sharing |
 | `js/sharecard.js`, `js/codec.js`, `js/profile.js` | Share card, challenge links, local progression |
 
+## Development Rules
+
+All code changes must follow [`AGENTS.md`](AGENTS.md).
+
+Before editing, inspect the relevant code, dependencies, callers, and tests. Keep changes scoped, preserve existing gameplay and saved data, and diagnose root causes before implementing fixes.
+
+Run the relevant tests and verify affected browser interactions. Visual changes must be checked against actual rendered output at appropriate screen sizes whenever tooling permits.
+
+Do not discard existing work or perform destructive Git operations without authorization. Commits, pushes, and merges require the appropriate user approval. Report what was changed, what was tested, and any remaining limitations honestly.
+
 ## Tests
 
 ```bash
