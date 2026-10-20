@@ -754,6 +754,8 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 
 /* ---------- Uncle Dev, the coach: slides up from the bottom with his advice ---------- */
 #coach { position: absolute; inset: 0; z-index: 90; background: rgba(4, 6, 24, 0.45); display: flex; align-items: flex-end; justify-content: center; }
+/* Isolate the coach overlay during its slide-in animation to avoid Safari canvas compositing artefacts. */
+#coach { isolation: isolate; transform: translateZ(0); }
 .coach-card { position: relative; width: min(100%, 520px); display: flex; align-items: flex-end; padding: 0 var(--gut-r) calc(var(--safe-b) + 14px) 0;
   transform: translateY(105%); transition: transform .28s cubic-bezier(.2, .9, .3, 1.15); }
 #coach.up .coach-card { transform: none; }
