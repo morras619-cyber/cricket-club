@@ -2,6 +2,8 @@
 """The lower-division clubs' crests (img/logo-<id>.webp, 192 px): a bold emblem in the club's
 colours, ink outline, a gloss, like the eight painted logos. Emblems are drawn from shapes here.
 usage: python3 tools/build_club_logos.py
+Now replaced by the painted crests (tools/build_painted_crests.py): running this overwrites them.
+Its emblem shapes still serve the create-your-club crest builder (tools/build_crest_masks.py).
 """
 import math, os, re
 import numpy as np
