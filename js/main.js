@@ -106,14 +106,13 @@ function renderHome() {
   // the small print on the mode blocks: one line each, as the blocks were drawn
   const lines = (...l) => l.filter(Boolean).map(x => `• ${x}`).join('\n');
   const club = c?.club ? teamById(c.club).name : '';
-  $('leagueSub').textContent = !c ? 'Pick your club. Build your dynasty.'
-    : c.phase === 'pick' ? `Season ${c.season} · Pick your club`
-      : c.phase === 'scouts' ? `Season ${c.season} · Scouts are back`
-      : c.phase === 'playoff' ? `Season ${c.season} · Relegation playoff`
-      : c.phase === 'auction' ? `Season ${c.season} · Club auction`
-        : c.phase === 'done' ? `Season ${c.season} complete`
-          : `Season ${c.season} · ${club || 'Your club'}`;
-  $('featureSeason').textContent = `SEASON ${c?.season || 1}`;
+  $('leagueSub').textContent = !c ? lines('Pick a club', 'Win the auction', 'Build a dynasty')
+    : c.phase === 'pick' ? lines(`Season ${c.season}`, 'Pick your club')
+      : c.phase === 'scouts' ? lines(`Season ${c.season} · ${club}`, 'Your scouts are home', `${money(c.money)} to spend`)
+      : c.phase === 'playoff' ? lines(`Season ${c.season} · ${club}`, 'Relegation play-off!')
+      : c.phase === 'auction' ? lines(`Season ${c.season} · ${club}`, 'Auction', `${money(c.money)} to spend`)
+        : c.phase === 'done' ? lines(`Season ${c.season} over · ${club}`, `${money(c.money)} in the bank`)
+          : lines(`Season ${c.season} · ${club}`, (f => f && `${f.label} v ${teamById(f.opp).name}`)(nextFixture(c.league)), `${money(c.money)} in the bank`);
   $('cupSub').textContent = status('cup')?.replace(' · ', '\n') || 'Quarter, semi, final:\n3 wins for the cup';
   const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key;
   $('dailySub').textContent = done ? `Done today ${profile.dailyChallenge.won ? '✅' : '❌'}\n${profile.dailyChallenge.line}` : `#${sc.no}\n${sc.title}`;
