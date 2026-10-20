@@ -5,7 +5,8 @@ import { heroById } from '../js/heroes.js';
 import { Innings } from '../js/match.js';
 import { aiBowlingScript } from '../js/ai.js';
 import { gestureToDelivery } from '../js/tactics.js';
-import { TEAMS } from '../js/teams.js';
+import { TEAMS, LEAGUE_CLUBS } from '../js/teams.js';
+import { HEROES } from '../js/heroes.js';
 
 const heroes = { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') };
 
@@ -17,6 +18,24 @@ test('every team has ten fixed regulars with pace and spin', () => {
     assert.deepEqual(roster(t.id), r); // fixed
     const types = r.filter(p => p.bowl).map(p => BOWL_TYPES[p.bowl]);
     assert.ok(types.some(x => x.spin) && types.some(x => !x.spin), t.id);
+  }
+});
+
+test('all club and hero names are unique, regardless of roster access order', () => {
+  const clubs = [...TEAMS, ...LEAGUE_CLUBS];
+  const names = [];
+  // Reverse access order deliberately to catch order-dependent collision handling.
+  for (const t of [...clubs].reverse()) {
+    const players = roster(t.id);
+    assert.equal(players.length, 10, t.id);
+    assert.equal(new Set(players.map(p => p.name.toLocaleLowerCase())).size, 10, t.id);
+    names.push(...players.map(p => p.name.toLocaleLowerCase()));
+  }
+  names.push(...HEROES.map(h => h.name.toLocaleLowerCase()));
+  assert.equal(new Set(names).size, names.length, 'no duplicate names across clubs or heroes');
+  // Accessing the same rosters again must preserve the exact generated names.
+  for (const t of clubs) {
+    assert.deepEqual(roster(t.id).map(p => p.name), roster(t.id).map(p => p.name));
   }
 });
 
