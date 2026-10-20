@@ -2017,7 +2017,6 @@ export class Game {
   // ---------- Wicket-Keeper Mode ----------
   async keeperEvent(kind, d, offset, opt = {}) {
     const S = this.S;
-    if (this.mode === 'tutorial') await this.coach?.('tutKeeper');
     this.view = 'keeper';
     this.phase = 'keeper';
     this.refreshPowers();
@@ -2035,9 +2034,14 @@ export class Game {
     const tapReach = elastic ? 0.95 : 0.45;
     const needSwipe = Math.abs(to.x - 0.3) > tapReach || to.y > 1.15;
     S.delivery = null; S.ball = null; S.flight = null;
+    S.kball = null;
+    S.reticle = null;
+    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1), emblem: this.team.field?.id === 'rani' ? this.team.field.emblem : null, people: this.keeperPeople() };
+    // Enter the keeper view before showing advice, so the previous bowling view cannot
+    // remain visible behind the coach card and appear to snap when the advice closes.
+    if (this.mode === 'tutorial') await this.coach?.('tutKeeper');
     S.kball = { from, to, t0: this.realTime, dur: approach, done: false };
     S.reticle = { ...to, needSwipe, elastic, t0: this.realTime, dur: approach };
-    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1), emblem: this.team.field?.id === 'rani' ? this.team.field.emblem : null, people: this.keeperPeople() };
     // clear leftover delivery text so nothing covers the target
     this.fx.words = []; this.fx.bubbles = []; this.ui.clearBanner();
     this.fx.word(kind === 'edge' ? 'EDGE!' : 'BEATEN!', this.W / 2, this.H * 0.18, { size: 50, dur: 900 });
@@ -3269,6 +3273,31 @@ export class Game {
     const me = O.fielders.find(f => f.ctrl);
     if (me) V.label(ctx, me.x, me.y, 'YOU', '#ffd23f');
     if (O.meter) this.drawMeter(ctx, O.meter);
+    if (O.ends && O.fielders) {
+      const thrower = O.fielders.find(f => f.ctrl);
+      if (thrower) {
+        const a = V.to(thrower.x, thrower.y);
+        for (const e of O.ends) {
+          const b = V.to(e.x, e.y);
+          const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len, uy = dy / len;
+          const startX = a.x + ux * 20, startY = a.y + uy * 20;
+          const endX = b.x - ux * 28, endY = b.y - uy * 28;
+          ctx.save();
+          ctx.globalAlpha = 0.82;
+          ctx.strokeStyle = '#ffd23f'; ctx.fillStyle = '#ffd23f'; ctx.lineWidth = 4;
+          ctx.setLineDash([9, 7]);
+          ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(endX - ux * 14 - uy * 8, endY - uy * 14 + ux * 8);
+          ctx.lineTo(endX - ux * 14 + uy * 8, endY - uy * 14 - ux * 8);
+          ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
     if (O.ends) {
       for (const e of O.ends) {
         const p = V.to(e.x, e.y);

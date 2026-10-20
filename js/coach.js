@@ -71,7 +71,7 @@ export const DEV = {
   ],
   tutRunOut: [
     "They're going for a quick single. Run-out chance!",
-    "Tap anywhere to pick the ball up when the ring is green, then tap the stumps to throw. Hit them and he's gone!",
+    "Tap when the ring turns green to pick up the ball. Then slide your finger toward the wicket you want to hit. Follow the arrows to choose the keeper's end or the bowler's end. Hit the stumps and he's gone!",
   ],
   tutYorker: [
     "Two down! Last ball. Aim for the glowing zone at his feet.",
