@@ -13,6 +13,14 @@ const POSE = {
   follow1: 6, follow2: 7, follow3: 7, finish: 8, field: 9, react: 9, celebrate1: 5, celebrate2: 5,
 };
 const POSE_FRONT = { celebrate2: 4 };
+// the Thunder's own painted bowler (front-thunder / back-thunder): stand, run 1-3, gather, coil, front
+// arm, release, follow-through, finish
+const POSE_OWN = {
+  start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 5, frontarm: 6, release: 7,
+  follow1: 8, follow2: 8, follow3: 8, finish: 9, field: 0, react: 9, celebrate1: 6, celebrate2: 7,
+};
+// a club with its own painted bowler sheets (img/kit/<view>-<club>)
+const ownView = (view, team) => (team && KIT_SHEETS[`${view}-${team.id}`] ? `${view}-${team.id}` : view);
 // the spinner (front, 15 poses): stance, three walking strides, the arm going up (4-7), release (8),
 // follow-through (9-12), walking back (13), standing (14)
 const POSE_SPIN = {
@@ -172,6 +180,12 @@ function teamSheet(view, team) {
     while (teamCache.size > 4) { const [k, old] = teamCache.entries().next().value; teamCache.delete(k); old.width = 0; old.height = 0; }
     return c;
   }
+  if (meta.own) {
+    // painted in the club's own colours: used as drawn
+    g.drawImage(v.img, 0, 0);
+    teamCache.set(key, c);
+    return c;
+  }
   const tones = { 255: [ramp(team.suit), meta.suit], 128: [ramp(team.trim), meta.trim] };
   for (let i = 0; i < p.length; i += 4) {
     const t = tones[m[i + 2]];
@@ -248,7 +262,7 @@ function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
   if (!data || !fontReady) return null;
   const sk = skinHex(look), hr = hairHex(look), style = hairStyleOf(look);
-  const facing = view.endsWith('front');
+  const facing = /front/.test(view); // (front, spin-front, front-<club>)
   const beard = facing ? beardOf(look) : null, wear = wearOf(look);
   const hp = style && meta.hair?.[style] ? hairData(view, style) : null;
   const bp = beard && meta.hair?.[beard] ? hairData(view, beard) : null;
@@ -344,6 +358,7 @@ function playerSheet(view, team, look, mirror) {
   }
   g.putImageData(img, 0, 0);
   layer.width = 0; layer.height = 0;
+  c.view = view;
   playerCache.set(key, c);
   while (playerCache.size > 4) { const [k, old] = playerCache.entries().next().value; playerCache.delete(k); old.width = 0; old.height = 0; }
   return c;
@@ -436,10 +451,13 @@ export function drawKitFielder(ctx, px, py, kPerM, frame, team, look, flip = fal
 // The bowler in the plain kit, feet at (px, py). False if it isn't ready (the old sprite is drawn).
 export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look) {
   if (!team || !look?.who) return false;
-  const sheet = playerSheet(view, team, look, !!flip);
+  const own = ownView(view, team);
+  // (the club's own sheet once it's in; the plain kit until then)
+  const sheet = (own !== view && playerSheet(own, team, look, !!flip)) || playerSheet(view, team, look, !!flip);
   if (!sheet) return false;
+  if (sheet.view === own) view = own;
   const meta = KIT_SHEETS[view];
-  const pose = (view === 'spin-back' ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
+  const pose = (KIT_SHEETS[view].own ? POSE_OWN[frame] : view === 'spin-back' ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
   let [sx, sy, w, h, ax, ay] = meta.frames[pose];
   if (flip) { sx = sheet.width - sx - w; ax = w - ax; }
   // his own build: taller or shorter, broader or slighter, about his feet
