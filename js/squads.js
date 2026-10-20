@@ -164,6 +164,36 @@ function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c
 
 const TIER_OFFSET = { 1: -5, 2: -2, 3: 1, 4: 4 };
 const rosterCache = new Map();
+// Keep generated lower-division names distinct from the hand-written squads and heroes.
+// Generated-name collisions are resolved deterministically from the player's team and slot.
+const reservedPlayerNames = new Set([
+  ...Object.values(SQUADS).flatMap(squad => squad.map(([name]) => name.toLocaleLowerCase())),
+  ...HEROES.map(hero => hero.name.toLocaleLowerCase()),
+]);
+const generatedPlayerNames = new Set();
+function uniqueClubPlayerName(name, nation, teamId, slot) {
+  const key = name.toLocaleLowerCase();
+  if (!reservedPlayerNames.has(key) && !generatedPlayerNames.has(key)) {
+    generatedPlayerNames.add(key);
+    return name;
+  }
+  const pool = NATIONS[nation];
+  // Try every first/last-name combination in a stable, team-specific order.
+  const seed = hashStr(`unique-${teamId}-${slot}-${name}`);
+  for (let n = 0; n < pool.first.length * pool.last.length; n++) {
+    const i = (seed + n) % (pool.first.length * pool.last.length);
+    const candidate = `${pool.first[Math.floor(i / pool.last.length)]} ${pool.last[i % pool.last.length]}`;
+    const candidateKey = candidate.toLocaleLowerCase();
+    if (!reservedPlayerNames.has(candidateKey) && !generatedPlayerNames.has(candidateKey)) {
+      generatedPlayerNames.add(candidateKey);
+      return candidate;
+    }
+  }
+  // Defensive fallback; the current pools are large enough that this should not be needed.
+  const fallback = `${name} ${slot + 2}`;
+  generatedPlayerNames.add(fallback.toLocaleLowerCase());
+  return fallback;
+}
 // A national side: the country's best ten from all the clubs (five batters with the best keeper,
 // two all-rounders, three bowlers with at least one spinner). Each keeps his club id and his look.
 function nationalRoster(team) {
@@ -192,7 +222,11 @@ function clubRoster(team) {
   const used = new Set();
   return CLUB_SHAPE.map(([role, label, kind], i) => {
     let name, nation;
-    do { nation = rng.pick(CLUB_NATIONS); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+    do {
+      nation = rng.pick(CLUB_NATIONS);
+      name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`;
+    } while (used.has(name));
+    name = uniqueClubPlayerName(name, nation, team.id, i);
     used.add(name);
     const bowl = kind === 'pace' ? rng.pick(['express', 'swing', 'leftpace']) : kind === 'seam' ? 'seam' : kind === 'spin' ? rng.pick(['offspin', 'legspin']) : null;
     const bat = role === 'bowl' ? rng.int(12, 24) : role === 'all' ? base - 6 + rng.int(-3, 4) : base + rng.int(-3, 6);
