@@ -754,13 +754,10 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 
 /* ---------- Uncle Dev, the coach: slides up from the bottom with his advice ---------- */
 #coach { position: absolute; inset: 0; z-index: 90; background: rgba(4, 6, 24, 0.45); display: flex; align-items: flex-end; justify-content: center; }
-/* Isolate the coach overlay during its slide-in animation to avoid Safari canvas compositing artefacts. */
-#coach { isolation: isolate; transform: translateZ(0); }
 .coach-card { position: relative; width: min(100%, 520px); display: flex; align-items: flex-end; padding: 0 var(--gut-r) calc(var(--safe-b) + 14px) 0;
   transform: translateY(105%); transition: transform .28s cubic-bezier(.2, .9, .3, 1.15); }
 #coach.up .coach-card { transform: none; }
-/* Diagnostic: temporarily remove coach-image filters to test the horizontal rendering artefact on mobile Safari. */
-.coach-face { flex: none; width: min(36vw, 170px); margin-bottom: -14px; filter: none; }
+.coach-face { flex: none; width: min(36vw, 170px); margin-bottom: -14px; filter: drop-shadow(3px 0 0 var(--ink)) drop-shadow(-2px 0 0 var(--ink)); }
 .coach-bubble { position: relative; flex: 1; min-width: 0; margin: 0 0 6px -6px; padding: 10px 12px 10px; background: var(--paper); color: var(--ink);
   border: 3px solid var(--ink); border-radius: 16px; box-shadow: 4px 5px 0 var(--ink); }
 .coach-bubble::before { content: ''; position: absolute; left: -14px; bottom: 28px; border: 9px solid transparent; border-right: 14px solid var(--ink); }
