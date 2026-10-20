@@ -255,6 +255,9 @@ export function roster(teamId) {
   rosterCache.set(teamId, list);
   return list;
 }
+// Resolve every lower-division roster once in canonical league order. This makes the
+// cross-club name reservations independent of which screen first requests a roster.
+for (const club of LEAGUE_CLUBS) roster(club.id);
 // "Aryan 'Sixer' Malhotra"
 export const fullName = p => (p.nick ? `${p.name.split(' ')[0]} '${p.nick}' ${p.name.split(' ').slice(1).join(' ')}` : p.name);
 // with the flag of his country in front
