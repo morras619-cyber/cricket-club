@@ -3,12 +3,12 @@
 export const GROUND_ART = {
  "thunder": {
   "top": {
-   "px": 14,
-   "w": 3136,
-   "h": 2922,
+   "px": 7.134,
+   "w": 1299,
+   "h": 1057,
    "c": [
-    1568.0,
-    1461.0
+    649.0,
+    495.5
    ]
   },
   "views": {
@@ -17,15 +17,15 @@ export const GROUND_ART = {
     "w": 2400,
     "h": 1536,
     "above": 480,
-    "top": "#112565",
-    "bottom": "#33a01c",
+    "top": "#3f84dc",
+    "bottom": "#2f9519",
     "board": {
      "r": 63.8,
      "h": 0.95
     },
     "roof": {
      "r": 94,
-     "h": 14.4
+     "h": 24.9
     }
    },
    "bowl": {
@@ -33,15 +33,15 @@ export const GROUND_ART = {
     "w": 2400,
     "h": 1536,
     "above": 576,
-    "top": "#02174d",
-    "bottom": "#2e9b1c",
+    "top": "#2f64c4",
+    "bottom": "#2a8f19",
     "board": {
      "r": 63.8,
      "h": 0.95
     },
     "roof": {
      "r": 94,
-     "h": 14.4
+     "h": 22.0
     }
    },
    "keeper": {
@@ -49,15 +49,15 @@ export const GROUND_ART = {
     "w": 2520,
     "h": 1704,
     "above": 480,
-    "top": "#0f215d",
-    "bottom": "#339f1c",
+    "top": "#2d69ce",
+    "bottom": "#2e941a",
     "board": {
      "r": 63.8,
      "h": 0.95
     },
     "roof": {
      "r": 94,
-     "h": 14.4
+     "h": 39.3
     }
    }
   },

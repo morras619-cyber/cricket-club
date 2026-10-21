@@ -8,8 +8,8 @@ import { LEAGUE_CLUBS, myClub } from './teams.js';
 //   field: fielders' speed; dew: from the second innings batting gets easier and the ball stops swinging
 export const GROUNDS = {
   thunder: {
-    name: 'The Thunderdome', time: 'night', landmark: 'bolts',
-    sky: ['#03061f', '#0f2363', '#2d4fb3'], skyline: '#0b1640', windows: ['#ffd23f', '#9fd8ff'],
+    name: 'The Thunderdome', time: 'day', landmark: 'bolts',
+    sky: ['#1f56c0', '#2f7be0', '#9fd0ff'], skyline: '#0b1640', windows: ['#ffd23f', '#9fd8ff'],
     grass: ['#1c7a3e', '#2a9a4a'], pitchCol: '#e2c27f',
     pitch: { id: 'flat', name: 'Flat road', report: 'Rock hard and flat: a batting paradise. Expect sixes.', bat: 1.08, ai: 0.92, swing: 0.8, seam: 0.8, turn: 0.85 },
   },
