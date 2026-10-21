@@ -1,7 +1,5 @@
 // Synthesised sound effects (no audio files to download). Starts on the first user gesture.
 let ac = null, master = null, noiseBuf = null;
-let crowdLoop = null;
-const CROWD_LOOP_URL = './assets/audio/Low-level-crowd-loop.mp3';
 export const sound = { on: true, haptics: true };
 
 export function unlockAudio() {
