@@ -45,6 +45,13 @@ export function stopCrowdAmbience() {
   try { crowdLoop.currentTime = 0; } catch { /* ignore if metadata is not loaded yet */ }
 }
 
+// File-backed crowd ambience uses a separate player so its level does not affect synthesized SFX.
+
+  if (!crowdLoop) return;
+  crowdLoop.pause();
+  try { crowdLoop.currentTime = 0; } catch { /* ignore if metadata is not loaded yet */ }
+}
+
 // File-backed crowd ambience intentionally uses a separate HTMLAudioElement so setting volume
 // to 20% does not change the synthesized sound-effects mixer.
 
