@@ -46,6 +46,40 @@ def structure_top(a):
     return int(np.nonzero(notsky.mean(1) > 0.015)[0].min())
 
 
+def grade(out, bt, stand):
+    """the Foundry's finish: the furnaces light the field and the boards glow, the grass is crisper and
+    richer, so the ground has the shine and ink-crisp pop the players have. Baked into the view."""
+    H, W = out.shape[:2]
+    f = out.copy()
+    rows = np.arange(H)[:, None, None].astype(np.float64)
+    field = np.clip((rows - bt - 6) / 30, 0, 1)                         # (below the boards)
+    # crisper: an unsharp mask on the field, so the stripes and the pitch read cleanly
+    blur = ndi.gaussian_filter(out, (5, 5, 0))
+    f = np.where(field > 0, out + (out - blur) * 0.9 * field, f)
+    # richer grass: a lift in saturation and a touch of contrast
+    lum = f.mean(2, keepdims=True)
+    sat = lum + (f - lum) * (1 + 0.22 * field)
+    f = np.where(field > 0, (sat - 128) * (1 + 0.06 * field) + 128, f)
+    # the furnaces' glow spilling on the grass: the stand's own colours just above the boards, smeared
+    # down the field, strongest at the boards and gone by a third of the way down
+    band = stand[-90:].mean(0)                                         # (W, 3)
+    band = ndi.gaussian_filter1d(band, W * 0.03, axis=0)
+    warm = np.clip(band * np.array([1.25, 0.8, 0.45]), 0, 255)          # (pushed towards fire)
+    fall = np.clip(1 - (rows - bt) / (0.34 * (H - bt)), 0, 1) ** 1.6 * field
+    spill = warm[None] * fall
+    f = 255 - (255 - f) * (255 - spill * 0.55) / 255                   # screen
+    # the rim of light along the boards, and the boards' own glow (a bloom of what's bright there)
+    bandrows = (np.abs(rows - bt) < 70).astype(np.float64)
+    bright = np.clip(f - 150, 0, None) * bandrows
+    bloom = ndi.gaussian_filter(bright, (9, 9, 0)) * 1.1
+    f = 255 - (255 - f) * (255 - np.clip(bloom, 0, 255)) / 255
+    # a soft vignette at the foot and the sides
+    ys = np.clip((rows - H * 0.75) / (H * 0.25), 0, 1) ** 2
+    xs = (np.abs(np.arange(W)[None, :, None] - W / 2) / (W / 2)) ** 3
+    f = f * (1 - 0.32 * ys - 0.22 * xs * field)
+    return np.clip(f, 0, 255)
+
+
 def build_view(name, v):
     g = np.asarray(Image.open(os.path.join(SRC, f'ground-{name}.webp')).convert('RGB')).astype(np.float64)
     H, W = g.shape[:2]
@@ -81,6 +115,8 @@ def build_view(name, v):
     row_struct = top + structure_top(st) * p
     d94 = v['dir'] * ((CY + v['dir'] * 94) - v['cz'])
     roof_h = v['cy'] - (row_struct - v['above']) * d94 / v['f']
+    if CLUB == 'titans':
+        out = grade(out, bt, stand)
     Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).save(os.path.join(OUT, f'view-{name}.webp'), 'WEBP', quality=90, method=6)
     print(name, 'painting', (pw, ph), 'boards row', bt, 'top', top, 'stand structure at', round(row_struct), 'roof h', round(roof_h, 1))
     return dict(top=meta_top, bottom=meta_bottom, roof=dict(r=94, h=round(roof_h, 1)), w=W, h=H, f=v['f'], above=v['above'])
