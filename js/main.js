@@ -598,6 +598,7 @@ $('coverGo').addEventListener('click', () => startMatch({ mode: 'tutorial' }));
 // opts.mode: 'quick' | 'challenge' | 'tutorial' | 'league' | 'cup' | 'daily'
 async function startMatch(opts) {
   unlockAudio();
+  game.matchActive = false;
   stopCrowdAmbience();
   ui.show(null);
   for (const s of ui.screens) $(s).hidden = true;
