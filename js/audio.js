@@ -1,5 +1,7 @@
 // Synthesised sound effects (no audio files to download). Starts on the first user gesture.
 let ac = null, master = null, noiseBuf = null;
+let crowdLoop = null;
+const CROWD_LOOP_URL = './assets/audio/low-level-crowd-loop.mp3';
 export const sound = { on: true, haptics: true };
 
 export function unlockAudio() {
@@ -16,6 +18,31 @@ export function unlockAudio() {
 }
 
 function ready() { return ac && sound.on; }
+
+// Start the supplied low-level stadium ambience after the game's normal user-gesture unlock.
+// Keep it separate from the master SFX bus so the 20% ambience level does not change effects.
+export async function startCrowdAmbience() {
+  if (!sound.on || typeof Audio === 'undefined') return;
+  if (!crowdLoop) {
+    crowdLoop = new Audio(CROWD_LOOP_URL);
+    crowdLoop.loop = true;
+    crowdLoop.preload = 'auto';
+    crowdLoop.volume = 0.2;
+  }
+  crowdLoop.volume = 0.2;
+  try {
+    await crowdLoop.play();
+  } catch (err) {
+    // Browsers can reject playback until a later user gesture; the next start call retries.
+    if (err?.name !== 'NotAllowedError') console.warn('Crowd ambience could not start:', err);
+  }
+}
+
+export function stopCrowdAmbience() {
+  if (!crowdLoop) return;
+  crowdLoop.pause();
+  crowdLoop.currentTime = 0;
+}
 
 function tone(freq, dur, { type = 'sine', gain = 0.3, to = null, delay = 0 } = {}) {
   if (!ready()) return;
