@@ -1,8 +1,60 @@
 // Synthesised sound effects (no audio files to download). Starts on the first user gesture.
 let ac = null, master = null, noiseBuf = null;
 let crowdLoop = null;
+let crowdNext = null;
+let crowdFadeFrame = null;
+let crowdFadeStarted = false;
 const CROWD_LOOP_URL = './assets/audio/Low-level-crowd-loop.mp3';
 const CROWD_LOOP_VOLUME = 0.06;
+const CROWD_CROSSFADE_SECONDS = 0.7;
+
+function prepareCrowdPlayer(player) {
+  player.preload = 'auto';
+  player.loop = false;
+  player.volume = CROWD_LOOP_VOLUME;
+  player.addEventListener('timeupdate', () => {
+    if (player !== crowdLoop || crowdFadeStarted || !Number.isFinite(player.duration)) return;
+    if (player.currentTime >= player.duration - CROWD_CROSSFADE_SECONDS) crossfadeCrowdLoop(player);
+  });
+}
+
+async function crossfadeCrowdLoop(current) {
+  if (crowdFadeStarted || current !== crowdLoop || current.paused) return;
+  crowdFadeStarted = true;
+  const next = new Audio(CROWD_LOOP_URL);
+  crowdNext = next;
+  next.preload = 'auto';
+  next.loop = false;
+  next.volume = 0;
+  try {
+    await next.play();
+  } catch (err) {
+    crowdNext = null;
+    crowdFadeStarted = false;
+    if (err?.name !== 'NotAllowedError') console.warn('Crowd ambience crossfade could not start:', err);
+    return;
+  }
+  const startedAt = performance.now();
+  const fadeMs = CROWD_CROSSFADE_SECONDS * 1000;
+  const fade = (now) => {
+    if (crowdNext !== next || crowdLoop !== current) return;
+    const progress = Math.min(1, (now - startedAt) / fadeMs);
+    current.volume = CROWD_LOOP_VOLUME * (1 - progress);
+    next.volume = CROWD_LOOP_VOLUME * progress;
+    if (progress < 1) {
+      crowdFadeFrame = requestAnimationFrame(fade);
+    } else {
+      current.pause();
+      try { current.currentTime = 0; } catch { /* ignore if metadata is unavailable */ }
+      crowdLoop = next;
+      crowdNext = null;
+      crowdFadeFrame = null;
+      crowdFadeStarted = false;
+      prepareCrowdPlayer(crowdLoop);
+    }
+  };
+  crowdFadeFrame = requestAnimationFrame(fade);
+}
 export const sound = { on: true, haptics: true };
 
 export function unlockAudio() {
@@ -20,30 +72,31 @@ export function unlockAudio() {
 
 function ready() { return ac && sound.on; }
 
-// Start the supplied low-level stadium ambience after the game's normal user-gesture unlock.
-// Keep it separate from the master SFX bus so ambience volume does not change effects.
+// Keep ambience separate from the master SFX bus. Crossfade overlapping copies to soften the loop seam.
 export async function startCrowdAmbience() {
   if (!sound.on || typeof Audio === 'undefined') return;
   if (!crowdLoop) {
     crowdLoop = new Audio(CROWD_LOOP_URL);
-    crowdLoop.loop = true;
-    crowdLoop.preload = 'auto';
-    crowdLoop.volume = CROWD_LOOP_VOLUME;
+    prepareCrowdPlayer(crowdLoop);
   }
-  crowdLoop.volume = CROWD_LOOP_VOLUME;
   if (!crowdLoop.paused) return; // already playing; preserve loop position
   try {
     await crowdLoop.play();
   } catch (err) {
-    // A later user gesture retries browsers' autoplay-policy rejection.
     if (err?.name !== 'NotAllowedError') console.warn('Crowd ambience could not start:', err);
   }
 }
 
 export function stopCrowdAmbience() {
-  if (!crowdLoop) return;
-  crowdLoop.pause();
-  try { crowdLoop.currentTime = 0; } catch { /* ignore if metadata is not loaded yet */ }
+  if (crowdFadeFrame !== null) cancelAnimationFrame(crowdFadeFrame);
+  crowdFadeFrame = null;
+  crowdFadeStarted = false;
+  for (const player of [crowdLoop, crowdNext]) {
+    if (!player) continue;
+    player.pause();
+    try { player.currentTime = 0; } catch { /* ignore if metadata is not loaded yet */ }
+  }
+  crowdNext = null;
 }
 
 
