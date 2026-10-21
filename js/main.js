@@ -20,7 +20,7 @@ import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
-import { sound, unlockAudio, sfx, buzz } from './audio.js';
+import { sound, unlockAudio, startCrowdAmbience, stopCrowdAmbience, sfx, buzz } from './audio.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
@@ -142,7 +142,7 @@ function renderSettings() {
 $('btnSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
 $('settingsBack').addEventListener('click', () => renderHome());
 $('playerName').addEventListener('input', e => { profile.name = e.target.value.trim().slice(0, 14); saveProfile(profile); });
-$('setSound').addEventListener('click', () => { sound.on = !sound.on; profile.settings.sound = sound.on; saveProfile(profile); unlockAudio(); renderSettings(); });
+$('setSound').addEventListener('click', () => { sound.on = !sound.on; profile.settings.sound = sound.on; saveProfile(profile); unlockAudio(); if (sound.on && game.matchActive) startCrowdAmbience(); else stopCrowdAmbience(); renderSettings(); });
 $('setHaptics').addEventListener('click', () => { sound.haptics = !sound.haptics; profile.settings.haptics = sound.haptics; saveProfile(profile); renderSettings(); });
 $('setField').addEventListener('click', () => {
   const order = ['key', 'all', 'off'];
@@ -598,6 +598,7 @@ $('coverGo').addEventListener('click', () => startMatch({ mode: 'tutorial' }));
 // opts.mode: 'quick' | 'challenge' | 'tutorial' | 'league' | 'cup' | 'daily'
 async function startMatch(opts) {
   unlockAudio();
+  stopCrowdAmbience();
   ui.show(null);
   for (const s of ui.screens) $(s).hidden = true;
   const mode = opts.mode;
@@ -642,10 +643,18 @@ async function startMatch(opts) {
   const order = ['quick', 'league', 'cup', 'career', 'war', 'warmup'].includes(mode) ? await coinToss(teamById(opp), home) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
   if (mode === 'quick') await quickTip();
-  const summary = await game.runMatch({
-    mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
-    records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
-  });
+  game.matchActive = true;
+  if (sound.on) startCrowdAmbience();
+  let summary;
+  try {
+    summary = await game.runMatch({
+      mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+      records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
+    });
+  } finally {
+    game.matchActive = false;
+    stopCrowdAmbience();
+  }
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
