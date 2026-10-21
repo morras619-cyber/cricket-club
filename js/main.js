@@ -20,7 +20,7 @@ import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
-import { sound, unlockAudio, sfx, buzz } from './audio.js';
+import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience } from './audio.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
@@ -644,6 +644,7 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   if (mode === 'quick') await quickTip();
   game.matchActive = true;
+  startAmbience();
   let summary;
   try {
     summary = await game.runMatch({
@@ -652,6 +653,7 @@ async function startMatch(opts) {
     });
   } finally {
     game.matchActive = false;
+    stopAmbience();
   }
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }

@@ -79,6 +79,48 @@ function iosTick() {
   }
   iosSwitch.click();
 }
+// ---------- the match's crowd bed ----------
+// A low crowd murmur under the whole match (snd/crowd-loop.wav, tools/build_crowd_loop.py: made to
+// loop with no seam). Two copies play at once, the second a little slower, so the short loop's
+// repeats never line up and no pattern is heard. It follows the Sound setting.
+const AMBIENCE = [{ rate: 1, gain: 0.8 }, { rate: 0.89, gain: 0.5 }];
+let ambBuf = null, ambLoading = null, amb = null, ambRun = 0;
+function loadAmbience() {
+  if (!ambLoading) {
+    ambLoading = fetch('snd/crowd-loop.wav').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
+      .then(buf => (ambBuf = buf)).catch(() => { ambLoading = null; return null; });
+  }
+  return ambLoading;
+}
+export function startAmbience() {
+  stopAmbience();
+  if (!ready()) return;
+  const run = ++ambRun;
+  loadAmbience().then(buf => {
+    if (!buf || run !== ambRun || !ready()) return; // (stopped, or muted, while it loaded)
+    const bus = ac.createGain(), t = ac.currentTime;
+    bus.gain.setValueAtTime(0.0001, t); bus.gain.linearRampToValueAtTime(1, t + 1.5);
+    bus.connect(master);
+    const srcs = AMBIENCE.map(({ rate, gain }, i) => {
+      const src = ac.createBufferSource(), g = ac.createGain();
+      src.buffer = buf; src.loop = true; src.playbackRate.value = rate; g.gain.value = gain;
+      src.connect(g).connect(bus);
+      src.start(0, i * buf.duration * 0.37);   // (the copies start at different places in it)
+      return src;
+    });
+    amb = { bus, srcs };
+  });
+}
+export function stopAmbience() {
+  ambRun++;
+  if (!amb) return;
+  const { bus, srcs } = amb; amb = null;
+  const t = ac.currentTime;
+  bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(0.0001, t + 0.5);
+  for (const s of srcs) s.stop(t + 0.55);
+  setTimeout(() => bus.disconnect(), 700);
+}
+
 export function buzz(pattern) {
   if (!sound.haptics) return;
   try {
