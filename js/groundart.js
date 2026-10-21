@@ -522,7 +522,7 @@ export const GROUND_ART = {
    "bat": {
     "f": 1600,
     "w": 2400,
-    "h": 1632,
+    "h": 1536,
     "above": 480,
     "top": "#947a67",
     "bottom": "#309919",
@@ -538,7 +538,7 @@ export const GROUND_ART = {
    "bowl": {
     "f": 2400,
     "w": 2400,
-    "h": 1680,
+    "h": 1536,
     "above": 576,
     "top": "#4874ab",
     "bottom": "#2b9219",
@@ -554,7 +554,7 @@ export const GROUND_ART = {
    "keeper": {
     "f": 1200,
     "w": 2520,
-    "h": 1800,
+    "h": 1704,
     "above": 480,
     "top": "#5681ab",
     "bottom": "#2f981a",
