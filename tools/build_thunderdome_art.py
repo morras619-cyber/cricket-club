@@ -85,13 +85,13 @@ def build_view(name, v):
 
 def build_top():
     a = np.asarray(Image.open(os.path.join(SRC, 'top-ring.png')).convert('RGB')).astype(np.float64)
-    mag = (a[..., 0] > 200) & (a[..., 2] > 200) & (a[..., 1] < 90)
+    mag = (a[..., 0] > 180) & (a[..., 2] > 180) & (a[..., 1] < 110)    # (a JPEG: its magenta isn't pure)
     lab, n = ndi.label(mag)
     hole = lab == (np.argmax(ndi.sum(mag, lab, range(1, n + 1))) + 1)
     ys, xs = np.nonzero(hole)
     hw, hh = xs.max() - xs.min(), ys.max() - ys.min()
     cx, cy = (xs.min() + xs.max()) / 2, (ys.min() + ys.max()) / 2
-    a[hole] = (38, 120, 52)                                           # (the game draws the grass over it)
+    a[ndi.binary_dilation(hole, iterations=5)] = (38, 120, 52)         # (the game draws the grass over it; the pink fringe goes too)
     squash = 0.78 * hw / hh                                           # the hole becomes the game's 0.78 tilt
     h2 = int(round(a.shape[0] * squash))
     img = Image.fromarray(a.astype(np.uint8)).resize((a.shape[1], h2), Image.LANCZOS)
