@@ -30,10 +30,11 @@ export async function startCrowdAmbience() {
     crowdLoop.volume = 0.2;
   }
   crowdLoop.volume = 0.2;
+  if (!crowdLoop.paused) return;
   try {
     await crowdLoop.play();
   } catch (err) {
-    // Browsers can reject playback until a later user gesture; the next start call retries.
+    // A later user gesture retries browsers' autoplay-policy rejection.
     if (err?.name !== 'NotAllowedError') console.warn('Crowd ambience could not start:', err);
   }
 }
