@@ -6,7 +6,8 @@ let crowdFadeFrame = null;
 let crowdFadeStarted = false;
 const CROWD_LOOP_URL = './assets/audio/Low-level-crowd-loop.mp3';
 const CROWD_LOOP_VOLUME = 0.06;
-const CROWD_CROSSFADE_SECONDS = 0.7;
+const CROWD_CROSSFADE_SECONDS = 1.0;
+const CROWD_CROSSFADE_TRIGGER_SECONDS = 1.6;
 
 function prepareCrowdPlayer(player) {
   player.preload = 'auto';
@@ -14,7 +15,7 @@ function prepareCrowdPlayer(player) {
   player.volume = CROWD_LOOP_VOLUME;
   player.addEventListener('timeupdate', () => {
     if (player !== crowdLoop || crowdFadeStarted || !Number.isFinite(player.duration)) return;
-    if (player.currentTime >= player.duration - CROWD_CROSSFADE_SECONDS) crossfadeCrowdLoop(player);
+    if (player.currentTime >= player.duration - CROWD_CROSSFADE_TRIGGER_SECONDS) crossfadeCrowdLoop(player);
   });
 }
 
