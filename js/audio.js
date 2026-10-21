@@ -19,33 +19,6 @@ export function unlockAudio() {
 
 function ready() { return ac && sound.on; }
 
-// Start the supplied low-level stadium ambience after the game's normal user-gesture unlock.
-// Keep it separate from the master SFX bus so the 20% ambience level does not change effects.
-export async function startCrowdAmbience() {
-  if (!sound.on || typeof Audio === 'undefined') return;
-  if (!crowdLoop) {
-    crowdLoop = new Audio(CROWD_LOOP_URL);
-    crowdLoop.loop = true;
-    crowdLoop.preload = 'auto';
-    crowdLoop.volume = 0.2;
-  }
-  crowdLoop.volume = 0.2;
-  if (!crowdLoop.paused) return; // already playing; preserve loop position
-  try {
-    await crowdLoop.play();
-  } catch (err) {
-    // A later user gesture retries browsers' autoplay-policy rejection.
-    if (err?.name !== 'NotAllowedError') console.warn('Crowd ambience could not start:', err);
-  }
-}
-
-export function stopCrowdAmbience() {
-  if (!crowdLoop) return;
-  crowdLoop.pause();
-  try { crowdLoop.currentTime = 0; } catch { /* ignore if metadata is not loaded yet */ }
-}
-
-
 function tone(freq, dur, { type = 'sine', gain = 0.3, to = null, delay = 0 } = {}) {
   if (!ready()) return;
   const t = ac.currentTime + delay;
