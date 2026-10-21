@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The Thunderdome's painted stands (img/ground/thunder/view-*.webp and js/groundart.js), from
-tools/ground/src/thunder/:
+"""A club's painted stands (img/ground/<club>/view-*.webp and js/groundart.js), from
+tools/ground/src/<club>/ (the Thunderdome, or the Steel Titans' Foundry):
   stand-screen.jpg, stand-arch.jpg  the stand ahead when batting / when bowling (2576 px wide: the
                                     painted stand, its sky above it, magenta below where the field goes)
   ground-<view>.webp                the rendered ground (grass, pitch, rope, boards: Blender, tools/blender)
@@ -9,17 +9,18 @@ Each view's picture is the rendered ground with the painted stand laid above its
 stand shows on a phone (the stand's middle 60% across the screen), the painting mirrored out to the
 sides for wider screens and its sky carried up past its top edge. The top view is the ring squashed to
 the game's 0.78 tilt, with its inner edge on the grass the game draws. Needs numpy, scipy and Pillow.
-usage: python3 tools/build_thunderdome_art.py
+usage: python3 tools/build_thunderdome_art.py [thunder|titans]
 """
-import json, os
+import json, os, sys
 import numpy as np
 from PIL import Image
 from scipy import ndimage as ndi
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..')
-SRC = os.path.join(HERE, 'ground', 'src', 'thunder')
-OUT = os.path.join(ROOT, 'img', 'ground', 'thunder')
+CLUB = sys.argv[1] if len(sys.argv) > 1 else 'thunder'
+SRC = os.path.join(HERE, 'ground', 'src', CLUB)
+OUT = os.path.join(ROOT, 'img', 'ground', CLUB)
 CY, BOARD_R, BOARD_H, ROPE_R, GRASS_R = 10.0, 63.8, 0.95, 62.0, 63.5
 # each camera (js/scene.js Cam3D): render focal length, pixels above the horizon, height, pitch-end
 # distance, direction, the painting seen, and the focal length a 390 x 844 phone gives it (the scale
@@ -29,6 +30,8 @@ VIEWS = {
     'bowl':   dict(f=2400, above=576, cy=2.6, cz=34.0, dir=-1, stand='stand-arch.jpg',   phone_f=1560),
     'keeper': dict(f=1200, above=480, cy=4.6, cz=-9.0, dir=1,  stand='stand-screen.jpg', phone_f=663),
 }
+if CLUB == 'titans':
+    VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # (the Foundry's sign stand faces the bowler)
 
 
 def painting(name):
@@ -107,9 +110,10 @@ if __name__ == '__main__':
     p = os.path.join(ROOT, 'js', 'groundart.js')
     src = open(p).read(); head, body = src.split('export const GROUND_ART = ', 1)
     art = json.loads(body.rstrip().rstrip(';'))
-    t = art['thunder']
+    # (a club's first build starts from the Thunderdome's stumps and broken stumps, drawn the same)
+    t = art.setdefault(CLUB, {'top': None, 'views': {n: {} for n in meta}, 'stumps': art['thunder']['stumps'], 'broken': art['thunder']['broken']})
     for n, m in meta.items():
-        t['views'][n].update(top=m['top'], bottom=m['bottom'], roof=m['roof'])
+        t['views'][n].update(f=m['f'], w=m['w'], h=m['h'], above=m['above'], top=m['top'], bottom=m['bottom'], board={'r': BOARD_R, 'h': BOARD_H}, roof=m['roof'])
     t['top'] = top
     open(p, 'w').write(head + 'export const GROUND_ART = ' + json.dumps(art, indent=1) + ';\n')
     print('wrote js/groundart.js')

@@ -17,6 +17,10 @@ CLUBS = {
     'thunder': dict(wall='#0b1f5c', fascia='#9fb0cc', canopy='#0b1f5c', dark='#0a0f24', track='#16264f', rope='#ffd23f',
                     board=('#0b2a6e', '#1c5ad6'), screen='#071447', crowd_len=155, sky=(48, 140, 1), foot='#0b1640',
                     world=[(0.0, '#1a3384'), (0.6, '#03061f')], sun=(0.25, (0.6, 0.7, 1.0), 0.526), flood=1.0, top_bg='#1b1838', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.9, 0.6)),
+    # The Foundry: the Steel Titans' ground, in steel grey (only the ground shows: the stands are painted over it)
+    'titans': dict(wall='#3a3f47', fascia='#b9c0c8', canopy='#3a3f47', dark='#101318', track='#2a2e35', rope='#aab2bb',
+                   board=('#2b3037', '#59616b'), screen='#14171c', crowd_len=155, sky=(48, 140, 1), foot='#14171c',
+                   world=[(0.0, '#2a3a52'), (0.6, '#07090f')], sun=(0.25, (0.8, 0.85, 1.0), 0.526), flood=1.0, top_bg='#1d2026', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.9, 0.6)),
     # Cyclone Park: a storm night, a tornado over the city, a two-tier green bowl with the club's swirls
     # everywhere, its sign on the roof at each end, green beams from the floodlights
     'cyclones': dict(wall='#0d3a1e', fascia='#cfd8d3', canopy='#0d3a1e', dark='#06140c', track='#10301c', rope='#ffd21f',

@@ -38,8 +38,8 @@ export const GROUNDS = {
     pitch: { id: 'dew', name: 'Evening dew', report: 'Dew will settle later on: chasing gets easier as the night goes on.', dew: true },
   },
   titans: {
-    name: 'The Foundry', time: 'night', landmark: 'foundry',
-    sky: ['#0b0d12', '#232a33', '#4a4f57'], skyline: '#16191f', windows: ['#ffb347', '#ffe08a'],
+    name: 'The Foundry', time: 'day', landmark: 'foundry',
+    sky: ['#1f56c0', '#2f7be0', '#9fd0ff'], skyline: '#16191f', windows: ['#ffb347', '#ffe08a'],
     grass: ['#17703a', '#208746'], pitchCol: '#9fae6a',
     pitch: { id: 'green', name: 'Green seamer', report: 'A green tinge on a hard deck: seamers will nip it both ways.', seam: 1.5, bat: 0.95, ai: 1.05 },
   },
