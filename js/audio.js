@@ -30,7 +30,7 @@ export async function startCrowdAmbience() {
     crowdLoop.volume = 0.2;
   }
   crowdLoop.volume = 0.2;
-  if (!crowdLoop.paused) return;
+  if (!crowdLoop.paused) return; // already playing; preserve loop position
   try {
     await crowdLoop.play();
   } catch (err) {
