@@ -598,6 +598,7 @@ $('coverGo').addEventListener('click', () => startMatch({ mode: 'tutorial' }));
 // opts.mode: 'quick' | 'challenge' | 'tutorial' | 'league' | 'cup' | 'daily'
 async function startMatch(opts) {
   unlockAudio();
+  game.matchActive = false;
   ui.show(null);
   for (const s of ui.screens) $(s).hidden = true;
   const mode = opts.mode;
@@ -642,10 +643,16 @@ async function startMatch(opts) {
   const order = ['quick', 'league', 'cup', 'career', 'war', 'warmup'].includes(mode) ? await coinToss(teamById(opp), home) : 'bat';
   for (const s of ui.screens) $(s).hidden = true;
   if (mode === 'quick') await quickTip();
-  const summary = await game.runMatch({
-    mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
-    records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
-  });
+  game.matchActive = true;
+  let summary;
+  try {
+    summary = await game.runMatch({
+      mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+      records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
+    });
+  } finally {
+    game.matchActive = false;
+  }
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
