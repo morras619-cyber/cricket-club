@@ -45,6 +45,14 @@ export function stopCrowdAmbience() {
   try { crowdLoop.currentTime = 0; } catch { /* ignore if metadata is not loaded yet */ }
 }
 
+// File-backed crowd ambience intentionally uses a separate HTMLAudioElement so setting volume
+// to 20% does not change the synthesized sound-effects mixer.
+
+  if (!crowdLoop) return;
+  crowdLoop.pause();
+  try { crowdLoop.currentTime = 0; } catch { /* ignore if metadata is not loaded yet */ }
+}
+
 function tone(freq, dur, { type = 'sine', gain = 0.3, to = null, delay = 0 } = {}) {
   if (!ready()) return;
   const t = ac.currentTime + delay;
