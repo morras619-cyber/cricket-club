@@ -58,7 +58,8 @@ def grade(out, bt, stand):
     f = np.where(field > 0, out + (out - blur) * 0.9 * field, f)
     # richer grass: a lift in saturation and a touch of contrast
     lum = f.mean(2, keepdims=True)
-    sat = lum + (f - lum) * (1 + 0.22 * field)
+    pitch = np.clip((f[..., :1] - f[..., 2:]) / 60 - 0.3, 0, 1)         # (the warm clay: kept as it was, the glow lights it enough)
+    sat = lum + (f - lum) * (1 + (0.22 * (1 - pitch) - 0.06 * pitch) * field)
     f = np.where(field > 0, (sat - 128) * (1 + 0.06 * field) + 128, f)
     # the furnaces' glow spilling on the grass: the stand's own colours just above the boards, smeared
     # down the field, strongest at the boards and gone by a third of the way down
@@ -66,7 +67,7 @@ def grade(out, bt, stand):
     band = ndi.gaussian_filter1d(band, W * 0.03, axis=0)
     warm = np.clip(band * np.array([1.25, 0.8, 0.45]), 0, 255)          # (pushed towards fire)
     fall = np.clip(1 - (rows - bt) / (0.34 * (H - bt)), 0, 1) ** 1.6 * field
-    spill = warm[None] * fall
+    spill = warm[None] * fall * (1 - 0.5 * pitch)
     f = 255 - (255 - f) * (255 - spill * 0.55) / 255                   # screen
     # the rim of light along the boards, and the boards' own glow (a bloom of what's bright there)
     bandrows = (np.abs(rows - bt) < 70).astype(np.float64)
