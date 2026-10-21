@@ -41,7 +41,7 @@ export async function startCrowdAmbience() {
 export function stopCrowdAmbience() {
   if (!crowdLoop) return;
   crowdLoop.pause();
-  crowdLoop.currentTime = 0;
+  try { crowdLoop.currentTime = 0; } catch { /* ignore if metadata is not loaded yet */ }
 }
 
 function tone(freq, dur, { type = 'sine', gain = 0.3, to = null, delay = 0 } = {}) {
