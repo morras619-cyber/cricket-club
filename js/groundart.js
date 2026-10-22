@@ -220,7 +220,7 @@ export const GROUND_ART = {
    "w": 2012,
    "h": 724,
    "ppm": 25.618,
-   "grass": 621,
+   "grass": 595,
    "tiles": 6,
    "rRef": 75.0,
    "rGrass": 63.5
