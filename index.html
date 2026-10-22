@@ -343,10 +343,12 @@ vs a random team</small></button>
   </section>
 
   <section id="cover" class="screen" hidden>
-    <div class="screen-inner">
-      <div class="comic-cover" id="coverPanel"></div>
+    <div class="cv-bg" aria-hidden="true"></div>
+    <div class="cv-wrap">
+      <button class="cv-back" id="coverBack" aria-label="Back"><img src="img/menu/cover/nav-back.webp" alt=""></button>
+      <div class="cv-stack" id="coverPanel"></div>
       <button class="coachbtn covertips" id="coverTips" aria-pressed="true"><img src="img/menu/coach-dev.webp" alt=""><span id="coverTipsText">Uncle Dev's tips: On</span></button>
-      <button class="bigbtn primary" id="coverGo">Let's go</button>
+      <button class="cv-go" id="coverGo" aria-label="Let's go"><img src="img/menu/cover/go.webp" alt="Let's go!" draggable="false"></button>
     </div>
   </section>
 

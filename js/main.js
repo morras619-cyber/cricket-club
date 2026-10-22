@@ -580,13 +580,13 @@ function showCover() {
   $('coverTips').hidden = first;
   coverTipsShow();
   coachOnce('welcome', DEV.welcome);
-  const p = $('coverPanel');
-  p.innerHTML = '<div class="issue">ISSUE #1</div><h2>THE FINAL OVER</h2>';
-  p.append(portrait(heroById('raja'), 140, 'bat'));
-  const t = document.createElement('p');
-  t.textContent = 'Thunder Raja needs 14 off the last 4 balls. Then you defend the final 3.';
-  p.append(t);
+  // the painted card (img/menu/cover): Thunder Raja in his frame, the title over its top edge, the brief under it
+  $('coverPanel').innerHTML = '<img class="cv-card" src="img/menu/cover/card.webp" alt="Thunder Raja, ready to bat" draggable="false">'
+    + '<img class="cv-fx" src="img/menu/cover/fx.webp" alt="" aria-hidden="true" draggable="false">'
+    + '<img class="cv-title" src="img/menu/cover/title.webp" alt="Issue #1: The Final Over" draggable="false">'
+    + '<img class="cv-text" src="img/menu/cover/text.webp" alt="Thunder Raja needs 14 off the last 4 balls. Then you defend the final 3." draggable="false">';
 }
+$('coverBack').addEventListener('click', () => { sfx.click(); ui.show('home'); });
 function coverTipsShow() {
   $('coverTips').setAttribute('aria-pressed', String(tutTips));
   $('coverTipsText').textContent = `Uncle Dev's tips: ${tutTips ? 'On' : 'Off'}`;
