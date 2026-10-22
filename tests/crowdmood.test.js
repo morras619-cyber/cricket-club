@@ -39,3 +39,15 @@ test('the boo is whole: a clear boo that dies away to silence', () => {
   assert.ok(at(c, m.length / rate - 0.1, 0.09) < at(c, 0.3, 0.3) * 0.1, 'it dies away, not cut off');
   assert.ok(Math.abs(m[0]) < 0.01 && Math.abs(m[m.length - 1]) < 0.01, 'starts and ends on silence');
 });
+
+import { heat, twoWickets, RUNAWAY } from '../js/crowdheat.js';
+test('the crowd heat: hit apart is a runaway for the home side, wickets hurt the home batters, an even start is neutral', () => {
+  assert.equal(heat(['1', '0', '1'], false), 0, 'too early to judge');
+  const hit = ['4', '4', '6', '4', '1', '6', '4', '4', '1', '6', '4', '4'];
+  assert.ok(heat(hit, false) <= RUNAWAY, 'the visitors hitting them apart is a runaway');
+  assert.ok(heat(hit, true) > 0.5, 'the same innings is the home side on top when they are the batters');
+  assert.ok(heat(['1', 'W', '0', 'W', '1', '0', '0', '1'], true) < -0.3, 'the home batters losing wickets');
+  assert.ok(heat(['1', 'W', '0', 'W', '1', '0', '0', '1'], false) > 0.3, 'and the home bowlers on top');
+  assert.ok(Math.abs(heat(['1', '0', '2', '1', '1', '0', '2', '1'], false)) < 0.4, 'an ordinary spell is near neutral');
+  assert.ok(twoWickets(['1', 'W', '0', 'W']) && !twoWickets(['W', '1', '1', '1', '1', '1', '1', 'W']));
+});

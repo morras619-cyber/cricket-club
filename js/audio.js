@@ -214,7 +214,7 @@ export function crowdBoo(delay = 0) {
 // loop with no seam). Two copies play at once, the second a little slower, so the short loop's
 // repeats never line up and no pattern is heard. It follows the Sound setting.
 const AMBIENCE = [{ rate: 1, gain: 0.5 }, { rate: 0.89, gain: 0.32 }];
-let ambBuf = null, ambLoading = null, amb = null, ambRun = 0;
+let ambBuf = null, ambLoading = null, amb = null, ambRun = 0, ambLevel = 1;
 function loadAmbience() {
   if (!ambLoading) {
     ambLoading = fetch('snd/crowd-loop.wav').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
@@ -231,7 +231,8 @@ export function startAmbience() {
     if (!buf || run !== ambRun || !ready()) return; // (stopped, or muted, while it loaded)
     const bus = ac.createGain(), t = ac.currentTime;
     bus.gain.setValueAtTime(0.0001, t); bus.gain.linearRampToValueAtTime(1, t + 1.5);
-    bus.connect(master);
+    const moodG = ac.createGain(); moodG.gain.value = ambLevel;   // (the murmur follows how the match is going for the home side)
+    bus.connect(moodG).connect(master);
     const srcs = AMBIENCE.map(({ rate, gain }, i) => {
       const src = ac.createBufferSource(), g = ac.createGain();
       src.buffer = buf; src.loop = true; src.playbackRate.value = rate; g.gain.value = gain;
@@ -239,8 +240,21 @@ export function startAmbience() {
       src.start(0, i * buf.duration * 0.37);   // (the copies start at different places in it)
       return src;
     });
-    amb = { bus, srcs };
+    amb = { bus, srcs, moodG };
   });
+}
+// how the match is going for the home side, -1 (a hush: they are being hit apart) to 1 (loud, they are on top)
+export function ambienceMood(x) {
+  ambLevel = x < 0 ? 1 + 0.45 * x : 1 + 0.2 * x;
+  if (!amb) return;
+  const g = amb.moodG.gain, t = ac.currentTime;
+  g.cancelScheduledValues(t); g.setTargetAtTime(ambLevel, t, 0.8);
+}
+// the crowd goes quiet for `sec` seconds (a wicket against the home side), then the murmur comes back
+export function ambienceHush(sec = 2.5) {
+  if (!amb) return;
+  const g = amb.moodG.gain, t = ac.currentTime;
+  g.cancelScheduledValues(t); g.setTargetAtTime(0.12, t, 0.25); g.setTargetAtTime(ambLevel, t + sec, 1);
 }
 export function stopAmbience() {
   ambRun++;
