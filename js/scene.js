@@ -80,11 +80,11 @@ function drawCreases(g, cam, PX) {
     const p = cam.project(0, 0, (z0 + z1) / 2);
     if (!p) return;
     const w = 0.045 * p.k;
-    g.lineCap = 'butt';
+    g.lineCap = 'square';   // (square ends reach each other's centre-line: no gaps at the corners)
     if (w >= 3) line(g, cam, x0, z0, x1, z1, 'rgba(20,16,24,0.7)', w + 1.2);
     line(g, cam, x0, z0, x1, z1, w >= 3 ? '#fffdf0' : 'rgba(255,253,240,0.7)', Math.max(0.9, w));
   };
-  const PE = PX - 0.06;
+  const PE = 1.32;   // (the popping crease runs out to the return creases and stops there: the lines meet in a clean corner)
   for (const [z, d] of [[0, 1], [20, -1]]) {
     crease(-PE, z + 1.22 * d, PE, z + 1.22 * d); // popping crease
     crease(-1.32, z, 1.32, z); // bowling crease, through the stumps
