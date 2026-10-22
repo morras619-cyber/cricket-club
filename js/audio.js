@@ -97,7 +97,7 @@ export function cheerBuild(sec) {
   if (!ready()) return;
   if (!cheerBufs) { loadCheer(); return; }
   const t = ac.currentTime, len = Math.min(5, Math.max(0.5, sec)), bus = ac.createGain();
-  bus.gain.setValueAtTime(0.5, t); bus.gain.linearRampToValueAtTime(3, t + len);
+  bus.gain.setValueAtTime(0.35, t); bus.gain.linearRampToValueAtTime(2.2, t + len);
   bus.connect(master);
   // two copies, the second a little slower, so the short loop's repeats never line up
   const srcs = [1, 0.87].map((rate, i) => {
@@ -116,8 +116,8 @@ export function cheerStop(fade = 0.3) {
   for (const s of srcs) { try { s.stop(t + fade + 0.05); } catch { /* already stopped */ } }
   setTimeout(() => bus.disconnect(), (fade + 0.3) * 1000);
 }
-// the roar: the ball is over the rope (power: 1 a four, 1.25 a six, 1.4 a perfect six)
-export function cheerFull(power = 1.25) {
+// the roar: the ball is over the rope (power: 0.7 a four, 0.9 a six, 1 a perfect six)
+export function cheerFull(power = 0.9) {
   cheerStop(0.3);
   if (!ready()) return;
   if (!cheerBufs) { loadCheer(); return; }
@@ -127,16 +127,16 @@ export function cheerFull(power = 1.25) {
 }
 // a short burst of music under the roar: brass-like notes up to a held chord (a six: longer, with drums)
 const STING = {
-  four: { notes: [196, 247, 294, 392], gap: 0.13, chord: [196, 247, 294], hold: 0.6, drums: [] },
-  six: { notes: [262, 330, 392, 523, 392, 523, 659], gap: 0.11, chord: [262, 330, 392, 523], hold: 1.0, drums: [0, 0.44, 0.88] },
+  four: { notes: [392, 494, 587, 784], gap: 0.13, chord: [392, 494, 587], hold: 0.6, drums: [] },
+  six: { notes: [523, 659, 784, 1046, 784, 1046, 1318], gap: 0.11, chord: [523, 659, 784, 1046], hold: 1.0, drums: [0, 0.44, 0.88] },
 };
 export function sting(kind = 'four') {
   if (!ready()) return;
   const k = STING[kind] || STING.four;
   k.drums.forEach(d => { tone(110, 0.3, { gain: 0.4, to: 55, delay: d }); noise(0.1, { gain: 0.18, freq: 300, q: 1, delay: d }); });
-  k.notes.forEach((f, i) => tone(f, 0.22, { type: 'triangle', gain: 0.1, delay: i * k.gap })); // (low and soft: a high sawtooth reads as a whistle)
+  k.notes.forEach((f, i) => tone(f, 0.22, { type: 'sawtooth', gain: 0.07, delay: i * k.gap }));
   const at = k.notes.length * k.gap;
-  k.chord.forEach(f => { tone(f, k.hold, { type: 'triangle', gain: 0.07, delay: at }); tone(f / 2, k.hold, { type: 'sine', gain: 0.08, delay: at }); });
+  k.chord.forEach(f => { tone(f, k.hold, { type: 'sawtooth', gain: 0.045, delay: at }); tone(f / 2, k.hold, { type: 'triangle', gain: 0.07, delay: at }); });
 }
 
 // ---------- the match's crowd bed ----------
