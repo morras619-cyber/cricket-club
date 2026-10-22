@@ -1232,7 +1232,7 @@ export class Game {
     if (!cleared) {
       let tClear = end;
       if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
-      cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.8 : 1.6) : 1.4);
+      cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
     }
     let said = false, slowUntil = 0, slowed = !(six && grade === 'perfect'), landed = null;
     await this.until(() => {
@@ -2414,7 +2414,7 @@ export class Game {
     me.pose = POSES.dive(Math.sign(P.x - me.x) || 1);
     const p = this.of.to(P.x, P.y);
     if (saved) { this.O.ball = { x: me.x, y: me.y, h: 0.2 }; this.fx.word('SAVED!', p.x, p.y - 50, { size: 60 }); sfx.glove(); this.hitStop(100); }
-    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); cheerStart(0.4, 1.4); sfx.crowd(0.6); }
+    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); cheerStart(0.4, 1.1); sfx.crowd(0.6); }
     await this.sleepReal(this.bot ? 100 : 1000);
     this.endEvent();
     return saved;

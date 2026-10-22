@@ -93,8 +93,8 @@ function loadCheer() {
   }
   return cheerLoading;
 }
-// sec: seconds until the ball clears the rope. power: how loud (1.4 a four, 1.6 a six, 1.8 a perfect six)
-export function cheerStart(sec, power = 1.5) {
+// sec: seconds until the ball clears the rope. power: how loud (1.1 a four, 1.3 a six, 1.45 a perfect six)
+export function cheerStart(sec, power = 1.2) {
   cheerStop(0.15);
   if (!ready()) return;
   if (!cheerBuf) { loadCheer(); return; }
