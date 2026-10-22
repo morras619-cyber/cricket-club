@@ -226,12 +226,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .cv-fx { position: absolute; left: 4%; top: 22%; width: 92%; mix-blend-mode: screen; opacity: .75; animation: cvfx 2.6s ease-in-out infinite; }
 .cv-title { position: absolute; top: calc(var(--cw) * -.22); left: -6%; width: 112%; }
 .cv-text { width: 104%; margin-top: calc(var(--cw) * -.2); position: relative; }
-.cv-go { width: calc(var(--cw) * .92); margin-top: 2px; padding: 0; border: 0; background: none; line-height: 0; filter: drop-shadow(0 0 16px rgba(255,210,63,.5)); animation: cvgo 1.8s ease-in-out infinite; }
+.cv-go { width: calc(var(--cw) * .92); margin-top: 2px; padding: 0; border: 0; background: none; line-height: 0; filter: drop-shadow(0 0 16px rgba(255,210,63,.5)); }
 .cv-go img { width: 100%; display: block; }
 #cover .covertips { margin-top: 10px; }
 @keyframes cvfx { 0%, 100% { opacity: .35; transform: scale(.97) rotate(-1.5deg); } 50% { opacity: .9; transform: scale(1.03) rotate(1.5deg); } }
-@keyframes cvgo { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
-@media (prefers-reduced-motion: reduce) { .cv-fx, .cv-go { animation: none; } .cv-fx { opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .cv-fx { animation: none; opacity: .6; } }
 .comic-cover { border: 3px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 6px; box-shadow: 6px 6px 0 var(--ink); padding: 16px; text-align: center; transform: rotate(-1deg); }
 .comic-cover .issue { font-family: var(--display); color: var(--hot); font-size: 18px; letter-spacing: 2px; }
 .comic-cover h2 { font-family: var(--display); font-size: 44px; margin: 4px 0; letter-spacing: 1.5px; line-height: .95; text-wrap: balance; }
