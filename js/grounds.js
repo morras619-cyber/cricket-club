@@ -14,8 +14,8 @@ export const GROUNDS = {
     pitch: { id: 'flat', name: 'Flat road', report: 'Rock hard and flat: a batting paradise. Expect sixes.', bat: 1.08, ai: 0.92, swing: 0.8, seam: 0.8, turn: 0.85 },
   },
   cyclones: {
-    name: 'Cyclone Park', time: 'overcast', landmark: 'turbines',
-    sky: ['#1b2a4a', '#33507a', '#6a8fb8'], skyline: '#0a1a30', windows: ['#ffd21f', '#9fffb0'],
+    name: 'Cyclone Park', time: 'day', landmark: 'turbines',
+    sky: ['#1f56c0', '#2f7be0', '#9fd0ff'], skyline: '#0a1a30', windows: ['#ffd21f', '#9fffb0'],
     grass: ['#1e6b36', '#2a8442'], pitchCol: '#cdb27a',
     pitch: { id: 'swing', name: 'Overcast swinger', report: 'A storm is brewing and the air is heavy: the new ball will hoop around.', swing: 1.45 },
   },

@@ -64,7 +64,7 @@ if os.path.exists(os.path.join(SRC, 'stand-sign.jpg')):
 # (each painting's structure row, by eye: the sky isn't a plain colour)
 STRUCT = STRUCT or {
     'eagles': {'stand-screen.jpg': 250, 'stand-sign.jpg': 300}, 'vipers': {'stand-screen.jpg': 420, 'stand-sign.jpg': 380},
-    'royals': {'stand-screen.jpg': 400, 'stand-sign.jpg': 330}, 'cyclones': {'stand-screen.jpg': 400, 'stand-sign.jpg': 400},
+    'royals': {'stand-screen.jpg': 400, 'stand-sign.jpg': 330}, 'cyclones': {'stand-screen.jpg': 180, 'stand-sign.jpg': 160},
 }.get(CLUB, {})
 
 
