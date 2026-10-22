@@ -308,15 +308,21 @@ vs a random team</small></button>
         <canvas class="mk-kit" id="mkKit" width="420" height="300" aria-label="Your kit"></canvas>
         <div class="mk-title"><b id="mkName">Your Club</b><span id="mkGround">Home ground</span></div>
       </div>
-      <div class="mk-panel">
-        <label class="mk-field"><small>Club name</small><input id="mkNameIn" maxlength="22" autocomplete="off" spellcheck="false"></label>
-        <div class="mk-row2">
-          <label class="mk-field"><small>Short name</small><input id="mkShortIn" maxlength="4" autocomplete="off" spellcheck="false"></label>
-          <label class="mk-field"><small>Home ground</small><input id="mkGroundIn" maxlength="24" autocomplete="off" spellcheck="false"></label>
+      <div class="mk-panel" id="mkPanel">
+        <div class="mk-sec">
+          <label class="mk-field"><small>Club name</small><input id="mkNameIn" maxlength="22" autocomplete="off" spellcheck="false"></label>
+          <div class="mk-row2">
+            <label class="mk-field"><small>Short name</small><input id="mkShortIn" maxlength="4" autocomplete="off" spellcheck="false"></label>
+            <label class="mk-field"><small>Home ground</small><input id="mkGroundIn" maxlength="24" autocomplete="off" spellcheck="false"></label>
+          </div>
         </div>
-        <div class="mk-sub">Main colour</div><div class="mk-swatches" id="mkSuit"></div>
-        <div class="mk-sub">Trim colour</div><div class="mk-swatches" id="mkTrim"></div>
-        <div class="mk-sub">Crest</div><div class="mk-emblems" id="mkEmblems"></div>
+        <div class="mk-sec">
+          <div class="mk-sub">Main colour</div><div class="mk-swatches" id="mkSuit"></div>
+          <div class="mk-sub">Trim colour</div><div class="mk-swatches" id="mkTrim"></div>
+        </div>
+        <div class="mk-sec">
+          <div class="mk-sub">Crest</div><div class="mk-emblems" id="mkEmblems"></div>
+        </div>
       </div>
       <div class="pt-btns">
         <button class="pt-btn ghost" id="mkBack2">Back</button>

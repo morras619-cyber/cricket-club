@@ -107,6 +107,11 @@ function autoPages(body, first = 'Match') {
   if (pages.length < 2) { return; }
   pager(body, pages);
 }
+// (the club maker's three sections are tabs, set up once)
+function setupClubTabs() {
+  const secs = [...document.querySelectorAll('#mkPanel > .mk-sec')];
+  if (secs.length === 3) pager($('mkPanel'), [['Name', secs[0]], ['Colours', secs[1]], ['Crest', secs[2]]]);
+}
 // carousel: a long list as swipeable pages of `per` rows, with dots
 function carousel(nodes, per) {
   const wrap = el('div', 'carousel'), track = el('div', 'pages'), dots = el('div', 'dots');
@@ -1050,6 +1055,7 @@ function renderCareer(notes = careerNotes) {
     const n = el('div', 'panel paper statcard'); n.append(el('h3', '', 'Off-season news')); for (const x of c.news) n.append(el('div', 'kotie', x)); body.append(n);
   }
   ({ pick: careerPick, scouts: careerScouts, auction: careerAuction, season: careerSeason, playoff: careerPlayoff, done: careerDone })[c.phase](c, body);
+  autoPages(body, 'Now');
   saveProfile(profile);
 }
 $('btnLeague').addEventListener('click', () => {
@@ -1248,7 +1254,7 @@ function careerAuction(c, body) {
     const card = el('div', 'panel paper lotcard');
     const shown = Math.min(A.lots.length, 16);
     card.append(el('div', 'eyebrow', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
-    card.append(futCard(p, { size: Math.min(250, window.innerWidth * 0.62) }));
+    card.append(futCard(p, { size: Math.min(250, window.innerWidth * 0.62, window.innerHeight * 0.15) }));
     card.append(el('p', 'lotmeta', `${ageNote(p)} · bat ${p.bat}${p.bowlSkill ? ` · bowl ${p.bowlSkill}` : ''} · worth ${money(value(p))}`));
     if (p.heroId) card.append(el('div', 'herostat', `${heroById(p.heroId).power.name}: ${heroById(p.heroId).power.desc}`));
     const price = el('div', 'lotprice');
@@ -1456,7 +1462,7 @@ function careerSquad(c, body) {
   for (const p of [...pool].sort((a, b) => ovr(b) - ovr(a))) {
     const r = el('div', 'futcell');
     const s = p.stats.season;
-    r.append(futCard(p, { size: 156 }),
+    r.append(futCard(p, { size: 112 }),
       el('div', 'futnote', `${p.contract} season${p.contract === 1 ? '' : 's'} left · this season ${s.runs}r ${s.wkts}w · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`));
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
@@ -1489,7 +1495,11 @@ function careerSquad(c, body) {
   };
   pick('Batting order', L.order, batCandidates(pool), ORDER_SIZE, p => `bat ${p.bat}`, next => { c.lineup = { order: next.map(p => p.id), attack: L.attack.map(p => p.id) }; });
   pick('Bowling attack', L.attack, bowlCandidates(pool), ATTACK_SIZE, p => `${bowlType(p.bowl).short} ${p.bowlSkill}`, next => { c.lineup = { order: L.order.map(p => p.id), attack: next.map(p => p.id) }; });
-  body.append(list, sheet);
+  // nothing scrolls down: the players swipe in pairs (fours on a tall phone), the line-up is its own tab
+  const per = window.innerHeight >= 800 ? 4 : 2;
+  grid.replaceWith(carousel([...grid.children], per));
+  list.querySelectorAll('.carousel .page').forEach(pg => pg.classList.add('futpage'));
+  pager(body, [['Players', list], ['Line-up', sheet]]);
 }
 
 // records that never go away
@@ -1530,7 +1540,10 @@ function renderRecords() {
   confirmTap(reset, 'Tap again to start over', () => {
     profile.career = null; saveProfile(profile); careerView = 'hub'; renderCareer();
   });
-  body.append(reset);
+  // nothing scrolls down: the boards swipe in threes (twos on a short phone)
+  const boards = [...body.children];
+  body.textContent = '';
+  body.append(carousel(boards, window.innerHeight >= 800 ? 3 : 2), reset);
 }
 $('recordsBack').addEventListener('click', () => renderCareer());
 
@@ -1829,6 +1842,7 @@ document.addEventListener('visibilitychange', () => {
 // ---------- boot ----------
 (async () => {
   try { await Promise.race([document.fonts.load('40px Bangers'), new Promise(r => setTimeout(r, 1500))]); } catch { /* fallback fonts */ }
+  setupClubTabs();
   game.resize(); // redraw the cached stadium now the comic font is ready
   if (challenge || window.__SIXCHARGE_BOT) renderHome();
   else renderTitle(); // (the title screen first for everyone; Play goes on to the tutorial or the hub)

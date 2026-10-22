@@ -995,3 +995,50 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 #league .tab { font-size: 15px; }
 #league .ghostchip { align-self: center; }
 @media (max-height: 880px) { #league .lg-logo { display: none; } }
+#career { overflow: hidden; touch-action: pan-x; }
+#career .screen-inner { height: 100%; padding-top: 12px; padding-bottom: calc(14px + var(--safe-b)); gap: 8px; }
+#career .title { font-size: 32px; margin: 0; }
+#career .lg-logo { width: min(150px, 38%); margin: -8px auto -10px; }
+#career .lede { margin: 0; font-size: 13px; }
+#career .tab { font-size: 15px; }
+#career .ghostchip { align-self: center; }
+@media (max-height: 880px) { #career .lg-logo { display: none; } }
+.futpage { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 6px; justify-items: center; align-content: start; }
+#career .sheetbox { flex: none; }
+#career .pt-coach { margin: 0; }
+#career .coachbtn { transform: scale(.85); transform-origin: center; margin: -4px 0; }
+#records { overflow: hidden; touch-action: pan-x; }
+#records .screen-inner { height: 100%; padding-top: 12px; padding-bottom: calc(14px + var(--safe-b)); gap: 8px; }
+#records .title { font-size: 32px; margin: 0; }
+#records .lede { margin: 0; font-size: 13px; }
+#records .statsbody { flex: 1 1 0; min-height: 0; }
+#records .carousel .page { gap: 8px; }
+#records .statcard { padding: 10px 12px; }
+@media (max-height: 880px) { #records .lede { display: none; } }
+#career .page .sheetnote { display: none; }
+#career .sheetbox h3 { margin: 0; font-size: 20px; }
+#career .sheetrow { gap: 8px; }
+#career .sheetrow select { padding: 5px 8px; font-size: 14px; }
+#career .sheetbox { gap: 6px; padding: 10px 12px; }
+#career .kostage { margin: 2px 0 0; }
+#career .lotcard { padding: 8px 10px; gap: 4px; }
+#career .lotcard .eyebrow { margin: 0; }
+#career .lotprice { padding: 4px 14px; }
+#career .lotprice b { font-size: 28px; }
+#career .lotmeta { font-size: 13px; }
+#career .notecard { padding: 8px 12px; font-size: 14px; }
+#career .lotcard .bigbtn { padding: 8px 12px; font-size: 22px; }
+#career .lotcard .ghostchip { font-size: 11px; padding: 3px 10px; }
+@media (max-height: 700px) { #career .sheetrow select { padding: 2px 8px; } #career .sheetbox { gap: 3px; } #career .sheetno { flex-basis: 22px; height: 22px; } #career .lotcard .fut { margin: 0 auto; } #career .notecard { display: none; } }
+/* the team picker never scrolls: the card is a little smaller and the hint goes on a short phone */
+#pickteam { overflow: hidden; }
+#pickteam .pt { --cw: min(64vw, 290px, 27vh); height: 100%; min-height: 0; }
+@media (max-height: 760px) { #pickteam .pt { --cw: min(60vw, 290px, 20vh); } #pickteam .pt-note { display: none; } #pickteam .pt-stage { margin-top: 2px; } }
+/* the club maker never scrolls: the preview on top, its three sections as tabs */
+#makeclub { overflow: hidden; }
+#makeclub .pt.mk { height: 100%; min-height: 0; }
+#makeclub .mk-show { height: clamp(140px, 24vh, 210px); }
+#makeclub .mk-panel { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; margin-top: 8px; }
+#makeclub .mk-panel .tabs { margin-bottom: 4px; }
+#makeclub .mk-panel .page { overflow: hidden; padding: 2px 0; }
+@media (max-height: 760px) { #makeclub .pt-coach { display: none; } #makeclub .mk-show { height: 132px; } }
