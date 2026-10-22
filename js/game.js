@@ -761,6 +761,7 @@ export class Game {
     if (opt.waitPower) await opt.waitPower();
     await this.sleepReal(this.bot ? 150 : aiPower ? 1700 : 650);
     await this.powerPause();
+    this.crowdBuild = this.wantBuild(ballNo);
     this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
 
     // run-up: freezes mid-stride while a power's comic panel is on screen
@@ -919,6 +920,7 @@ export class Game {
       await this.battingHit(inn, ballNo, res, grade, aiField, rng, fx);
     }
     this.bowlCrowd(inn.wkts > before.wkts ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
+    this.afterWicket = inn.wkts > before.wkts;
     this.hud(inn);
     if (!opt.assist) await this.battingBanter({ runs: inn.runs - before.runs, wicketFell: inn.wkts > before.wkts, beaten: res.outcome === 'beaten' || (res.outcome === 'edge' && inn.wkts === before.wkts), rng, inn });
     await this.sleepReal(this.bot ? 50 : 650);
@@ -1064,8 +1066,19 @@ export class Game {
   // counts. A catch chance only softens the build-up (it is not held for the catch): a catch taken is a wicket.
   bowlCrowdStart(bowlingTeam) {
     this.crowdLive = bowlingTeam.id === this.home;
-    if (this.crowdLive) crowdOhh();
+    this.groaned = false;
+    // the build-up is saved for the first ball of an over and the first ball after a wicket; the groan and the roar
+    // are for every ball
+    if (this.crowdLive && this.crowdBuild) crowdOhh();
   }
+  // a home fielder falls short, or the home side's throw misses: the crowd groans (once a ball)
+  fieldingGroan(fieldingTeam) {
+    if (fieldingTeam.id !== this.home || this.groaned) return;
+    this.groaned = true;
+    crowdResolve('dot');
+  }
+  // the build-up is wanted on the first ball of an over and the first ball after a wicket
+  wantBuild(ballNo) { return (ballNo - 1) % 6 === 0 || !!this.afterWicket; }
   bowlCrowdSoften() { if (this.crowdLive) crowdSoften(); }
   bowlCrowd(kind) {
     if (!this.crowdLive) return;
@@ -1295,6 +1308,7 @@ export class Game {
         const q = this.of.to(miss.point.x, miss.point.y);
         this.fx.sparks(q.x, q.y, 10, ['#c9a46a', '#8a6a3c', '#f2e2b8'], 3);
         this.fx.word('JUST SHORT!', q.x, q.y - 50, { size: 40, color: '#fff4da', stroke: '#e8343b', dur: 1100 });
+        this.fieldingGroan(o.side === 'ai' ? this.oppTeam : this.myTeam); // (the fielding side's own crowd, if it is at home)
         sfx.crowd(0.6);
       }
       if (tb >= end && A && (o.caught || sim.intercept)) { b.x = A.x; b.y = A.y; b.h = o.caught ? 1.6 : 0.3; }
@@ -1308,7 +1322,7 @@ export class Game {
           roDone = true;
           const es = this.of.to(roEnd.x, roEnd.y);
           if (o.runOut) { this.hitStop(150); sfx.stumps(); this.fx.shake(12); this.fx.burst(es.x, es.y, { color: '#ffd23f' }); this.fx.word('RUN OUT!', es.x, es.y - 50, { size: 62 }); }
-          else this.fx.word('SAFE!', es.x, es.y - 40, { size: 52, color: '#fff4da', stroke: INK });
+          else { this.fx.word('SAFE!', es.x, es.y - 40, { size: 52, color: '#fff4da', stroke: INK }); this.fieldingGroan(o.side === 'ai' ? this.oppTeam : this.myTeam); }
         }
       }
       // a six by a side with painted effects flies as a comet; a four races along with a streak
@@ -1350,7 +1364,7 @@ export class Game {
           this.board(`${m}m SIX!`);
         }
         else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
-        else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); }
+        else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); this.fieldingGroan(o.side === 'ai' ? this.oppTeam : this.myTeam); }
         else if (o.runOut !== undefined) { /* the throw says RUN OUT! or SAFE! */ }
         else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * (D ? 0.62 : 0.3), { size: 44, color: '#fff4da', stroke: INK });
       }
@@ -1463,6 +1477,7 @@ export class Game {
     const hint = opt.hint || (this.bowlHints-- > 0 ? 'SWIPE FROM YOUR BOWLER UP THE PITCH' : null);
     if (hint) this.ui.hint(hint);
 
+    this.crowdBuild = this.wantBuild(ballNo);
     // the swipe (the FIELD button may interrupt it)
     let G;
     for (;;) {
@@ -1679,6 +1694,7 @@ export class Game {
 
     const runs = inn.runs - before.runs, wicketFell = inn.wkts > before.wkts;
     this.bowlCrowd(wicketFell ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
+    this.afterWicket = wicketFell;
     const goodBall = wicketFell || (runs === 0 && (res.outcome !== 'hit' || rg === 'perfect' || (mods?.tags.some(t => t.charge > 0) ?? false)));
     await this.bowlingBanter({ runs, wicketFell, goodBall, rng, inn });
     await this.sleepReal(this.bot ? 50 : 400);
@@ -2293,7 +2309,7 @@ export class Game {
     } else {
       this.O.ball = { x: L.x, y: L.y, h: 0 };
       this.fx.word('BUTTERFINGERS!', p.x, p.y - 50, { size: 52 });
-      sfx.trombone();
+      sfx.trombone(); this.fieldingGroan(this.myTeam);
     }
     await this.sleepReal(this.bot ? 100 : 1000);
     this.endEvent();
@@ -2411,6 +2427,7 @@ export class Game {
       this.ui.banner('OUT!', `by ${Math.abs(margin).toFixed(2)}s`, 1500);
     } else {
       this.fx.word(wild ? 'WILD THROW!' : 'SAFE!', es.x, es.y - 40, { size: 52, color: '#fff4da', stroke: INK });
+      this.fieldingGroan(this.myTeam); // (the throw missed)
       this.ui.banner('NOT OUT', wild ? 'Overthrow: +1 run' : `by ${margin.toFixed(2)}s`, 1400);
     }
     await this.sleepReal(this.bot ? 100 : 1200);
