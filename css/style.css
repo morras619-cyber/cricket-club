@@ -966,3 +966,22 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
   #war .warpick-q, #war .fixabout { font-size: 13px; }
   #war .title { font-size: 30px; }
 }
+
+/* the result screen: the score on top, tabs over pages, Home / Play again fixed at the foot */
+#result { overflow: hidden; touch-action: pan-x; background: linear-gradient(rgba(2, 10, 56, .5), rgba(2, 10, 56, .28) 38%, rgba(2, 10, 56, .62)), #02103a url(../img/menu/screen-bg.webp) center top / cover no-repeat; }
+#result .screen-inner { height: 100%; padding-top: 12px; padding-bottom: calc(14px + var(--safe-b)); gap: 8px; }
+#result .title { font-size: 38px; margin: 0; }
+#result .lede { margin: 0; font-size: 13px; }
+#result .cards { gap: 8px; }
+#result .card { padding: 7px 10px; border-radius: 12px; }
+#result .card .score { font-size: 26px; line-height: 1.05; }
+#result .card .sub { font-size: 12px; }
+#result .matchstats { padding: 10px 12px; gap: 5px; }
+#result .matchstats .row b { font-size: 18px; }
+#result .matchstats .row span { font-size: 13px; }
+#result .sharefig { gap: 4px; }
+#result .sharefig img { width: auto; max-width: 100%; max-height: 34vh; border-radius: 8px; }
+#result .sharebox { gap: 8px; }
+#result .sharebox .bigbtn { padding: 9px 12px; font-size: 20px; }
+#result .page { align-items: stretch; }
+#result .page > .sharefig { align-items: center; }

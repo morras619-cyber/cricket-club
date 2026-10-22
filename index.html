@@ -392,21 +392,24 @@ vs a random team</small></button>
       <h2 class="title" id="resTitle">You won!</h2>
       <p class="lede" id="resText"></p>
       <div class="cards" id="resCards"></div>
-      <div class="panel paper matchstats" id="resStats"></div>
-      <figure class="sharefig">
-        <img id="shareImg" alt="Comic share card of your biggest moment">
-        <figcaption id="shareCaption">Long-press the card to save it.</figcaption>
-      </figure>
-      <div class="menu">
-        <a class="bigbtn whatsapp" id="shareWa" href="#" target="_blank" rel="noopener">Share on WhatsApp</a>
-        <button class="bigbtn" id="shareNative" hidden>Share card + link</button>
-        <div class="copyrow"><input id="shareLink" readonly aria-label="Challenge link"><button class="chipbtn" id="copyLink">Copy</button></div>
-        <div class="menu row">
-          <button class="bigbtn ghost" id="resHome">Home</button>
-          <button class="bigbtn primary" id="resAgain">Play again</button>
+      <div id="resPages"></div>
+      <div class="menu row">
+        <button class="bigbtn ghost" id="resHome">Home</button>
+        <button class="bigbtn primary" id="resAgain">Play again</button>
+      </div>
+      <div id="resStash" hidden>
+        <div class="panel paper matchstats" id="resStats"></div>
+        <p id="resRewards"></p>
+        <figure class="sharefig" id="shareFig">
+          <img id="shareImg" alt="Comic share card of your biggest moment">
+          <figcaption id="shareCaption">Long-press the card to save it.</figcaption>
+        </figure>
+        <div class="menu sharebox" id="shareBox">
+          <a class="bigbtn whatsapp" id="shareWa" href="#" target="_blank" rel="noopener">Share on WhatsApp</a>
+          <button class="bigbtn" id="shareNative" hidden>Share card + link</button>
+          <div class="copyrow"><input id="shareLink" readonly aria-label="Challenge link"><button class="chipbtn" id="copyLink">Copy</button></div>
         </div>
       </div>
-      <p class="fineprint" id="resRewards"></p>
     </div>
   </section>
 

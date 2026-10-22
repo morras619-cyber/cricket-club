@@ -1676,6 +1676,7 @@ function showResult(summary) {
   }
   const got = mode === 'tutorial' ? [] : checkAchievements(profile, { summary, rec, events });
   saveProfile(profile);
+  $('resStash').append($('shareFig'), $('shareBox'), $('resStats')); // (back to the stash: the pages below are rebuilt each match)
   ui.show('result');
   $('resTitle').textContent = win ? 'YOU WON!' : summary.result.outcome === 'tie' ? 'TIED!' : 'SO CLOSE!';
   $('resText').textContent = summary.result.text;
@@ -1767,6 +1768,17 @@ function showResult(summary) {
       };
     }
   }, 'image/jpeg', 0.86);
+  // the result in tabs over swipeable pages: nothing scrolls down
+  const hl = el('div', 'panel paper matchstats'), sc = el('div', 'panel paper matchstats');
+  hl.append(el('div', 'row notes', $('resRewards').textContent));
+  for (const row of [...ms.children]) {
+    const tag = row.querySelector?.('.badge')?.textContent;
+    (row.classList.contains('notes') || tag === 'ACHIEVEMENT' || tag === 'LEVEL UP' ? hl : sc).append(row);
+  }
+  const pages = [['Highlights', hl]];
+  if (sc.children.length) pages.push(['Scorecard', sc]);
+  pages.push(['Share', [$('shareFig'), $('shareBox')]]);
+  pager($('resPages'), pages);
   $('resAgain').textContent = { tutorial: 'Play Quick Match', league: 'Back to the league', cup: 'Back to the cup', daily: 'Daily results', career: 'Back to the season', war: 'Back to the war', warmup: 'Back to the war' }[mode] || 'Play again';
 }
 
