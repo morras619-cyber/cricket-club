@@ -17,7 +17,7 @@ export const GROUND_ART = {
     "w": 2400,
     "h": 1536,
     "above": 480,
-    "top": "#3f84dc",
+    "top": "#333b54",
     "bottom": "#2f9519",
     "board": {
      "r": 63.8,
@@ -25,7 +25,7 @@ export const GROUND_ART = {
     },
     "roof": {
      "r": 94,
-     "h": 24.9
+     "h": 26.6
     }
    },
    "bowl": {
@@ -33,7 +33,7 @@ export const GROUND_ART = {
     "w": 2400,
     "h": 1536,
     "above": 576,
-    "top": "#2f64c4",
+    "top": "#1b3976",
     "bottom": "#2a8f19",
     "board": {
      "r": 63.8,
@@ -41,7 +41,7 @@ export const GROUND_ART = {
     },
     "roof": {
      "r": 94,
-     "h": 22.0
+     "h": 19.4
     }
    },
    "keeper": {
@@ -49,7 +49,7 @@ export const GROUND_ART = {
     "w": 2520,
     "h": 1704,
     "above": 480,
-    "top": "#2d69ce",
+    "top": "#263964",
     "bottom": "#2e941a",
     "board": {
      "r": 63.8,
@@ -57,7 +57,7 @@ export const GROUND_ART = {
     },
     "roof": {
      "r": 94,
-     "h": 39.3
+     "h": 42.0
     }
    }
   },
