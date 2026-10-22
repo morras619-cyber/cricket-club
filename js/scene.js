@@ -73,6 +73,24 @@ const ART = {};
 const artKey = team => { const t = teamById(team); return t.custom ? `${team}|own${t.stadium}|${t.suit}|${t.trim}|${logoSrc(team).length}` : team; };
 // the pitch, grass and stumps a ground may share with another (meta.share) rather than carry its own copies
 const SHARED = new Set(['pitch', 'grass', 'stumps', 'stumps-broken']);
+// creases, kept on the pitch: white, with a fine ink edge only where they're big enough to
+// carry one (far away an edge turns a crease into a stack of stripes)
+function drawCreases(g, cam, PX) {
+  const crease = (x0, z0, x1, z1) => {
+    const p = cam.project(0, 0, (z0 + z1) / 2);
+    if (!p) return;
+    const w = 0.045 * p.k;
+    g.lineCap = 'butt';
+    if (w >= 3) line(g, cam, x0, z0, x1, z1, 'rgba(20,16,24,0.7)', w + 1.2);
+    line(g, cam, x0, z0, x1, z1, w >= 3 ? '#fffdf0' : 'rgba(255,253,240,0.7)', Math.max(0.9, w));
+  };
+  const PE = PX - 0.06;
+  for (const [z, d] of [[0, 1], [20, -1]]) {
+    crease(-PE, z + 1.22 * d, PE, z + 1.22 * d); // popping crease
+    crease(-1.32, z, 1.32, z); // bowling crease, through the stumps
+    for (const x of [-1.32, 1.32]) crease(x, z + 1.22 * d, x, z - 1.22 * d); // return creases
+  }
+}
 // Grounds with a painted strip of their own, fresh and late (img/ground/<club>/pitch-fresh.webp, pitch-late.webp): the strip
 // fades from one to the other as the match wears (js/pitches.js pitchLate). The others keep the shared strip.
 const OWN_PITCH = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix'];   // (their order in img/ground/pitches.webp: a strip 320 px wide, fresh then late, for each)
@@ -273,22 +291,7 @@ function renderPainted(cam, art) {
   // the 30-yard circle (in the Power Burst only two fielders may stand outside it); the rope
   // shows only in the outfield view from above
   ring(g, cam, 27, 'rgba(255,255,255,0.5)', 1.6, [8, 7]);
-  // creases, kept on the pitch: white, with a fine ink edge only where they're big enough to
-  // carry one (far away an edge turns a crease into a stack of stripes)
-  const crease = (x0, z0, x1, z1) => {
-    const p = cam.project(0, 0, (z0 + z1) / 2);
-    if (!p) return;
-    const w = 0.045 * p.k;
-    g.lineCap = 'butt';
-    if (w >= 3) line(g, cam, x0, z0, x1, z1, 'rgba(20,16,24,0.7)', w + 1.2);
-    line(g, cam, x0, z0, x1, z1, w >= 3 ? '#fffdf0' : 'rgba(255,253,240,0.7)', Math.max(0.9, w));
-  };
-  const PE = PX - 0.06;
-  for (const [z, d] of [[0, 1], [20, -1]]) {
-    crease(-PE, z + 1.22 * d, PE, z + 1.22 * d); // popping crease
-    crease(-1.32, z, 1.32, z); // bowling crease, through the stumps
-    for (const x of [-1.32, 1.32]) crease(x, z + 1.22 * d, x, z - 1.22 * d); // return creases
-  }
+  drawCreases(g, cam, PX);
   // vignette, darker after dark
   const gr = g.createRadialGradient(W / 2, H * 0.55, H * 0.32, W / 2, H * 0.55, H * 0.8);
   gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(6,4,20,${0.12 + 0.22 * night})`);
@@ -333,6 +336,7 @@ function renderBuilt(cam, art, v, im) {
       const span = Math.max(1, (ph(pt) / (PZ1 - PZ0)) * (rowH * d * d) / (cam.cy * cam.f));
       g.drawImage(pt, ptx0, Math.min(v, ph(pt) - span), ptw, span, Math.min(a.x, b.x), y, Math.abs(b.x - a.x), rowH + 0.4);
     }
+    drawCreases(g, cam, PX);   // (the strip covers the rendered ground's creases: they are drawn again on it)
   }
   if (dy > 0) {
     const gr = g.createLinearGradient(0, dy, 0, dy + dh * 0.06);
