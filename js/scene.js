@@ -75,7 +75,7 @@ const artKey = team => { const t = teamById(team); return t.custom ? `${team}|ow
 const SHARED = new Set(['pitch', 'grass', 'stumps', 'stumps-broken']);
 // Grounds with a painted strip of their own, fresh and late (img/ground/<club>/pitch-fresh.webp, pitch-late.webp): the strip
 // fades from one to the other as the match wears (js/pitches.js pitchLate). The others keep the shared strip.
-const OWN_PITCH = new Set(['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix']);
+const OWN_PITCH = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix'];   // (their order in img/ground/pitches.webp: a strip 320 px wide, fresh then late, for each)
 let PITCH_LATE = 0;
 export function setPitchLate(w) {
   const q = Math.round(Math.max(0, Math.min(1, w)) * 8) / 8;
@@ -87,13 +87,12 @@ export function setPitchLate(w) {
 function pitchNow(art) {
   if (!art.pitchFresh) return art.pitch;
   const f = art.pitchFresh, l = art.pitchLate;
-  if (!f.complete || !f.naturalWidth) return art.pitch;
   if (art.pitchCur && art.pitchQ === PITCH_LATE) return art.pitchCur;
-  const c = art.pitchCur && art.pitchCur.width === f.naturalWidth ? art.pitchCur : document.createElement('canvas');
-  c.width = f.naturalWidth; c.height = f.naturalHeight;
+  const c = art.pitchCur || document.createElement('canvas');
+  c.width = f.width; c.height = f.height;
   const g = c.getContext('2d');
   g.drawImage(f, 0, 0);
-  if (PITCH_LATE > 0 && l?.complete && l.naturalWidth) { g.globalAlpha = PITCH_LATE; g.drawImage(l, 0, 0, c.width, c.height); g.globalAlpha = 1; }
+  if (PITCH_LATE > 0) { g.globalAlpha = PITCH_LATE; g.drawImage(l, 0, 0); g.globalAlpha = 1; }
   art.pitchCur = c; art.pitchQ = PITCH_LATE;
   return c;
 }
@@ -110,11 +109,20 @@ function loadArt(team) {
   // a ground built in Blender: one finished background per camera (tools/blender)
   for (const v of Object.keys(meta.views || {})) files['view-' + v] = 'view-' + v;
   if (meta.top) files.topView = 'view-top';
-  if (OWN_PITCH.has(team)) Object.assign(files, { pitchFresh: 'pitch-fresh', pitchLate: 'pitch-late' });
   if (meta.strip) files.stripImg = 'strip'; // (the close-up stands, wrapped round the rope in the top view: OutfieldView.drawStrip)
-  let left = Object.keys(files).length + 1;
+  const own = OWN_PITCH.indexOf(team);
+  let left = Object.keys(files).length + 1 + (own >= 0 ? 1 : 0);
   const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
   for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${meta.share && SHARED.has(f) ? meta.share : team}/${f}.webp`; a[k] = im; }
+  if (own >= 0) {   // (this ground's strip, fresh and late, cut from the shared picture)
+    const at = new Image();
+    at.onload = () => {
+      const cut = x => { const c = document.createElement('canvas'); c.width = 320; c.height = at.naturalHeight; c.getContext('2d').drawImage(at, x, 0, 320, at.naturalHeight, 0, 0, 320, at.naturalHeight); return c; };
+      a.pitchFresh = cut(own * 640); a.pitchLate = cut(own * 640 + 320); done();
+    };
+    at.onerror = () => { done(); };   // (without it the shared strip stays)
+    at.src = 'img/ground/pitches.webp';
+  }
   a.logo = new Image(); a.logo.onload = done; a.logo.onerror = done; a.logo.src = 'img/menu/logo.webp';
 }
 function loadOwnArt(team, key, a, dir) {
