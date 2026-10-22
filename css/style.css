@@ -331,12 +331,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .title-logo { position: relative; display: block; width: 100%; height: auto; filter: drop-shadow(0 6px 12px rgba(0, 0, 40, .5)); animation: titlepop .7s cubic-bezier(.2, 1.4, .4, 1) both; }
 /* a slow shine crosses the lettering, cut to the logo's own shape */
 .title-shine { position: absolute; inset: 0; -webkit-mask: url(../img/menu/title-logo.webp) center / 100% 100% no-repeat; mask: url(../img/menu/title-logo.webp) center / 100% 100% no-repeat; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .75) 50%, transparent 62%) -140% 0 / 60% 100% no-repeat; animation: titleshine 4.2s ease-in-out 1.2s infinite; mix-blend-mode: overlay; }
-.title-heroes { position: relative; display: block; width: 118%; max-width: none; height: auto; margin-top: -14px; pointer-events: none; -webkit-mask-image: linear-gradient(#000 84%, transparent); mask-image: linear-gradient(#000 84%, transparent); }
+.title-heroes { position: relative; display: block; width: 112%; max-width: none; height: auto; margin-top: -26px; margin-bottom: -34px; pointer-events: none; }
 @keyframes titlefx { 0%, 100% { opacity: .78; } 50% { opacity: 1; } }
 @keyframes titlepop { from { transform: scale(.86); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes titleshine { 0%, 55% { background-position: -140% 0; } 100% { background-position: 240% 0; } }
 @media (prefers-reduced-motion: reduce) { .title-fx, .title-logo, .title-shine { animation: none; } }
-.title-play { position: relative; display: block; width: 94%; margin-top: -30px; padding: 0; border: 0; background: none; filter: drop-shadow(0 5px 8px rgba(0, 0, 30, .6)); }
+.title-play { position: relative; display: block; width: 94%; margin-top: 0; padding: 0; border: 0; background: none; filter: drop-shadow(0 5px 8px rgba(0, 0, 30, .6)); }
 .title-play img { display: block; width: 100%; height: auto; }
 .title-play:active { transform: translate(1px, 2px); }
 .title-tunnel { position: absolute; z-index: 0; left: 0; bottom: 0; width: 100%; height: auto; pointer-events: none; -webkit-mask-image: linear-gradient(transparent, #000 28%); mask-image: linear-gradient(transparent, #000 28%); }
