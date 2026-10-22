@@ -73,6 +73,31 @@ const ART = {};
 const artKey = team => { const t = teamById(team); return t.custom ? `${team}|own${t.stadium}|${t.suit}|${t.trim}|${logoSrc(team).length}` : team; };
 // the pitch, grass and stumps a ground may share with another (meta.share) rather than carry its own copies
 const SHARED = new Set(['pitch', 'grass', 'stumps', 'stumps-broken']);
+// Grounds with a painted strip of their own, fresh and late (img/ground/<club>/pitch-fresh.webp, pitch-late.webp): the strip
+// fades from one to the other as the match wears (js/pitches.js pitchLate). The others keep the shared strip.
+const OWN_PITCH = new Set(['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix']);
+let PITCH_LATE = 0;
+export function setPitchLate(w) {
+  const q = Math.round(Math.max(0, Math.min(1, w)) * 8) / 8;
+  if (q === PITCH_LATE) return;
+  PITCH_LATE = q;
+  groundListener?.();   // (the cached backgrounds are painted again with the strip as it is now)
+}
+// the strip as it is now: the fresh picture with the late one laid over it, cached for each step
+function pitchNow(art) {
+  if (!art.pitchFresh) return art.pitch;
+  const f = art.pitchFresh, l = art.pitchLate;
+  if (!f.complete || !f.naturalWidth) return art.pitch;
+  if (art.pitchCur && art.pitchQ === PITCH_LATE) return art.pitchCur;
+  const c = art.pitchCur && art.pitchCur.width === f.naturalWidth ? art.pitchCur : document.createElement('canvas');
+  c.width = f.naturalWidth; c.height = f.naturalHeight;
+  const g = c.getContext('2d');
+  g.drawImage(f, 0, 0);
+  if (PITCH_LATE > 0 && l?.complete && l.naturalWidth) { g.globalAlpha = PITCH_LATE; g.drawImage(l, 0, 0, c.width, c.height); g.globalAlpha = 1; }
+  art.pitchCur = c; art.pitchQ = PITCH_LATE;
+  return c;
+}
+const pw = p => p.naturalWidth || p.width, ph = p => p.naturalHeight || p.height;
 function loadArt(team) {
   const T = teamById(team), key = artKey(team), dir = T.custom ? `own${T.stadium}` : team;
   const meta = GROUND_ART[dir];
@@ -85,6 +110,7 @@ function loadArt(team) {
   // a ground built in Blender: one finished background per camera (tools/blender)
   for (const v of Object.keys(meta.views || {})) files['view-' + v] = 'view-' + v;
   if (meta.top) files.topView = 'view-top';
+  if (OWN_PITCH.has(team)) Object.assign(files, { pitchFresh: 'pitch-fresh', pitchLate: 'pitch-late' });
   if (meta.strip) files.stripImg = 'strip'; // (the close-up stands, wrapped round the rope in the top view: OutfieldView.drawStrip)
   let left = Object.keys(files).length + 1;
   const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
@@ -190,8 +216,8 @@ function renderPainted(cam, art) {
   // the outfield and the pitch, row by row: each screen row is one line across the ground, cut
   // from the art (plain drawImage calls: pattern transforms are unreliable on iPhone Safari)
   const mips = grassMips(art);
-  const pt = art.pitch, PZ0 = -2, PZ1 = 22, PX = 1.52; // the painted strip covers 24 m; its ragged sides are trimmed
-  const ptx0 = pt.naturalWidth * 0.04, ptw = pt.naturalWidth * 0.92;
+  const pt = pitchNow(art), PZ0 = -2, PZ1 = 22, PX = 1.52; // the painted strip covers 24 m; its ragged sides are trimmed
+  const ptx0 = pw(pt) * 0.04, ptw = pw(pt) * 0.92;
   const rowH = 1 / dpr;
   for (let y = hy; y < H; y += rowH) {
     const gp = cam.groundAt(W / 2, y + rowH / 2);
@@ -210,12 +236,12 @@ function renderPainted(cam, art) {
       g.drawImage(tex, 0, row, TS, 1, cam.dir > 0 ? sx : sx - tw, y, tw + 0.6, rowH + 0.4);
     }
     if (gp.z > PZ0 && gp.z < PZ1) {
-      const v = ((PZ1 - gp.z) / (PZ1 - PZ0)) * pt.naturalHeight;
+      const v = ((PZ1 - gp.z) / (PZ1 - PZ0)) * ph(pt);
       const a = cam.project(-PX, 0, gp.z), b = cam.project(PX, 0, gp.z);
       if (a && b) {
         const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
-        const span = Math.max(1, (pt.naturalHeight / (PZ1 - PZ0)) * (rowH * d * d) / (cam.cy * cam.f));
-        g.drawImage(pt, ptx0, Math.min(v, pt.naturalHeight - span), ptw, span, x0, y, x1 - x0, rowH + 0.4);
+        const span = Math.max(1, (ph(pt) / (PZ1 - PZ0)) * (rowH * d * d) / (cam.cy * cam.f));
+        g.drawImage(pt, ptx0, Math.min(v, ph(pt) - span), ptw, span, x0, y, x1 - x0, rowH + 0.4);
       }
     }
   }
@@ -286,6 +312,20 @@ function renderBuilt(cam, art, v, im) {
   }
   if (dy + dh < H) { g.fillStyle = v.bottom; g.fillRect(0, dy + dh - 1, W, H - dy - dh + 1); }
   g.drawImage(im, dx, dy, dw, dh);
+  // a ground with a strip of its own: it is laid over the rendered one, row by row, in this camera's perspective
+  if (art.pitchFresh) {
+    const pt = pitchNow(art), PZ0 = -2, PZ1 = 22, PX = 1.52, rowH = 1 / dpr;
+    const ptx0 = pw(pt) * 0.04, ptw = pw(pt) * 0.92;
+    for (let y = hy; y < H; y += rowH) {
+      const gp = cam.groundAt(W / 2, y + rowH / 2);
+      if (!gp || gp.z <= PZ0 || gp.z >= PZ1) continue;
+      const d = cam.depth(gp.z), a = cam.project(-PX, 0, gp.z), b = cam.project(PX, 0, gp.z);
+      if (!a || !b) continue;
+      const v = ((PZ1 - gp.z) / (PZ1 - PZ0)) * ph(pt);
+      const span = Math.max(1, (ph(pt) / (PZ1 - PZ0)) * (rowH * d * d) / (cam.cy * cam.f));
+      g.drawImage(pt, ptx0, Math.min(v, ph(pt) - span), ptw, span, Math.min(a.x, b.x), y, Math.abs(b.x - a.x), rowH + 0.4);
+    }
+  }
   if (dy > 0) {
     const gr = g.createLinearGradient(0, dy, 0, dy + dh * 0.06);
     gr.addColorStop(0, v.top); gr.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1063,8 +1103,8 @@ export class OutfieldView {
     ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, 27 * k, 27 * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     if (art) {
-      const a = this.to(-1.52, 22), b = this.to(1.52, -2), pt = art.pitch;
-      ctx.drawImage(pt, pt.naturalWidth * 0.04, 0, pt.naturalWidth * 0.92, pt.naturalHeight, a.x, a.y, b.x - a.x, b.y - a.y);
+      const a = this.to(-1.52, 22), b = this.to(1.52, -2), pt = pitchNow(art);
+      ctx.drawImage(pt, pw(pt) * 0.04, 0, pw(pt) * 0.92, ph(pt), a.x, a.y, b.x - a.x, b.y - a.y);
       ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
       const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);

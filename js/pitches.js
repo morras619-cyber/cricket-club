@@ -6,6 +6,12 @@
 //   carry: speed of the ball off the bat     roll: how far a ground shot runs     field: fielders' speed
 //   wear: { turn, seam, swing, bounce } added by the end of the match (60 balls): spin grips, seam flattens, the new ball ages
 //   dew: in the second innings the ball skids on, swing dies, batting eases, as the night goes on
+// How much of the "late" picture of a pitch shows: 0 (fresh) to 1 (fully worn, or fully dewy). The dew builds through the second
+// innings; any other pitch wears over the whole match, as much as its `lookWear` allows (a flat road barely marks).
+export function pitchLate(P, { wear = 0, innings = 1, balls = 0 } = {}) {
+  if (P?.dew) return innings >= 2 ? Math.max(0, Math.min(1, balls / 30)) : 0;
+  return Math.max(0, Math.min(1, wear)) * (P?.lookWear ?? 1);
+}
 export const PITCH_BASE = { swing: 1, seam: 1, turn: 1, kmh: 1, bounce: 1, skid: 1, uneven: 0, bat: 1, ai: 1, carry: 1, roll: 1, field: 1 };
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 

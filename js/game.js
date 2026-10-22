@@ -1,6 +1,6 @@
 import { CFG, phaseFor } from './config.js';
 import { makeRng } from './rng.js';
-import { pitchFeel } from './pitches.js';
+import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
 import { SPARKS, heroById, AI_LOOK } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc } from './teams.js';
@@ -21,7 +21,7 @@ import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagN
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
-import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
@@ -347,7 +347,9 @@ export class Game {
   feel() {
     const inn = this.innings[this.innings.length - 1];
     const before = this.innings.slice(0, -1).reduce((n, i) => n + (i.balls || 0), 0);
-    return pitchFeel(this.pitch, { wear: (before + (inn?.balls || 0)) / 60, innings: this.innings.length, balls: inn?.balls || 0 });
+    const prog = { wear: (before + (inn?.balls || 0)) / 60, innings: this.innings.length, balls: inn?.balls || 0 };
+    setPitchLate(pitchLate(this.pitch, prog));   // (the painted strip wears with the match)
+    return pitchFeel(this.pitch, prog);
   }
   // a delivery as this pitch makes it behave (spin grips on the turner, the new ball hoops at Cyclone Park, the ball keeps
   // low on a cracked pitch, holds up on a slow one, rears up on a bouncy one...)
