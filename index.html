@@ -143,6 +143,14 @@ vs a random team</small></button>
     </div>
   </section>
 
+  <section id="pitches" class="screen" hidden>
+    <div class="screen-inner">
+      <h2 class="title">Pitch guide</h2>
+      <div id="pgBody"></div>
+      <button class="bigbtn ghost" id="pgBack">Back</button>
+    </div>
+  </section>
+
   <section id="settings" class="screen" hidden>
     <div class="screen-inner">
       <h2 class="title">Settings</h2>
@@ -153,6 +161,7 @@ vs a random team</small></button>
         <button class="setcard" id="setUnits"><img src="img/menu/icon-fielding.webp" alt=""><b>Ball speed</b><span>km/h</span></button>
       </div>
       <div class="panel paper profile"><label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label></div>
+      <button class="bigbtn" id="setPitches">Pitch guide</button>
       <button class="bigbtn primary" id="settingsBack">Done</button>
       <p class="fineprint">Playtest build · v0.3</p>
     </div>
@@ -387,6 +396,7 @@ vs a random team</small></button>
       <h2 class="title">Paused</h2>
       <div class="menu">
         <button class="bigbtn primary" id="resumeBtn">Resume</button>
+        <button class="bigbtn" id="pausePitch">This pitch</button>
         <button class="bigbtn ghost" id="quitBtn">Quit to home</button>
       </div>
       <p class="fineprint" id="pauseInfo"></p>

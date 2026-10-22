@@ -8,7 +8,8 @@ import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUn
 import { flag, nationName } from './nations.js';
 import { faceEl } from './looks.js';
 import { futCard, portraitFace } from './futcard.js';
-import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
+import { groundOf, pitchOf, homeFromSeed, GROUNDS } from './grounds.js';
+import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
   value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium } from './career.js';
@@ -170,6 +171,51 @@ function carousel(nodes, per) {
   wrap.append(track, dots); requestAnimationFrame(sync);
   return wrap;
 }
+
+// ---------- the pitch guide: what each pitch does, from Settings or the venue line of a fixture ----------
+let pitchGuideBack = 'home';
+// a venue line you can tap: it opens the guide to that pitch
+function pitchLink(node, pitchId) {
+  node.classList.add('pitchlink'); node.setAttribute('role', 'button'); node.title = 'How this pitch plays';
+  node.append(el('span', 'pg-i', ' ⓘ'));
+  node.addEventListener('click', () => { sfx.click(); openPitchGuide(pitchId); });
+  return node;
+}
+function openPitchGuide(pitchId) {
+  const here = [...document.querySelectorAll('section.screen')].find(s => !s.hidden);
+  if (here && here.id !== 'pitches') pitchGuideBack = here.id;
+  ui.show('pitches');
+  const body = $('pgBody');
+  const cards = GUIDE_ORDER.map(id => {
+    const g = GUIDE[id];
+    const clubs = Object.entries(GROUNDS).filter(([c, G]) => G.pitch?.id === id && G.landmark && !['india', 'pakistan'].includes(c));   // (the painted grounds)
+    const P = clubs[0]?.[1].pitch || {};
+    const card = el('div', 'panel paper pgcard');
+    const head = el('div', 'pg-head');
+    head.append(el('h3', '', P.name || id), el('p', 'pg-at', clubs.length ? `Played at ${clubs.map(([, G]) => G.name).join(', ')}, and in a milder form at some club grounds` : 'Played at some club grounds'));
+    const grid = el('div', 'pg-meters');
+    for (const [label, n] of meters(P)) {
+      const row = el('div', 'pg-row'), pipsEl = el('span', 'pg-pips');
+      for (let i = 1; i <= 5; i++) pipsEl.append(el('i', i <= n ? 'on' : ''));
+      row.append(el('b', '', label), pipsEl); grid.append(row);
+    }
+    const does = el('ul', 'pg-does'); for (const t of g.does) does.append(el('li', '', t));
+    const tips = el('div', 'pg-tips');
+    tips.append(el('p', '', ''), el('p', ''));
+    tips.children[0].append(el('b', '', 'Batting '), g.bat); tips.children[1].append(el('b', '', 'Bowling '), g.bowl);
+    card.append(head, el('p', 'pg-sum', g.sum), grid, does, tips);
+    return [id, card];
+  });
+  const start = Math.max(0, cards.findIndex(([id]) => id === pitchId));
+  pager(body, cards.map(([id, card]) => [id, card]), start);
+  body.querySelector('.tabs').hidden = true;                       // (swipe between pitches: dots show where you are)
+  const dots = el('div', 'dots'); for (let i = 0; i < cards.length; i++) dots.append(el('i'));
+  const track = body.querySelector('.pages');
+  const sync = () => { const k = Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); [...dots.children].forEach((d, j) => d.classList.toggle('on', j === k)); };
+  track.addEventListener('scroll', sync, { passive: true }); body.append(dots); requestAnimationFrame(() => requestAnimationFrame(sync));
+}
+$('pgBack').addEventListener('click', () => { sfx.click(); ui.show(pitchGuideBack || 'home'); });
+$('setPitches').addEventListener('click', () => { sfx.click(); openPitchGuide(pitchOf(profile.team || 'thunder').id); });
 
 // ---------- the title screen: the first thing a returning player sees; Play goes to the hub ----------
 const myTeam = () => teamById(profile.team || 'thunder');
@@ -559,7 +605,7 @@ function renderSquad() {
   const starWrap = el('div', 'slot');
   const G = groundOf(t.id);
   starWrap.append(el('h3', '', `${t.name} · ${t.style.tag}`), el('p', 'sheetnote', t.style.desc),
-    el('p', 'sheetnote venue', `🏟 Home ground: ${G.name} · Pitch: ${G.pitch.name}. ${G.pitch.report}`));
+    pitchLink(el('p', 'sheetnote venue', `🏟 Home ground: ${G.name} · Pitch: ${G.pitch.name}. ${G.pitch.report}`), G.pitch.id));
   const starRow = el('div', 'slot-row');
   starRow.append(heroCard(star, { on: true, note: `★ Your star · plays every match` }));
   starWrap.append(starRow);
@@ -789,6 +835,7 @@ $('btnPause').addEventListener('pointerdown', e => {
   $('pauseInfo').textContent = miss.length ? `Drawings missing: ${miss.join(', ')}` : `All ${st.total} drawing sheets loaded`;
 });
 $('resumeBtn').addEventListener('click', () => { game.paused = false; $('pause').hidden = true; });
+$('pausePitch').addEventListener('click', () => { sfx.click(); openPitchGuide(game.pitch?.id || 'flat'); });   // (the pitch of this match; Back returns here)
 $('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
 
 // "🏟 The Snakepit · AWAY · Pitch: Dusty turner"
@@ -805,6 +852,7 @@ function fixtureCard(f, me, o, about, onPlay) {
   logos.append(la, vs, lb);
   const G = groundOf(f.home || me.id), venue = el('p', 'fixvenue');
   venue.append(el('i', '', '🏟'), el('b', '', G.name), '\u00a0· ', el('strong', '', f.home === me.id ? 'HOME' : 'AWAY'), '\u00a0· ', el('b', '', `Pitch: ${G.pitch.name}`));
+  pitchLink(venue, G.pitch.id);
   const go = el('button', 'playbtn', `Play ${f.label.startsWith('Matchday') ? 'match' : f.label.toLowerCase()}`);
   go.addEventListener('click', onPlay);
   card.append(el('div', 'fixribbon', f.label), logos, venue, el('p', 'fixabout', about), go);
