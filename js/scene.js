@@ -294,7 +294,10 @@ function renderBuilt(cam, art, v, im) {
   const at = (r, h) => { const d = cam.depth(CY + cam.dir * r); return hy + (cam.cy - h) * f / d; };
   const by = at(v.board.r, v.board.h);
   cam.board = { y: by, h: at(v.board.r, 0) - by, painted: true };
-  cam.layout = { roofY: Math.max(0, at(v.roof.r, v.roof.h)), standTop: at(v.roof.r, v.roof.h - 1.5), hy, spots: G.landmark === 'bolts' ? { lightning: true } : {} };
+  // (the furnace stacks of a painted stand: the stand's own smoke and embers are animated from here)
+  const spots = G.landmark === 'bolts' ? { lightning: true } : {};
+  if (v.plumes) spots.plumes = { at: v.plumes.map(([x, y]) => ({ x: dx + x * k, y: dy + y * k })), s: v.ps * k };
+  cam.layout = { roofY: Math.max(0, at(v.roof.r, v.roof.h)), standTop: at(v.roof.r, v.roof.h - 1.5), hy, spots };
   return c;
 }
 
@@ -637,6 +640,43 @@ function drawLandmark(g, kind, { W, roofY, standTop, rnd, T, spots, hi }) {
   if (!hi) delete spots.rain;
 }
 
+// Smoke and embers rising from a painted stand's furnace stacks: soft dark puffs that grow and thin as
+// they climb, leaning with the wind, lit orange at the foot, and sparks that flicker up (more on a six).
+let puffSprite = null;
+function puff() {
+  if (puffSprite) return puffSprite;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return (puffSprite = c);
+}
+function drawPlumes(ctx, P, t, flare, hi) {
+  const sp = puff(), n = hi ? 7 : 4, u = P.s;                       // u: pixels to a painting pixel
+  P.at.forEach((e, i) => {
+    for (let k = 0; k < n; k++) {
+      const p = (t * 0.00011 + k / n + i * 0.37) % 1, q = 1 - p;
+      const x = e.x + (p * 70 + Math.sin(t * 0.0009 + i * 2 + k) * 14 * p) * u, y = e.y - p * 230 * u;
+      const r = (16 + p * 62) * u, a = Math.min(1, p * 9) * q ** 1.4;
+      // dark smoke, warmed to orange where it leaves the stack
+      ctx.globalAlpha = 0.72 * a; ctx.drawImage(sp, x - r, y - r, r * 2, r * 2);
+      if (p < 0.3) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 * (1 - p / 0.3) * Math.min(1, p * 12); ctx.drawImage(sp, x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4); ctx.globalCompositeOperation = 'source-over'; }
+    }
+    if (!hi) return;
+    ctx.globalCompositeOperation = 'lighter';
+    const m = 6 + (flare > 0 ? 8 : 0);
+    for (let k = 0; k < m; k++) {
+      const p = (t * 0.00035 * (0.8 + (k % 3) * 0.25) + k / m + i * 0.21) % 1;
+      const x = e.x + (Math.sin(k * 12.9 + i * 3 + t * 0.002) * 22 + p * 46) * u, y = e.y - p * 190 * u * (0.7 + (k % 4) * 0.12);
+      ctx.globalAlpha = (1 - p) * (0.55 + 0.45 * Math.sin(t * 0.02 + k * 5)) * (flare > 0 ? 1 : 0.8);
+      ctx.fillStyle = k % 3 ? '#ff9a2a' : '#ffd36b';
+      const r = Math.max(1.1, (2.6 - p * 1.6) * u * 1.6); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  });
+  ctx.globalAlpha = 1;
+}
+
 // Moving parts of the ground, drawn every frame over the painted stadium.
 export function drawAtmosphere(ctx, cam, t, flare = 0) {
   const L = cam.layout;
@@ -669,6 +709,7 @@ export function drawAtmosphere(ctx, cam, t, flare = 0) {
       ctx.beginPath(); ctx.arc(st.x + p * 26, st.y - p * 50, 6 + p * 14, 0, Math.PI * 2); ctx.fill();
     }
   }
+  if (s.plumes) drawPlumes(ctx, s.plumes, t, flare, hi);
   if (s.eyes) {
     const glow = 0.6 + 0.4 * Math.sin(t * 0.004);
     ctx.fillStyle = `rgba(255,${60 + 80 * glow},40,1)`;

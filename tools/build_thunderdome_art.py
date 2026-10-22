@@ -30,8 +30,14 @@ VIEWS = {
     'bowl':   dict(f=2400, above=576, cy=2.6, cz=34.0, dir=-1, stand='stand-arch.jpg',   phone_f=1560),
     'keeper': dict(f=1200, above=480, cy=4.6, cz=-9.0, dir=1,  stand='stand-screen.jpg', phone_f=663),
 }
+# where smoke and embers rise, in each painting's pixels: the furnace stacks (the game animates them, js/scene.js)
+EMIT = {}
 if CLUB == 'titans':
     VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # (the Foundry's sign stand faces the bowler)
+    EMIT = {
+        'stand-screen.jpg': [(410, 250), (985, 350), (1580, 350), (2160, 250)],
+        'stand-sign.jpg': [(490, 525), (680, 590), (970, 545), (1200, 560), (1470, 555), (1640, 540), (2080, 525)],
+    }
 
 
 def painting(name):
@@ -120,7 +126,9 @@ def build_view(name, v):
         out = grade(out, bt, stand)
     Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).save(os.path.join(OUT, f'view-{name}.webp'), 'WEBP', quality=90, method=6)
     print(name, 'painting', (pw, ph), 'boards row', bt, 'top', top, 'stand structure at', round(row_struct), 'roof h', round(roof_h, 1))
-    return dict(top=meta_top, bottom=meta_bottom, roof=dict(r=94, h=round(roof_h, 1)), w=W, h=H, f=v['f'], above=v['above'])
+    x0 = W / 2 - pw / 2
+    plumes = [[round(x0 + ex * p, 1), round(top + ey * p, 1)] for ex, ey in EMIT.get(v['stand'], [])]
+    return dict(top=meta_top, bottom=meta_bottom, roof=dict(r=94, h=round(roof_h, 1)), w=W, h=H, f=v['f'], above=v['above'], plumes=plumes, ps=round(p, 4))
 
 
 def build_top():
@@ -151,6 +159,8 @@ if __name__ == '__main__':
     t = art.setdefault(CLUB, {'top': None, 'views': {n: {} for n in meta}, 'stumps': art['thunder']['stumps'], 'broken': art['thunder']['broken']})
     for n, m in meta.items():
         t['views'][n].update(f=m['f'], w=m['w'], h=m['h'], above=m['above'], top=m['top'], bottom=m['bottom'], board={'r': BOARD_R, 'h': BOARD_H}, roof=m['roof'])
+        if m['plumes']:
+            t['views'][n].update(plumes=m['plumes'], ps=m['ps'])
     t['top'] = top
     open(p, 'w').write(head + 'export const GROUND_ART = ' + json.dumps(art, indent=1) + ';\n')
     print('wrote js/groundart.js')
