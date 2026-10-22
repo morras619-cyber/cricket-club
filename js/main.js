@@ -74,6 +74,35 @@ let tourNotes = []; // what happened in the tournament after the last match
 
 const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance', off: 'Fielding: auto' };
 
+// ---------- screens that never scroll down: tabs and swipeable pages ----------
+// pager: a tab bar over pages that swipe left and right (a tap on a tab slides to its page). Each page fits the screen.
+function pager(host, pages, start = 0) {
+  host.innerHTML = '';
+  host.classList.add('pagerhost');
+  const tabs = el('div', 'tabs'), track = el('div', 'pages');
+  pages.forEach(([name, nodes], i) => {
+    const b = el('button', 'tab', name);
+    b.addEventListener('click', () => { sfx.click(); track.scrollTo({ left: i * track.clientWidth, behavior: 'smooth' }); });
+    tabs.append(b);
+    const pg = el('div', 'page'); pg.append(...[].concat(nodes)); track.append(pg);
+  });
+  const sync = () => { const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); [...tabs.children].forEach((t, k) => t.classList.toggle('on', k === i)); };
+  track.addEventListener('scroll', sync, { passive: true });
+  host.append(tabs, track);
+  requestAnimationFrame(() => { track.scrollLeft = start * track.clientWidth; sync(); });
+}
+// carousel: a long list as swipeable pages of `per` rows, with dots
+function carousel(nodes, per) {
+  const wrap = el('div', 'carousel'), track = el('div', 'pages'), dots = el('div', 'dots');
+  for (let i = 0; i < nodes.length; i += per) {
+    const pg = el('div', 'page'); pg.append(...nodes.slice(i, i + per)); track.append(pg); dots.append(el('i'));
+  }
+  const sync = () => { const k = Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); [...dots.children].forEach((d, j) => d.classList.toggle('on', j === k)); };
+  track.addEventListener('scroll', sync, { passive: true });
+  wrap.append(track, dots); requestAnimationFrame(sync);
+  return wrap;
+}
+
 // ---------- the title screen: the first thing a returning player sees; Play goes to the hub ----------
 const myTeam = () => teamById(profile.team || 'thunder');
 function renderTitle() {
@@ -221,12 +250,16 @@ function renderPass() {
   claim.textContent = `Claim ${ps.ready} tier${ps.ready === 1 ? '' : 's'}`;
   const list = $('passTiers');
   list.innerHTML = '';
+  let focus = null;
   for (let n = 1; n <= PASS_TIERS; n++) {
     const r = passReward(n);
-    const row = el('div', `passtier${n <= ps.claimed ? ' got' : n <= ps.tier ? ' ready' : ''}`);
-    row.append(el('b', '', `${n}`), el('span', '', `${r.coins} coins${r.gems ? ` + ${r.gems} 💎` : ''}`), el('i', '', n <= ps.claimed ? '✓' : n <= ps.tier ? 'Ready' : '🔒'));
-    list.append(row);
+    const card = el('div', `passtier${n <= ps.claimed ? ' got' : n <= ps.tier ? ' ready' : ''}`);
+    card.append(el('em', '', 'Tier'), el('b', '', `${n}`), el('span', '', `${r.coins} coins`), el('span', r.gems ? 'pg' : 'pg none', r.gems ? `+${r.gems} 💎` : ''), el('i', '', n <= ps.claimed ? '✓' : n <= ps.tier ? 'Ready' : '🔒'));
+    list.append(card);
+    if (!focus && n > ps.claimed) focus = card;   // (the first tier not yet claimed)
   }
+  // swipe sideways; it opens on the next reward
+  requestAnimationFrame(() => { if (focus) list.scrollLeft = focus.offsetLeft - (list.clientWidth - focus.offsetWidth) / 2; });
 }
 $('btnPass').addEventListener('click', () => { unlockAudio(); renderPass(); });
 $('passClaim').addEventListener('click', () => {
@@ -286,7 +319,7 @@ function renderStats() {
   body.innerHTML = '';
   body.className = 'statsbody';
   const card = (title, grid) => { const c = el('div', 'panel paper statcard'); c.append(el('h3', '', title), grid); return c; };
-  body.append(card('Batting', statGrid(batItems(s.bat))), card('Bowling', statGrid(bowlItems(s.bowl))));
+  const pages = [['Batting', card('Batting', statGrid(batItems(s.bat)))], ['Bowling', card('Bowling', statGrid(bowlItems(s.bowl)))]];
   const table = (title, slot, kind, cols) => {
     const c = el('div', 'panel paper statcard');
     c.append(el('h3', '', title));
@@ -303,10 +336,9 @@ function renderStats() {
     wrap.append(t); c.append(wrap);
     return c;
   };
-  body.append(
+  pager(body, [...pages, ['Heroes', [
     table('Batting heroes', 'bat', 'bat', [['Runs', t => t.runs], ['HS', fmt.hs], ['Avg', t => fmt.avg(t.runs, t.inns - t.notOuts)], ['SR', t => fmt.sr(t.runs, t.balls)], ['Ducks', t => t.ducks]]),
-    table('Bowling heroes', 'bowl', 'bowl', [['Wkts', t => t.wkts], ['Best', fmt.best], ['Overs', t => fmt.overs(t.balls)], ['Runs', t => t.runs], ['Econ', t => fmt.econ(t.runs, t.balls)]]),
-  );
+    table('Bowling heroes', 'bowl', 'bowl', [['Wkts', t => t.wkts], ['Best', fmt.best], ['Overs', t => fmt.overs(t.balls)], ['Runs', t => t.runs], ['Econ', t => fmt.econ(t.runs, t.balls)]])]]]);
 }
 function heroStatLine(hero) {
   const s = careerStats(profile).heroes[hero.id];
@@ -918,7 +950,7 @@ function renderWar() {
         el('p', 'warnote', `${new Date(c.opensAt).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}, from midnight. One match per weekend.`));
     }
   }
-  body.append(head);
+  const p1 = [head];
   // the four weekends
   const wk = el('div', 'lpanel'), wkin = el('div', 'lp-body lp-list');
   wk.append(lpHead('Weekends'), wkin);
@@ -930,20 +962,20 @@ function renderWar() {
       el('em', '', `IND ${w.india} · PAK ${w.pakistan}`));
     wkin.append(row);
   }
-  body.append(wk);
+  const p2 = [wk];
   // what's been happening
   const fd = feed(warState.entries);
   if (fd.length) {
     const fp = el('div', 'lpanel'), fin = el('div', 'lp-body lp-list');
     fp.append(lpHead('Latest', 'live'), fin);
-    for (const f of fd) {
+    for (const f of fd.slice(0, 4)) {
       const row = el('div', 'lres'), logo = document.createElement('img');
       logo.src = logoSrc(f.country); logo.alt = '';
       const who = f.id === myId() || f.id === 'me' ? 'You' : warNames[f.id] || 'A player';
       row.append(el('b', f.win ? 'lres-W' : 'lres-L', f.win ? '+1' : '0'), logo, el('span', '', `${who} ${f.win ? 'won' : 'lost'} for ${sideName(f.country)}`), el('em', '', f.line));
       fin.append(row);
     }
-    body.append(fp);
+    p2.push(fp);
   }
   // a warm-up, any time, no points
   const wu = el('button', 'chipbtn', 'Warm-up match (no points)');
@@ -952,7 +984,7 @@ function renderWar() {
   rules.append(el('i', '', '⚔️'), el('span', '', warOnline()
     ? 'Every player\'s wins count for their country, live. A win is +1; a loss scores nothing. The side with the most points after four weekends wins.'
     : 'Offline here: only your own results show. Open the game on claude.ai to join the live table.'));
-  body.append(wu, rules);
+  pager(body, [['The war', [...p1, wu]], ['Weekends', [...p2, rules]]]);
 }
 // after the weekend's match: the result into the shared table
 function warAfterMatch(summary) {
@@ -1544,12 +1576,13 @@ function renderTrophies() {
   const ach = el('div', 'panel paper statcard');
   const got = profile.achievements || {};
   ach.append(el('h3', '', `Achievements · ${Object.keys(got).length}/${ACHIEVEMENTS.length}`));
-  for (const a of ACHIEVEMENTS) {
+  const rows = ACHIEVEMENTS.map(a => {
     const row = el('div', 'achrow' + (got[a.id] ? ' got' : ''));
     row.append(el('b', '', `${got[a.id] ? '★' : '☆'} ${a.name}`), el('span', '', `${a.desc} · ${a.coins} coins${got[a.id] ? ` · ${got[a.id]}` : ''}`));
-    ach.append(row);
-  }
-  body.append(cab, heroes, ach);
+    return row;
+  });
+  ach.append(carousel(rows, 5));
+  pager(body, [['Trophies', cab], ['Heroes', heroes], ['Medals', ach]]);
 }
 $('trophiesBack').addEventListener('click', renderHome);
 
