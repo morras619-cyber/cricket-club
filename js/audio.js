@@ -91,50 +91,39 @@ function loadCheer() {
   }
   return cheerLoading;
 }
-// the crowd rises as the ball flies: the recording (3 s, rising to its end, then carried on) is started part-way
-// in, so that its rise ends just as the ball clears the rope, `sec` seconds on (a flight over 3 s starts it at the beginning).
-const BUILD_RISE = 3.0;
+// the crowd rises as the ball flies: from nothing, up to the level where the roar begins. The recording (3 s,
+// rising to its end, then carried on) is started part-way in so that its own rise ends as the ball clears the
+// rope, `sec` seconds on (a flight over 3 s starts it at the beginning), and a swell in volume is laid over it
+// so it begins from silence however far in it starts.
+const BUILD_RISE = 3.0, BUILD_GAIN = 1.35;
+const SWELL = Float32Array.from({ length: 48 }, (_, i) => BUILD_GAIN * Math.pow(i / 47, 1.6));
 export function cheerBuild(sec) {
   cheerStop(0.15);
   if (!ready()) return;
   if (!cheerBufs) { loadCheer(); return; }
-  const t = ac.currentTime, buf = cheerBufs.build, from = Math.min(BUILD_RISE - 0.3, Math.max(0, BUILD_RISE - sec));
-  const bus = ac.createGain(), src = ac.createBufferSource();
-  bus.gain.setValueAtTime(0.0001, t); bus.gain.linearRampToValueAtTime(2, t + 0.12);
-  src.buffer = buf; src.connect(bus).connect(master); src.start(t, from); // (it ends itself, faded out, if the ball never clears)
-  building = { bus, srcs: [src] };
+  const t = ac.currentTime, len = Math.min(4, Math.max(0.4, sec)), from = Math.min(BUILD_RISE - 0.3, Math.max(0, BUILD_RISE - sec));
+  const swell = ac.createGain(), fade = ac.createGain(), src = ac.createBufferSource();
+  swell.gain.setValueCurveAtTime(SWELL, t, len);
+  src.buffer = cheerBufs.build; src.connect(swell).connect(fade).connect(master); src.start(t, from); // (it ends itself, faded out, if the ball never clears)
+  building = { bus: fade, srcs: [src] };
 }
 export function cheerStop(fade = 0.3) {
   if (!building || !ac) return;
   const { bus, srcs } = building; building = null;
   const t = ac.currentTime;
-  bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(0.0001, t + fade);
+  bus.gain.setValueAtTime(1, t); bus.gain.linearRampToValueAtTime(0.0001, t + fade);   // (a node of its own: the swell may still be running on the one before it)
   for (const s of srcs) { try { s.stop(t + fade + 0.05); } catch { /* already stopped */ } }
   setTimeout(() => bus.disconnect(), (fade + 0.3) * 1000);
 }
 // the roar: the ball is over the rope (power: 1 a four, 1.25 a six, 1.4 a perfect six)
 export function cheerFull(power = 1.25) {
-  cheerStop(0.3);
+  cheerStop(0.4);
   if (!ready()) return;
   if (!cheerBufs) { loadCheer(); return; }
   const t = ac.currentTime, src = ac.createBufferSource(), g = ac.createGain();
   src.buffer = cheerBufs.cheer; g.gain.value = power; src.connect(g).connect(master); src.start(t);
   roarUntil = t + cheerBufs.cheer.duration;
 }
-// a short burst of music under the roar: brass-like notes up to a held chord (a six: longer, with drums)
-const STING = {
-  four: { notes: [196, 247, 294, 392], gap: 0.13, chord: [196, 247, 294], hold: 0.6, drums: [] },
-  six: { notes: [262, 330, 392, 523, 392, 523, 659], gap: 0.11, chord: [262, 330, 392, 523], hold: 1.0, drums: [0, 0.44, 0.88] },
-};
-export function sting(kind = 'four') {
-  if (!ready()) return;
-  const k = STING[kind] || STING.four;
-  k.drums.forEach(d => { tone(110, 0.3, { gain: 0.4, to: 55, delay: d }); noise(0.1, { gain: 0.18, freq: 300, q: 1, delay: d }); });
-  k.notes.forEach((f, i) => tone(f, 0.22, { type: 'triangle', gain: 0.1, delay: i * k.gap })); // (low and soft: a high sawtooth reads as a whistle)
-  const at = k.notes.length * k.gap;
-  k.chord.forEach(f => { tone(f, k.hold, { type: 'triangle', gain: 0.07, delay: at }); tone(f / 2, k.hold, { type: 'sine', gain: 0.08, delay: at }); });
-}
-
 // ---------- the match's crowd bed ----------
 // A low crowd murmur under the whole match (snd/crowd-loop.wav, tools/build_crowd_loop.py: made to
 // loop with no seam). Two copies play at once, the second a little slower, so the short loop's
