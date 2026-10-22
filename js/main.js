@@ -75,6 +75,28 @@ let tourNotes = []; // what happened in the tournament after the last match
 const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance', off: 'Fielding: auto' };
 
 // ---------- screens that never scroll down: tabs and swipeable pages ----------
+// fitPage: a page's content is shrunk, if it has to be, to fit the page (the real fonts are taller than a test's, and phones
+// differ): nothing is cut off and nothing scrolls. Pages inside a carousel that grows with its content are left alone.
+const fitWatch = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => fitPage(e.target))) : null;
+function fitPage(pg) {
+  if (pg.parentElement && getComputedStyle(pg.parentElement).flexGrow === '0') return;
+  let box = pg.querySelector(':scope > .fitbox');
+  if (!box) {
+    box = el('div', 'fitbox');
+    if (pg.classList.contains('futpage')) box.classList.add('futpage');
+    box.append(...pg.childNodes); pg.append(box);
+  }
+  box.style.width = ''; box.style.transform = '';
+  const avail = pg.clientHeight - 12;
+  if (avail <= 40) return;                                  // (hidden for now: it is fitted when it is shown)
+  let h = box.offsetHeight;
+  if (h <= avail) return;
+  let s = Math.max(0.6, avail / h);
+  for (let i = 0; i < 2; i++) { box.style.width = `${100 / s}%`; h = box.offsetHeight; s = Math.max(0.6, Math.min(1, avail / h)); }
+  box.style.width = `${100 / s}%`; box.style.transformOrigin = '0 0'; box.style.transform = `scale(${s})`;
+}
+const watchFit = pg => { fitWatch?.observe(pg); requestAnimationFrame(() => fitPage(pg)); };
+document.fonts?.ready?.then(() => document.querySelectorAll('.pages > .page').forEach(fitPage));
 // pager: a tab bar over pages that swipe left and right (a tap on a tab slides to its page). Each page fits the screen.
 function pager(host, pages, start = 0) {
   host.innerHTML = '';
@@ -84,10 +106,11 @@ function pager(host, pages, start = 0) {
     const b = el('button', 'tab', name);
     b.addEventListener('click', () => { sfx.click(); track.scrollTo({ left: i * track.clientWidth, behavior: 'smooth' }); });
     tabs.append(b);
-    const pg = el('div', 'page'); pg.append(...[].concat(nodes)); track.append(pg);
+    const pg = el('div', 'page'); pg.append(...[].concat(nodes)); track.append(pg); watchFit(pg);
   });
   const sync = () => { const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); [...tabs.children].forEach((t, k) => t.classList.toggle('on', k === i)); };
   track.addEventListener('scroll', sync, { passive: true });
+  tabs.hidden = pages.length < 2;
   host.append(tabs, track);
   requestAnimationFrame(() => { track.scrollLeft = start * track.clientWidth; sync(); });
 }
@@ -95,17 +118,17 @@ function pager(host, pages, start = 0) {
 // the first headed panel (notes, the fixture card) is the first page, called `first`.
 function autoPages(body, first = 'Match') {
   const kids = [...body.children];
-  const head = k => k.querySelector?.('.lp-head b, h3')?.textContent?.trim();
+  const head = k => (k.querySelector?.('.lp-head b') || k.querySelector?.('h3'))?.textContent?.replace(/[^\p{L}\p{N}' ]/gu, '').trim();
   const pages = [];
   let lead = [];
   for (const k of kids) {
     const h = head(k);
-    if (h && !k.classList.contains('notecard')) { if (lead.length) { pages.push([first, lead]); lead = []; } pages.push([h.length > 12 ? h.slice(0, 11).trim() + '…' : h, [k]]); }
+    if (h && !k.classList.contains('notecard')) { if (lead.length) { pages.push([first, lead]); lead = []; } pages.push([h.length > 11 ? h.split(' ')[0] : h, [k]]); }
     else lead.push(k);
   }
   if (lead.length) pages.push([pages.length ? first : first, lead]);
-  if (pages.length < 2) { return; }
-  pager(body, pages);
+  if (!pages.length) return;
+  pager(body, pages);   // (one page alone has no tab bar, but still fits the screen)
 }
 // (the club maker's three sections are tabs, set up once)
 function setupClubTabs() {
@@ -116,7 +139,7 @@ function setupClubTabs() {
 function carousel(nodes, per) {
   const wrap = el('div', 'carousel'), track = el('div', 'pages'), dots = el('div', 'dots');
   for (let i = 0; i < nodes.length; i += per) {
-    const pg = el('div', 'page'); pg.append(...nodes.slice(i, i + per)); track.append(pg); dots.append(el('i'));
+    const pg = el('div', 'page'); pg.append(...nodes.slice(i, i + per)); track.append(pg); dots.append(el('i')); watchFit(pg);
   }
   const sync = () => { const k = Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); [...dots.children].forEach((d, j) => d.classList.toggle('on', j === k)); };
   track.addEventListener('scroll', sync, { passive: true });

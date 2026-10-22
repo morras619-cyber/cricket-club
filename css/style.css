@@ -933,7 +933,9 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .pages { flex: 1 1 0; min-height: 0; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; overscroll-behavior-x: contain; }
 .pages::-webkit-scrollbar { display: none; }
 .page { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; display: flex; flex-direction: column; gap: 10px; overflow: hidden; padding: 4px 2px 8px; }
-.page > .panel { flex: none; }
+.page > .panel, .fitbox > .panel { flex: none; }
+.fitbox { display: flex; flex-direction: column; gap: inherit; flex: none; min-width: 0; }
+.fitbox.futpage { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 6px; justify-items: center; align-content: start; }
 .carousel { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .carousel .pages { flex: none; }
 .carousel .page { padding: 0; gap: 0; }
@@ -984,7 +986,7 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 #result .sharebox { gap: 8px; }
 #result .sharebox .bigbtn { padding: 9px 12px; font-size: 20px; }
 #result .page { align-items: stretch; }
-#result .page > .sharefig { align-items: center; }
+#result .fitbox > .sharefig, #result .page > .sharefig { align-items: center; }
 
 /* the tournament screen (Knockout Cup, Super League): the fixture, the table, knockouts and results as tabs over pages */
 #league { overflow: hidden; touch-action: pan-x; }
@@ -1042,3 +1044,6 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 #makeclub .mk-panel .tabs { margin-bottom: 4px; }
 #makeclub .mk-panel .page { overflow: hidden; padding: 2px 0; }
 @media (max-height: 760px) { #makeclub .pt-coach { display: none; } #makeclub .mk-show { height: 132px; } }
+
+#records .carousel { flex: 1 1 0; min-height: 0; }
+#records .carousel .pages { flex: 1 1 0; }
