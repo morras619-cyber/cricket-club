@@ -672,7 +672,8 @@ export const GROUND_ART = {
     426,
     141.0
    ]
-  ]
+  ],
+  "share": "thunder"
  },
  "phoenix": {
   "top": {
@@ -812,7 +813,8 @@ export const GROUND_ART = {
     426,
     141.0
    ]
-  ]
+  ],
+  "share": "thunder"
  },
  "storm": {
   "top": {
@@ -909,7 +911,8 @@ export const GROUND_ART = {
     426,
     141.0
    ]
-  ]
+  ],
+  "share": "thunder"
  },
  "eagles": {
   "top": {
@@ -1006,7 +1009,8 @@ export const GROUND_ART = {
     426,
     141.0
    ]
-  ]
+  ],
+  "share": "thunder"
  },
  "vipers": {
   "top": {
@@ -1103,7 +1107,8 @@ export const GROUND_ART = {
     426,
     141.0
    ]
-  ]
+  ],
+  "share": "thunder"
  },
  "royals": {
   "top": {
@@ -1200,6 +1205,7 @@ export const GROUND_ART = {
     426,
     141.0
    ]
-  ]
+  ],
+  "share": "thunder"
  }
 };

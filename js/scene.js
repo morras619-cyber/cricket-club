@@ -71,6 +71,8 @@ export function setGround(teamId, onChange) {
 const ART = {};
 // (your own club's ground: its level's grey build, painted in your colours and crest)
 const artKey = team => { const t = teamById(team); return t.custom ? `${team}|own${t.stadium}|${t.suit}|${t.trim}|${logoSrc(team).length}` : team; };
+// the pitch, grass and stumps a ground may share with another (meta.share) rather than carry its own copies
+const SHARED = new Set(['pitch', 'grass', 'stumps', 'stumps-broken']);
 function loadArt(team) {
   const T = teamById(team), key = artKey(team), dir = T.custom ? `own${T.stadium}` : team;
   const meta = GROUND_ART[dir];
@@ -85,7 +87,7 @@ function loadArt(team) {
   if (meta.top) files.topView = 'view-top';
   let left = Object.keys(files).length + 1;
   const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
-  for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${team}/${f}.webp`; a[k] = im; }
+  for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${meta.share && SHARED.has(f) ? meta.share : team}/${f}.webp`; a[k] = im; }
   a.logo = new Image(); a.logo.onload = done; a.logo.onerror = done; a.logo.src = 'img/menu/logo.webp';
 }
 function loadOwnArt(team, key, a, dir) {

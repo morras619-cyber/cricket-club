@@ -191,5 +191,7 @@ if __name__ == '__main__':
         if m['plumes']:
             t['views'][n].update(plumes=m['plumes'], ps=m['ps'])
     t['top'] = top
+    if CLUB not in ('thunder', 'cyclones'):
+        t['share'] = 'thunder'                                          # (its pitch, grass and stumps are the Thunderdome's: one copy of each ships)
     open(p, 'w').write(head + 'export const GROUND_ART = ' + json.dumps(art, indent=1) + ';\n')
     print('wrote js/groundart.js')
