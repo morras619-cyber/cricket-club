@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// snd/boundary-build.wav loops (its last sample runs into its first) and snd/boundary-cheer.wav, the roar
-// (tools/build_boundary_cheer.py), must be long enough to carry a cheer and must end faded out, not cut off
+// snd/boundary-build.wav (the crowd getting to its feet) and snd/boundary-cheer.wav (the roar), built by
+// tools/build_boundary_cheer.py, must be long enough to carry a cheer and must end faded out, not cut off
 function readWav(path) {
   const b = readFileSync(path);
   assert.equal(b.toString('ascii', 0, 4), 'RIFF');
@@ -21,12 +21,14 @@ function readWav(path) {
 }
 const rms = (x, a, b) => { let s = 0; for (let i = a; i < b; i++) s += x[i] * x[i]; return Math.sqrt(s / (b - a)); };
 
-test('the boundary murmur loops with no jump', () => {
+test('the boundary build-up starts quiet, rises, runs on past the recording\'s 3 s, and fades out', () => {
   const { mono: m, rate } = readWav(new URL('../snd/boundary-build.wav', import.meta.url));
-  assert.ok(m.length / rate > 0.6, 'long enough to loop');
-  let big = 0;
-  for (let i = 1; i < m.length; i++) big = Math.max(big, Math.abs(m[i] - m[i - 1]));
-  assert.ok(Math.abs(m[0] - m[m.length - 1]) <= big, 'the jump at the wrap is no bigger than the loop\'s own steps');
+  assert.ok(m.length / rate > 4, 'the recording stops at 3 s while still rising: it now runs on');
+  const w = Math.floor(rate * 0.3), at = t => rms(m, Math.floor(t * rate), Math.floor(t * rate) + w);
+  assert.ok(at(2.6) > at(0.4) * 4, 'rising');
+  assert.ok(at(3.4) > at(2.6) * 0.6, 'still a crowd after the point the recording stopped');
+  assert.ok(rms(m, m.length - Math.floor(rate * 0.1), m.length) < at(3.0) * 0.2, 'faded out at the end');
+  assert.ok(Math.abs(m[m.length - 1]) < 0.01, 'ends on silence');
 });
 
 test('the boundary roar is long, full for seconds, and fades out before it ends', () => {

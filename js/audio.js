@@ -80,8 +80,8 @@ function iosTick() {
   iosSwitch.click();
 }
 // ---------- a four or a six: the crowd's build-up and roar ----------
-// snd/boundary-build.wav (a murmur that loops) plays from the moment the ball is struck and swells as
-// it flies, like a crowd getting to its feet; snd/boundary-cheer.wav (tools/build_boundary_cheer.py: the
+// snd/boundary-build.wav (a crowd getting to its feet) plays from the moment the ball is struck, timed to
+// reach its height as the ball clears the rope; snd/boundary-cheer.wav (tools/build_boundary_cheer.py: the
 // roar, carried on and faded out so it no longer stops mid-cheer) plays when the ball clears the rope.
 let cheerBufs = null, cheerLoading = null, building = null, roarUntil = 0;
 function loadCheer() {
@@ -91,22 +91,18 @@ function loadCheer() {
   }
   return cheerLoading;
 }
-// the murmur swells for `sec` seconds (the ball's flight to the rope), then holds
+// the crowd rises as the ball flies: the recording (3 s, rising to its end, then carried on) is started part-way
+// in, so that its rise ends just as the ball clears the rope, `sec` seconds on (a flight over 3 s starts it at the beginning).
+const BUILD_RISE = 3.0;
 export function cheerBuild(sec) {
   cheerStop(0.15);
   if (!ready()) return;
   if (!cheerBufs) { loadCheer(); return; }
-  const t = ac.currentTime, len = Math.min(5, Math.max(0.5, sec)), bus = ac.createGain();
-  bus.gain.setValueAtTime(0.5, t); bus.gain.linearRampToValueAtTime(3, t + len);
-  bus.connect(master);
-  // two copies, the second a little slower, so the short loop's repeats never line up
-  const srcs = [1, 0.87].map((rate, i) => {
-    const src = ac.createBufferSource(), g = ac.createGain();
-    src.buffer = cheerBufs.build; src.loop = true; src.playbackRate.value = rate; g.gain.value = i ? 0.55 : 0.8;
-    src.connect(g).connect(bus); src.start(0, i * 0.3); src.stop(t + len + 1.5); // (it ends itself if the ball never clears)
-    return src;
-  });
-  building = { bus, srcs };
+  const t = ac.currentTime, buf = cheerBufs.build, from = Math.min(BUILD_RISE - 0.3, Math.max(0, BUILD_RISE - sec));
+  const bus = ac.createGain(), src = ac.createBufferSource();
+  bus.gain.setValueAtTime(0.0001, t); bus.gain.linearRampToValueAtTime(2, t + 0.12);
+  src.buffer = buf; src.connect(bus).connect(master); src.start(t, from); // (it ends itself, faded out, if the ball never clears)
+  building = { bus, srcs: [src] };
 }
 export function cheerStop(fade = 0.3) {
   if (!building || !ac) return;
