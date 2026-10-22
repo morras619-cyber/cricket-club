@@ -62,3 +62,12 @@ test('the extra boos are whole and match the first boo in loudness', () => {
     assert.ok(at(c, m.length / c.rate - 0.1, 0.09) < ref * 0.1, `${n} dies away, not cut off`);
   }
 });
+
+test('the applause is whole: a steady crowd with a short fade in, dying away to silence, as loud as the boos', () => {
+  const peakRms = c => { let m = 0; for (let t = 0; t + 0.25 < c.mono.length / c.rate; t += 0.1) m = Math.max(m, at(c, t, 0.25)); return m; };
+  const c = load('clap'), m = c.mono;
+  assert.ok(Math.abs(peakRms(c) / (0.8 * peakRms(load('boo'))) - 1) < 0.15, 'levelled to 0.8 of the boos');
+  assert.ok(Math.abs(m[0]) < 0.01 && Math.abs(m[m.length - 1]) < 0.01, 'starts and ends on silence');
+  assert.ok(at(c, 0, 0.05) < peakRms(c) * 0.5, 'a short fade in, not a sudden start');
+  assert.ok(m.length / c.rate > 2.5 && m.length / c.rate < 4, 'a short burst of applause');
+});

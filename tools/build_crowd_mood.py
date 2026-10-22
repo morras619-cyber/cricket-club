@@ -3,6 +3,8 @@
   crowd-sing.wav  a happy crowd singing. The recording is 3 s, loud at both ends (cut off at both). Faded in, its middle
                   section carried on (folded over itself with crossfades, no repeat heard) to 10 s, and faded out
   crowd-boo.wav   an angry crowd booing: attack, hold, a natural decay to silence (kept whole)
+  crowd-clap.wav  a crowd applauding, 3 s, whole: a short fade in over the cut-off start, its own natural fade out. Levelled
+                  to 0.8 of the boos' loudest moment (clapping sits under the other crowd sounds)
   crowd-boo2.wav, crowd-boo3.wav  two more boos (the same shape), so the booing is not always the same one; each is
                   levelled to crowd-boo's loudest moment
 The recordings have a narrow whistle line near 6 kHz: any bin in 1.5-8 kHz that stands out from its neighbours is pulled
@@ -87,3 +89,10 @@ for k in ('boo2', 'boo3'):
     x[-n:] *= np.linspace(1, 0, n)[:, None]; x[:n // 2] *= np.linspace(0, 1, n // 2)[:, None]
     b[k] = x
     save(f'crowd-{k}.wav', x * (ref / loud(x)))
+
+# the applause (tools/audio/src/clap-a.mp3; clap-b.mp3 is to be a second take: js/audio.js takes turns between them)
+clap = load('clap-a.mp3')
+n_in = int(0.15 * SR)
+clap[:n_in] *= np.linspace(0, 1, n_in)[:, None]
+clap[-n:] *= np.linspace(1, 0, n)[:, None]
+save('crowd-clap.wav', clap * (0.8 * ref / loud(clap)))

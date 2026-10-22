@@ -22,7 +22,7 @@ import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, ambienceMood } from './audio.js';
+import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
@@ -925,6 +925,7 @@ export class Game {
     }
     this.bowlCrowd(inn.wkts > before.wkts ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     this.afterWicket = inn.wkts > before.wkts;
+    this.homeClaps(inn, inn.runs - before.runs, inn.wkts > before.wkts, true);
     this.hud(inn);
     if (!opt.assist) await this.battingBanter({ runs: inn.runs - before.runs, wicketFell: inn.wkts > before.wkts, beaten: res.outcome === 'beaten' || (res.outcome === 'edge' && inn.wkts === before.wkts), rng, inn });
     await this.sleepReal(this.bot ? 50 : 650);
@@ -1033,6 +1034,7 @@ export class Game {
       this.fx.shake(10); sfx.bat('perfect'); buzz(45);
     } else if (grade === 'defend') {
       this.fx.word('DEFENDED', this.W / 2, this.H * 0.3, { size: 42, color: '#fff4da', stroke: INK, rot: 0 });
+      if (this.myTeam.id === this.home) crowdClap(0.1); // (a well-timed defence at home is applauded)
       this.fx.shake(3); sfx.bat('good'); buzz(15);
     } else if (grade === 'good') {
       this.hitStop(40); this.fx.word('NICE!', this.W / 2, this.H * 0.3, { size: 46, color: '#3ec6ff', stroke: INK });
@@ -1126,6 +1128,14 @@ export class Game {
   homeWicket() {
     crowdResolve('dot');
     this.angry(1.3, true);
+  }
+  // The home crowd applauds (js/audio.js): its batters running 1, 2 or 3, and its bowlers' second dot ball in a row
+  homeClaps(inn, runs, wicket, iBat) {
+    if (wicket) return;
+    if ((iBat ? this.myTeam : this.oppTeam).id === this.home) { if (runs >= 1 && runs <= 3) crowdClap(); return; }
+    let n = 0;
+    while (n < inn.log.length && inn.log[inn.log.length - 1 - n] === '0') n++;
+    if (n === 2 || n === 4) crowdClap();
   }
   // a team's star powers up: a roar of song for the home side, a boo for the visitors
   starPower(team) { if (team.id === this.home) this.sing(0.4, 3.5, 0.45); else this.boo(0.2); }
@@ -1763,6 +1773,7 @@ export class Game {
     this.bowlCrowd(wicketFell ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     this.afterWicket = wicketFell;
     this.dotsAgainst(inn);
+    this.homeClaps(inn, runs, wicketFell, false);
     const goodBall = wicketFell || (runs === 0 && (res.outcome !== 'hit' || rg === 'perfect' || (mods?.tags.some(t => t.charge > 0) ?? false)));
     await this.bowlingBanter({ runs, wicketFell, goodBall, rng, inn });
     await this.sleepReal(this.bot ? 50 : 400);

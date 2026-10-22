@@ -93,6 +93,7 @@ function loadCheer() {
   }
   return cheerLoading;
 }
+const CHEER_SOFT = 0.7;   // (the cheers were too loud: every cheer and roar plays at this much of its level)
 // sec: seconds until the ball clears the rope. power: how loud (1.1 a four, 1.3 a six, 1.45 a perfect six)
 export function cheerStart(sec, power = 1.2) {
   cheerStop(0.15); singDuck(0.4);
@@ -100,7 +101,7 @@ export function cheerStart(sec, power = 1.2) {
   if (!cheerBuf) { loadCheer(); return; }
   const t = ac.currentTime, from = Math.max(0, CUE - sec), delay = Math.max(0, sec - CUE);
   const src = ac.createBufferSource(), vol = ac.createGain(), fadeIn = ac.createGain(), stopG = ac.createGain();
-  vol.gain.value = power;
+  vol.gain.value = power * CHEER_SOFT;
   if (from > 0) { fadeIn.gain.setValueAtTime(0.0001, t); fadeIn.gain.linearRampToValueAtTime(1, t + Math.max(0.3, Math.min(0.8, sec * 0.5))); }
   src.buffer = cheerBuf; src.connect(vol).connect(fadeIn).connect(stopG).connect(master); src.start(t + delay, from);
   cheerNow = { src, stopG };
@@ -135,7 +136,7 @@ export function crowdOhh() {
   if (!ready()) return;
   if (!bowlBufs) { loadBowlCrowd(); return; }
   const t = ac.currentTime, src = ac.createBufferSource(), vol = ac.createGain(), stopG = ac.createGain();
-  vol.gain.value = 1.1;
+  vol.gain.value = 1.1 * CHEER_SOFT;
   src.buffer = bowlBufs.ohh; src.connect(vol).connect(stopG).connect(master); src.start(t);
   ohhNow = { src, stopG };
 }
@@ -156,7 +157,7 @@ export function crowdResolve(kind) {
   if (!ready() || (kind !== 'wicket' && kind !== 'dot')) return;
   if (!bowlBufs) { loadBowlCrowd(); return; }
   const t = ac.currentTime, src = ac.createBufferSource(), g = ac.createGain(), buf = kind === 'wicket' ? bowlBufs.wicket : bowlBufs.hoo;
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(kind === 'wicket' ? 1.1 : 0.95, t + 0.03);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(kind === 'wicket' ? 1.1 * CHEER_SOFT : 0.95, t + 0.03);
   const skip = kind === 'wicket' ? 0.1 : 0;                                  // (the wicket recording opens with 0.12 s of near-silence: start past it)
   src.buffer = buf; src.connect(g).connect(master); src.start(t, skip);
   roarUntil = Math.max(roarUntil, t + (buf.duration - skip) * 0.7);                 // (the synthetic crowd stays quiet under it)
@@ -174,7 +175,7 @@ let moodBufs = null, moodLoading = null, singing = [];
 function loadMood() {
   if (!moodLoading) {
     const get = n => fetch(`snd/crowd-${n}.wav`).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)));
-    moodLoading = Promise.all([get('sing'), get('boo'), get('boo2'), get('boo3')]).then(([sing, boo, boo2, boo3]) => (moodBufs = { sing, boos: [boo, boo2, boo3] })).catch(() => { moodLoading = null; return null; });
+    moodLoading = Promise.all([get('sing'), get('boo'), get('boo2'), get('boo3'), get('clap')]).then(([sing, boo, boo2, boo3, clap]) => (moodBufs = { sing, boos: [boo, boo2, boo3], claps: [clap] })).catch(() => { moodLoading = null; return null; });
   }
   return moodLoading;
 }
@@ -199,6 +200,21 @@ function singDuck(sec = 0.4) {
     try { src.stop(t + sec + 0.05); } catch { /* already stopped */ }
   }
   singing = [];
+}
+// Applause for the home side's good moments. The recordings take turns (never two at once, and none while a roar or
+// another clap is playing); it ducks any singing.
+let clapNext = 0, clapUntil = 0;
+export function crowdClap(delay = 0) {
+  if (!ready()) return;
+  if (!moodBufs) { loadMood(); return; }
+  const now = ac.currentTime, t = now + Math.max(0, delay);
+  if (t < clapUntil || now < roarUntil) return;
+  const buf = moodBufs.claps[clapNext++ % moodBufs.claps.length], src = ac.createBufferSource(), g = ac.createGain();
+  singDuck(0.4);
+  g.gain.value = 0.7;
+  src.buffer = buf; src.connect(g).connect(master); src.start(t);
+  clapUntil = t + buf.duration;
+  roarUntil = Math.max(roarUntil, t + buf.duration * 0.7);                 // (the synthetic crowd stays quiet under it)
 }
 let lastBoo = -1;
 // a boo, never the one just heard
