@@ -40,7 +40,7 @@ test('the boo is whole: a clear boo that dies away to silence', () => {
   assert.ok(Math.abs(m[0]) < 0.01 && Math.abs(m[m.length - 1]) < 0.01, 'starts and ends on silence');
 });
 
-import { heat, twoWickets, RUNAWAY } from '../js/crowdheat.js';
+import { heat, RUNAWAY } from '../js/crowdheat.js';
 test('the crowd heat: hit apart is a runaway for the home side, wickets hurt the home batters, an even start is neutral', () => {
   assert.equal(heat(['1', '0', '1'], false), 0, 'too early to judge');
   const hit = ['4', '4', '6', '4', '1', '6', '4', '4', '1', '6', '4', '4'];
@@ -49,20 +49,16 @@ test('the crowd heat: hit apart is a runaway for the home side, wickets hurt the
   assert.ok(heat(['1', 'W', '0', 'W', '1', '0', '0', '1'], true) < -0.3, 'the home batters losing wickets');
   assert.ok(heat(['1', 'W', '0', 'W', '1', '0', '0', '1'], false) > 0.3, 'and the home bowlers on top');
   assert.ok(Math.abs(heat(['1', '0', '2', '1', '1', '0', '2', '1'], false)) < 0.4, 'an ordinary spell is near neutral');
-  assert.ok(twoWickets(['1', 'W', '0', 'W']) && !twoWickets(['W', '1', '1', '1', '1', '1', '1', 'W']));
+
 });
 
-test('the extra boos are whole and match the first boo in loudness; the heated one swells, holds steadily, and dies away', () => {
+test('the extra boos are whole and match the first boo in loudness', () => {
   const peakRms = c => { let m = 0; for (let t = 0; t + 0.25 < c.mono.length / c.rate; t += 0.1) m = Math.max(m, at(c, t, 0.25)); return m; };
   const ref = peakRms(load('boo'));
-  for (const n of ['boo2', 'boo3', 'booing']) {
+  for (const n of ['boo2', 'boo3']) {
     const c = load(n), m = c.mono;
     assert.ok(Math.abs(peakRms(c) / ref - 1) < 0.15, `${n} is as loud as the first boo`);
     assert.ok(Math.abs(m[0]) < 0.01 && Math.abs(m[m.length - 1]) < 0.01, `${n} starts and ends on silence`);
     assert.ok(at(c, m.length / c.rate - 0.1, 0.09) < ref * 0.1, `${n} dies away, not cut off`);
   }
-  const h = load('booing');
-  assert.ok(at(h, 0, 0.1) < at(h, 1, 0.25) * 0.4, 'it swells in');
-  for (const t of [0.75, 1, 1.5, 2, 2.5]) assert.ok(at(h, t, 0.25) > ref * 0.75 && at(h, t, 0.25) < ref * 1.25, `a steady level at ${t}s`);
-  assert.ok(h.mono.length / h.rate > 4, 'long enough to feel like a crowd turning');
 });

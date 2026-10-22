@@ -10,4 +10,3 @@ export function heat(log, homeBatting) {
   const bat = Math.max(-1, Math.min(1, (runs / w.length * 6 - 8) / 6 - 0.6 * wkts + 0.05 * bounds));
   return homeBatting ? bat : -bat;
 }
-export const twoWickets = log => log.slice(-6).filter(r => r === 'W').length >= 2;

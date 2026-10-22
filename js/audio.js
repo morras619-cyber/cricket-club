@@ -173,7 +173,7 @@ let moodBufs = null, moodLoading = null, singing = [];
 function loadMood() {
   if (!moodLoading) {
     const get = n => fetch(`snd/crowd-${n}.wav`).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)));
-    moodLoading = Promise.all([get('sing'), get('boo'), get('boo2'), get('boo3'), get('booing')]).then(([sing, boo, boo2, boo3, booing]) => (moodBufs = { sing, boos: [boo, boo2, boo3], booing })).catch(() => { moodLoading = null; return null; });
+    moodLoading = Promise.all([get('sing'), get('boo'), get('boo2'), get('boo3')]).then(([sing, boo, boo2, boo3]) => (moodBufs = { sing, boos: [boo, boo2, boo3] })).catch(() => { moodLoading = null; return null; });
   }
   return moodLoading;
 }
@@ -200,8 +200,8 @@ function singDuck(sec = 0.4) {
   singing = [];
 }
 let lastBoo = -1;
-// a boo, never the one just heard; `heated` (the visitors are running away with the game) is the longer, swelling one
-export function crowdBoo(delay = 0, heated = false) {
+// a boo, never the one just heard
+export function crowdBoo(delay = 0) {
   if (!ready()) return;
   if (!moodBufs) { loadMood(); return; }
   singDuck(0.4);
@@ -209,7 +209,7 @@ export function crowdBoo(delay = 0, heated = false) {
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.25);   // softer, easing in rather than hitting at once
   let pick; do pick = Math.floor(Math.random() * moodBufs.boos.length); while (pick === lastBoo);
   lastBoo = pick;
-  src.buffer = heated ? moodBufs.booing : moodBufs.boos[pick]; src.connect(g).connect(master); src.start(t);
+  src.buffer = moodBufs.boos[pick]; src.connect(g).connect(master); src.start(t);
   roarUntil = Math.max(roarUntil, t + src.buffer.duration * 0.7);        // (the synthetic crowd stays quiet under it)
 }
 
@@ -247,18 +247,12 @@ export function startAmbience() {
     amb = { bus, srcs, moodG };
   });
 }
-// how the match is going for the home side, -1 (a hush: they are being hit apart) to 1 (loud, they are on top)
+// how the match is going for the home side, -1 (they are being hit apart: restless, a little louder) to 1 (loud, they are on top)
 export function ambienceMood(x) {
-  ambLevel = x < 0 ? 1 + 0.45 * x : 1 + 0.2 * x;
+  ambLevel = x < 0 ? 1 - 0.15 * x : 1 + 0.2 * x;
   if (!amb) return;
   const g = amb.moodG.gain, t = ac.currentTime;
   g.cancelScheduledValues(t); g.setTargetAtTime(ambLevel, t, 0.8);
-}
-// the crowd goes quiet for `sec` seconds (a wicket against the home side), then the murmur comes back
-export function ambienceHush(sec = 2.5) {
-  if (!amb) return;
-  const g = amb.moodG.gain, t = ac.currentTime;
-  g.cancelScheduledValues(t); g.setTargetAtTime(0.12, t, 0.25); g.setTargetAtTime(ambLevel, t + sec, 1);
 }
 export function stopAmbience() {
   ambRun++;

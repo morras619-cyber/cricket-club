@@ -22,8 +22,8 @@ import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, ambienceMood, ambienceHush } from './audio.js';
-import { heat, twoWickets, RUNAWAY } from './crowdheat.js';
+import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, ambienceMood } from './audio.js';
+import { heat, RUNAWAY } from './crowdheat.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -765,7 +765,7 @@ export class Game {
     await this.sleepReal(this.bot ? 150 : aiPower ? 1700 : 650);
     await this.powerPause();
     this.crowdBuild = this.wantBuild(ballNo) && !this.lastOverChorus(inn, ballNo, true);
-    this.crowdHeat(inn, this.myTeam.id === this.home);
+    this.crowdHeat(inn, this.myTeam.id === this.home, true);
     this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
 
     // run-up: freezes mid-stride while a power's comic panel is on screen
@@ -1058,6 +1058,7 @@ export class Game {
 
   wicketFx(text, at) {
     this.bowlCrowd('wicket');
+    if (this.homeBat) this.homeWicket();
     this.board(text.replace('!', '') + '!');
     this.fx.flash('#e8343b', 0.4); this.fx.shake(12);
     this.fx.word(text, this.W / 2, this.H * 0.36, { size: 62, color: '#fff4da', stroke: '#e8343b', dur: 1500 });
@@ -1091,14 +1092,17 @@ export class Game {
     if (key !== this.moodKey) { this.moodKey = key; this.mood = { sang: false, booed: false }; }
   }
   sing(delay, sec, vol) { if (!this.mood || this.mood.sang) return; this.mood.sang = true; crowdSing(delay, sec, vol); }
-  boo(delay = 0, heated = false) { if (!this.mood || this.mood.booed) return; this.mood.booed = true; crowdBoo(delay, heated); }
-  // How the match is going for the home side (js/crowdheat.js) sets how loud the murmur is; when the visitors are
-  // running away with it, their fours get booed as well as their sixes
-  crowdHeat(inn, homeBatting) { this.heat = heat(inn.log, homeBatting); ambienceMood(this.heat); }
-  // a wicket against the home side: the crowd goes quiet, and when it is two in an over a song rallies the batters
-  homeWicket(inn) {
-    ambienceHush(2.5);
-    if (twoWickets(inn.log)) this.sing(3.2, 5, 0.45);
+  boo(delay = 0) { if (!this.mood || this.mood.booed) return; this.mood.booed = true; crowdBoo(delay); }
+  // How the match is going for the home side (js/crowdheat.js) sets how loud the murmur is (restless when they are
+  // being hit apart); when the visitors are running away with it, their fours get booed as well as their sixes
+  crowdHeat(inn, homeBatting, iBat) {
+    this.homeBat = homeBatting && !iBat; // (set when I bowl at the home side: a wicket I take is theirs to groan at)
+    this.heat = heat(inn.log, homeBatting); ambienceMood(this.heat);
+  }
+  // a wicket I take against the home side: the crowd groans at once (the hoooo), then boos
+  homeWicket() {
+    crowdResolve('dot');
+    crowdBoo(1.3);
   }
   // a team's star powers up: a roar of song for the home side, a boo for the visitors
   starPower(team) { if (team.id === this.home) this.sing(0.4, 3.5, 0.45); else this.boo(0.2); }
@@ -1303,7 +1307,7 @@ export class Game {
     } else if ((six || (toRope && this.heat <= RUNAWAY)) && (o.side === 'ai' ? this.myTeam : this.oppTeam).id !== this.home) {
       let tClear = end;
       for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
-      this.boo(tClear / ballK / 1.6, this.heat <= RUNAWAY); // the visitors' six (or a four when they are running away with it): the home crowd boos
+      this.boo(tClear / ballK / 1.6); // the visitors' six (or a four when they are running away with it): the home crowd boos
     }
     let said = false, slowUntil = 0, slowed = !(six && grade === 'perfect'), landed = null;
     await this.until(() => {
@@ -1516,7 +1520,7 @@ export class Game {
     if (hint) this.ui.hint(hint);
 
     this.crowdBuild = this.wantBuild(ballNo) && !this.lastOverChorus(inn, ballNo, false);
-    this.crowdHeat(inn, this.oppTeam.id === this.home);
+    this.crowdHeat(inn, this.oppTeam.id === this.home, false);
     // the swipe (the FIELD button may interrupt it)
     let G;
     for (;;) {
@@ -1735,7 +1739,6 @@ export class Game {
     const runs = inn.runs - before.runs, wicketFell = inn.wkts > before.wkts;
     this.bowlCrowd(wicketFell ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     this.afterWicket = wicketFell;
-    if (wicketFell && this.myTeam.id !== this.home) this.homeWicket(inn); // (I bowl, so the batters are the home side's)
     const goodBall = wicketFell || (runs === 0 && (res.outcome !== 'hit' || rg === 'perfect' || (mods?.tags.some(t => t.charge > 0) ?? false)));
     await this.bowlingBanter({ runs, wicketFell, goodBall, rng, inn });
     await this.sleepReal(this.bot ? 50 : 400);
