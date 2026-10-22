@@ -22,7 +22,7 @@ import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerStart, cheerStop } from './audio.js';
+import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdStop } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -761,6 +761,7 @@ export class Game {
     if (opt.waitPower) await opt.waitPower();
     await this.sleepReal(this.bot ? 150 : aiPower ? 1700 : 650);
     await this.powerPause();
+    this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
 
     // run-up: freezes mid-stride while a power's comic panel is on screen
     let prog = 0, last = this.gameTime;
@@ -897,6 +898,7 @@ export class Game {
       this.charge.wicketLost();
       if (opt.onOut) opt.onOut();
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
+      this.bowlCrowd('dot');
       this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
       inn.ball({ runs: 0 });
       this.charge.dot();
@@ -916,6 +918,7 @@ export class Game {
       this.hitGrade = grade;
       await this.battingHit(inn, ballNo, res, grade, aiField, rng, fx);
     }
+    this.bowlCrowd(inn.wkts > before.wkts ? 'wicket' : inn.runs - before.runs === 0 ? 'dot' : 'runs'); // (a ball the crowd has not yet heard about)
     this.hud(inn);
     if (!opt.assist) await this.battingBanter({ runs: inn.runs - before.runs, wicketFell: inn.wkts > before.wkts, beaten: res.outcome === 'beaten' || (res.outcome === 'edge' && inn.wkts === before.wkts), rng, inn });
     await this.sleepReal(this.bot ? 50 : 650);
@@ -1047,11 +1050,26 @@ export class Game {
   }
 
   wicketFx(text, at) {
+    this.bowlCrowd('wicket');
     this.board(text.replace('!', '') + '!');
     this.fx.flash('#e8343b', 0.4); this.fx.shake(12);
     this.fx.word(text, this.W / 2, this.H * 0.36, { size: 62, color: '#fff4da', stroke: '#e8343b', dur: 1500 });
     this.fx.sparks(at.x, at.y, 20, ['#fff4da', '#e8343b', '#f0c27a'], 9);
     sfx.wicket(); buzz([60, 40, 60]);
+  }
+
+  // The home crowd when its own side bowls (js/audio.js): a build-up as the bowler runs in, a groan for a miss, a
+  // block or a dot, a roar for a wicket. The away side's bowling gets nothing, as the away side's boundaries get
+  // no cheer. A ball is resolved once: the first call after the run-up counts (a catch that takes a while keeps the
+  // build-up held until it is decided).
+  bowlCrowdStart(bowlingTeam) {
+    this.crowdLive = bowlingTeam.id === this.home;
+    if (this.crowdLive) crowdOhh();
+  }
+  bowlCrowd(kind) {
+    if (!this.crowdLive) return;
+    this.crowdLive = false;
+    crowdResolve(kind);
   }
 
   async battingHit(inn, ballNo, res, grade, aiField, rng, fx) {
@@ -1066,6 +1084,7 @@ export class Game {
       return;
     }
     const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: (this.oppStyle.field || 1) * this.pitch.field * fieldSpeed(this.sideRating(this.oppSide)) });
+    if (!sim.catch) this.bowlCrowd(sim.runs === 0 ? 'dot' : 'runs'); // (a catch chance keeps the build-up held until it is decided)
     let caught = false, saved = false, dropped = false;
     if (sim.catch) {
       caught = rng.chance(sim.catch.p * 0.92);
@@ -1482,6 +1501,7 @@ export class Game {
       S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
       inn.extra(1, true);
       this.freeHit = true;
+      this.bowlCrowd('abort');
       this.ui.banner('NO BALL!', 'Too fast — you overstepped. +1 run, free hit next', 1700);
       sfx.trombone();
       await this.sleepReal(this.bot ? 100 : 1500);
@@ -1600,7 +1620,7 @@ export class Game {
     }
 
     const wicket = (text, kind2, hero, extra = {}) => {
-      if (freeHit) { outFree(); inn.ball({ runs: 0 }); return; }
+      if (freeHit) { this.bowlCrowd('dot'); outFree(); inn.ball({ runs: 0 }); return; }
       inn.ball({ wicket: true });
       this.charge.award('wicket', 'WICKET');
       this.wicketFx(text, cs);
@@ -1616,6 +1636,7 @@ export class Game {
       const powerWord = usedPower ? { tornado: 'TORNADO YORKER!', maya: 'MAYA BALL!', shatter: 'SHATTERED!' }[usedPower] : comboTag ? comboTag.label : null;
       wicket(res.mayaFooled ? 'FOOLED BY MAYA!' : 'BOWLED!', usedPower || comboTag ? 'twoWickets' : 'wicket', bowlerHero, { word: powerWord || 'BOWLED!', detail: powerWord ? `${powerWord.replace('!', '').toLowerCase()} wicket` : 'stumps cartwheeling' });
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
+      this.bowlCrowd('dot');
       this.fx.word(res.outcome === 'leave' ? 'LEFT ALONE' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
       inn.ball({ runs: 0 });
       this.charge.award('dot', 'DOT'); this.charge.dot();
@@ -1656,6 +1677,7 @@ export class Game {
     this.hud(inn);
 
     const runs = inn.runs - before.runs, wicketFell = inn.wkts > before.wkts;
+    this.bowlCrowd(wicketFell ? 'wicket' : runs === 0 ? 'dot' : 'runs'); // (a ball the crowd has not yet heard about)
     const goodBall = wicketFell || (runs === 0 && (res.outcome !== 'hit' || rg === 'perfect' || (mods?.tags.some(t => t.charge > 0) ?? false)));
     await this.bowlingBanter({ runs, wicketFell, goodBall, rng, inn });
     await this.sleepReal(this.bot ? 50 : 400);
@@ -1682,6 +1704,7 @@ export class Game {
         if (g.y < this.H * 0.28 || this.realTime < this.powerFxUntil) return;
         pts = [{ x: g.x, y: g.y, t: g.t }];
         S.runStart = this.realTime;
+        this.bowlCrowdStart(this.myTeam); // the crowd builds as the bowler runs in
         this.ui.hint(null);
         this.bowlTrail = pts;
       } else if (type === 'move' && pts) {
@@ -1693,7 +1716,7 @@ export class Game {
         const r = this.aimAt(gestureToDelivery(pts, kind, scale), g);
         if (!r) {
           this.fx.word('SWIPE FURTHER UP THE PITCH', this.W / 2, this.H * 0.5, { size: 26, color: '#fff4da', stroke: INK, rot: 0, dur: 1000 });
-          pts = null; S.aim = null; S.runStart = null; this.bowlTrail = null;
+          pts = null; S.aim = null; S.runStart = null; this.bowlTrail = null; this.bowlCrowd('abort');
           S.bowler.z = 26; S.bowler.pose = POSES.stand(); S.bowler.spr = null;
           return;
         }
@@ -1716,7 +1739,7 @@ export class Game {
     });
     this.onInput = null;
     this.ui.fieldButton(false);
-    if (this.fieldEditRequested && !done) return 'field';
+    if (this.fieldEditRequested && !done) { this.bowlCrowd('abort'); return 'field'; }
     return done;
   }
 
@@ -1937,6 +1960,8 @@ export class Game {
   async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit) {
     const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field * fieldSpeed(this.sideRating(this.mySide)), riskyRun: res.risky ? 1 : undefined });
     const ctl = ch => playerControls(ch, this.fieldState, ballNo);
+    // hit with no catch, run out or save to wait for: the crowd knows now. (With one it keeps the build-up held until it is decided.)
+    if (!sim.catch && !sim.runOut && !sim.save) this.bowlCrowd(sim.runs === 0 ? 'dot' : 'runs');
 
     if (sim.catch) {
       const ch = { kind: 'catch', p: sim.catch.p };

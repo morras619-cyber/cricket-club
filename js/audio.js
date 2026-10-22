@@ -117,6 +117,52 @@ export function cheerStop(fade = 0.3) {
   setTimeout(() => stopG.disconnect(), (fade + 0.3) * 1000);
 }
 
+// ---------- the home crowd when its side bowls: a build-up, then a groan or a roar ----------
+// snd/crowd-ohh.wav (tools/build_bowling_crowd.py) rises as the bowler runs in and is carried on, so a catch that
+// takes a while to settle still has a tense crowd under it. When the ball is decided it is faded out under:
+// crowd-hoo.wav (a miss, a block, a dot) or crowd-wicket.wav (a wicket), each kept whole. A ball that scores
+// just lets the build-up fade away.
+const BOWLCROWD = ['ohh', 'hoo', 'wicket'];
+let bowlBufs = null, bowlLoading = null, ohhNow = null;
+function loadBowlCrowd() {
+  if (!bowlLoading) {
+    const get = n => fetch(`snd/crowd-${n}.wav`).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)));
+    bowlLoading = Promise.all(BOWLCROWD.map(get)).then(([ohh, hoo, wicket]) => (bowlBufs = { ohh, hoo, wicket })).catch(() => { bowlLoading = null; return null; });
+  }
+  return bowlLoading;
+}
+export function crowdOhh() {
+  crowdFade(0.15);
+  if (!ready()) return;
+  if (!bowlBufs) { loadBowlCrowd(); return; }
+  const t = ac.currentTime, src = ac.createBufferSource(), vol = ac.createGain(), stopG = ac.createGain();
+  vol.gain.value = 1.1;
+  src.buffer = bowlBufs.ohh; src.connect(vol).connect(stopG).connect(master); src.start(t);
+  ohhNow = { src, stopG };
+}
+// fade the build-up out (a node of its own, so stopping never reads a volume that may be mid-change)
+function crowdFade(sec) {
+  if (!ohhNow || !ac) return;
+  const { src, stopG } = ohhNow; ohhNow = null;
+  const t = ac.currentTime;
+  stopG.gain.setValueAtTime(1, t); stopG.gain.linearRampToValueAtTime(0.0001, t + sec);
+  try { src.stop(t + sec + 0.05); } catch { /* already stopped */ }
+  setTimeout(() => stopG.disconnect(), (sec + 0.3) * 1000);
+}
+// the ball is decided: 'wicket', 'dot' (a miss, a block, no runs) or 'runs'/'abort' (only the build-up fading away)
+export function crowdResolve(kind) {
+  const was = !!ohhNow;
+  crowdFade(kind === 'wicket' ? 0.9 : kind === 'dot' ? 0.3 : 0.6); // (the build-up outlasts the wicket cheer's attack, so there is no dip between them)
+  if (!ready() || (kind !== 'wicket' && kind !== 'dot')) return;
+  if (!bowlBufs) { loadBowlCrowd(); return; }
+  const t = ac.currentTime, src = ac.createBufferSource(), g = ac.createGain(), buf = kind === 'wicket' ? bowlBufs.wicket : bowlBufs.hoo;
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(kind === 'wicket' ? 1.1 : 0.95, t + 0.03);
+  src.buffer = buf; src.connect(g).connect(master); src.start(t);
+  roarUntil = Math.max(roarUntil, t + buf.duration * 0.7);                 // (the synthetic crowd stays quiet under it)
+  return was;
+}
+export function crowdStop() { crowdFade(0.2); }
+
 // ---------- the match's crowd bed ----------
 // A low crowd murmur under the whole match (snd/crowd-loop.wav, tools/build_crowd_loop.py: made to
 // loop with no seam). Two copies play at once, the second a little slower, so the short loop's
@@ -134,7 +180,7 @@ export function startAmbience() {
   stopAmbience();
   if (!ready()) return;
   const run = ++ambRun;
-  loadCheer();
+  loadCheer(); loadBowlCrowd();
   loadAmbience().then(buf => {
     if (!buf || run !== ambRun || !ready()) return; // (stopped, or muted, while it loaded)
     const bus = ac.createGain(), t = ac.currentTime;
