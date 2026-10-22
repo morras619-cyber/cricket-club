@@ -22,7 +22,7 @@ import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop } from './audio.js';
+import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -552,7 +552,7 @@ export class Game {
       result = { outcome: o.won ? 'win' : o.tied ? 'tie' : 'loss', text: o.line, daily: o };
     } else result = matchResult(a, b, this.tiebreakRounds || []);
     const sorted = [...this.moments].sort((x, y) => y.score - x.score);
-    return { mode: this.mode, innings: this.innings.slice(0, 2), tiebreaks: this.tiebreakRounds || [], result, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats, myTeam: this.myTeam, oppTeam: this.oppTeam, captain: this.captain, scenario: this.scenario || null, levels: this.levels };
+    return { mode: this.mode, innings: this.innings.slice(0, 2), tiebreaks: this.tiebreakRounds || [], result, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats, myTeam: this.myTeam, oppTeam: this.oppTeam, home: this.home, captain: this.captain, scenario: this.scenario || null, levels: this.levels };
   }
 
   addMoment(kind, title, word, hero, opts = {}) {
@@ -630,6 +630,7 @@ export class Game {
     else if (kind === 'elastic') A.elastic = 2;
     else A[kind] = true;
     this.stats.powers++;
+    this.starPower(this.myTeam);
     if (def.cost >= 60 && !this.bot) {
       // signature powers get a full comic cut-in panel
       this.showCutIn(hero, def);
@@ -751,6 +752,7 @@ export class Game {
       const star = this.rival.bowl, pw = star.power;
       if (this.bot) this.ui.banner(`${pw.name.toUpperCase()}!`, `${star.name} powers up`, 1600);
       else { this.showCutIn(star, pw); this.powerFxUntil = this.realTime + 1400; }
+      this.starPower(this.oppTeam);
       sfx.whoosh();
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
@@ -761,7 +763,7 @@ export class Game {
     if (opt.waitPower) await opt.waitPower();
     await this.sleepReal(this.bot ? 150 : aiPower ? 1700 : 650);
     await this.powerPause();
-    this.crowdBuild = this.wantBuild(ballNo);
+    this.crowdBuild = this.wantBuild(ballNo) && !this.lastOverChorus(inn, ballNo, true);
     this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
 
     // run-up: freezes mid-stride while a power's comic panel is on screen
@@ -954,6 +956,7 @@ export class Game {
       this.fx.bubble(line('bowlerSledge', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1800 });
       if (!wicketFell || inn.wkts < CFG.wickets) {
         this.playerRevenge = true;
+        if (this.oppTeam.id !== this.home) this.boo(0.2); // the home crowd boos the visiting sledger
         this.ui.banner('HE\'S TALKING', 'Hit a boundary next ball for +10 REVENGE', 1700);
       }
       await this.sleepReal(this.bot ? 50 : 900);
@@ -1078,12 +1081,31 @@ export class Game {
     crowdResolve('dot');
   }
   // the build-up is wanted on the first ball of an over and the first ball after a wicket
-  wantBuild(ballNo) { return (ballNo - 1) % 6 === 0 || !!this.afterWicket; }
+  wantBuild(ballNo) { this.moodTick(ballNo); return (ballNo - 1) % 6 === 0 || !!this.afterWicket; }
+  // The home crowd's moods (js/audio.js): it sings when its side is on top and boos the visitors. Each at most once
+  // an over, so they stay special.
+  moodTick(ballNo) {
+    const key = `${this.innings.length}:${Math.floor((ballNo - 1) / 6)}`;
+    if (key !== this.moodKey) { this.moodKey = key; this.mood = { sang: false, booed: false }; }
+  }
+  sing(delay, sec, vol) { if (!this.mood || this.mood.sang) return; this.mood.sang = true; crowdSing(delay, sec, vol); }
+  boo(delay = 0) { if (!this.mood || this.mood.booed) return; this.mood.booed = true; crowdBoo(delay); }
+  // a team's star powers up: a roar of song for the home side, a boo for the visitors
+  starPower(team) { if (team.id === this.home) this.sing(0.4, 3.5, 0.45); else this.boo(0.2); }
+  // the last over of a chase, the home side clearly on top: a chorus
+  lastOverChorus(inn, ballNo, mineBatting) {
+    if (inn.target == null || inn.ballsLeft !== 6 || (ballNo - 1) % 6 !== 0) return false;
+    const need = inn.target - inn.runs, chasingHome = (mineBatting ? this.myTeam : this.oppTeam).id === this.home;
+    if (chasingHome ? need > 8 : need < 14) return false;
+    this.sing(0.3, 7, 0.4);
+    return true;
+  }
   bowlCrowdSoften() { if (this.crowdLive) crowdSoften(); }
   bowlCrowd(kind) {
     if (!this.crowdLive) return;
     this.crowdLive = false;
     crowdResolve(kind);
+    if (kind === 'wicket') this.sing(1.6, 5, 0.5); // (a chant over the new batter walking in, after the wicket cheer has died down)
   }
 
   async battingHit(inn, ballNo, res, grade, aiField, rng, fx) {
@@ -1267,6 +1289,11 @@ export class Game {
       let tClear = end;
       if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
       cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
+      if (six) this.sing(tClear / ballK / 1.6 + 2.2, 4.5, 0.45); // (the roar dies down into a few seconds of song)
+    } else if (six && (o.side === 'ai' ? this.myTeam : this.oppTeam).id !== this.home) {
+      let tClear = end;
+      for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
+      this.boo(tClear / ballK / 1.6); // the visitors' six: the home crowd boos as it goes over
     }
     let said = false, slowUntil = 0, slowed = !(six && grade === 'perfect'), landed = null;
     await this.until(() => {
@@ -1455,6 +1482,7 @@ export class Game {
       this.aiBatPower = k === 'meteor' ? 'thunder' : k;
       const pw = this.rival.bat.power;
       if (!this.bot) { this.showCutIn(this.rival.bat, pw); this.powerFxUntil = this.realTime + 1400; }
+      this.starPower(this.oppTeam);
       this.ui.banner(`${this.rival.bat.name.toUpperCase()}: ${pw.name.toUpperCase()}!`, 'Answer with a power of your own', 2000);
       if (this.aiBatPower === 'mirror') this.aiMirror = 3;
       sfx.whoosh();
@@ -1477,7 +1505,7 @@ export class Game {
     const hint = opt.hint || (this.bowlHints-- > 0 ? 'SWIPE FROM YOUR BOWLER UP THE PITCH' : null);
     if (hint) this.ui.hint(hint);
 
-    this.crowdBuild = this.wantBuild(ballNo);
+    this.crowdBuild = this.wantBuild(ballNo) && !this.lastOverChorus(inn, ballNo, false);
     // the swipe (the FIELD button may interrupt it)
     let G;
     for (;;) {
@@ -1518,6 +1546,7 @@ export class Game {
       inn.extra(1, true);
       this.freeHit = true;
       this.bowlCrowd('abort');
+      if (this.myTeam.id === this.home) this.boo(0.1); // the free hit goes to the visitors
       this.ui.banner('NO BALL!', 'Too fast — you overstepped. +1 run, free hit next', 1700);
       sfx.trombone();
       await this.sleepReal(this.bot ? 100 : 1500);

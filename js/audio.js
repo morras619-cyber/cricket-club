@@ -95,7 +95,7 @@ function loadCheer() {
 }
 // sec: seconds until the ball clears the rope. power: how loud (1.1 a four, 1.3 a six, 1.45 a perfect six)
 export function cheerStart(sec, power = 1.2) {
-  cheerStop(0.15);
+  cheerStop(0.15); singDuck(0.4);
   if (!ready()) return;
   if (!cheerBuf) { loadCheer(); return; }
   const t = ac.currentTime, from = Math.max(0, CUE - sec), delay = Math.max(0, sec - CUE);
@@ -151,6 +151,7 @@ function crowdFade(sec) {
 // the ball is decided: 'wicket', 'dot' (a miss or a block) or 'runs'/'abort' (only the build-up fading away)
 export function crowdResolve(kind) {
   const was = !!ohhNow;
+  if (kind === 'wicket' || kind === 'dot') singDuck(0.4);
   crowdFade(kind === 'wicket' ? 0.9 : kind === 'dot' ? 0.3 : 0.6); // (the build-up outlasts the wicket cheer's attack, so there is no dip between them)
   if (!ready() || (kind !== 'wicket' && kind !== 'dot')) return;
   if (!bowlBufs) { loadBowlCrowd(); return; }
@@ -162,7 +163,51 @@ export function crowdResolve(kind) {
 }
 // the ball is in the air with a catch to come: the build-up fades away now (it is not held for the catch)
 export function crowdSoften() { crowdFade(0.8); }
-export function crowdStop() { crowdFade(0.2); }
+export function crowdStop() { crowdFade(0.2); singDuck(0.3); }
+
+// ---------- the crowd's moods: singing and booing ----------
+// snd/crowd-sing.wav (a happy crowd, 10 s, faded at both ends) plays as much as a moment needs, faded in and out so
+// it never starts or stops abruptly; snd/crowd-boo.wav (an angry crowd, whole). Singing ducks away under any of the
+// louder crowd sounds that come after it (the roar, a wicket, a groan, a boo). tools/build_crowd_mood.py.
+let moodBufs = null, moodLoading = null, singing = [];
+function loadMood() {
+  if (!moodLoading) {
+    const get = n => fetch(`snd/crowd-${n}.wav`).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)));
+    moodLoading = Promise.all([get('sing'), get('boo')]).then(([sing, boo]) => (moodBufs = { sing, boo })).catch(() => { moodLoading = null; return null; });
+  }
+  return moodLoading;
+}
+// sing for `sec` seconds starting `delay` seconds from now, at volume `vol`
+export function crowdSing(delay = 0, sec = 5, vol = 0.5) {
+  if (!ready()) return;
+  if (!moodBufs) { loadMood(); return; }
+  const t0 = ac.currentTime + Math.max(0, delay), len = Math.min(sec, moodBufs.sing.duration);
+  const src = ac.createBufferSource(), g = ac.createGain(), stopG = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.6, len * 0.3));
+  g.gain.setValueAtTime(vol, t0 + Math.max(0.7, len - 1.3)); g.gain.linearRampToValueAtTime(0.0001, t0 + len);
+  src.buffer = moodBufs.sing; src.connect(g).connect(stopG).connect(master); src.start(t0); src.stop(t0 + len + 0.05);
+  singing.push({ src, stopG });
+  setTimeout(() => { singing = singing.filter(x => x.src !== src); stopG.disconnect(); }, (delay + len + 0.5) * 1000);
+}
+// fade the singing away (any that is playing or waiting to start)
+function singDuck(sec = 0.4) {
+  if (!ac) return;
+  const t = ac.currentTime;
+  for (const { src, stopG } of singing) {
+    stopG.gain.setValueAtTime(1, t); stopG.gain.linearRampToValueAtTime(0.0001, t + sec);
+    try { src.stop(t + sec + 0.05); } catch { /* already stopped */ }
+  }
+  singing = [];
+}
+export function crowdBoo(delay = 0) {
+  if (!ready()) return;
+  if (!moodBufs) { loadMood(); return; }
+  singDuck(0.4);
+  const t = ac.currentTime + Math.max(0, delay), src = ac.createBufferSource(), g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.95, t + 0.04);
+  src.buffer = moodBufs.boo; src.connect(g).connect(master); src.start(t);
+  roarUntil = Math.max(roarUntil, t + moodBufs.boo.duration * 0.7);        // (the synthetic crowd stays quiet under it)
+}
 
 // ---------- the match's crowd bed ----------
 // A low crowd murmur under the whole match (snd/crowd-loop.wav, tools/build_crowd_loop.py: made to
@@ -181,7 +226,7 @@ export function startAmbience() {
   stopAmbience();
   if (!ready()) return;
   const run = ++ambRun;
-  loadCheer(); loadBowlCrowd();
+  loadCheer(); loadBowlCrowd(); loadMood();
   loadAmbience().then(buf => {
     if (!buf || run !== ambRun || !ready()) return; // (stopped, or muted, while it loaded)
     const bus = ac.createGain(), t = ac.currentTime;

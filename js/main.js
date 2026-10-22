@@ -20,7 +20,7 @@ import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
-import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop } from './audio.js';
+import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
@@ -658,6 +658,7 @@ async function startMatch(opts) {
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
+  if (summary.result?.outcome === 'win' && summary.home && summary.home === summary.myTeam?.id) crowdSing(0.4, 10, 0.5); // a win at home: the crowd sings
   if (mode === 'tutorial' && tutTips && !window.__SIXCHARGE_BOT) coachSay(DEV.tutDone);
 }
 

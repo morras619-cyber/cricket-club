@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""The crowd's moods (snd/crowd-sing.wav, crowd-boo.wav), from tools/audio/src/crowd-{sing,boo}.mp3 (js/audio.js plays them):
+  crowd-sing.wav  a happy crowd singing. The recording is 3 s, loud at both ends (cut off at both). Faded in, its middle
+                  section carried on (folded over itself with crossfades, no repeat heard) to 10 s, and faded out
+  crowd-boo.wav   an angry crowd booing: attack, hold, a natural decay to silence (kept whole)
+The recordings have a narrow whistle line near 6 kHz: any bin in 1.5-8 kHz that stands out from its neighbours is pulled
+down to them. Each file starts and ends on silence.
+usage: python3 tools/build_crowd_mood.py   (needs ffmpeg, numpy, scipy)
+"""
+import os, subprocess, tempfile
+import numpy as np
+import scipy.io.wavfile as w
+from scipy.signal import stft, istft
+from scipy.ndimage import median_filter
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SRC = os.path.join(HERE, 'audio', 'src')
+OUT = os.path.join(HERE, '..', 'snd')
+SR = 32000
+SING_LEN = 10.0      # seconds of singing: js/audio.js plays as much of it as a moment needs
+SING_IN = 0.35       # fade in
+SING_OUT = 1.6       # fade out
+
+
+def load(name):
+    tmp = os.path.join(tempfile.mkdtemp(), 'a.wav')
+    subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', os.path.join(SRC, name), '-ar', str(SR), '-ac', '2', tmp], check=True)
+    return w.read(tmp)[1].astype(np.float64) / 32768
+
+
+def untone(x, lo=1500, hi=8000, ratio=1.3, passes=3):
+    out = []
+    for c in range(x.shape[1]):
+        y = x[:, c]
+        for _ in range(passes):
+            f, t, Z = stft(y, SR, nperseg=2048, noverlap=1536)
+            mag, ph = np.abs(Z), np.angle(Z)
+            floor = median_filter(mag, size=(41, 5))
+            band = ((f >= lo) & (f <= hi))[:, None]
+            mag = np.where(band & (mag > ratio * floor), floor, mag)
+            y = istft(mag * np.exp(1j * ph), SR, nperseg=2048, noverlap=1536)[1][:len(x)]
+        out.append(y)
+    return np.stack(out, 1)
+
+
+def xfade_append(x, y, n):
+    t = np.linspace(0, np.pi / 2, n)[:, None]
+    return np.concatenate([x[:-n], x[-n:] * np.cos(t) + y[:n] * np.sin(t), y[n:]])
+
+
+def save(name, x, peak=0.92):
+    x = x * min(1.0, peak / max(abs(x).max(), 1e-9))
+    p = os.path.join(OUT, name)
+    w.write(p, SR, (np.clip(x, -1, 1) * 32767).astype(np.int16))
+    print('wrote', p, f'{len(x) / SR:.2f}s', os.path.getsize(p) // 1024, 'KB', '| peak', round(float(abs(x).max()), 2), '| rms', round(float(np.sqrt((x.mean(1) ** 2).mean())), 3))
+
+
+os.makedirs(OUT, exist_ok=True)
+sing = untone(load('crowd-sing.mp3'))
+mid = sing[int(0.4 * SR):int(2.7 * SR)]                 # the steady middle, away from the cut-off ends
+clip = mid
+rng = np.random.default_rng(21)
+want = int(SING_LEN * SR)
+while len(clip) < want:
+    skip = int(rng.uniform(0, 0.35) * SR)
+    clip = xfade_append(clip, mid[skip:], int(0.4 * SR))
+clip = clip[:want]
+n_in, n_out = int(SING_IN * SR), int(SING_OUT * SR)
+clip[:n_in] *= np.linspace(0, 1, n_in)[:, None] ** 1.5
+clip[-n_out:] *= (np.cos(np.linspace(0, np.pi / 2, n_out)) ** 2)[:, None]
+save('crowd-sing.wav', clip)
+boo = untone(load('crowd-boo.mp3'))
+n = int(0.04 * SR)
+boo[-n:] *= np.linspace(1, 0, n)[:, None]; boo[:n // 2] *= np.linspace(0, 1, n // 2)[:, None]
+save('crowd-boo.wav', boo)
