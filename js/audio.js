@@ -56,7 +56,7 @@ export const sfx = {
   stumps() { noise(0.25, { gain: 0.8, freq: 900, q: 1.2 }); tone(220, 0.2, { type: 'square', gain: 0.15, to: 80 }); },
   glove() { noise(0.12, { gain: 0.7, freq: 400, q: 1 }); tone(110, 0.15, { gain: 0.6, to: 60 }); },
   trombone() { [392, 370, 349, 262].forEach((f, i) => tone(f, i === 3 ? 0.6 : 0.22, { type: 'sawtooth', gain: 0.12, delay: i * 0.22, to: i === 3 ? 220 : null })); },
-  crowd(intensity = 1) { noise(1.6 * intensity, { gain: 0.25 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
+  crowd(intensity = 1) { if (ac && ac.currentTime < roarUntil) return; /* (the boundary cheer is the crowd) */ noise(1.6 * intensity, { gain: 0.25 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
   whoosh() { noise(0.35, { gain: 0.4, freq: 600, q: 0.6, type: 'lowpass', attack: 0.1 }); },
   boom() { tone(70, 0.8, { gain: 0.9, to: 30 }); noise(0.6, { gain: 0.6, freq: 200, q: 0.5, type: 'lowpass' }); },
   zap() { tone(1400, 0.18, { type: 'sawtooth', gain: 0.18, to: 200 }); noise(0.15, { gain: 0.3, freq: 4000, q: 3 }); },
@@ -79,6 +79,44 @@ function iosTick() {
   }
   iosSwitch.click();
 }
+// ---------- a four or a six: the crowd builds as the ball flies, then roars ----------
+// snd/boundary-cheer.wav (tools/build_boundary_cheer.py) is one continuous clip: a crowd rising from near
+// silence, running into a full cheer that holds and fades out. CUE is the moment in it that the ball clears
+// the rope. It is started CUE seconds before that moment: part-way in for a short flight (faded in from
+// silence), late for a long one, so the roar arrives as the ball goes over.
+const CUE = 2.9;
+let cheerBuf = null, cheerLoading = null, cheerNow = null, roarUntil = 0;
+function loadCheer() {
+  if (!cheerLoading) {
+    cheerLoading = fetch('snd/boundary-cheer.wav').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
+      .then(buf => (cheerBuf = buf)).catch(() => { cheerLoading = null; return null; });
+  }
+  return cheerLoading;
+}
+// sec: seconds until the ball clears the rope. power: how loud (1.4 a four, 1.6 a six, 1.8 a perfect six)
+export function cheerStart(sec, power = 1.5) {
+  cheerStop(0.15);
+  if (!ready()) return;
+  if (!cheerBuf) { loadCheer(); return; }
+  const t = ac.currentTime, from = Math.max(0, CUE - sec), delay = Math.max(0, sec - CUE);
+  const src = ac.createBufferSource(), vol = ac.createGain(), fadeIn = ac.createGain(), stopG = ac.createGain();
+  vol.gain.value = power;
+  if (from > 0) { fadeIn.gain.setValueAtTime(0.0001, t); fadeIn.gain.linearRampToValueAtTime(1, t + Math.max(0.3, Math.min(0.8, sec * 0.5))); }
+  src.buffer = cheerBuf; src.connect(vol).connect(fadeIn).connect(stopG).connect(master); src.start(t + delay, from);
+  cheerNow = { src, stopG };
+  roarUntil = t + delay + cheerBuf.duration - from;
+}
+// (stopG is a node of its own, so stopping never has to read a volume that may be mid-fade)
+export function cheerStop(fade = 0.3) {
+  if (!cheerNow || !ac) return;
+  const { src, stopG } = cheerNow; cheerNow = null;
+  const t = ac.currentTime;
+  stopG.gain.setValueAtTime(1, t); stopG.gain.linearRampToValueAtTime(0.0001, t + fade);
+  try { src.stop(t + fade + 0.05); } catch { /* already stopped */ }
+  roarUntil = 0;
+  setTimeout(() => stopG.disconnect(), (fade + 0.3) * 1000);
+}
+
 // ---------- the match's crowd bed ----------
 // A low crowd murmur under the whole match (snd/crowd-loop.wav, tools/build_crowd_loop.py: made to
 // loop with no seam). Two copies play at once, the second a little slower, so the short loop's
@@ -96,6 +134,7 @@ export function startAmbience() {
   stopAmbience();
   if (!ready()) return;
   const run = ++ambRun;
+  loadCheer();
   loadAmbience().then(buf => {
     if (!buf || run !== ambRun || !ready()) return; // (stopped, or muted, while it loaded)
     const bus = ac.createGain(), t = ac.currentTime;
