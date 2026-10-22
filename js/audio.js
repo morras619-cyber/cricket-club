@@ -157,8 +157,9 @@ export function crowdResolve(kind) {
   if (!bowlBufs) { loadBowlCrowd(); return; }
   const t = ac.currentTime, src = ac.createBufferSource(), g = ac.createGain(), buf = kind === 'wicket' ? bowlBufs.wicket : bowlBufs.hoo;
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(kind === 'wicket' ? 1.1 : 0.95, t + 0.03);
-  src.buffer = buf; src.connect(g).connect(master); src.start(t);
-  roarUntil = Math.max(roarUntil, t + buf.duration * 0.7);                 // (the synthetic crowd stays quiet under it)
+  const skip = kind === 'wicket' ? 0.1 : 0;                                  // (the wicket recording opens with 0.12 s of near-silence: start past it)
+  src.buffer = buf; src.connect(g).connect(master); src.start(t, skip);
+  roarUntil = Math.max(roarUntil, t + (buf.duration - skip) * 0.7);                 // (the synthetic crowd stays quiet under it)
   return was;
 }
 // the ball is in the air with a catch to come: the build-up fades away now (it is not held for the catch)
@@ -206,7 +207,7 @@ export function crowdBoo(delay = 0) {
   if (!moodBufs) { loadMood(); return; }
   singDuck(0.4);
   const t = ac.currentTime + Math.max(0, delay), src = ac.createBufferSource(), g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.25);   // softer, easing in rather than hitting at once
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.1);   // softer than it was, but in at once
   let pick; do pick = Math.floor(Math.random() * moodBufs.boos.length); while (pick === lastBoo);
   lastBoo = pick;
   src.buffer = moodBufs.boos[pick]; src.connect(g).connect(master); src.start(t);
