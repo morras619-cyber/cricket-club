@@ -52,6 +52,12 @@ if CLUB == 'titans':
     }
 
 
+if CLUB == 'vipers':
+    # the volcano craters and the smoking peaks behind them
+    EMIT = {
+        'stand-screen.jpg': [(920, 410)],
+        'stand-sign.jpg': [(1150, 430), (870, 530, 0.8), (1480, 500, 0.8), (1860, 530, 0.8)],
+    }
 if os.path.exists(os.path.join(SRC, 'stand-sign.jpg')):
     VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # (the branded stand faces the bowler)
 # (each painting's structure row, by eye: the sky isn't a plain colour)
