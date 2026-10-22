@@ -46,7 +46,7 @@ export function renderShareCard(summary, playerName) {
   g.fillStyle = halftonePattern(g, 'rgba(255,255,255,0.08)', 22, 4); g.fillRect(0, 0, W, H);
 
   // masthead
-  if (LOGO.complete && LOGO.naturalWidth) g.drawImage(LOGO, 20, 4, 450, 150);
+  if (LOGO.complete && LOGO.naturalWidth) { const k = Math.min(450 / LOGO.naturalWidth, 150 / LOGO.naturalHeight), w = LOGO.naturalWidth * k, h = LOGO.naturalHeight * k; g.drawImage(LOGO, 20 + (450 - w) / 2, 4 + (150 - h) / 2, w, h); } // (the logo keeps its own proportions)
   else comicText(g, 'SIXCHARGE!', 250, 70, 92, '#ffd23f', '#e8343b', 460, -0.04);
   g.fillStyle = '#3ec6ff'; g.strokeStyle = INK; g.lineWidth = 5;
   g.save(); g.translate(760, 70); g.rotate(0.03);

@@ -349,7 +349,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 /* sits on the blocks (its foot slides under them), but never higher than the top of the screen */
 .hub-bg { position: absolute; left: 0; right: 0; top: max(0px, calc(100% + 26px - (100cqw + 20px) * 826 / 852)); aspect-ratio: 852 / 826; background: url(../img/menu/hero.webp) 0 0 / 100% 100% no-repeat; -webkit-mask-image: linear-gradient(transparent, #000 7%, #000 82%, transparent); mask-image: linear-gradient(transparent, #000 7%, #000 82%, transparent); pointer-events: none; }
 /* the logo goes back exactly where the picture's own logo was painted out */
-.hub-logo { position: absolute; left: 0; top: 13.2%; width: 94.8%; height: auto; }
+.hub-logo { position: absolute; left: 11%; top: 6%; width: 78%; height: auto; filter: drop-shadow(0 4px 10px rgba(0, 0, 40, .45)); }
 .hub-stack { position: relative; flex: none; display: flex; flex-direction: column; gap: 10px; }
 .hub-top { display: flex; align-items: stretch; gap: 4px; position: relative; z-index: 1; }
 .hub-top button { font: inherit; color: #fffbe8; padding: 0; background: none; border: 0; flex: none; }
@@ -601,7 +601,7 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 /* ---------- the Super League and the cup: stadium night, cream fixture card, dark table ---------- */
 .leaguescreen { background: #12095a url(../img/league-bg.webp) center top / cover no-repeat; }
 .leaguescreen .screen-inner { gap: 16px; }
-.lg-logo { display: block; width: min(300px, 74%); height: auto; margin: -6px auto -14px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.45)); }
+.lg-logo { display: block; width: min(230px, 60%); height: auto; margin: -6px auto -14px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.45)); }
 .leaguescreen .title { font-size: 30px; margin-top: 0; }
 .leaguescreen .lede { color: #d9d0ff; font-size: 14px; margin-top: -10px; }
 
