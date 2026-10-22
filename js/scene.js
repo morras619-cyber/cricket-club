@@ -95,7 +95,7 @@ function loadOwnArt(team, key, a, dir) {
   const files = { pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
   let left = Object.keys(files).length + 1;
   const done = () => { if (--left === 0) { a.ready = true; if (artKey(HOME) === key) groundListener?.(); } };
-  for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${dir}/${f}.webp`; a[k] = im; }
+  for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/thunder/${f}.webp`; a[k] = im; } // (the pitch, grass and stumps are the same pictures for every club's own ground: one copy ships)
   a.logo = { naturalWidth: 0 };
   paintGround(+dir.slice(3), teamById(team), logoSrc(team)).then(v => {
     a['view-bat'] = v.bat; a['view-bowl'] = v.bowl; a['view-keeper'] = v.keeper; a.topView = v.top;
