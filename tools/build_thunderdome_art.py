@@ -52,6 +52,15 @@ if CLUB == 'titans':
     }
 
 
+if os.path.exists(os.path.join(SRC, 'stand-sign.jpg')):
+    VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # (the branded stand faces the bowler)
+# (each painting's structure row, by eye: the sky isn't a plain colour)
+STRUCT = STRUCT or {
+    'eagles': {'stand-screen.jpg': 250, 'stand-sign.jpg': 300}, 'vipers': {'stand-screen.jpg': 420, 'stand-sign.jpg': 380},
+    'royals': {'stand-screen.jpg': 400, 'stand-sign.jpg': 330}, 'cyclones': {'stand-screen.jpg': 400, 'stand-sign.jpg': 400},
+}.get(CLUB, {})
+
+
 def painting(name):
     a = np.asarray(Image.open(os.path.join(SRC, name)).convert('RGB')).astype(np.float64)
     mag = (a[..., 0] > 200) & (a[..., 2] > 200) & (a[..., 1] < 90)

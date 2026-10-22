@@ -29,6 +29,22 @@ CLUBS = {
     'storm': dict(wall='#2a1060', fascia='#d8c060', canopy='#3a1a80', dark='#0a0620', track='#1c1048', rope='#f2b21b',
                   board=('#2a1060', '#6a22c4'), screen='#160a3a', crowd_len=155, sky=(48, 140, 1), foot='#160a3a',
                   world=[(0.0, '#2a1a84'), (0.6, '#07041c')], sun=(0.25, (0.85, 0.8, 1.0), 0.526), flood=1.0, top_bg='#1b1040', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.9, 0.6)),
+    # Eagle's Nest: the Mountain Eagles' ground, in black and gold
+    'eagles': dict(wall='#1a1408', fascia='#d8c070', canopy='#2a2008', dark='#0a0804', track='#1c1608', rope='#ffc81e',
+                   board=('#16120a', '#8a6a10'), screen='#0c0a06', crowd_len=155, sky=(48, 140, 1), foot='#0c0a06',
+                   world=[(0.0, '#2a5a9a'), (0.6, '#07101c')], sun=(0.25, (1.0, 0.95, 0.8), 0.526), flood=1.0, top_bg='#14260f', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.9, 0.6)),
+    # The Viper Pit: black and red
+    'vipers': dict(wall='#1a0808', fascia='#c0c0c8', canopy='#1a0a0a', dark='#080204', track='#200a0a', rope='#ff3b1a',
+                   board=('#1a0808', '#a01818'), screen='#0c0406', crowd_len=155, sky=(48, 140, 1), foot='#0c0406',
+                   world=[(0.0, '#4a1c1c'), (0.6, '#0a0204')], sun=(0.25, (1.0, 0.7, 0.6), 0.526), flood=1.0, top_bg='#1a0c0a', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.6, 0.5)),
+    # The Royal Palace Oval: pink and gold
+    'royals': dict(wall='#5a1448', fascia='#f0d890', canopy='#6a1a58', dark='#1a0614', track='#3a0c30', rope='#ff4db0',
+                   board=('#5a1448', '#d02a88'), screen='#2a0a22', crowd_len=155, sky=(48, 140, 1), foot='#2a0a22',
+                   world=[(0.0, '#3a7ad0'), (0.6, '#10142c')], sun=(0.25, (1.0, 0.9, 0.95), 0.526), flood=1.0, top_bg='#1b1838', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.8, 0.9)),
+    # Cyclone Park, rebuilt from the painted stands: green and yellow under a storm sky
+    'cyclones2': dict(wall='#0d3a1e', fascia='#cfd8d3', canopy='#0d3a1e', dark='#06140c', track='#10301c', rope='#ffd21f',
+                      board=('#0b3d1b', '#1e7a32'), screen='#06180d', crowd_len=155, sky=(48, 140, 1), foot='#06180d',
+                      world=[(0.0, '#2a4a6a'), (0.6, '#050c14')], sun=(0.25, (0.8, 0.9, 1.0), 0.526), flood=1.0, top_bg='#0b1a14', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(0.9, 1, 0.7)),
     # Cyclone Park: a storm night, a tornado over the city, a two-tier green bowl with the club's swirls
     # everywhere, its sign on the roof at each end, green beams from the floodlights
     'cyclones': dict(wall='#0d3a1e', fascia='#cfd8d3', canopy='#0d3a1e', dark='#06140c', track='#10301c', rope='#ffd21f',
