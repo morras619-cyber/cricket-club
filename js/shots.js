@@ -98,9 +98,9 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   } else if (fx.mirror && !loft && good) {
     forced = { four: true, uncatchable: true };
   }
-  let v = (14 + 20 * power) * (1 + rng.range(-0.04, 0.04)) * strength;
+  let v = (14 + 20 * power) * (1 + rng.range(-0.04, 0.04)) * strength * (fx.pitch?.carry || 1);   // (the pitch: shots carry on a flat deck, die on a slow one)
   if (fx.tornado) {
     v = Math.min(v, 15); loft = false; launchDeg = 0; forced = { cap: 2 };
   }
-  return { outcome: 'hit', grade, angle, loft, launchDeg, v, forced, label };
+  return { outcome: 'hit', grade, angle, loft, launchDeg, v, forced, label, roll: fx.pitch?.roll || 1 };
 }

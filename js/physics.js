@@ -61,7 +61,7 @@ export function makeDelivery(opts) {
     const zb = bounce;
     const xb = xt - move;
     const t1 = (RELEASE_Z - zb) / v;
-    const v2 = v * 0.92;
+    const v2 = v * 0.92 * (opts.skid || 1);                 // (the pitch: a slow one holds the ball up, a quick one lets it skid on)
     d.bounceT = t1;
     d.bounce = { x: xb, z: zb };
     d.pos = t => {

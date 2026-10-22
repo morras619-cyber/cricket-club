@@ -1,9 +1,10 @@
 import { CFG, phaseFor } from './config.js';
 import { makeRng } from './rng.js';
+import { pitchFeel } from './pitches.js';
 import { Charge } from './charge.js';
 import { SPARKS, heroById, AI_LOOK } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc } from './teams.js';
-import { makeDelivery } from './physics.js';
+import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
 import { simulateHit, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
@@ -341,16 +342,30 @@ export class Game {
     sfx.crowd(this.home === this.myTeam.id ? 1.3 : 0.7);
     await this.sleepReal(this.bot ? 150 : 2800);
   }
-  // a delivery as this pitch makes it behave (spin grips on the turner, the new ball hoops at Cyclone Park...)
+  // How this pitch plays right now (js/pitches.js): it changes as the match goes on (spin grips, the seam flattens, the
+  // ball ages, the dew settles)
+  feel() {
+    const inn = this.innings[this.innings.length - 1];
+    const before = this.innings.slice(0, -1).reduce((n, i) => n + (i.balls || 0), 0);
+    return pitchFeel(this.pitch, { wear: (before + (inn?.balls || 0)) / 60, innings: this.innings.length, balls: inn?.balls || 0 });
+  }
+  // a delivery as this pitch makes it behave (spin grips on the turner, the new ball hoops at Cyclone Park, the ball keeps
+  // low on a cracked pitch, holds up on a slow one, rears up on a bouncy one...)
   pitched(spec, type) {
-    const P = this.pitch, dew = P.dew && this.innings.length >= 2;
+    const f = this.feel(), inn = this.innings[this.innings.length - 1];
     const out = { ...spec };
-    if (type?.spin) { out.move = (out.move || 0) * P.turn; out.flight = SPIN_FLIGHT; }
-    else { out.swing = (out.swing || 0) * P.swing * (dew ? 0.8 : 1); out.move = (out.move || 0) * P.seam; out.kmh = (out.kmh || 0) * P.kmh; }
+    if (type?.spin) { out.move = (out.move || 0) * f.turn; out.flight = SPIN_FLIGHT; }
+    else { out.swing = (out.swing || 0) * f.swing; out.move = (out.move || 0) * f.seam; out.kmh = (out.kmh || 0) * f.kmh; }
+    // the ball's height at the batter and its pace off the pitch (unevenly, on a cracked pitch), the same for every ball of a seed
+    const r = makeRng((this.seed * 131 + ((inn?.balls || 0) + 1) * 977 + this.innings.length * 7919 + (this.rebowls || 0) * 1299709) >>> 0);
+    const u = f.uneven ? r.normal() * f.uneven : 0;
+    const base = out.h ?? lengthById(out.length)?.h;
+    if (base != null) out.h = clamp(base * f.bounce * (1 + u), 0.05, 2.4);
+    out.skid = clamp(f.skid * (1 + u * 0.8), 0.6, 1.2);
     return out;
   }
   // timing on this pitch: easier on a road or under the dew, harder on a seamer
-  pitchBat() { return this.pitch.bat * (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1); }
+  pitchBat() { return this.feel().bat; }
 
   newCharge(value) {
     this.charge = new Charge(value);
@@ -860,7 +875,7 @@ export class Game {
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
       const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
-      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, tornado: aiPower === 'tornado', shatter: aiPower === 'shatter' }, rng, strength: hitStrength(striker.bat) });
+      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, tornado: aiPower === 'tornado', shatter: aiPower === 'shatter', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) });
       if (aiPower === 'tornado' && grade === 'miss') res.outcome = 'bowled';
     }
     if (opt.assist) res = opt.assist(res, grade) || res;
@@ -1675,8 +1690,9 @@ export class Game {
     // the AI batter's ability, and how hard my bowler is to read
     const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
-    const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * this.pitch.ai * aiHome / (this.pitch.dew && this.innings.length >= 2 ? 1.08 : 1) / this.pitch.bat };
-    let ai = aiBat(d, { skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: fxFlags, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * 1.6 } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    const pf = this.feel();
+    const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * pf.ai * aiHome / pf.bat };
+    let ai = aiBat(d, { skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * 1.6 } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;

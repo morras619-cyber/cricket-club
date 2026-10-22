@@ -100,7 +100,7 @@ export function makePath(res) {
     along = t => (t <= T ? carry * t / T : carry + vr * tau * (1 - Math.exp(-(t - T) / tau)));
     height = t => (t <= T ? 4 * apex * (t / T) * (1 - t / T) : 0);
   } else {
-    const vg = forcedFour ? Math.max(res.v, 30) : res.v * 0.95, tau = 2.8;
+    const vg = forcedFour ? Math.max(res.v, 30) : res.v * 0.95, tau = 2.8 * (res.roll || 1);   // (a fast outfield runs the ball on)
     along = t => vg * tau * (1 - Math.exp(-t / tau));
     height = () => 0;
   }
