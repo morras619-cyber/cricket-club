@@ -39,6 +39,11 @@ EMIT = {}
 if CLUB == 'phoenix':
     VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # ("THE FURNACE" faces the bowler)
     STRUCT = {'stand-screen.jpg': 300, 'stand-sign.jpg': 340}
+    # the volcano craters (and the torches by the sign: a third entry sizes the plume)
+    EMIT = {
+        'stand-screen.jpg': [(530, 480), (1710, 570)],
+        'stand-sign.jpg': [(536, 460), (1810, 580), (1120, 680, 0.45), (1454, 680, 0.45)],
+    }
 if CLUB == 'titans':
     VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # (the Foundry's sign stand faces the bowler)
     EMIT = {
@@ -135,7 +140,7 @@ def build_view(name, v):
     Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).save(os.path.join(OUT, f'view-{name}.webp'), 'WEBP', quality=90, method=6)
     print(name, 'painting', (pw, ph), 'boards row', bt, 'top', top, 'stand structure at', round(row_struct), 'roof h', round(roof_h, 1))
     x0 = W / 2 - pw / 2
-    plumes = [[round(x0 + ex * p, 1), round(top + ey * p, 1)] for ex, ey in EMIT.get(v['stand'], [])]
+    plumes = [[round(x0 + e[0] * p, 1), round(top + e[1] * p, 1)] + list(e[2:]) for e in EMIT.get(v['stand'], [])]
     return dict(top=meta_top, bottom=meta_bottom, roof=dict(r=94, h=round(roof_h, 1)), w=W, h=H, f=v['f'], above=v['above'], plumes=plumes, ps=round(p, 4))
 
 

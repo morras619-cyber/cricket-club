@@ -297,7 +297,7 @@ function renderBuilt(cam, art, v, im) {
   cam.board = { y: by, h: at(v.board.r, 0) - by, painted: true };
   // (the furnace stacks of a painted stand: the stand's own smoke and embers are animated from here)
   const spots = G.landmark === 'bolts' ? { lightning: true } : {};
-  if (v.plumes) spots.plumes = { at: v.plumes.map(([x, y]) => ({ x: dx + x * k, y: dy + y * k })), s: v.ps * k };
+  if (v.plumes) spots.plumes = { at: v.plumes.map(([x, y, z = 1]) => ({ x: dx + x * k, y: dy + y * k, z })), s: v.ps * k };
   cam.layout = { roofY: Math.max(0, at(v.roof.r, v.roof.h)), standTop: at(v.roof.r, v.roof.h - 1.5), hy, spots };
   return c;
 }
@@ -657,8 +657,9 @@ function drawPlumes(ctx, P, t, flare, hi) {
   const lv = smokeLevel(t);                                         // (a phone that can't keep up gets less smoke, then none)
   if (lv >= 2) return;
   if (lv === 1) hi = false;
-  const sp = puff(), n = hi ? 7 : 4, u = P.s;                       // u: pixels to a painting pixel
+  const sp = puff(), n = hi ? 7 : 4;
   P.at.forEach((e, i) => {
+    const u = P.s * e.z;                                             // (a smaller plume for a torch)
     for (let k = 0; k < n; k++) {
       const p = (t * 0.00011 + k / n + i * 0.37) % 1, q = 1 - p;
       const x = e.x + (p * 70 + Math.sin(t * 0.0009 + i * 2 + k) * 14 * p) * u, y = e.y - p * 230 * u;
