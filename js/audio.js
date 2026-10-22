@@ -56,7 +56,7 @@ export const sfx = {
   stumps() { noise(0.25, { gain: 0.8, freq: 900, q: 1.2 }); tone(220, 0.2, { type: 'square', gain: 0.15, to: 80 }); },
   glove() { noise(0.12, { gain: 0.7, freq: 400, q: 1 }); tone(110, 0.15, { gain: 0.6, to: 60 }); },
   trombone() { [392, 370, 349, 262].forEach((f, i) => tone(f, i === 3 ? 0.6 : 0.22, { type: 'sawtooth', gain: 0.12, delay: i * 0.22, to: i === 3 ? 220 : null })); },
-  crowd(intensity = 1) { noise(1.6 * intensity, { gain: 0.25 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
+  crowd(intensity = 1) { if (ac && ac.currentTime < roarUntil) return; /* (the boundary roar is the crowd) */ noise(1.6 * intensity, { gain: 0.25 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
   whoosh() { noise(0.35, { gain: 0.4, freq: 600, q: 0.6, type: 'lowpass', attack: 0.1 }); },
   boom() { tone(70, 0.8, { gain: 0.9, to: 30 }); noise(0.6, { gain: 0.6, freq: 200, q: 0.5, type: 'lowpass' }); },
   zap() { tone(1400, 0.18, { type: 'sawtooth', gain: 0.18, to: 200 }); noise(0.15, { gain: 0.3, freq: 4000, q: 3 }); },
@@ -79,6 +79,66 @@ function iosTick() {
   }
   iosSwitch.click();
 }
+// ---------- a four or a six: the crowd's build-up and roar ----------
+// snd/boundary-build.wav (a murmur that loops) plays from the moment the ball is struck and swells as
+// it flies, like a crowd getting to its feet; snd/boundary-cheer.wav (tools/build_boundary_cheer.py: the
+// roar, carried on and faded out so it no longer stops mid-cheer) plays when the ball clears the rope.
+let cheerBufs = null, cheerLoading = null, building = null, roarUntil = 0;
+function loadCheer() {
+  if (!cheerLoading) {
+    const get = n => fetch(`snd/${n}.wav`).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)));
+    cheerLoading = Promise.all([get('boundary-build'), get('boundary-cheer')]).then(([build, cheer]) => (cheerBufs = { build, cheer })).catch(() => { cheerLoading = null; return null; });
+  }
+  return cheerLoading;
+}
+// the murmur swells for `sec` seconds (the ball's flight to the rope), then holds
+export function cheerBuild(sec) {
+  cheerStop(0.15);
+  if (!ready()) return;
+  if (!cheerBufs) { loadCheer(); return; }
+  const t = ac.currentTime, len = Math.min(5, Math.max(0.5, sec)), bus = ac.createGain();
+  bus.gain.setValueAtTime(0.35, t); bus.gain.linearRampToValueAtTime(2.2, t + len);
+  bus.connect(master);
+  // two copies, the second a little slower, so the short loop's repeats never line up
+  const srcs = [1, 0.87].map((rate, i) => {
+    const src = ac.createBufferSource(), g = ac.createGain();
+    src.buffer = cheerBufs.build; src.loop = true; src.playbackRate.value = rate; g.gain.value = i ? 0.55 : 0.8;
+    src.connect(g).connect(bus); src.start(0, i * 0.3); src.stop(t + len + 1.5); // (it ends itself if the ball never clears)
+    return src;
+  });
+  building = { bus, srcs };
+}
+export function cheerStop(fade = 0.3) {
+  if (!building || !ac) return;
+  const { bus, srcs } = building; building = null;
+  const t = ac.currentTime;
+  bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(0.0001, t + fade);
+  for (const s of srcs) { try { s.stop(t + fade + 0.05); } catch { /* already stopped */ } }
+  setTimeout(() => bus.disconnect(), (fade + 0.3) * 1000);
+}
+// the roar: the ball is over the rope (power: 0.7 a four, 0.9 a six, 1 a perfect six)
+export function cheerFull(power = 0.9) {
+  cheerStop(0.3);
+  if (!ready()) return;
+  if (!cheerBufs) { loadCheer(); return; }
+  const t = ac.currentTime, src = ac.createBufferSource(), g = ac.createGain();
+  src.buffer = cheerBufs.cheer; g.gain.value = power; src.connect(g).connect(master); src.start(t);
+  roarUntil = t + cheerBufs.cheer.duration;
+}
+// a short burst of music under the roar: brass-like notes up to a held chord (a six: longer, with drums)
+const STING = {
+  four: { notes: [392, 494, 587, 784], gap: 0.13, chord: [392, 494, 587], hold: 0.6, drums: [] },
+  six: { notes: [523, 659, 784, 1046, 784, 1046, 1318], gap: 0.11, chord: [523, 659, 784, 1046], hold: 1.0, drums: [0, 0.44, 0.88] },
+};
+export function sting(kind = 'four') {
+  if (!ready()) return;
+  const k = STING[kind] || STING.four;
+  k.drums.forEach(d => { tone(110, 0.3, { gain: 0.4, to: 55, delay: d }); noise(0.1, { gain: 0.18, freq: 300, q: 1, delay: d }); });
+  k.notes.forEach((f, i) => tone(f, 0.22, { type: 'sawtooth', gain: 0.07, delay: i * k.gap }));
+  const at = k.notes.length * k.gap;
+  k.chord.forEach(f => { tone(f, k.hold, { type: 'sawtooth', gain: 0.045, delay: at }); tone(f / 2, k.hold, { type: 'triangle', gain: 0.07, delay: at }); });
+}
+
 // ---------- the match's crowd bed ----------
 // A low crowd murmur under the whole match (snd/crowd-loop.wav, tools/build_crowd_loop.py: made to
 // loop with no seam). Two copies play at once, the second a little slower, so the short loop's
@@ -96,6 +156,7 @@ export function startAmbience() {
   stopAmbience();
   if (!ready()) return;
   const run = ++ambRun;
+  loadCheer();
   loadAmbience().then(buf => {
     if (!buf || run !== ambRun || !ready()) return; // (stopped, or muted, while it loaded)
     const bus = ac.createGain(), t = ac.currentTime;

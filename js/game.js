@@ -22,7 +22,7 @@ import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio } from './audio.js';
+import { sfx, buzz, unlockAudio, cheerBuild, cheerFull, cheerStop, sting } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -1227,10 +1227,21 @@ export class Game {
     const dur = Math.max(0.8, endT + 0.6, miss ? miss.t + 1.5 : 0, runTime, ro ? roThrow + roFlight + 1.1 : 0);
     this.timeScale = 1.6;
     const t0 = this.gameTime;
+    // an obvious four or six: the crowd gets to its feet as the ball flies (js/audio.js), and roars when it clears the rope
+    let cheered = !(six || toRope);
+    if (!cheered) {
+      let tClear = end;
+      if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
+      cheerBuild(tClear / ballK / 1.6);
+    }
     let said = false, slowUntil = 0, slowed = !(six && grade === 'perfect'), landed = null;
     await this.until(() => {
       const t = this.gameTime - t0, tb = t * ballK;
       const b = path.ballAt(Math.min(tb, end));
+      if (!cheered && (six ? Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR : tb >= end)) {
+        cheered = true;
+        cheerFull(six ? (grade === 'perfect' ? 1 : 0.9) : 0.7); sting(six ? 'six' : 'four');
+      }
       // the ball is loose (nobody may be drawn holding it) until it's caught or gathered; a boundary
       // never is, even when it runs past a fielder diving for it
       this.O.loose = boundary || tb < end || !(A && (o.caught || sim.intercept || o.saved));
@@ -1328,6 +1339,7 @@ export class Game {
       return t >= dur;
     });
     this.timeScale = 1;
+    if (!cheered) cheerStop();
     // let a boundary sink in before the next thing pops up
     if ((sim.kind === 'six' && !o.caught) || (sim.kind === 'four' && !o.saved)) await this.sleepReal(this.bot ? 0 : 1100);
   }
@@ -2405,7 +2417,7 @@ export class Game {
     me.pose = POSES.dive(Math.sign(P.x - me.x) || 1);
     const p = this.of.to(P.x, P.y);
     if (saved) { this.O.ball = { x: me.x, y: me.y, h: 0.2 }; this.fx.word('SAVED!', p.x, p.y - 50, { size: 60 }); sfx.glove(); this.hitStop(100); }
-    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); sfx.crowd(0.6); }
+    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); cheerFull(0.7); sfx.crowd(0.6); }
     await this.sleepReal(this.bot ? 100 : 1000);
     this.endEvent();
     return saved;
