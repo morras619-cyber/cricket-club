@@ -12,7 +12,7 @@ export const GROUNDS = {
     name: 'The Thunderdome', time: 'day', landmark: 'bolts',
     sky: ['#1f56c0', '#2f7be0', '#9fd0ff'], skyline: '#0b1640', windows: ['#ffd23f', '#9fd8ff'],
     grass: ['#1c7a3e', '#2a9a4a'], pitchCol: '#e2c27f',
-    pitch: { id: 'flat', name: 'Flat road', report: 'Rock hard, true bounce, and shots carry: time it and it flies. Expect sixes.', bat: 1.08, ai: 0.92, swing: 0.8, seam: 0.8, turn: 0.85, carry: 1.07 },
+    pitch: { id: 'flat', name: 'Flat road', report: 'Rock hard, true bounce, and shots carry: time it and it flies. Expect sixes.', bat: 1.08, ai: 0.92, swing: 0.8, seam: 0.8, turn: 0.85, carry: 1.05 },
   },
   cyclones: {
     name: 'Cyclone Park', time: 'day', landmark: 'turbines',
@@ -48,7 +48,7 @@ export const GROUNDS = {
     name: 'Eye of the Storm', time: 'day', landmark: 'storm',
     sky: ['#1f56c0', '#2f7be0', '#9fd0ff'], skyline: '#1d0c3a', windows: ['#c79bff', '#ffd23f'],
     grass: ['#1a6e3a', '#258447'], pitchCol: '#c9ab78',
-    pitch: { id: 'slow', name: 'Slow and low', report: 'Damp and slow: the ball holds up and arrives late, shots die, the wrist spinners grip. Work the ones and twos.', kmh: 0.93, turn: 1.2, bat: 0.97, bounce: 0.9, skid: 0.84, carry: 0.9, roll: 0.85 },
+    pitch: { id: 'slow', name: 'Slow and low', report: 'Damp and slow: the ball holds up and arrives late, shots die, the wrist spinners grip. Work the ones and twos.', kmh: 0.93, turn: 1.2, bat: 0.97, bounce: 0.9, skid: 0.86, carry: 0.93, roll: 0.88 },
   },
   royals: {
     name: 'Royal Palace Oval', time: 'day', landmark: 'palace',

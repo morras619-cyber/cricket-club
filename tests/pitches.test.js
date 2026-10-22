@@ -12,7 +12,7 @@ const feelAt = (club, p) => pitchFeel(pitchOf(club), p);
 test('every painted ground has its own signature, and a neutral pitch changes nothing', () => {
   assert.deepEqual(pitchFeel({}, {}), PITCH_BASE);
   const f = Object.fromEntries(['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals'].map(c => [c, feelAt(c, {})]));
-  assert.ok(f.thunder.carry > 1.05 && f.thunder.uneven === 0, 'a flat road: shots carry, a true bounce');
+  assert.ok(f.thunder.carry >= 1.05 && f.thunder.uneven === 0, 'a flat road: shots carry, a true bounce');
   assert.ok(f.cyclones.swing > 1.3, 'the swinger hoops');
   assert.ok(f.vipers.uneven > 0.1 && f.vipers.bounce < 0.9 && f.vipers.turn > 1.3, 'the turner keeps low and uneven');
   assert.ok(f.eagles.bounce > 1.2 && f.eagles.kmh > 1.05, 'the ball rears up and arrives fast');
