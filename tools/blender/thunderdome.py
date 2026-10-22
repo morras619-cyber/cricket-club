@@ -21,6 +21,14 @@ CLUBS = {
     'titans': dict(wall='#3a3f47', fascia='#b9c0c8', canopy='#3a3f47', dark='#101318', track='#2a2e35', rope='#aab2bb',
                    board=('#2b3037', '#59616b'), screen='#14171c', crowd_len=155, sky=(48, 140, 1), foot='#14171c',
                    world=[(0.0, '#2a3a52'), (0.6, '#07090f')], sun=(0.25, (0.8, 0.85, 1.0), 0.526), flood=1.0, top_bg='#1d2026', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.9, 0.6)),
+    # The Furnace: Phoenix Blaze's ground, in ember orange and ash (only the ground shows: the stands are painted over it)
+    'phoenix': dict(wall='#3a1208', fascia='#e8a060', canopy='#4a1a0a', dark='#120604', track='#2a1008', rope='#ffb020',
+                    board=('#3a1208', '#c2451c'), screen='#1a0806', crowd_len=155, sky=(48, 140, 1), foot='#1a0806',
+                    world=[(0.0, '#4a1d12'), (0.6, '#120604')], sun=(0.25, (1.0, 0.7, 0.5), 0.526), flood=1.0, top_bg='#1a0c0a', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.8, 0.5)),
+    # Eye of the Storm: Purple Storm's ground, in purple and gold
+    'storm': dict(wall='#2a1060', fascia='#d8c060', canopy='#3a1a80', dark='#0a0620', track='#1c1048', rope='#f2b21b',
+                  board=('#2a1060', '#6a22c4'), screen='#160a3a', crowd_len=155, sky=(48, 140, 1), foot='#160a3a',
+                  world=[(0.0, '#2a1a84'), (0.6, '#07041c')], sun=(0.25, (0.85, 0.8, 1.0), 0.526), flood=1.0, top_bg='#1b1040', turbines=False, tiers=False, full_stand=True, mega=True, sign=False, beams=None, halo=(1, 0.9, 0.6)),
     # Cyclone Park: a storm night, a tornado over the city, a two-tier green bowl with the club's swirls
     # everywhere, its sign on the roof at each end, green beams from the floodlights
     'cyclones': dict(wall='#0d3a1e', fascia='#cfd8d3', canopy='#0d3a1e', dark='#06140c', track='#10301c', rope='#ffd21f',

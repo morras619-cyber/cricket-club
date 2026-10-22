@@ -33,7 +33,7 @@ export const GROUNDS = {
   },
   phoenix: {
     name: 'The Furnace', time: 'sunset', landmark: 'cauldrons',
-    sky: ['#3a0d2e', '#c2451c', '#ffb347'], skyline: '#3a1410', windows: ['#ffd36b'],
+    sky: ['#3a1610', '#7a2a14', '#c2451c'], skyline: '#3a1410', windows: ['#ffd36b'],
     grass: ['#257a3a', '#33924a'], pitchCol: '#dcb77a',
     pitch: { id: 'dew', name: 'Evening dew', report: 'Dew will settle later on: chasing gets easier as the night goes on.', dew: true },
   },
@@ -44,8 +44,8 @@ export const GROUNDS = {
     pitch: { id: 'green', name: 'Green seamer', report: 'A green tinge on a hard deck: seamers will nip it both ways.', seam: 1.5, bat: 0.95, ai: 1.05 },
   },
   storm: {
-    name: 'Eye of the Storm', time: 'storm', landmark: 'storm',
-    sky: ['#120428', '#33115e', '#6a3fa0'], skyline: '#1d0c3a', windows: ['#c79bff', '#ffd23f'],
+    name: 'Eye of the Storm', time: 'day', landmark: 'storm',
+    sky: ['#1f56c0', '#2f7be0', '#9fd0ff'], skyline: '#1d0c3a', windows: ['#c79bff', '#ffd23f'],
     grass: ['#1a6e3a', '#258447'], pitchCol: '#c9ab78',
     pitch: { id: 'slow', name: 'Slow and low', report: 'Damp and slow: hard to force the pace, and the wrist spinners grip.', kmh: 0.93, turn: 1.2, bat: 0.97 },
   },

@@ -31,7 +31,14 @@ VIEWS = {
     'keeper': dict(f=1200, above=480, cy=4.6, cz=-9.0, dir=1,  stand='stand-screen.jpg', phone_f=663),
 }
 # where smoke and embers rise, in each painting's pixels: the furnace stacks (the game animates them, js/scene.js)
+# the ground views' height in the game: the Blender render is cropped from the top to this
+RENDER_H = {'bat': 1536, 'bowl': 1536, 'keeper': 1704}
+# where the stand's structure begins in a painting, when its sky is too dark to tell by colour
+STRUCT = {}
 EMIT = {}
+if CLUB == 'phoenix':
+    VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # ("THE FURNACE" faces the bowler)
+    STRUCT = {'stand-screen.jpg': 300, 'stand-sign.jpg': 340}
 if CLUB == 'titans':
     VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # (the Foundry's sign stand faces the bowler)
     EMIT = {
@@ -89,6 +96,7 @@ def grade(out, bt, stand):
 
 def build_view(name, v):
     g = np.asarray(Image.open(os.path.join(SRC, f'ground-{name}.webp')).convert('RGB')).astype(np.float64)
+    g = g[g.shape[0] - RENDER_H[name]:]                              # (the Blender render has more sky above the horizon than the game's views keep)
     H, W = g.shape[:2]
     st = painting(v['stand'])
     sh, sw = st.shape[:2]
@@ -119,10 +127,10 @@ def build_view(name, v):
     meta_top = '#%02x%02x%02x' % tuple(int(c) for c in out[:4].mean((0, 1)))
     meta_bottom = '#%02x%02x%02x' % tuple(int(c) for c in g[-4:].mean((0, 1)))
     # where the stand's structure begins, as the radius and height the game's sky effects use (r = 94)
-    row_struct = top + structure_top(st) * p
+    row_struct = top + STRUCT.get(v['stand'], structure_top(st)) * p
     d94 = v['dir'] * ((CY + v['dir'] * 94) - v['cz'])
     roof_h = v['cy'] - (row_struct - v['above']) * d94 / v['f']
-    if CLUB == 'titans':
+    if CLUB != 'thunder':
         out = grade(out, bt, stand)
     Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).save(os.path.join(OUT, f'view-{name}.webp'), 'WEBP', quality=90, method=6)
     print(name, 'painting', (pw, ph), 'boards row', bt, 'top', top, 'stand structure at', round(row_struct), 'roof h', round(roof_h, 1))
@@ -139,6 +147,13 @@ def build_top():
     ys, xs = np.nonzero(hole)
     hw, hh = xs.max() - xs.min(), ys.max() - ys.min()
     cx, cy = (xs.min() + xs.max()) / 2, (ys.min() + ys.max()) / 2
+    rest = mag & ~ndi.binary_dilation(hole, iterations=8)               # (a thin magenta band elsewhere in the ring: painted over from what's round it)
+    lab2, n2 = ndi.label(ndi.binary_dilation(rest, iterations=2))
+    if n2:
+        big = np.isin(lab2, [i + 1 for i, c in enumerate(ndi.sum(rest, lab2, range(1, n2 + 1))) if c > 1000])
+        big = ndi.binary_dilation(big, iterations=3)
+        idx = ndi.distance_transform_edt(big | hole, return_distances=False, return_indices=True)
+        a = np.where(big[..., None], a[idx[0], idx[1]], a)
     a[ndi.binary_dilation(hole, iterations=5)] = (38, 120, 52)         # (the game draws the grass over it; the pink fringe goes too)
     squash = 0.78 * hw / hh                                           # the hole becomes the game's 0.78 tilt
     h2 = int(round(a.shape[0] * squash))
