@@ -2,6 +2,7 @@ import { CFG } from './config.js';
 import { INK, FONT_DISPLAY, FONT_BODY, halftonePattern } from './fx.js';
 import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
+import { makeEffectLevel } from './effectlevel.js';
 import { groundOf } from './grounds.js';
 import { teamById, logoSrc } from './teams.js';
 import { paintGround } from './ownground.js';
@@ -651,7 +652,11 @@ function puff() {
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   return (puffSprite = c);
 }
+const smokeLevel = makeEffectLevel();
 function drawPlumes(ctx, P, t, flare, hi) {
+  const lv = smokeLevel(t);                                         // (a phone that can't keep up gets less smoke, then none)
+  if (lv >= 2) return;
+  if (lv === 1) hi = false;
   const sp = puff(), n = hi ? 7 : 4, u = P.s;                       // u: pixels to a painting pixel
   P.at.forEach((e, i) => {
     for (let k = 0; k < n; k++) {
