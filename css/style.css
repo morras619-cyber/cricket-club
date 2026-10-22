@@ -167,7 +167,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 /* ---------- Screens ---------- */
 .screen { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding-top: var(--safe-t); padding-bottom: var(--safe-b);
   background: radial-gradient(circle at 50% -10%, #3b2a7a 0%, transparent 60%), radial-gradient(rgba(255,255,255,.07) 1.6px, transparent 1.8px) 0 0/11px 11px, var(--night); z-index: 5; }
-#pause { background: rgba(10, 12, 30, 0.82); }
+#pause, #cover { background: rgba(10, 12, 30, 0.82); }
 .screen-inner { max-width: 440px; margin: 0 auto; padding: 22px max(16px, env(safe-area-inset-left, 0px)) 28px max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 14px; }
 .screen-inner.wide { max-width: 720px; }
 .logo { text-align: center; margin: 8px 0 2px; line-height: .86; transform: rotate(-3deg); }
@@ -213,8 +213,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .hero .quote { font-size: 12px; font-style: italic; opacity: .75; }
 
 /* ---------- Tutorial cover (img/menu/cover) ---------- */
-#cover { background: #0a2a24; overflow-x: hidden; }
-.cv-bg { position: absolute; inset: 0; background: url(../img/menu/cover/bg.webp) center top / 100% auto no-repeat, linear-gradient(#050d2c 0, #0a2a24 62%); pointer-events: none; }
 .cv-wrap { position: relative; max-width: 440px; margin: 0 auto; min-height: 100%; padding: 14px 16px 24px; display: flex; flex-direction: column; align-items: center; gap: 0;
   --cw: max(236px, min(80vw, 330px, calc((100dvh - 430px) * .758))); }
 .cv-back { align-self: flex-start; width: 56px; padding: 0; border: 0; background: none; line-height: 0; }
@@ -225,7 +223,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .cv-card { width: 100%; }
 .cv-fx { position: absolute; left: 4%; top: 22%; width: 92%; mix-blend-mode: screen; opacity: .75; animation: cvfx 2.6s ease-in-out infinite; }
 .cv-title { position: absolute; top: calc(var(--cw) * -.22); left: -6%; width: 112%; }
-.cv-text { width: 104%; margin-top: calc(var(--cw) * -.2); position: relative; }
+.cv-text { width: 104%; margin-top: calc(var(--cw) * -.36); position: relative; }
 .cv-go { width: calc(var(--cw) * .92); margin-top: 2px; padding: 0; border: 0; background: none; line-height: 0; filter: drop-shadow(0 0 16px rgba(255,210,63,.5)); }
 .cv-go img { width: 100%; display: block; }
 #cover .covertips { margin-top: 10px; }
