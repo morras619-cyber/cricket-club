@@ -94,6 +94,9 @@ function drawCreases(g, cam, PX) {
 // Grounds with a painted strip of their own, fresh and late (img/ground/<club>/pitch-fresh.webp, pitch-late.webp): the strip
 // fades from one to the other as the match wears (js/pitches.js pitchLate). The others keep the shared strip.
 const OWN_PITCH = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix'];   // (their order in img/ground/pitches.webp: a strip 320 px wide, fresh then late, for each)
+// the painted strips with their own ink edge are drawn whole; the rest have ragged edges that are trimmed
+const PITCH_TRIM = { thunder: 0 };
+const trimOf = art => (art.pitchFresh ? (PITCH_TRIM[art.team] ?? 0.04) : 0.04);
 let PITCH_LATE = 0;
 export function setPitchLate(w) {
   const q = Math.round(Math.max(0, Math.min(1, w)) * 8) / 8;
@@ -119,7 +122,7 @@ function loadArt(team) {
   const T = teamById(team), key = artKey(team), dir = T.custom ? `own${T.stadium}` : team;
   const meta = GROUND_ART[dir];
   if (!meta || ART[key]) return;
-  const a = (ART[key] = { meta, ready: false });
+  const a = (ART[key] = { meta, ready: false, team });
   if (T.custom) return loadOwnArt(team, key, a, dir);
   const files = { pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
   // the painted stands (a ground built in Blender for every camera needs none)
@@ -243,7 +246,7 @@ function renderPainted(cam, art) {
   // from the art (plain drawImage calls: pattern transforms are unreliable on iPhone Safari)
   const mips = grassMips(art);
   const pt = pitchNow(art), PZ0 = -2, PZ1 = 22, PX = 1.52; // the painted strip covers 24 m; its ragged sides are trimmed
-  const ptx0 = pw(pt) * 0.04, ptw = pw(pt) * 0.92;
+  const ptx0 = pw(pt) * trimOf(art), ptw = pw(pt) * (1 - 2 * trimOf(art));
   const rowH = 1 / dpr;
   for (let y = hy; y < H; y += rowH) {
     const gp = cam.groundAt(W / 2, y + rowH / 2);
@@ -326,7 +329,7 @@ function renderBuilt(cam, art, v, im) {
   // a ground with a strip of its own: it is laid over the rendered one, row by row, in this camera's perspective
   if (art.pitchFresh) {
     const pt = pitchNow(art), PZ0 = -2, PZ1 = 22, PX = 1.52, rowH = 1 / dpr;
-    const ptx0 = pw(pt) * 0.04, ptw = pw(pt) * 0.92;
+    const ptx0 = pw(pt) * trimOf(art), ptw = pw(pt) * (1 - 2 * trimOf(art));
     for (let y = hy; y < H; y += rowH) {
       const gp = cam.groundAt(W / 2, y + rowH / 2);
       if (!gp || gp.z <= PZ0 || gp.z >= PZ1) continue;
@@ -1116,7 +1119,7 @@ export class OutfieldView {
     ctx.beginPath(); ctx.ellipse(c.x, c.y, 27 * k, 27 * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     if (art) {
       const a = this.to(-1.52, 22), b = this.to(1.52, -2), pt = pitchNow(art);
-      ctx.drawImage(pt, pw(pt) * 0.04, 0, pw(pt) * 0.92, ph(pt), a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.drawImage(pt, pw(pt) * trimOf(art), 0, pw(pt) * (1 - 2 * trimOf(art)), ph(pt), a.x, a.y, b.x - a.x, b.y - a.y);
       ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
       const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);
