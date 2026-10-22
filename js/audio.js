@@ -118,10 +118,9 @@ export function cheerStop(fade = 0.3) {
 }
 
 // ---------- the home crowd when its side bowls: a build-up, then a groan or a roar ----------
-// snd/crowd-ohh.wav (tools/build_bowling_crowd.py) rises as the bowler runs in and is carried on, so a catch that
-// takes a while to settle still has a tense crowd under it. When the ball is decided it is faded out under:
-// crowd-hoo.wav (a miss, a block, a dot) or crowd-wicket.wav (a wicket), each kept whole. A ball that scores
-// just lets the build-up fade away.
+// snd/crowd-ohh.wav (tools/build_bowling_crowd.py) rises as the bowler runs in and fades away once the ball is played
+// (it is not held for a catch). When the ball is decided it is faded out under: crowd-hoo.wav (a miss or a block)
+// or crowd-wicket.wav (a wicket), each kept whole. A ball that scores just lets the build-up fade away.
 const BOWLCROWD = ['ohh', 'hoo', 'wicket'];
 let bowlBufs = null, bowlLoading = null, ohhNow = null;
 function loadBowlCrowd() {
@@ -149,7 +148,7 @@ function crowdFade(sec) {
   try { src.stop(t + sec + 0.05); } catch { /* already stopped */ }
   setTimeout(() => stopG.disconnect(), (sec + 0.3) * 1000);
 }
-// the ball is decided: 'wicket', 'dot' (a miss, a block, no runs) or 'runs'/'abort' (only the build-up fading away)
+// the ball is decided: 'wicket', 'dot' (a miss or a block) or 'runs'/'abort' (only the build-up fading away)
 export function crowdResolve(kind) {
   const was = !!ohhNow;
   crowdFade(kind === 'wicket' ? 0.9 : kind === 'dot' ? 0.3 : 0.6); // (the build-up outlasts the wicket cheer's attack, so there is no dip between them)
@@ -161,6 +160,8 @@ export function crowdResolve(kind) {
   roarUntil = Math.max(roarUntil, t + buf.duration * 0.7);                 // (the synthetic crowd stays quiet under it)
   return was;
 }
+// the ball is in the air with a catch to come: the build-up fades away now (it is not held for the catch)
+export function crowdSoften() { crowdFade(0.8); }
 export function crowdStop() { crowdFade(0.2); }
 
 // ---------- the match's crowd bed ----------

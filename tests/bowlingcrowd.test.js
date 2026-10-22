@@ -23,13 +23,12 @@ const load = n => readWav(new URL(`../snd/crowd-${n}.wav`, import.meta.url));
 const rms = (x, a, b) => { let s = 0; for (let i = a; i < b; i++) s += x[i] * x[i]; return Math.sqrt(s / (b - a)); };
 const at = ({ mono, rate }, t, d = 0.2) => rms(mono, Math.floor(t * rate), Math.floor((t + d) * rate));
 
-test('the build-up rises from near silence and is held past the end of its recording, then fades out', () => {
+test('the build-up rises from near silence and fades away at the end (it is not dragged out)', () => {
   const c = load('ohh'), m = c.mono, rate = c.rate;
-  assert.ok(m.length / rate > 7, 'longer than the 3 s recording, so a slow catch still has a crowd');
+  assert.ok(m.length / rate > 3.2 && m.length / rate < 4.6, 'the 3 s recording and a short fade, not a long hold');
   assert.ok(at(c, 0.1) < at(c, 2.6) * 0.15, 'it starts near silence');
   for (let t = 0.2; t <= 2.8; t += 0.2) assert.ok(at(c, t) > at(c, t - 0.2) * 0.8, `rising at ${t.toFixed(1)}s`);
-  for (const t of [3.5, 4.5, 6.0]) assert.ok(at(c, t) > at(c, 2.6) * 0.6, `held at ${t}s`);
-  assert.ok(at(c, m.length / rate - 0.1, 0.09) < at(c, 4.0) * 0.1, 'faded out at the end');
+  assert.ok(at(c, m.length / rate - 0.1, 0.09) < at(c, 2.6) * 0.1, 'faded out at the end');
   assert.ok(Math.abs(m[m.length - 1]) < 0.01 && Math.abs(m[0]) < 0.01, 'starts and ends on silence');
 });
 

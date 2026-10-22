@@ -22,7 +22,7 @@ import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdStop } from './audio.js';
+import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -898,7 +898,7 @@ export class Game {
       this.charge.wicketLost();
       if (opt.onOut) opt.onOut();
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
-      this.bowlCrowd('dot');
+      this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs');
       this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
       inn.ball({ runs: 0 });
       this.charge.dot();
@@ -918,7 +918,7 @@ export class Game {
       this.hitGrade = grade;
       await this.battingHit(inn, ballNo, res, grade, aiField, rng, fx);
     }
-    this.bowlCrowd(inn.wkts > before.wkts ? 'wicket' : inn.runs - before.runs === 0 ? 'dot' : 'runs'); // (a ball the crowd has not yet heard about)
+    this.bowlCrowd(inn.wkts > before.wkts ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     this.hud(inn);
     if (!opt.assist) await this.battingBanter({ runs: inn.runs - before.runs, wicketFell: inn.wkts > before.wkts, beaten: res.outcome === 'beaten' || (res.outcome === 'edge' && inn.wkts === before.wkts), rng, inn });
     await this.sleepReal(this.bot ? 50 : 650);
@@ -1058,14 +1058,15 @@ export class Game {
     sfx.wicket(); buzz([60, 40, 60]);
   }
 
-  // The home crowd when its own side bowls (js/audio.js): a build-up as the bowler runs in, a groan for a miss, a
-  // block or a dot, a roar for a wicket. The away side's bowling gets nothing, as the away side's boundaries get
-  // no cheer. A ball is resolved once: the first call after the run-up counts (a catch that takes a while keeps the
-  // build-up held until it is decided).
+  // The home crowd when its own side bowls (js/audio.js): a build-up as the bowler runs in that fades away once the
+  // ball is played, a groan if the batter blocks it or misses, a roar for a wicket. The away side's bowling gets
+  // nothing, as the away side's boundaries get no cheer. A ball is resolved once: the first call after the run-up
+  // counts. A catch chance only softens the build-up (it is not held for the catch): a catch taken is a wicket.
   bowlCrowdStart(bowlingTeam) {
     this.crowdLive = bowlingTeam.id === this.home;
     if (this.crowdLive) crowdOhh();
   }
+  bowlCrowdSoften() { if (this.crowdLive) crowdSoften(); }
   bowlCrowd(kind) {
     if (!this.crowdLive) return;
     this.crowdLive = false;
@@ -1084,7 +1085,7 @@ export class Game {
       return;
     }
     const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: (this.oppStyle.field || 1) * this.pitch.field * fieldSpeed(this.sideRating(this.oppSide)) });
-    if (!sim.catch) this.bowlCrowd(sim.runs === 0 ? 'dot' : 'runs'); // (a catch chance keeps the build-up held until it is decided)
+    if (!sim.catch) this.bowlCrowd(res.grade === 'defend' ? 'dot' : 'runs'); else this.bowlCrowdSoften(); // (a block gets the groan; a catch chance only softens the build-up)
     let caught = false, saved = false, dropped = false;
     if (sim.catch) {
       caught = rng.chance(sim.catch.p * 0.92);
@@ -1636,7 +1637,7 @@ export class Game {
       const powerWord = usedPower ? { tornado: 'TORNADO YORKER!', maya: 'MAYA BALL!', shatter: 'SHATTERED!' }[usedPower] : comboTag ? comboTag.label : null;
       wicket(res.mayaFooled ? 'FOOLED BY MAYA!' : 'BOWLED!', usedPower || comboTag ? 'twoWickets' : 'wicket', bowlerHero, { word: powerWord || 'BOWLED!', detail: powerWord ? `${powerWord.replace('!', '').toLowerCase()} wicket` : 'stumps cartwheeling' });
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
-      this.bowlCrowd('dot');
+      this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs'); // (a miss gets the groan; a ball left alone only lets the build-up fade)
       this.fx.word(res.outcome === 'leave' ? 'LEFT ALONE' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
       inn.ball({ runs: 0 });
       this.charge.award('dot', 'DOT'); this.charge.dot();
@@ -1677,7 +1678,7 @@ export class Game {
     this.hud(inn);
 
     const runs = inn.runs - before.runs, wicketFell = inn.wkts > before.wkts;
-    this.bowlCrowd(wicketFell ? 'wicket' : runs === 0 ? 'dot' : 'runs'); // (a ball the crowd has not yet heard about)
+    this.bowlCrowd(wicketFell ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     const goodBall = wicketFell || (runs === 0 && (res.outcome !== 'hit' || rg === 'perfect' || (mods?.tags.some(t => t.charge > 0) ?? false)));
     await this.bowlingBanter({ runs, wicketFell, goodBall, rng, inn });
     await this.sleepReal(this.bot ? 50 : 400);
@@ -1960,8 +1961,10 @@ export class Game {
   async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit) {
     const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field * fieldSpeed(this.sideRating(this.mySide)), riskyRun: res.risky ? 1 : undefined });
     const ctl = ch => playerControls(ch, this.fieldState, ballNo);
-    // hit with no catch, run out or save to wait for: the crowd knows now. (With one it keeps the build-up held until it is decided.)
-    if (!sim.catch && !sim.runOut && !sim.save) this.bowlCrowd(sim.runs === 0 ? 'dot' : 'runs');
+    // a block gets the groan; a ball hit away only lets the build-up fade. With a catch chance the build-up softens
+    // while it is decided (a catch taken is a wicket: the roar comes then)
+    if (!sim.catch && !sim.runOut && !sim.save) this.bowlCrowd(res.grade === 'defend' ? 'dot' : 'runs');
+    else this.bowlCrowdSoften();
 
     if (sim.catch) {
       const ch = { kind: 'catch', p: sim.catch.p };

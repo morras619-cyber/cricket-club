@@ -2,9 +2,9 @@
 """The home crowd's reactions to its side bowling (snd/crowd-ohh.wav, crowd-hoo.wav, crowd-wicket.wav), from
 tools/audio/src/crowd-{ohh,hoo,wicket}.mp3 (js/audio.js plays them):
   crowd-ohh.wav     the build-up as the bowler runs in: near silence rising for 3 s, where the recording stops
-                    abruptly. Carried on (its last stretch folded over itself with crossfades, no repeat heard) so a
-                    catch that takes a while to resolve still has a held, tense crowd under it, then faded out
-  crowd-hoo.wav     the "hoooo" for a miss, a block or a dot: attack, swell, and a natural decay (kept whole)
+                    abruptly. Eased to a short hold and faded away (a fraction of a second more: it is not
+                    dragged out for a catch). js/audio.js fades it sooner when the ball is played
+  crowd-hoo.wav     the "hoooo" for a miss or a block: attack, swell, and a natural decay (kept whole)
   crowd-wicket.wav  the wicket cheer: it rises and decays naturally (kept whole), lifted to the level of the hoo
 The recordings have a narrow whistle line near 2-3 kHz (strongest in the build-up): any bin in 1.5-8 kHz that stands
 out from its neighbours is pulled down to them. Each file starts and ends on silence.
@@ -20,8 +20,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'audio', 'src')
 OUT = os.path.join(HERE, '..', 'snd')
 SR = 32000
-HOLD = 5.5           # seconds the build-up is carried on past the end of its recording
-FADE = 1.8           # of which the last are the fade-out
+HOLD = 0.5           # seconds the build-up goes on past the end of its recording
+FADE = 0.9           # of which the last are the fade-out
 HOLD_LEVEL = 0.8     # the held crowd is this much of the level the recording reached
 WICKET_LIFT = 2.4    # the wicket recording is a quarter the level of the others
 
