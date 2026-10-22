@@ -12,6 +12,8 @@ usage: python3 tools/build_boundary_cheer.py   (needs ffmpeg, numpy, scipy)
 import os, subprocess, tempfile
 import numpy as np
 import scipy.io.wavfile as w
+from scipy.signal import stft, istft
+from scipy.ndimage import median_filter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'audio', 'src', 'boundary-cheer.mp3')
@@ -27,6 +29,24 @@ tmp = os.path.join(tempfile.mkdtemp(), 'a.wav')
 subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', SRC, '-ar', str(SR), '-ac', '2', tmp], check=True)
 sr, a = w.read(tmp)
 a = a.astype(np.float64) / 32768
+
+
+def untone(x, lo=1000, hi=7000, ratio=2.2, keep=1.4):
+    """the recording has a whistle in it (a narrow tone near 2-3 kHz, in the murmur and as the roar rises);
+    looped and swelled it is irritating. Any bin in lo-hi that stands out from the bins round it (a crowd is
+    noise: nothing in it should) is pulled down to just above its surroundings, keeping its phase."""
+    out = []
+    for c in range(x.shape[1]):
+        f, t, Z = stft(x[:, c], SR, nperseg=2048, noverlap=1536)
+        mag, ph = np.abs(Z), np.angle(Z)
+        floor = median_filter(mag, size=(25, 3))             # what the neighbouring bins (and frames) are doing
+        band = ((f >= lo) & (f <= hi))[:, None]
+        mag = np.where(band & (mag > ratio * floor), keep * floor, mag)
+        out.append(istft(mag * np.exp(1j * ph), SR, nperseg=2048, noverlap=1536)[1][:len(x)])
+    return np.stack(out, 1)
+
+
+a = untone(a)
 sl = lambda t0, t1: a[int(t0 * SR):int(t1 * SR)]
 
 
@@ -58,6 +78,7 @@ nf = int(FADE * SR)
 fade = np.cos(np.linspace(0, np.pi / 2, nf)) ** 2
 cheer[-nf:] *= fade[:, None]
 
+cheer = np.tanh(cheer * 2.2) / np.tanh(2.2)           # the roar sat at about a quarter of full scale: lifted (a soft clip, so no harsh peaks)
 peak = max(abs(cheer).max(), 1e-9)
 g = 0.92 / peak
 os.makedirs(OUT, exist_ok=True)

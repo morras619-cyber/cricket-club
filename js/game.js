@@ -1240,7 +1240,7 @@ export class Game {
       const b = path.ballAt(Math.min(tb, end));
       if (!cheered && (six ? Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR : tb >= end)) {
         cheered = true;
-        cheerFull(six ? (grade === 'perfect' ? 1 : 0.9) : 0.7); sting(six ? 'six' : 'four');
+        cheerFull(six ? (grade === 'perfect' ? 1.4 : 1.25) : 1); sting(six ? 'six' : 'four');
       }
       // the ball is loose (nobody may be drawn holding it) until it's caught or gathered; a boundary
       // never is, even when it runs past a fielder diving for it
@@ -2417,7 +2417,7 @@ export class Game {
     me.pose = POSES.dive(Math.sign(P.x - me.x) || 1);
     const p = this.of.to(P.x, P.y);
     if (saved) { this.O.ball = { x: me.x, y: me.y, h: 0.2 }; this.fx.word('SAVED!', p.x, p.y - 50, { size: 60 }); sfx.glove(); this.hitStop(100); }
-    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); cheerFull(0.7); sfx.crowd(0.6); }
+    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); cheerFull(1); sfx.crowd(0.6); }
     await this.sleepReal(this.bot ? 100 : 1000);
     this.endEvent();
     return saved;
