@@ -2,6 +2,7 @@
 // the home side keeps losing wickets) to 1 (the home side is on top). 0 until there are six balls to judge by.
 // `log` is an innings' per-ball record ('0'..'6', 'W'); `homeBatting` is whether the batting side is the home side.
 export const RUNAWAY = -0.6;
+export const TROUBLE = -0.3;   // the home side is struggling: the crowd turns on them
 export function heat(log, homeBatting) {
   const w = log.slice(-12);
   if (w.length < 6) return 0;

@@ -23,7 +23,7 @@ import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, ambienceMood } from './audio.js';
-import { heat, RUNAWAY } from './crowdheat.js';
+import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -1082,6 +1082,7 @@ export class Game {
     if (fieldingTeam.id !== this.home || this.groaned) return;
     this.groaned = true;
     crowdResolve('dot');
+    if (this.heat <= TROUBLE) this.angry(1.3); // (the home side is struggling: a dropped catch or a bad throw gets booed too)
   }
   // the build-up is wanted on the first ball of an over and the first ball after a wicket
   wantBuild(ballNo) { this.moodTick(ballNo); return (ballNo - 1) % 6 === 0 || !!this.afterWicket; }
@@ -1092,7 +1093,24 @@ export class Game {
     if (key !== this.moodKey) { this.moodKey = key; this.mood = { sang: false, booed: false }; }
   }
   sing(delay, sec, vol) { if (!this.mood || this.mood.sang) return; this.mood.sang = true; crowdSing(delay, sec, vol); }
-  boo(delay = 0) { if (!this.mood || this.mood.booed) return; this.mood.booed = true; crowdBoo(delay); }
+  boo(delay = 0) { if (!this.mood || this.mood.booed || !this.angry(delay)) return; this.mood.booed = true; }
+  // A boo, spaced from the last one (8 s; a wicket's boo only has to clear it, 3.2 s) so the crowd never boos on top
+  // of itself. Returns whether it played.
+  angry(delay, force = false) {
+    const at = performance.now() / 1000 + delay;
+    if (at - (this.lastBoo ?? -99) < (force ? 3.2 : 8)) return false;
+    this.lastBoo = at; crowdBoo(delay);
+    return true;
+  }
+  // I bowl at the home side and it is struggling (js/crowdheat.js): two dots in a row, and a maiden over, get the
+  // hoooo and a boo
+  dotsAgainst(inn) {
+    if (!this.homeBat || this.heat > TROUBLE) return;
+    let n = 0;
+    while (n < inn.log.length && inn.log[inn.log.length - 1 - n] === '0') n++;
+    if (n !== 2 && n !== 6) return;
+    crowdResolve('dot'); this.angry(1.3, n === 6);
+  }
   // How the match is going for the home side (js/crowdheat.js) sets how loud the murmur is (restless when they are
   // being hit apart); when the visitors are running away with it, their fours get booed as well as their sixes
   crowdHeat(inn, homeBatting, iBat) {
@@ -1102,7 +1120,7 @@ export class Game {
   // a wicket I take against the home side: the crowd groans at once (the hoooo), then boos
   homeWicket() {
     crowdResolve('dot');
-    crowdBoo(1.3);
+    this.angry(1.3, true);
   }
   // a team's star powers up: a roar of song for the home side, a boo for the visitors
   starPower(team) { if (team.id === this.home) this.sing(0.4, 3.5, 0.45); else this.boo(0.2); }
@@ -1739,6 +1757,7 @@ export class Game {
     const runs = inn.runs - before.runs, wicketFell = inn.wkts > before.wkts;
     this.bowlCrowd(wicketFell ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     this.afterWicket = wicketFell;
+    this.dotsAgainst(inn);
     const goodBall = wicketFell || (runs === 0 && (res.outcome !== 'hit' || rg === 'perfect' || (mods?.tags.some(t => t.charge > 0) ?? false)));
     await this.bowlingBanter({ runs, wicketFell, goodBall, rng, inn });
     await this.sleepReal(this.bot ? 50 : 400);
