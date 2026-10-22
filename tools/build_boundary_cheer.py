@@ -31,23 +31,18 @@ sr, a = w.read(tmp)
 a = a.astype(np.float64) / 32768
 
 
-def untone(x, lo=1500, hi=8000, ratio=1.3, passes=3):
-    """the recording has a whistle in it: thin sweeping lines near 2-3 kHz (with its second harmonic near
-    5.5-6 kHz and another near 7 kHz) through the murmur and the start of the roar. Looped and swelled it is
-    irritating. A crowd is noise, so in lo-hi any bin that stands out even a little from the bins round it
-    (a whistle is a line a bin or two wide) is pulled down to what is round it, keeping its phase. Three
-    passes, as the lines drift and one pass takes only the strongest."""
+def untone(x, lo=1000, hi=7000, ratio=2.2, keep=1.4):
+    """the recording has a whistle in it (a narrow tone near 2-3 kHz, in the murmur and as the roar rises);
+    looped and swelled it is irritating. Any bin in lo-hi that stands out from the bins round it (a crowd is
+    noise: nothing in it should) is pulled down to just above its surroundings, keeping its phase."""
     out = []
     for c in range(x.shape[1]):
-        y = x[:, c]
-        for _ in range(passes):
-            f, t, Z = stft(y, SR, nperseg=2048, noverlap=1536)
-            mag, ph = np.abs(Z), np.angle(Z)
-            floor = median_filter(mag, size=(41, 5))          # what the bins either side (and the frames round it) are doing
-            band = ((f >= lo) & (f <= hi))[:, None]
-            mag = np.where(band & (mag > ratio * floor), floor, mag)
-            y = istft(mag * np.exp(1j * ph), SR, nperseg=2048, noverlap=1536)[1][:len(x)]
-        out.append(y)
+        f, t, Z = stft(x[:, c], SR, nperseg=2048, noverlap=1536)
+        mag, ph = np.abs(Z), np.angle(Z)
+        floor = median_filter(mag, size=(25, 3))             # what the neighbouring bins (and frames) are doing
+        band = ((f >= lo) & (f <= hi))[:, None]
+        mag = np.where(band & (mag > ratio * floor), keep * floor, mag)
+        out.append(istft(mag * np.exp(1j * ph), SR, nperseg=2048, noverlap=1536)[1][:len(x)])
     return np.stack(out, 1)
 
 
