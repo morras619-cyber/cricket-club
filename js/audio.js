@@ -203,6 +203,7 @@ function singDuck(sec = 0.4) {
 }
 // Applause for the home side's good moments. The recordings take turns (never two at once, and none while a roar or
 // another clap is playing); it ducks any singing.
+const CLAP_VOL = 0.2;
 let clapNext = 0, clapUntil = 0;
 export function crowdClap(delay = 0) {
   if (!ready()) return;
@@ -211,7 +212,7 @@ export function crowdClap(delay = 0) {
   if (t < clapUntil || now < roarUntil) return;
   const buf = moodBufs.claps[clapNext++ % moodBufs.claps.length], src = ac.createBufferSource(), g = ac.createGain();
   singDuck(0.4);
-  g.gain.value = 0.7;
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(CLAP_VOL, t + 0.3);   // (applause sits well under the other crowd sounds, and swells in)
   src.buffer = buf; src.connect(g).connect(master); src.start(t);
   clapUntil = t + buf.duration;
   roarUntil = Math.max(roarUntil, t + buf.duration * 0.7);                 // (the synthetic crowd stays quiet under it)
