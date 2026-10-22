@@ -1056,9 +1056,14 @@ export class Game {
     await this.sleepReal(this.bot ? 60 : 1400);
   }
 
-  wicketFx(text, at) {
+  // the crowd's reaction to a wicket the moment it happens: the roar if the home side is bowling, the groan and boo if
+  // it is batting (a controlled catch or run out has no wicketFx: this is how the crowd hears of it)
+  wicketCrowd() {
     this.bowlCrowd('wicket');
     if (this.homeBat) this.homeWicket();
+  }
+  wicketFx(text, at) {
+    this.wicketCrowd();
     this.board(text.replace('!', '') + '!');
     this.fx.flash('#e8343b', 0.4); this.fx.shake(12);
     this.fx.word(text, this.W / 2, this.H * 0.36, { size: 62, color: '#fff4da', stroke: '#e8343b', dur: 1500 });
@@ -2048,7 +2053,7 @@ export class Game {
     if (sim.catch) {
       const ch = { kind: 'catch', p: sim.catch.p };
       let r;
-      if (ctl(ch)) { this.noteEvent(ballNo); r = await this.catchEvent(sim, field); }
+      if (ctl(ch)) { this.noteEvent(ballNo); r = await this.catchEvent(sim, field, freeHit); }
       else {
         r = rng.chance(sim.catch.p) ? 'caught' : sim.catch.p >= 0.3 ? 'dropped' : 'safe';
         await this.showAutoPlay(sim, field, { side: 'player', caught: r === 'caught', dropped: r === 'dropped' });
@@ -2301,7 +2306,7 @@ export class Game {
     return d - step;
   }
 
-  async catchEvent(sim, field) {
+  async catchEvent(sim, field, freeHit = false) {
     const c = sim.catch, path = sim.path, L = c.point, T = path.T;
     const me = this.startEvent(field, c.fielder.id);
     if (this.mode === 'tutorial') await this.coach?.('tutCatch');
@@ -2367,6 +2372,7 @@ export class Game {
       this.O.ball = { x: me.x, y: me.y, h: 1.4 };
       me.pose = POSES.celebrate();
       this.hitStop(120); sfx.glove(); buzz(60);
+      if (!freeHit) this.wicketCrowd(); // (the crowd reacts as the ball is held, not when the ball is over)
       this.fx.burst(p.x, p.y - 30, { color: '#ffd23f' });
       this.fx.word(result === 'dive' ? 'GOTCHA!' : 'CAUGHT!', p.x, p.y - 60, { size: 64 });
     } else {
@@ -2487,6 +2493,7 @@ export class Game {
       this.hitStop(150); sfx.stumps(); this.fx.shake(12);
       this.fx.burst(es.x, es.y, { color: '#ffd23f' });
       this.fx.word(direct ? 'DIRECT HIT!' : 'RUN OUT!', es.x, es.y - 50, { size: 62 });
+      this.wicketCrowd();
       this.ui.banner('OUT!', `by ${Math.abs(margin).toFixed(2)}s`, 1500);
     } else {
       this.fx.word(wild ? 'WILD THROW!' : 'SAFE!', es.x, es.y - 40, { size: 52, color: '#fff4da', stroke: INK });
