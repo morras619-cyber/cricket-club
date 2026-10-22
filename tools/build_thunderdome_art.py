@@ -151,8 +151,7 @@ def build_view(name, v):
     row_struct = top + STRUCT.get(v['stand'], structure_top(st)) * p
     d94 = v['dir'] * ((CY + v['dir'] * 94) - v['cz'])
     roof_h = v['cy'] - (row_struct - v['above']) * d94 / v['f']
-    if CLUB != 'thunder':
-        out = grade(out, bt, stand)
+    out = grade(out, bt, stand)
     Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).save(os.path.join(OUT, f'view-{name}.webp'), 'WEBP', quality=90, method=6)
     print(name, 'painting', (pw, ph), 'boards row', bt, 'top', top, 'stand structure at', round(row_struct), 'roof h', round(roof_h, 1))
     x0 = W / 2 - pw / 2
