@@ -45,10 +45,11 @@ if CLUB == 'phoenix':
         'stand-sign.jpg': [(536, 460), (1810, 580), (1120, 680, 0.45), (1454, 680, 0.45)],
     }
 if CLUB == 'titans':
+    STRUCT = {'stand-screen.jpg': 300, 'stand-sign.jpg': 470}          # (a dark blue sky: the towers begin here, by eye)
     VIEWS['bowl']['stand'] = 'stand-sign.jpg'                          # (the Foundry's sign stand faces the bowler)
     EMIT = {
-        'stand-screen.jpg': [(410, 250), (985, 350), (1580, 350), (2160, 250)],
-        'stand-sign.jpg': [(490, 525), (680, 590), (970, 545), (1200, 560), (1470, 555), (1640, 540), (2080, 525)],
+        'stand-screen.jpg': [(410, 300), (985, 430), (1580, 430), (2170, 300)],
+        'stand-sign.jpg': [(485, 500), (985, 540), (1190, 530), (1460, 530), (1630, 480), (2080, 500)],
     }
 
 
