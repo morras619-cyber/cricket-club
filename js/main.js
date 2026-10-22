@@ -91,6 +91,22 @@ function pager(host, pages, start = 0) {
   host.append(tabs, track);
   requestAnimationFrame(() => { track.scrollLeft = start * track.clientWidth; sync(); });
 }
+// autoPages: the panels already in `body` become tabs over swipeable pages, named from their headings. Whatever comes before
+// the first headed panel (notes, the fixture card) is the first page, called `first`.
+function autoPages(body, first = 'Match') {
+  const kids = [...body.children];
+  const head = k => k.querySelector?.('.lp-head b, h3')?.textContent?.trim();
+  const pages = [];
+  let lead = [];
+  for (const k of kids) {
+    const h = head(k);
+    if (h && !k.classList.contains('notecard')) { if (lead.length) { pages.push([first, lead]); lead = []; } pages.push([h.length > 12 ? h.slice(0, 11).trim() + '…' : h, [k]]); }
+    else lead.push(k);
+  }
+  if (lead.length) pages.push([pages.length ? first : first, lead]);
+  if (pages.length < 2) { return; }
+  pager(body, pages);
+}
 // carousel: a long list as swipeable pages of `per` rows, with dots
 function carousel(nodes, per) {
   const wrap = el('div', 'carousel'), track = el('div', 'pages'), dots = el('div', 'dots');
@@ -777,6 +793,7 @@ function renderTournament(notes = []) {
     body.append(el('div', 'panel paper notecard big', place === 'champion' ? `🏆 Champions! +${prize} coins` : place === 'runnerUp' ? `🥈 Runners-up · +${prize} coins` : place === 'semi' ? `Semi-finalists · +${prize} coins` : 'Better luck next time'));
   }
   body.append(...leaguePanels(t));
+  autoPages(body);
   $('leagueGo').hidden = true; // (the play button is on the fixture card)
   $('leagueQuit').hidden = !f;
 }
@@ -1701,7 +1718,8 @@ function showResult(summary) {
   if (got.length) extra.push(...got.map(a => `🏅 ${a.name} +${a.coins}`));
   if (ups.length) extra.push(...ups.map(u => `⬆ ${heroById(u.id).name} level ${u.to}`));
   if (rewards.pass) extra.push(`Season Pass tier ${rewards.pass}!`);
-  $('resRewards').textContent = [`+${rewards.xp} XP · +${rewards.coins} coins${rewards.gems ? ` · +${rewards.gems} 💎` : ''} · Level ${level(profile.xp).lv}`, ...extra].join(' · ');
+  const rewardLine = `+${rewards.xp} XP · +${rewards.coins} coins${rewards.gems ? ` · +${rewards.gems} 💎` : ''} · Level ${level(profile.xp).lv}`;
+  $('resRewards').textContent = [rewardLine, ...extra].join(' · ');
   // this match's scorecard
   const ms = $('resStats');
   ms.innerHTML = '';
@@ -1770,11 +1788,13 @@ function showResult(summary) {
   }, 'image/jpeg', 0.86);
   // the result in tabs over swipeable pages: nothing scrolls down
   const hl = el('div', 'panel paper matchstats'), sc = el('div', 'panel paper matchstats');
-  hl.append(el('div', 'row notes', $('resRewards').textContent));
+  hl.append(el('div', 'row notes', rewardLine));
+  const hlRows = [];
   for (const row of [...ms.children]) {
     const tag = row.querySelector?.('.badge')?.textContent;
-    (row.classList.contains('notes') || tag === 'ACHIEVEMENT' || tag === 'LEVEL UP' ? hl : sc).append(row);
+    if (row.classList.contains('notes') || tag === 'ACHIEVEMENT' || tag === 'LEVEL UP') hlRows.push(row); else sc.append(row);
   }
+  if (hlRows.length > 3) hl.append(carousel(hlRows, 3)); else hl.append(...hlRows);   // (a long list of medals swipes in threes)
   const pages = [['Highlights', hl]];
   if (sc.children.length) pages.push(['Scorecard', sc]);
   pages.push(['Share', [$('shareFig'), $('shareBox')]]);

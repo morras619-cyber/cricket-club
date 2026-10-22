@@ -980,8 +980,18 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 #result .matchstats .row b { font-size: 18px; }
 #result .matchstats .row span { font-size: 13px; }
 #result .sharefig { gap: 4px; }
-#result .sharefig img { width: auto; max-width: 100%; max-height: 34vh; border-radius: 8px; }
+#result .sharefig img { width: auto; max-width: 100%; max-height: 30vh; border-radius: 8px; }
 #result .sharebox { gap: 8px; }
 #result .sharebox .bigbtn { padding: 9px 12px; font-size: 20px; }
 #result .page { align-items: stretch; }
 #result .page > .sharefig { align-items: center; }
+
+/* the tournament screen (Knockout Cup, Super League): the fixture, the table, knockouts and results as tabs over pages */
+#league { overflow: hidden; touch-action: pan-x; }
+#league .screen-inner { height: 100%; padding-top: 12px; padding-bottom: calc(14px + var(--safe-b)); gap: 8px; }
+#league .title { font-size: 32px; margin: 0; }
+#league .lg-logo { width: min(150px, 38%); margin: -8px auto -10px; }
+#league .lede { margin: 0; font-size: 13px; }
+#league .tab { font-size: 15px; }
+#league .ghostchip { align-self: center; }
+@media (max-height: 880px) { #league .lg-logo { display: none; } }
