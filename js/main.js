@@ -74,8 +74,26 @@ let tourNotes = []; // what happened in the tournament after the last match
 
 const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance', off: 'Fielding: auto' };
 
-// ---------- home: the hub ----------
+// ---------- the title screen: the first thing a returning player sees; Play goes to the hub ----------
 const myTeam = () => teamById(profile.team || 'thunder');
+function renderTitle() {
+  ui.show('title');
+  const { lv, progress } = level(profile.xp);
+  $('tLvl').textContent = `Lv ${lv}`;
+  $('tXp').style.width = `${Math.round(progress * 100)}%`;
+  $('tCoins').textContent = profile.coins;
+  $('tGems').textContent = profile.gems || 0;
+  const t = myTeam();
+  $('tLogo').src = logoSrc(t.id);
+  $('tName').textContent = t.name;
+  $('tStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
+}
+$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); renderHome(); });
+$('tSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
+for (const id of ['tCoinPill', 'tGemPill']) $(id).addEventListener('click', () => { unlockAudio(); renderShop(); });
+$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); renderHome(); });
+
+// ---------- home: the hub ----------
 function renderHome() {
   ui.show('home');
   warWatch(); warBanner();
@@ -1747,7 +1765,8 @@ document.addEventListener('visibilitychange', () => {
   try { await Promise.race([document.fonts.load('40px Bangers'), new Promise(r => setTimeout(r, 1500))]); } catch { /* fallback fonts */ }
   game.resize(); // redraw the cached stadium now the comic font is ready
   if (!profile.tutorialDone && !challenge && !window.__SIXCHARGE_BOT) showCover();
-  else renderHome();
+  else if (challenge || window.__SIXCHARGE_BOT) renderHome();
+  else renderTitle();
   // the logo splash: up for a moment, then it fades away
   const splash = $('splash');
   if (splash) {

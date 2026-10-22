@@ -319,6 +319,19 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .logo.small { margin: 0; }
 .logo.small .logo-six, .logo.small .logo-charge { display: inline; font-size: clamp(40px, 12vw, 56px); }
 /* the hub never scrolls: the picture shrinks out of the way on short screens instead */
+/* the title screen: the stadium picture behind, the logo and the three heroes, Play; the tunnel at the foot */
+.titlescreen { background: #02103a; overflow: hidden; overscroll-behavior: none; touch-action: manipulation; }
+.title-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; pointer-events: none; }
+.title-inner { position: relative; z-index: 1; max-width: 440px; height: 100%; box-sizing: border-box; margin: 0 auto; padding: 8px max(10px, env(safe-area-inset-left, 0px)) 0 max(10px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: center; }
+.title-top { width: 100%; }
+/* the logo, heroes and Play sit centred in the room between the top bar and the tunnel */
+.title-main { flex: 1 1 0; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 70px; }
+.title-logo { display: block; width: 100%; height: auto; margin-top: 2px; filter: drop-shadow(0 4px 10px rgba(0, 0, 40, .45)); pointer-events: none; }
+.title-heroes { position: relative; display: block; width: calc(100% + 20px); max-width: none; height: auto; margin-top: -34px; pointer-events: none; }
+.title-play { position: relative; display: block; width: 94%; margin-top: -30px; padding: 0; border: 0; background: none; filter: drop-shadow(0 5px 8px rgba(0, 0, 30, .6)); }
+.title-play img { display: block; width: 100%; height: auto; }
+.title-play:active { transform: translate(1px, 2px); }
+.title-tunnel { position: absolute; z-index: 0; left: 0; bottom: 0; width: 100%; height: auto; pointer-events: none; -webkit-mask-image: linear-gradient(transparent, #000 28%); mask-image: linear-gradient(transparent, #000 28%); }
 .hub { background: linear-gradient(#011134 45%, #06123a); overflow: hidden; overscroll-behavior: none; touch-action: manipulation; }
 .hub::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: calc(var(--safe-t) + 2px); background: #011234; }
 .hub-inner { position: relative; max-width: 440px; height: 100%; box-sizing: border-box; margin: 0 auto; padding: 0 max(10px, env(safe-area-inset-left, 0px)) 12px max(10px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; }
