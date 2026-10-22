@@ -96,6 +96,8 @@ function drawCreases(g, cam, PX) {
 const OWN_PITCH = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix'];   // (their order in img/ground/pitches.webp: a strip 320 px wide, fresh then late, for each)
 // the painted strips with their own ink edge are drawn whole; the rest have ragged edges that are trimmed
 const PITCH_TRIM = { thunder: 0 };
+// a strip that carries its own ink edge is drawn a little wider than the rendered pitch under it, so its edge covers the old one
+const edgeOf = art => (art.pitchFresh && (PITCH_TRIM[art.team] ?? 0.04) === 0 ? 0.06 : 0);
 const trimOf = art => (art.pitchFresh ? (PITCH_TRIM[art.team] ?? 0.04) : 0.04);
 let PITCH_LATE = 0;
 export function setPitchLate(w) {
@@ -312,7 +314,7 @@ function renderBuilt(cam, art, v, im) {
   const { W, H, hy, f } = cam;
   const G = groundOf(HOME), night = NIGHT[G.time] ?? 1;
   const c = document.createElement('canvas');
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = Math.min(3, window.devicePixelRatio || 1);   // (a sharp edge on a 3x phone)
   c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
   const g = c.getContext('2d');
   g.scale(dpr, dpr);
@@ -328,7 +330,7 @@ function renderBuilt(cam, art, v, im) {
   g.drawImage(im, dx, dy, dw, dh);
   // a ground with a strip of its own: it is laid over the rendered one, row by row, in this camera's perspective
   if (art.pitchFresh) {
-    const pt = pitchNow(art), PZ0 = -2, PZ1 = 22, PX = 1.52, rowH = 1 / dpr;
+    const pt = pitchNow(art), PZ0 = -2, PZ1 = 22, PX = 1.52 + edgeOf(art), rowH = 1 / dpr;
     const ptx0 = pw(pt) * trimOf(art), ptw = pw(pt) * (1 - 2 * trimOf(art));
     for (let y = hy; y < H; y += rowH) {
       const gp = cam.groundAt(W / 2, y + rowH / 2);
@@ -339,7 +341,7 @@ function renderBuilt(cam, art, v, im) {
       const span = Math.max(1, (ph(pt) / (PZ1 - PZ0)) * (rowH * d * d) / (cam.cy * cam.f));
       g.drawImage(pt, ptx0, Math.min(v, ph(pt) - span), ptw, span, Math.min(a.x, b.x), y, Math.abs(b.x - a.x), rowH + 0.4);
     }
-    drawCreases(g, cam, PX);   // (the strip covers the rendered ground's creases: they are drawn again on it)
+    drawCreases(g, cam, 1.52);   // (the strip covers the rendered ground's creases: they are drawn again on it)
   }
   if (dy > 0) {
     const gr = g.createLinearGradient(0, dy, 0, dy + dh * 0.06);
@@ -1118,7 +1120,7 @@ export class OutfieldView {
     ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, 27 * k, 27 * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     if (art) {
-      const a = this.to(-1.52, 22), b = this.to(1.52, -2), pt = pitchNow(art);
+      const e = edgeOf(art), a = this.to(-1.52 - e, 22), b = this.to(1.52 + e, -2), pt = pitchNow(art);
       ctx.drawImage(pt, pw(pt) * trimOf(art), 0, pw(pt) * (1 - 2 * trimOf(art)), ph(pt), a.x, a.y, b.x - a.x, b.y - a.y);
       ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
