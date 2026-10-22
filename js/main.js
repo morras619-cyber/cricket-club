@@ -118,17 +118,41 @@ function pager(host, pages, start = 0) {
 // the first headed panel (notes, the fixture card) is the first page, called `first`.
 function autoPages(body, first = 'Match') {
   const kids = [...body.children];
-  const head = k => (k.querySelector?.('.lp-head b') || k.querySelector?.('h3'))?.textContent?.replace(/[^\p{L}\p{N}' ]/gu, '').trim();
+  const NAMES = { 'your results': 'Results', 'across the divisions': 'Divisions', 'travelling scouts': 'Scouts', 'off-season news': 'News' };
+  const raw = k => (k.querySelector?.('.lp-head b') || k.querySelector?.('h3'))?.textContent?.replace(/[^\p{L}\p{N}' -]/gu, '').trim();
+  const name = k => {
+    if (k.classList.contains('stadpanel')) return 'Stadium';
+    const h = raw(k);
+    if (!h) return null;
+    return NAMES[h.toLowerCase()] || (h.length > 11 ? h.split(' ')[0] : h);
+  };
+  // what belongs on the first page: notes, the fixture card, the auction lot, the season result
+  const lead = k => ['notecard', 'fixture', 'lotcard'].some(c => k.classList.contains(c));
   const pages = [];
-  let lead = [];
+  let first_ = [];
   for (const k of kids) {
-    const h = head(k);
-    if (h && !k.classList.contains('notecard')) { if (lead.length) { pages.push([first, lead]); lead = []; } pages.push([h.length > 11 ? h.split(' ')[0] : h, [k]]); }
-    else lead.push(k);
+    const n = lead(k) ? null : name(k);
+    if (n) pages.push([n, [k]]); else first_.push(k);
   }
-  if (lead.length) pages.push([pages.length ? first : first, lead]);
+  if (first_.length) pages.unshift([first, first_]);
   if (!pages.length) return;
   pager(body, pages);   // (one page alone has no tab bar, but still fits the screen)
+}
+// fitBlock: a whole screen block (the team picker) is shrunk to fit its screen, so its buttons are never pushed out of sight
+function fitBlock(pt) {
+  const sc = pt.closest('.screen');
+  if (!sc || sc.hidden || sc.clientHeight < 200) return;
+  pt.style.cssText = 'height:auto;min-height:0;margin:0 auto;';
+  let h = pt.offsetHeight; const avail = sc.clientHeight - (parseFloat(getComputedStyle(sc).paddingTop) || 0);
+  if (h <= avail) { pt.style.cssText = ''; return; }
+  let k = Math.max(0.6, avail / h);
+  for (let i = 0; i < 2; i++) { pt.style.cssText = `height:auto;min-height:0;margin:0;width:${100 / k}%;max-width:none;`; h = pt.offsetHeight; k = Math.max(0.6, Math.min(1, avail / h)); }
+  pt.style.cssText = `height:auto;min-height:0;margin:0;width:${100 / k}%;max-width:none;transform-origin:0 0;transform:scale(${k});`;
+}
+function watchBlock(sel) {
+  const pt = document.querySelector(sel); if (!pt || typeof ResizeObserver === 'undefined') return;
+  new ResizeObserver(() => fitBlock(pt)).observe(pt.closest('.screen'));
+  document.fonts?.ready?.then(() => fitBlock(pt));
 }
 // (the club maker's three sections are tabs, set up once)
 function setupClubTabs() {
@@ -433,6 +457,7 @@ let pick = null;
 function renderPickTeam(o) {
   pick = { ...o, idx: Math.max(0, o.teams.findIndex(t => t.id === o.start)), stars: teamStars(o.squads, o.teams) };
   ui.show('pickteam');
+  requestAnimationFrame(() => requestAnimationFrame(() => fitBlock(document.querySelector('#pickteam .pt')))); // (its buttons are never pushed out of sight)
   $('ptCoins').textContent = profile.coins;
   $('ptNote').hidden = !o.note; $('ptNote').textContent = o.note || '';
   $('ptMake').hidden = !o.make;
@@ -1866,6 +1891,7 @@ document.addEventListener('visibilitychange', () => {
 (async () => {
   try { await Promise.race([document.fonts.load('40px Bangers'), new Promise(r => setTimeout(r, 1500))]); } catch { /* fallback fonts */ }
   setupClubTabs();
+  watchBlock('#pickteam .pt');
   game.resize(); // redraw the cached stadium now the comic font is ready
   if (challenge || window.__SIXCHARGE_BOT) renderHome();
   else renderTitle(); // (the title screen first for everyone; Play goes on to the tutorial or the hub)

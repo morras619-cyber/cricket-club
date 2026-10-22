@@ -1047,3 +1047,4 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 
 #records .carousel { flex: 1 1 0; min-height: 0; }
 #records .carousel .pages { flex: 1 1 0; }
+#pickteam .pt { transform-origin: 0 0; }
