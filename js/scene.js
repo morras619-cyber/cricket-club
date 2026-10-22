@@ -123,7 +123,7 @@ function loadArt(team) {
     at.onerror = () => { done(); };   // (without it the shared strip stays)
     at.src = 'img/ground/pitches.webp';
   }
-  a.logo = new Image(); a.logo.onload = done; a.logo.onerror = done; a.logo.src = 'img/menu/logo.webp';
+  a.logo = new Image(); a.logo.onload = done; a.logo.onerror = done; a.logo.src = 'img/logo-sixcharge.webp';
 }
 function loadOwnArt(team, key, a, dir) {
   const files = { pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
