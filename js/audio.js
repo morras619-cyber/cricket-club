@@ -204,7 +204,7 @@ export function crowdBoo(delay = 0) {
   if (!moodBufs) { loadMood(); return; }
   singDuck(0.4);
   const t = ac.currentTime + Math.max(0, delay), src = ac.createBufferSource(), g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.95, t + 0.04);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.25);   // softer, easing in rather than hitting at once
   src.buffer = moodBufs.boo; src.connect(g).connect(master); src.start(t);
   roarUntil = Math.max(roarUntil, t + moodBufs.boo.duration * 0.7);        // (the synthetic crowd stays quiet under it)
 }
