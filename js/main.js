@@ -88,10 +88,11 @@ function renderTitle() {
   $('tName').textContent = t.name;
   $('tStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
 }
-$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); renderHome(); });
+// (a player who has not done the tutorial goes to it first)
+$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) showCover(); else renderHome(); });
 $('tSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
 for (const id of ['tCoinPill', 'tGemPill']) $(id).addEventListener('click', () => { unlockAudio(); renderShop(); });
-$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); renderHome(); });
+$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) showCover(); else renderHome(); });
 
 // ---------- home: the hub ----------
 function renderHome() {
@@ -1764,9 +1765,8 @@ document.addEventListener('visibilitychange', () => {
 (async () => {
   try { await Promise.race([document.fonts.load('40px Bangers'), new Promise(r => setTimeout(r, 1500))]); } catch { /* fallback fonts */ }
   game.resize(); // redraw the cached stadium now the comic font is ready
-  if (!profile.tutorialDone && !challenge && !window.__SIXCHARGE_BOT) showCover();
-  else if (challenge || window.__SIXCHARGE_BOT) renderHome();
-  else renderTitle();
+  if (challenge || window.__SIXCHARGE_BOT) renderHome();
+  else renderTitle(); // (the title screen first for everyone; Play goes on to the tutorial or the hub)
   // the logo splash: up for a moment, then it fades away
   const splash = $('splash');
   if (splash) {
