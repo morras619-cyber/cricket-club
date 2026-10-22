@@ -22,7 +22,7 @@ import { FX, INK, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerBuild, cheerFull, cheerStop } from './audio.js';
+import { sfx, buzz, unlockAudio, cheerBuild, cheerFull, cheerStop, sting } from './audio.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -1240,7 +1240,7 @@ export class Game {
       const b = path.ballAt(Math.min(tb, end));
       if (!cheered && (six ? Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR : tb >= end)) {
         cheered = true;
-        cheerFull(six ? (grade === 'perfect' ? 1.4 : 1.25) : 1);
+        cheerFull(six ? (grade === 'perfect' ? 1.4 : 1.25) : 1); sting(six ? 'six' : 'four');
       }
       // the ball is loose (nobody may be drawn holding it) until it's caught or gathered; a boundary
       // never is, even when it runs past a fielder diving for it
