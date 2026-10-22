@@ -56,7 +56,7 @@ export const sfx = {
   stumps() { noise(0.25, { gain: 0.8, freq: 900, q: 1.2 }); tone(220, 0.2, { type: 'square', gain: 0.15, to: 80 }); },
   glove() { noise(0.12, { gain: 0.7, freq: 400, q: 1 }); tone(110, 0.15, { gain: 0.6, to: 60 }); },
   trombone() { [392, 370, 349, 262].forEach((f, i) => tone(f, i === 3 ? 0.6 : 0.22, { type: 'sawtooth', gain: 0.12, delay: i * 0.22, to: i === 3 ? 220 : null })); },
-  crowd(intensity = 1) { if (ac && ac.currentTime < roarUntil) return; /* (the boundary cheer is the crowd) */ noise(1.6 * intensity, { gain: 0.25 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
+  crowd(intensity = 1) { if (ac && ac.currentTime < roarUntil) return; /* (the boundary cheer is the crowd) */ noise(1.6 * intensity, { gain: 0.18 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
   whoosh() { noise(0.35, { gain: 0.4, freq: 600, q: 0.6, type: 'lowpass', attack: 0.1 }); },
   boom() { tone(70, 0.8, { gain: 0.9, to: 30 }); noise(0.6, { gain: 0.6, freq: 200, q: 0.5, type: 'lowpass' }); },
   zap() { tone(1400, 0.18, { type: 'sawtooth', gain: 0.18, to: 200 }); noise(0.15, { gain: 0.3, freq: 4000, q: 3 }); },
@@ -121,7 +121,7 @@ export function cheerStop(fade = 0.3) {
 // A low crowd murmur under the whole match (snd/crowd-loop.wav, tools/build_crowd_loop.py: made to
 // loop with no seam). Two copies play at once, the second a little slower, so the short loop's
 // repeats never line up and no pattern is heard. It follows the Sound setting.
-const AMBIENCE = [{ rate: 1, gain: 0.8 }, { rate: 0.89, gain: 0.5 }];
+const AMBIENCE = [{ rate: 1, gain: 0.5 }, { rate: 0.89, gain: 0.32 }];
 let ambBuf = null, ambLoading = null, amb = null, ambRun = 0;
 function loadAmbience() {
   if (!ambLoading) {

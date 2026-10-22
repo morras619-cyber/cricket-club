@@ -22,6 +22,7 @@ XFADE = 0.35         # the build-up runs into the cheer over this long
 CUE = 2.9            # where in the clip the ball clears the rope (as printed below)
 EXTRA = 2.2          # seconds the cheer is carried on past the end of its recording
 FADE = 1.8           # of which the last are the fade-out
+BUILD_SOFT = 0.7      # the build-up, before the roar, is this much of its level (about -3 dB): the roar stays the loudest by a wider margin
 TARGET = 0.40        # the cheer's steady level (rms, of a peak of 0.92): the roar you liked, loud
 
 
@@ -68,6 +69,10 @@ for _ in range(40):
     if np.sqrt((finish(a)[steady_part] ** 2).mean()) < TARGET: lo = a
     else: hi = a
 clip = finish(a)
+# the build-up softer: held at BUILD_SOFT until 2 s, then back up to full by 3.6 s (a smooth rise, so no step at the join)
+tt = np.arange(len(clip)) / SR
+env = BUILD_SOFT + (1 - BUILD_SOFT) * (0.5 - 0.5 * np.cos(np.pi * np.clip((tt - 2.0) / 1.6, 0, 1)))
+clip = clip * env[:, None]
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 w.write(OUT, SR, (np.clip(clip, -1, 1) * 32767).astype(np.int16))
 print('wrote', OUT, f'{len(clip) / SR:.2f}s', os.path.getsize(OUT) // 1024, 'KB', f'| join ends at {join_end / SR:.2f}s, CUE {CUE}s')
