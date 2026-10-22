@@ -173,7 +173,7 @@ let moodBufs = null, moodLoading = null, singing = [];
 function loadMood() {
   if (!moodLoading) {
     const get = n => fetch(`snd/crowd-${n}.wav`).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)));
-    moodLoading = Promise.all([get('sing'), get('boo')]).then(([sing, boo]) => (moodBufs = { sing, boo })).catch(() => { moodLoading = null; return null; });
+    moodLoading = Promise.all([get('sing'), get('boo'), get('boo2'), get('boo3'), get('booing')]).then(([sing, boo, boo2, boo3, booing]) => (moodBufs = { sing, boos: [boo, boo2, boo3], booing })).catch(() => { moodLoading = null; return null; });
   }
   return moodLoading;
 }
@@ -199,14 +199,18 @@ function singDuck(sec = 0.4) {
   }
   singing = [];
 }
-export function crowdBoo(delay = 0) {
+let lastBoo = -1;
+// a boo, never the one just heard; `heated` (the visitors are running away with the game) is the longer, swelling one
+export function crowdBoo(delay = 0, heated = false) {
   if (!ready()) return;
   if (!moodBufs) { loadMood(); return; }
   singDuck(0.4);
   const t = ac.currentTime + Math.max(0, delay), src = ac.createBufferSource(), g = ac.createGain();
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.25);   // softer, easing in rather than hitting at once
-  src.buffer = moodBufs.boo; src.connect(g).connect(master); src.start(t);
-  roarUntil = Math.max(roarUntil, t + moodBufs.boo.duration * 0.7);        // (the synthetic crowd stays quiet under it)
+  let pick; do pick = Math.floor(Math.random() * moodBufs.boos.length); while (pick === lastBoo);
+  lastBoo = pick;
+  src.buffer = heated ? moodBufs.booing : moodBufs.boos[pick]; src.connect(g).connect(master); src.start(t);
+  roarUntil = Math.max(roarUntil, t + src.buffer.duration * 0.7);        // (the synthetic crowd stays quiet under it)
 }
 
 // ---------- the match's crowd bed ----------

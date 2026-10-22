@@ -3,6 +3,10 @@
   crowd-sing.wav  a happy crowd singing. The recording is 3 s, loud at both ends (cut off at both). Faded in, its middle
                   section carried on (folded over itself with crossfades, no repeat heard) to 10 s, and faded out
   crowd-boo.wav   an angry crowd booing: attack, hold, a natural decay to silence (kept whole)
+  crowd-boo2.wav, crowd-boo3.wav  two more boos (the same shape), so the booing is not always the same one; each is
+                  levelled to crowd-boo's loudest moment
+  crowd-booing.wav  a heated crowd: the steady part of all three boos joined in turn with crossfades (a different crowd
+                  at each seam, so no repeat is heard), swelling in, then boo 3's natural decay (~5 s)
 The recordings have a narrow whistle line near 6 kHz: any bin in 1.5-8 kHz that stands out from its neighbours is pulled
 down to them. Each file starts and ends on silence.
 usage: python3 tools/build_crowd_mood.py   (needs ffmpeg, numpy, scipy)
@@ -73,3 +77,26 @@ boo = untone(load('crowd-boo.mp3'))
 n = int(0.04 * SR)
 boo[-n:] *= np.linspace(1, 0, n)[:, None]; boo[:n // 2] *= np.linspace(0, 1, n // 2)[:, None]
 save('crowd-boo.wav', boo)
+
+# the two further boos, levelled to the first; and a longer one for a crowd that is really angry
+def loud(x, win=int(0.25 * SR)):
+    m = x.mean(1) if x.ndim > 1 else x
+    return max(np.sqrt((m[i:i + win] ** 2).mean()) for i in range(0, len(m) - win, win // 4))
+ref = loud(boo * min(1.0, 0.92 / abs(boo).max()))          # (as crowd-boo.wav was saved)
+b = {'boo': boo}
+for k in ('boo2', 'boo3'):
+    x = untone(load(f'crowd-{k}.mp3'))
+    x[-n:] *= np.linspace(1, 0, n)[:, None]; x[:n // 2] *= np.linspace(0, 1, n // 2)[:, None]
+    b[k] = x
+    save(f'crowd-{k}.wav', x * (ref / loud(x)))
+lv = {k: x * (ref / loud(x)) for k, x in b.items()}
+seg = lambda k, a, z: lv[k][int(a * SR):int(z * SR)]
+XF = int(0.3 * SR)
+long = seg('boo3', 0.15, 1.3)
+for k, a, z in (('boo2', 0.15, 1.1), ('boo', 0.15, 1.1), ('boo3', 0.5, 1.3), ('boo2', 0.4, 1.0)):
+    long = xfade_append(long, seg(k, a, z), XF)
+long = xfade_append(long, seg('boo3', 1.3, 3.0), XF)
+n_in = int(0.5 * SR)
+long[:n_in] *= np.linspace(0, 1, n_in)[:, None] ** 1.5
+long[-n:] *= np.linspace(1, 0, n)[:, None]
+save('crowd-booing.wav', long)

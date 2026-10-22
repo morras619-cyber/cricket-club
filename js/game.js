@@ -1091,7 +1091,7 @@ export class Game {
     if (key !== this.moodKey) { this.moodKey = key; this.mood = { sang: false, booed: false }; }
   }
   sing(delay, sec, vol) { if (!this.mood || this.mood.sang) return; this.mood.sang = true; crowdSing(delay, sec, vol); }
-  boo(delay = 0) { if (!this.mood || this.mood.booed) return; this.mood.booed = true; crowdBoo(delay); }
+  boo(delay = 0, heated = false) { if (!this.mood || this.mood.booed) return; this.mood.booed = true; crowdBoo(delay, heated); }
   // How the match is going for the home side (js/crowdheat.js) sets how loud the murmur is; when the visitors are
   // running away with it, their fours get booed as well as their sixes
   crowdHeat(inn, homeBatting) { this.heat = heat(inn.log, homeBatting); ambienceMood(this.heat); }
@@ -1303,7 +1303,7 @@ export class Game {
     } else if ((six || (toRope && this.heat <= RUNAWAY)) && (o.side === 'ai' ? this.myTeam : this.oppTeam).id !== this.home) {
       let tClear = end;
       for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
-      this.boo(tClear / ballK / 1.6); // the visitors' six (or a four when they are running away with it): the home crowd boos
+      this.boo(tClear / ballK / 1.6, this.heat <= RUNAWAY); // the visitors' six (or a four when they are running away with it): the home crowd boos
     }
     let said = false, slowUntil = 0, slowed = !(six && grade === 'perfect'), landed = null;
     await this.until(() => {
