@@ -1129,13 +1129,14 @@ export class Game {
     crowdResolve('dot');
     this.angry(1.3, true);
   }
-  // The home crowd applauds (js/audio.js): its batters running 1, 2 or 3, and its bowlers' second dot ball in a row
+  // The home crowd applauds (js/audio.js): its batters running 1, 2 or 3, and its bowlers' dot balls: the ball that
+  // opened the over (or came after a wicket: the one with the build-up) if it scores nothing, then every second dot
   homeClaps(inn, runs, wicket, iBat) {
-    if (wicket) return;
+    if (wicket) { this.clapDots = 0; return; }
     if ((iBat ? this.myTeam : this.oppTeam).id === this.home) { if (runs >= 1 && runs <= 3) crowdClap(); return; }
-    let n = 0;
-    while (n < inn.log.length && inn.log[inn.log.length - 1 - n] === '0') n++;
-    if (n === 2 || n === 4) crowdClap();
+    if (runs > 0) { this.clapDots = 0; return; }
+    this.clapDots = (this.clapDots || 0) + 1;
+    if (this.crowdBuild || this.clapDots >= 2) { this.clapDots = 0; crowdClap(); }
   }
   // a team's star powers up: a roar of song for the home side, a boo for the visitors
   starPower(team) { if (team.id === this.home) this.sing(0.4, 3.5, 0.45); else this.boo(0.2); }

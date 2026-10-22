@@ -203,7 +203,7 @@ function singDuck(sec = 0.4) {
 }
 // Applause for the home side's good moments. The recordings take turns (never two at once, and none while a roar or
 // another clap is playing); it ducks any singing.
-const CLAP_VOL = 0.2;
+const CLAP_VOL = 0.15;
 let clapNext = 0, clapUntil = 0;
 export function crowdClap(delay = 0) {
   if (!ready()) return;
