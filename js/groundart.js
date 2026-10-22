@@ -215,7 +215,16 @@ export const GROUND_ART = {
     426,
     141.0
    ]
-  ]
+  ],
+  "strip": {
+   "w": 2012,
+   "h": 724,
+   "ppm": 25.618,
+   "grass": 621,
+   "tiles": 6,
+   "rRef": 75.0,
+   "rGrass": 63.5
+  }
  },
  "own1": {
   "views": {

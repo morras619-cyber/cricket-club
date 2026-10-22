@@ -85,6 +85,7 @@ function loadArt(team) {
   // a ground built in Blender: one finished background per camera (tools/blender)
   for (const v of Object.keys(meta.views || {})) files['view-' + v] = 'view-' + v;
   if (meta.top) files.topView = 'view-top';
+  if (meta.strip) files.stripImg = 'strip'; // (the close-up stands, wrapped round the rope in the top view: OutfieldView.drawStrip)
   let left = Object.keys(files).length + 1;
   const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
   for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${meta.share && SHARED.has(f) ? meta.share : team}/${f}.webp`; a[k] = im; }
@@ -971,6 +972,27 @@ export class OutfieldView {
   to(x, y, h = 0) {
     return { x: this.W / 2 + (x - this.cx) * this.k, y: this.H * 0.5 - (y - this.cy) * this.k * 0.78 - h * this.k * 0.85 };
   }
+  // The close-up stands, wrapped round the rope: the ring painting is only a few pixels a metre, so zoomed right in
+  // the stands are drawn from a strip (tools/build_ground_strip.py) at about 25 px a metre. The strip is cut into
+  // narrow slices, each a parallelogram from the rope out, upright where the stand faces the camera. Only the
+  // slices on screen are drawn.
+  drawStrip(ctx, img, m, c, alpha) {
+    const { W, H, k } = this, du = 48, n = Math.ceil(m.w / du);
+    const rIn = m.rGrass - (m.h - m.grass) / m.ppm, rOut = rIn + m.h / m.ppm;
+    const G = (r, th) => this.to(r * Math.cos(th), CY + r * Math.sin(th));
+    ctx.save(); ctx.globalAlpha = alpha; ctx.imageSmoothingQuality = 'high';
+    const base = ctx.getTransform(); // (the screen's own scale for sharp pixels stays under each slice's)
+    for (let tile = 0; tile < m.tiles; tile++) for (let i = 0; i < n; i++) {
+      const u0 = i * du, u1 = Math.min(m.w, u0 + du), span = (2 * Math.PI) / m.tiles / m.w;
+      const th0 = Math.PI / 2 - (tile * m.w + u0) * span, th1 = Math.PI / 2 - (tile * m.w + u1) * span;
+      const bl = G(rIn, th0), br = G(rIn, th1), tl = G(rOut, th0), tr = G(rOut, th1);
+      if (Math.max(bl.x, br.x, tl.x, tr.x) < -20 || Math.min(bl.x, br.x, tl.x, tr.x) > W + 20 || Math.max(bl.y, br.y, tl.y, tr.y) < -20 || Math.min(bl.y, br.y, tl.y, tr.y) > H + 20) continue;
+      const a = (br.x - bl.x) / (u1 - u0), b = (br.y - bl.y) / (u1 - u0), cc = (bl.x - tl.x) / m.h, d = (bl.y - tl.y) / m.h;
+      ctx.setTransform(base); ctx.transform(a, b, cc, d, bl.x - u0 * a - m.h * cc, bl.y - u0 * b - m.h * d);
+      ctx.drawImage(img, u0, 0, u1 - u0 + 1, m.h, u0, 0, u1 - u0 + 1, m.h);
+    }
+    ctx.restore();
+  }
   drawGround(ctx) {
     const { W, H, k } = this;
     ctx.fillStyle = '#1b1838'; ctx.fillRect(0, 0, W, H);
@@ -983,6 +1005,7 @@ export class OutfieldView {
       const t = art.meta.top, s = k / t.px;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(top, c.x - t.c[0] * s, c.y - t.c[1] * s, t.w * s, t.h * s);
+      if (art.meta.strip && art.stripImg?.complete && k > 5) this.drawStrip(ctx, art.stripImg, art.meta.strip, c, Math.min(1, (k - 5) / 2));
     } else {
       // the stands: a ring of crowd around the rope
       if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(ctx); this.crowdFor = HOME; }
