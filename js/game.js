@@ -1336,15 +1336,7 @@ export class Game {
     await this.until(() => {
       const t = this.gameTime - t0, tb = t * ballK;
       const b = path.ballAt(Math.min(tb, end));
-      if (!cleared && (six ? Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR : tb >= end)) {
-        cleared = true;
-        if (six) { // the moment it crosses the rope is the moment of the six: the word, the shake and the crowd come with the roar
-          const q = this.of.to(b.x, b.y, b.h);
-          this.fx.word('SIX!', q.x, q.y - 40, { size: 80 });
-          this.fx.shake(grade === 'perfect' ? 18 : 9);
-          sfx.crowd(grade === 'perfect' ? 1.8 : 1.2);
-        }
-      }
+      if (!cleared && (six ? Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR : tb >= end)) cleared = true;
       // the ball is loose (nobody may be drawn holding it) until it's caught or gathered; a boundary
       // never is, even when it runs past a fielder diving for it
       this.O.loose = boundary || tb < end || !(A && (o.caught || sim.intercept || o.saved));
@@ -1417,16 +1409,19 @@ export class Game {
         const ahead = path.ballAt(Math.min(tb + 0.45 * ballK, end));
         this.of.focus([b, ahead, { x: 0, y: 10 }]);
       } else this.of.focus([b, { x: 0, y: 10 }, ...(A ? [A] : []), ...(ro ? [roEnd] : [])]);
-      if (!said && tb >= end && (six || !D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read (a six strikes as it lands)
+      if (!said && (six ? cleared : tb >= end) && (six || !D || t >= miss.t + 0.8)) { // after JUST SHORT! has been read (a six strikes the moment it clears the rope, with the roar: the word, shake, lightning and burst all land together)
         said = true;
         const p = this.of.to(b.x, b.y, b.h);
         if (sim.kind === 'six' && !o.caught) {
           const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
+          this.fx.word('SIX!', p.x, p.y - 40, { size: 80 });
           if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3); }
           // the crowd where it lands jumps up; a perfect six shakes the whole ground
           const T = o.side === 'ai' ? this.myTeam : this.oppTeam;
           this.fx.ripple(p.x, p.y, { colors: [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], r: grade === 'perfect' ? 150 : 110 });
           this.fx.sparks(p.x, p.y, grade === 'perfect' ? 30 : 18, [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], 6);
+          this.fx.shake(grade === 'perfect' ? 18 : 9);
+          sfx.crowd(grade === 'perfect' ? 1.8 : 1.2);
           // how far it went
           const m = this.sixDistance(sim);
           this.fx.word(`${m} METRES`, p.x, p.y + 30, { size: 40, color: '#fff4da', stroke: '#e8343b', rot: 0, dur: 1400 });
