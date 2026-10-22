@@ -1227,9 +1227,10 @@ export class Game {
     const dur = Math.max(0.8, endT + 0.6, miss ? miss.t + 1.5 : 0, runTime, ro ? roThrow + roFlight + 1.1 : 0);
     this.timeScale = 1.6;
     const t0 = this.gameTime;
-    // an obvious four or six: the crowd builds as the ball flies and roars as it clears the rope (js/audio.js)
+    // an obvious four or six: the crowd builds as the ball flies and roars as it clears the rope (js/audio.js), but
+    // only when the home side hit it: the away side's boundaries get no celebration from the crowd
     let cleared = !(six || toRope);
-    if (!cleared) {
+    if (!cleared && (o.side === 'ai' ? this.myTeam : this.oppTeam).id === this.home) {
       let tClear = end;
       if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
       cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
@@ -2414,7 +2415,7 @@ export class Game {
     me.pose = POSES.dive(Math.sign(P.x - me.x) || 1);
     const p = this.of.to(P.x, P.y);
     if (saved) { this.O.ball = { x: me.x, y: me.y, h: 0.2 }; this.fx.word('SAVED!', p.x, p.y - 50, { size: 60 }); sfx.glove(); this.hitStop(100); }
-    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); cheerStart(0.4, 1.1); sfx.crowd(0.6); }
+    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); if (this.oppTeam.id === this.home) cheerStart(0.4, 1.1); sfx.crowd(0.6); }
     await this.sleepReal(this.bot ? 100 : 1000);
     this.endEvent();
     return saved;
