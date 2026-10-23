@@ -114,3 +114,54 @@ export const SIDEKICK_LOOKS = [
   { suit: '#f3efe2', trim: '#e0245e', cape: null, skin: '#c48a64', hair: '#2a1a14', mask: null },
 ];
 export const AI_LOOK = { suit: '#2b2b33', trim: '#ff3b3b', cape: '#121216', skin: '#b07a58', hair: '#101010', mask: '#ff3b3b', style: 'short' };
+
+// ======== player types: every player's power comes from his type (heroes are being retired) ========
+// every power by its kind (a signature one, an extra one, the keeper's ultimate)
+export const POWERS = Object.fromEntries([...HEROES.flatMap(h => [h.power, h.ultimate, ...(h.alts || [])]), HUNT].filter(Boolean).map(p => [p.kind, p]));
+
+// A batter's type: his power, what he is good at, and what he struggles with (the match engine reads `strong` / `weak`, rating scales them)
+export const BAT_TYPES = {
+  power: { id: 'power', name: 'Power batter', power: 'thunder', strong: 'Clears the rope', weak: 'Struggles against quality swing' },
+  tactical: { id: 'tactical', name: 'Tactical batter', power: 'gapfinder', strong: 'Finds the gaps', weak: 'Fewer sixes' },
+  touch: { id: 'touch', name: 'Touch batter', power: 'mirror', strong: 'Wide timing', weak: 'Hates the short ball' },
+  finisher: { id: 'finisher', name: 'Finisher', power: 'meteor', strong: 'Deadly in the last overs', weak: 'Slow starter' },
+  opener: { id: 'opener', name: 'Aggressive opener', power: 'showdown', strong: 'Scores fast early', weak: 'Loses wickets early' },
+  anchor: { id: 'anchor', name: 'Anchor', power: 'luckybreak', strong: 'Hard to dislodge', weak: 'Scores slowly' },
+  keeper: { id: 'keeper', name: 'Keeper-batter', power: 'readbowler', strong: 'Reads the bowler', weak: 'Lighter hitter' },
+};
+// a bowler's power, by his bowling type (seam splits: the cutter men and the hit-the-deck men)
+export const BOWL_POWERS = { express: 'tornado', swing: 'storm', seam: 'shatter', leftpace: 'bouncer', offspin: 'maya', legspin: 'googly' };
+
+const TRAIT_RULES = [
+  ['finisher', /death|big swings|finish/i],
+  ['power', /rope|sixes|crowd|helicopter|smash|sweeps everything|big hitting|clears|hits through|long handle|lofts|loves the pull|pulls anything|boom|slog|hits the death/i],
+  ['anchor', /grind|wall|leaves|never gets out|sees off|bats through|blocks|plays straight|grafts|patient|solid|anchor/i],
+  ['touch', /timing|silk|late cut|flick|classic|cover drive|rotates|nudges|reverse|ramps|flourish|strong off the back/i],
+  ['tactical', /gap|twos|quick between|runs like|dances|picks|direct|dives|hits straight/i],
+];
+function hashId(s) { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+
+// The batter type of a player (null for a bowler who hardly bats: he has no batting power, only the Sparks)
+export function batTypeOf(p) {
+  if (!p || (p.role === 'bowl' && p.bat < 40)) return null;
+  const label = p.label || '', trait = p.trait || '';
+  if (p.role === 'wk' || /keeper/i.test(label)) return 'keeper';
+  if (/finisher/i.test(label)) return 'finisher';
+  const named = /power batter/i.test(label) ? 'power' : /touch batter/i.test(label) ? 'touch' : /tactical/i.test(label) ? 'tactical' : /anchor/i.test(label) ? 'anchor' : /outfielder/i.test(label) ? 'tactical' : null;
+  if (named) return named;
+  const hit = TRAIT_RULES.find(([, re]) => re.test(trait));
+  if (/opener/i.test(label)) return hit && hit[0] === 'anchor' ? 'anchor' : hit && hit[0] === 'touch' ? 'touch' : 'opener';
+  if (hit) return hit[0];
+  // no clue in his trait: by his place in the order, then by chance (the same for him every time)
+  if (/middle/i.test(label)) return hit && hit[0] === 'power' ? 'finisher' : 'anchor';
+  if (/no\. ?3/i.test(label)) return 'tactical';
+  return ['power', 'touch', 'tactical', 'anchor'][hashId(p.id || p.name) % 4];
+}
+// The bowling power of a player (by his bowling type; a seam bowler's trait picks Cutter over Shatter Seam)
+export function bowlPowerOf(p) {
+  if (!p?.bowl) return null;
+  if (p.bowl === 'seam') return /deck|hard|raw|fast|pace|hits|short|bounce/i.test(p.trait || '') ? 'shatter' : /cutter|knuckle|slower|line and length|tight|stop/i.test(p.trait || '') ? 'cutter' : hashId(p.id || p.name) % 2 ? 'cutter' : 'shatter';
+  return BOWL_POWERS[p.bowl] || null;
+}
+// the power definitions a player brings: { bat, bowl } (a def from POWERS, or null)
+export const powersOf = p => { const b = batTypeOf(p), w = bowlPowerOf(p); return { bat: b ? POWERS[BAT_TYPES[b].power] : null, bowl: w ? POWERS[w] : null }; };
