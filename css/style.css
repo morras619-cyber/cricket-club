@@ -1164,3 +1164,5 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .taunt-text { font-family: var(--ui); font-weight: 700; font-size: 19px; line-height: 1.15; letter-spacing: .2px; }
 .heat { top: calc(var(--safe-t) + 134px); width: min(58%, 226px); }
 .heat-label { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 14px; letter-spacing: 1.2px; text-transform: uppercase; color: #ffd9a8; -webkit-text-stroke: 0; text-shadow: 0 2px 0 rgba(0, 0, 0, .7); }
+.power canvas.powerface { width: 40px; height: 40px; border-radius: 8px; background: #1f6fe0; object-fit: cover; }
+.powers.n3 .power canvas.powerface { width: 32px; height: 32px; }

@@ -1,4 +1,5 @@
 import { portrait } from './figure.js';
+import { portraitFace } from './futcard.js';
 import { drawEffect } from './fx.js';
 
 const $ = id => document.getElementById(id);
@@ -163,9 +164,14 @@ export class UI {
         const b = document.createElement('button');
         b.className = 'power';
         b.dataset.key = p.key;
-        const pc = this.portraitFor(p.hero, p.pose).cloneNode();
-        pc.getContext('2d').drawImage(this.portraitFor(p.hero, p.pose), 0, 0);
-        b.append(pc);
+        // the hero's painted face in the club's colours (it draws itself once its picture has loaded); the drawn figure if he has none
+        const face = p.hero?.id && portraitFace({ heroId: p.hero.id }, p.team || null, 40);
+        if (face) { face.className = 'powerface'; b.append(face); }
+        else {
+          const pc = this.portraitFor(p.hero, p.pose).cloneNode();
+          pc.getContext('2d').drawImage(this.portraitFor(p.hero, p.pose), 0, 0);
+          b.append(pc);
+        }
         const t = document.createElement('span');
         t.innerHTML = `<span class="pname"></span><span class="pcost"></span>`;
         b.append(t);

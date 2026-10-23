@@ -605,7 +605,7 @@ export class Game {
     const mk = (key, def, hero, pose, armed, extraOk = true) => {
       const cost = this.charge.cost(this.price(def, hero), ball);
       const state = armed ? 'armed' : this.powerLock || !extraOk || this.charge.value < cost ? 'off' : 'ready';
-      return { key, name: def.name, cost, hero, pose, state, onTap: () => this.activate(key) };
+      return { key, name: def.name, cost, hero, pose, state, team: this.myTeam, onTap: () => this.activate(key) };
     };
     const A = this.armed;
     if (this.phase === 'bat') {
