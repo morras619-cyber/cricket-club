@@ -443,14 +443,22 @@ export function startSeason(c) {
   for (const p of Object.values(c.players)) p.stats.season = blankStats();
 }
 
-// A simulated match between two AI clubs, ball by ball, so every player gets a scorecard.
-export function simCareerMatch(c, a, b, rng) {
-  const ia = simInnings(c, a, b, rng), ib = simInnings(c, b, a, rng, ia.runs + 1);
+// A simulated match between two AI clubs, ball by ball, so every player gets a scorecard. favour: a club that is stronger in it
+// and must win (the match is played again, off the record, until it does: only the match that stands is written into the stats).
+export function simCareerMatch(c, a, b, rng, favour = null) {
+  let ia, ib, winner, tries = 0;
+  do {
+    ia = simInnings(c, a, b, rng, null, favour); ib = simInnings(c, b, a, rng, ia.runs + 1, favour);
+    winner = ib.runs > ia.runs ? b : ib.runs < ia.runs ? a : rng.chance(0.5) ? a : b; // (a tie goes to a super over)
+  } while (favour && (a === favour || b === favour) && winner !== favour && ++tries < 25);
+  // (a result that would still not go their way after all that has its scores turned round: practically never)
+  if (favour && (a === favour || b === favour) && winner !== favour) { [ia, ib] = [ib, ia]; winner = favour; }
+  commitInnings(c, ia); commitInnings(c, ib);
   const la = lineupOf(c, a), lb = lineupOf(c, b);
   played(c, [...la.order, ...la.attack, ...lb.order, ...lb.attack].filter(Boolean).map(p => p.id));
-  const winner = ib.runs > ia.runs ? b : ib.runs < ia.runs ? a : rng.chance(0.5) ? a : b; // (a tie goes to a super over)
-  return { a, b, ia, ib, winner };
+  return { a, b, ia: stripInnings(ia), ib: stripInnings(ib), winner };
 }
+const stripInnings = ({ runs, wkts, balls, boundaries }) => ({ runs, wkts, balls, boundaries });
 function lineupOf(c, teamId) {
   const pool = clubPool(c, teamId);
   const l = defaultLineup(teamId, clubHeroes(pool), {}, pool);
@@ -458,46 +466,49 @@ function lineupOf(c, teamId) {
   return { order: l.order.map(byId), attack: l.attack.map(byId) };
 }
 // The Thunder Strikers' dynasty: until you reach the Super League nobody can beat them, so they take the title every year and you
-// build up to meeting them there. They are simply better in those matches, and if one still goes against them its scores are
-// turned round. Once you are in the Super League its matches are played as normal.
+// build up to meeting them there. They are simply better in those matches (and win them, see simCareerMatch). Once you are in
+// the Super League its matches are played as normal.
 const DYNASTY = 'thunder';
-let dynasty = false;
-function dynastyMatch(c) {
-  return (a, b, rng) => {
-    dynasty = true;
-    let m;
-    try { m = simCareerMatch(c, a, b, rng); } finally { dynasty = false; }
-    if ((a !== DYNASTY && b !== DYNASTY) || m.winner === DYNASTY) return m;
-    return { ...m, ia: m.ib, ib: m.ia, winner: DYNASTY };
-  };
-}
-function simInnings(c, batId, bowlId, rng, target = null) {
+const dynastyMatch = c => (a, b, rng) => simCareerMatch(c, a, b, rng, DYNASTY);
+// One innings: two batters at the crease, as in the game: an odd number of runs and the end of an over change the strike, and a
+// new batter comes in on strike when one is out. Its cards are only written into the stats by commitInnings.
+function simInnings(c, batId, bowlId, rng, target = null, favour = null) {
   const L = lineupOf(c, batId), B = lineupOf(c, bowlId);
   const plan = overPlan(B.attack.filter(Boolean), CFG.balls / 6);
   let runs = 0, wkts = 0, balls = 0, boundaries = 0;
+  let strike = 0, other = 1, next = 2;
+  const last = L.order.length - 1;
   const bat = new Map(), bowl = new Map();
   const card = (m, id) => m.get(id) || (m.set(id, { runs: 0, balls: 0, fours: 0, sixes: 0, out: false, wkts: 0 }), m.get(id));
   while (balls < CFG.balls && wkts < CFG.wickets && (target == null || runs < target)) {
-    const s = L.order[Math.min(wkts, L.order.length - 1)], bw = plan[Math.floor(balls / 6)];
+    const s = L.order[Math.min(strike, last)], bw = plan[Math.floor(balls / 6)];
     balls++;
     const sc = card(bat, s.id), bc = card(bowl, bw.id);
     sc.balls++; bc.balls++;
     let d = (s.bat - bw.bowlSkill) / 100;
-    if (dynasty) d += (batId === DYNASTY ? 0.1 : 0) - (bowlId === DYNASTY ? 0.1 : 0);
+    if (favour) d += (batId === favour ? 0.1 : 0) - (bowlId === favour ? 0.1 : 0);
     if (s.ability === 'eagleEye') d += 0.05;
     if (bw.ability === 'mystery' || bw.ability === 'swingMaster') d -= 0.04;
-    if (rng.chance(Math.max(0.03, Math.min(0.16, 0.075 - 0.08 * d)))) { wkts++; sc.out = true; bc.wkts++; continue; }
-    const r = rng.next();
-    const x = r < 0.32 - 0.2 * d ? 0 : r < 0.6 ? 1 : r < 0.73 ? 2 : r < 0.9 + 0.1 * d ? 4 : 6;
-    runs += x; sc.runs += x; bc.runs += x;
-    if (x === 4) { sc.fours++; boundaries++; }
-    if (x === 6) { sc.sixes++; boundaries++; }
+    let x = 0;
+    if (rng.chance(Math.max(0.03, Math.min(0.16, 0.075 - 0.08 * d)))) { wkts++; sc.out = true; bc.wkts++; strike = next++; }
+    else {
+      const r = rng.next();
+      x = r < 0.32 - 0.2 * d ? 0 : r < 0.6 ? 1 : r < 0.73 ? 2 : r < 0.9 + 0.1 * d ? 4 : 6;
+      runs += x; sc.runs += x; bc.runs += x;
+      if (x === 4) { sc.fours++; boundaries++; }
+      if (x === 6) { sc.sixes++; boundaries++; }
+      if (x === 1) [strike, other] = [other, strike];
+    }
+    if (balls % 6 === 0) [strike, other] = [other, strike];   // (the end of an over: the other batter faces)
   }
   for (const p of L.order) if (p) card(bat, p.id); // the order all count as having played
+  return { runs, wkts, balls, boundaries, bat, bowl, L };
+}
+// write an innings into the players' stats, form and the records
+function commitInnings(c, { bat, bowl, L }) {
   for (const [id, s] of bat) recordBat(c, id, s);
   for (const [id, f] of bowl) recordBowl(c, id, f);
   for (const p of [...L.order, ...L.attack]) if (p) formFrom(c, c.players[p.id], bat.get(p.id), bowl.get(p.id));
-  return { runs, wkts, balls, boundaries };
 }
 
 // ---------- stats that never go away ----------

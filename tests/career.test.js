@@ -230,3 +230,24 @@ test('the Thunder Strikers take the Super League every year until you join it, a
   }
   assert.ok(lost > 0 || d.history.some(h => h.champion !== 'thunder'), 'in the Super League they can lose');
 });
+
+test('simulated matches have two batters at the crease: nobody faces all thirty balls, and a favoured club that wins has its own scores', () => {
+  const c = C.newCareer(41);
+  C.chooseClub(c, 'kites'); C.finishAuction(c);
+  const rng = makeRng(77), ids = CLUBS.map(t => t.id);
+  for (let i = 0; i < 300; i++) {
+    const a = ids[i % ids.length], b = ids[(i * 7 + 3) % ids.length];
+    if (a !== b) C.simCareerMatch(c, a, b, rng);
+  }
+  const hs = c.records.hs;
+  assert.ok(hs.length >= 5, 'big scores were recorded');
+  const most = Math.max(...hs.map(r => r.balls));
+  assert.ok(most <= 26, `no one faces all thirty (the most in 300 matches: ${most})`);
+  // the favoured club: it wins every one, and the scores say so (nothing is turned round, so the stats and the table agree)
+  for (let i = 0; i < 60; i++) {
+    const m = C.simCareerMatch(c, i % 2 ? 'thunder' : 'harbour', i % 2 ? 'harbour' : 'thunder', rng, 'thunder');
+    assert.equal(m.winner, 'thunder');
+    const mine = m.a === 'thunder' ? [m.ia, m.ib] : [m.ib, m.ia];
+    assert.ok(mine[0].runs >= mine[1].runs, 'their score is the higher');
+  }
+});
