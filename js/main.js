@@ -20,6 +20,7 @@ import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { levelOf, levelName, learn, adaptScale } from './adapt.js';
+import { preMatch } from './rivals.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
@@ -810,7 +811,7 @@ $('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
 // ---------- tournaments ----------
 // The next match: a ribbon with the round, both crests either side of the V, the ground, a line on
 // the opposition and the play button.
-function fixtureCard(f, me, o, about, onPlay) {
+function fixtureCard(f, me, o, about, onPlay, derby = null) {
   const card = el('div', 'fixcard');
   const logos = el('div', 'fixlogos');
   const la = document.createElement('img'); la.src = logoSrc(me.id); la.alt = me.name;
@@ -822,7 +823,15 @@ function fixtureCard(f, me, o, about, onPlay) {
   pitchLink(venue, G.pitch.id);
   const go = el('button', 'playbtn', `Play ${f.label.startsWith('Matchday') ? 'match' : f.label.toLowerCase()}`);
   go.addEventListener('click', onPlay);
-  card.append(el('div', 'fixribbon', f.label), logos, venue, el('p', 'fixabout', about), go);
+  card.append(el('div', 'fixribbon', f.label), logos, venue);
+  // a rival's word before the match (js/rivals.js), and the record between you
+  if (derby) {
+    card.classList.add('derby');
+    const q = el('div', 'fixtaunt'), r = derby.record;
+    q.append(el('b', 'fixtag', derby.kind === 'nemesis' ? '⚡ YOUR NEMESIS' : '⚔️ DIVISION RIVAL'), el('p', '', `“${derby.text}”`), el('small', '', `${derby.who}, ${o.name}${r.w + r.l ? ` · you ${r.w}-${r.l}` : ''}`));
+    card.append(q);
+  }
+  card.append(el('p', 'fixabout', about), go);
   return card;
 }
 
@@ -1374,11 +1383,27 @@ function careerSeason(c, body) {
     const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
     const best = [...theirs].sort((a, b) => ovr(b) - ovr(a))[0];
     body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
-      () => startMatch({ mode: 'career' })));
+      () => startMatch({ mode: 'career' }), preMatch(c, o.id)));
   }
+  body.append(newsroomPanel(c));
   if (c.custom) body.append(stadiumPanel(c));
   body.append(scoutsPanel(c));
   body.append(...leaguePanels(c.league));
+}
+
+// ---------- the Newsroom: what your rivals have been saying (js/rivals.js) ----------
+function newsroomPanel(c) {
+  const box = el('div', 'panel paper newsroom');
+  box.append(el('h3', '', '📣 Newsroom'));
+  const inbox = c.rivals?.inbox || [];
+  if (!inbox.length) { box.append(el('p', 'sheetnote', 'Quiet for now. Win a few matches and your rivals will have something to say.')); return box; }
+  for (const m of inbox.slice(0, 3)) {
+    const row = el('div', 'newsmsg');
+    const logo = document.createElement('img'); logo.src = logoSrc(m.from); logo.alt = ''; row.append(logo);
+    const txt = el('div'); txt.append(el('p', '', `“${m.text}”`), el('small', '', `${m.who} · ${teamById(m.from).name} · season ${m.season}`)); row.append(txt);
+    box.append(row);
+  }
+  return box;
 }
 
 // ---------- your own ground: its level, and building the next one ----------

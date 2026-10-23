@@ -1181,3 +1181,15 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .powers.n4 .power.ready:not(:disabled)::after, .powers.n5 .power.ready:not(:disabled)::after { content: none; }
 
 .ptype { display: block; margin-top: 2px; font-size: 12.5px; font-style: italic; font-weight: 700; color: #8a3a00; }
+/* the rivals: a derby fixture card with the rival's word, and the Newsroom */
+.fixcard.derby { box-shadow: 0 0 0 3px #ff5a36, 0 0 22px rgba(255, 90, 54, .45); }
+.fixtaunt { margin: 4px 0 8px; padding: 8px 12px; border-radius: 12px; background: #1c1442; color: #fff4da; text-align: center; }
+.fixtaunt .fixtag { display: block; font-family: var(--display); font-size: 15px; letter-spacing: 1px; color: #ffd23f; }
+.fixtaunt p { margin: 4px 0 2px; font-size: 15px; font-weight: 800; font-style: italic; line-height: 1.35; text-wrap: balance; }
+.fixtaunt small { opacity: .75; font-weight: 700; }
+.newsroom h3 { margin: 0 0 6px; }
+.newsmsg { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-top: 2px dashed rgba(26, 20, 66, .18); }
+.newsmsg:first-of-type { border-top: 0; }
+.newsmsg img { flex: none; width: 44px; height: 44px; object-fit: contain; }
+.newsmsg p { margin: 0; font-weight: 800; font-style: italic; font-size: 14px; line-height: 1.35; }
+.newsmsg small { opacity: .65; font-weight: 700; }

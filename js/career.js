@@ -13,6 +13,7 @@ import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating,
 import { newLeague, simLeague, advance, playerResult, table, finish, nextFixture } from './tournament.js';
 import { NATIONS, pickNation } from './nations.js';
 import { randomLook } from './looks.js';
+import { ensureRivals, nemesisOf, say, afterMatch, messageNote } from './rivals.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -259,6 +260,7 @@ export function migrateCareer(c) {
     else if (p.age >= 28) p.pot = Math.min(pot, Math.max(main, main + 2));
     c.lookAges[p.id] = a;
   }
+  if (c.club && !c.rivals && c.divisions) refreshRivals(c);   // careers from before the rivals get them
   if (c.nations) return c;
   for (const p of Object.values(c.players)) {
     const [team] = p.id.split('-');
@@ -284,6 +286,18 @@ export function clubHeroes(pool) {
 }
 export const clubRating = (c, teamId) => teamRating(clubPool(c, teamId));
 
+// ---------- rivals (js/rivals.js) ----------
+// the nemesis and the rival of your division: made when you take a club, and again whenever you change division. The messages they send
+// go into the inbox (the Newsroom); the first word from your nemesis comes with the club.
+function refreshRivals(c) {
+  const first = !c.rivals;
+  const next = ensureRivals(c, id => clubRating(c, id), c.divisions[divisionOf(c, c.club)]);
+  const out = [];
+  if (first) out.push(say(c, 'nemesis', 'intro', nemesisOf(c)));
+  if (next) out.push(say(c, 'division', 'new', next));
+  return out.filter(Boolean);
+}
+
 // ---------- choosing a club ----------
 export function chooseClub(c, teamId) {
   const t = teamById(teamId);
@@ -291,6 +305,7 @@ export function chooseClub(c, teamId) {
   if (c.club ? teamId !== c.club : !isUnlocked(c, t)) return false;
   if (c.club !== teamId) c.lineup = null;
   c.club = teamId;
+  refreshRivals(c);
   // your scouts' finds come first, at their set price; then the auction
   if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c);
   return true;
@@ -443,6 +458,7 @@ export function startSeason(c) {
   c.league = newLeague(c.club, hashStr(`${c.seed}-league-${c.season}`), c.divisions[divisionOf(c, c.club)]);
   c.league.div = divisionOf(c, c.club);
   c.league.season = c.season;
+  refreshRivals(c);   // (a new division has a new rival)
   for (const p of Object.values(c.players)) p.stats.season = blankStats();
 }
 
@@ -596,7 +612,11 @@ export function afterLeagueMatch(c, summary) {
   // your own ground's gate money
   if (home) { const tk = STADIUMS[home].ticket; c.money = round2(c.money + tk); notes.push(`🎟️ ${STADIUMS[home].fans} fans at ${c.custom.ground}: +${money(tk)} in ticket money`); }
   notes.push(...scoutReports(c));
-  notes.push(...advance(c.league, playerResult(c.league, summary), (a, b, rng) => simCareerMatch(c, a, b, rng)));
+  const result = playerResult(c.league, summary);
+  notes.push(...advance(c.league, result, (a, b, rng) => simCareerMatch(c, a, b, rng)));
+  // the rivals have their say (a rival who beat you, or whom you beat; your nemesis, watching)
+  const top = table(c.league)[0]?.id === c.club ? 1 : 0;
+  notes.push(...afterMatch(c, summary.oppTeam.id, result.winner === c.club, id => clubRating(c, id), top).map(messageNote));
   if (finish(c.league)) notes.push(...endSeason(c));
   return notes;
 }
@@ -669,6 +689,9 @@ function applyMoves(c, notes) {
   const h = c.history.at(-1);
   if (M.d3up === c.club || M.d2up === c.club) { h.promoted = divisionOf(c, c.club); notes.push(`⬆️ PROMOTED! Next season ${teamById(c.club).name} play in ${divisionName(h.promoted)}.`); }
   if (M.d2down === c.club || M.aslDown === c.club) { h.relegated = divisionOf(c, c.club); notes.push(`⬇️ Relegated. Next season ${teamById(c.club).name} play in ${divisionName(h.relegated)}.`); }
+  // your nemesis has a word on where you are going
+  const ev = h.promoted ? 'promoted' : h.relegated ? 'relegated' : h.pos === 1 ? 'champion' : null;
+  if (ev) { const m = say(c, 'nemesis', ev, nemesisOf(c)); if (m) notes.push(messageNote(m)); }
   c.moveNews = [
     `⬆️ ${teamById(M.d2up).name} are promoted to the Asian Super League`, `⬇️ ${teamById(M.aslDown).name} lose the play-off and go down to Division 2`,
     `⬆️ ${teamById(M.d3up).name} are promoted to Division 2`, `⬇️ ${teamById(M.d2down).name} finish bottom and go down to Division 3`,
