@@ -119,6 +119,15 @@ function pitchNow(art) {
   art.pitchCur = c; art.pitchQ = PITCH_LATE;
   return c;
 }
+// Load a picture into im; a failed download (a flaky connection) is tried again a few times before it counts as failed.
+function fetchImg(im, src, ok, fail, tries = 0) {
+  im.onload = ok;
+  im.onerror = () => {
+    if (tries >= 4) return fail();
+    setTimeout(() => fetchImg(im, src, ok, fail, tries + 1), 600 * 2 ** tries);
+  };
+  im.src = tries ? `${src}${src.includes('?') ? '&' : '?'}retry=${tries}` : src;
+}
 const pw = p => p.naturalWidth || p.width, ph = p => p.naturalHeight || p.height;
 function loadArt(team) {
   const T = teamById(team), key = artKey(team), dir = T.custom ? `own${T.stadium}` : team;
@@ -136,15 +145,14 @@ function loadArt(team) {
   const own = OWN_PITCH.indexOf(team);
   let left = Object.keys(files).length + 1 + (own >= 0 ? 1 : 0);
   const done = () => { if (--left === 0) { a.ready = true; if (HOME === team) groundListener?.(); } };
-  for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/${meta.share && SHARED.has(f) ? meta.share : team}/${f}.webp`; a[k] = im; }
+  for (const [k, f] of Object.entries(files)) { const im = new Image(); fetchImg(im, `img/ground/${meta.share && SHARED.has(f) ? meta.share : team}/${f}.webp`, done, () => { a.failed = true; }); a[k] = im; }
   if (own >= 0) {   // (this ground's strip, fresh and late, cut from the shared picture)
     const at = new Image();
-    at.onload = () => {
+    const cutAtlas = () => {
       const cut = x => { const c = document.createElement('canvas'); c.width = 320; c.height = at.naturalHeight; c.getContext('2d').drawImage(at, x, 0, 320, at.naturalHeight, 0, 0, 320, at.naturalHeight); return c; };
       a.pitchFresh = cut(own * 640); a.pitchLate = cut(own * 640 + 320); done();
     };
-    at.onerror = () => { done(); };   // (without it the shared strip stays)
-    at.src = 'img/ground/pitches.webp';
+    fetchImg(at, 'img/ground/pitches.webp', cutAtlas, () => { done(); });   // (without it the shared strip stays)
   }
   a.logo = new Image(); a.logo.onload = done; a.logo.onerror = done; a.logo.src = 'img/logo-sixcharge.webp';
 }
@@ -152,7 +160,7 @@ function loadOwnArt(team, key, a, dir) {
   const files = { pitch: 'pitch', grass: 'grass', stumps: 'stumps', broken: 'stumps-broken' };
   let left = Object.keys(files).length + 1;
   const done = () => { if (--left === 0) { a.ready = true; if (artKey(HOME) === key) groundListener?.(); } };
-  for (const [k, f] of Object.entries(files)) { const im = new Image(); im.onload = done; im.onerror = () => { a.failed = true; }; im.src = `img/ground/thunder/${f}.webp`; a[k] = im; } // (the pitch, grass and stumps are the same pictures for every club's own ground: one copy ships)
+  for (const [k, f] of Object.entries(files)) { const im = new Image(); fetchImg(im, `img/ground/thunder/${f}.webp`, done, () => { a.failed = true; }); a[k] = im; } // (the pitch, grass and stumps are the same pictures for every club's own ground: one copy ships)
   a.logo = { naturalWidth: 0 };
   paintGround(+dir.slice(3), teamById(team), logoSrc(team)).then(v => {
     a['view-bat'] = v.bat; a['view-bowl'] = v.bowl; a['view-keeper'] = v.keeper; a.topView = v.top;
