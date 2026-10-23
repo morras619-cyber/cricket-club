@@ -1115,3 +1115,52 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .heat.hot .heat-label { color: #fff; animation: heatpulse .7s ease-in-out infinite alternate; }
 .heat.hot .heat-bar { border-color: #e8262b; box-shadow: 0 0 8px #ff6a1a; }
 @keyframes heatpulse { from { opacity: .75; } to { opacity: 1; } }
+
+/* ---------- the in-match type: one condensed sports face (Barlow Condensed) for the scorecard, banners, hints and buttons,
+   in capitals with room between the letters, as a broadcast graphic; the comic face stays for the big impact words ---------- */
+:root { --ui: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif; }
+.scorecard { width: min(58%, 226px); background: #fffaf0; border: 2.5px solid var(--ink); border-radius: 7px; transform: none; box-shadow: 0 4px 0 rgba(0, 0, 0, .5); overflow: hidden; }
+.sc-head { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 14.5px; letter-spacing: 1.3px; text-transform: uppercase; padding: 4px 9px 3px; background: linear-gradient(#2d80f5, #1a5fd0); color: #fff; border-bottom: 2.5px solid var(--ink); }
+.sc-body { gap: 9px; padding: 3px 9px 2px; }
+.score { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 48px; letter-spacing: -.5px; line-height: .95; }
+.score small { font-size: 32px; opacity: .55; margin: 0 2px; }
+.sc-col { font-family: var(--ui); font-weight: 700; font-size: 14px; letter-spacing: .5px; text-transform: uppercase; line-height: 1.2; color: #3d3558; }
+.sc-col .heroline { color: #1a5fd0; font-weight: 800; font-size: 14px; }
+.sc-need { font-family: var(--ui); font-weight: 700; font-size: 14px; letter-spacing: .6px; text-transform: uppercase; padding: 3px 9px; background: #ece5f7; border-top: 2px solid var(--ink); }
+.sc-rates { font-family: var(--ui); font-size: 13.5px; letter-spacing: .4px; }
+.ribbon { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 15px; letter-spacing: 1.3px; text-transform: uppercase; padding: 5px 16px 4px 9px; }
+.overballs b { font-family: var(--ui); font-weight: 800; font-size: 14px; }
+.banner { top: 26%; left: 0; right: 0; }
+.banner strong { font-family: var(--ui); font-style: italic; font-weight: 800; text-transform: uppercase; font-size: clamp(30px, 9.5vw, 46px); letter-spacing: 1.2px; line-height: 1.02; color: #fff; -webkit-text-stroke: 0; text-shadow: 0 3px 0 rgba(0, 0, 0, .55);
+  padding: 7px var(--gut-r) 5px var(--gut-l); background: linear-gradient(90deg, rgba(10, 8, 20, 0), rgba(10, 8, 20, .78) 16%, rgba(10, 8, 20, .78) 84%, rgba(10, 8, 20, 0)); border-bottom: 3px solid transparent; border-image: linear-gradient(90deg, transparent, var(--bolt) 20%, var(--bolt) 80%, transparent) 1; }
+.banner span { margin-top: 7px; font-family: var(--ui); font-weight: 800; font-size: 16px; letter-spacing: 1px; text-transform: uppercase; background: var(--bolt); color: var(--ink); padding: 3px 16px 2px; border: 0; border-radius: 3px; box-shadow: 0 3px 0 rgba(0, 0, 0, .45); }
+.hint { left: var(--gut-l); right: var(--gut-r); width: fit-content; margin: 0 auto; bottom: calc(var(--safe-b) + 122px); font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 15.5px; letter-spacing: 1px; text-transform: uppercase; color: #fff; text-shadow: none;
+  background: rgba(12, 10, 26, .78); border: 1.5px solid rgba(255, 255, 255, .28); border-radius: 14px; padding: 6px 16px 5px; max-width: calc(100% - 24px); white-space: nowrap; }
+.hint:empty { display: none; }
+.charge { border-radius: 7px; border-width: 2.5px; box-shadow: 0 3px 0 rgba(0, 0, 0, .5); }
+.charge-val { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 20px; letter-spacing: .5px; }
+.power { border-radius: 8px; border-width: 2.5px; background: #fffaf0; box-shadow: 0 4px 0 rgba(0, 0, 0, .5); }
+.power:nth-child(odd), .power:nth-child(even) { transform: none; }
+.power .pname { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 16px; letter-spacing: .6px; text-transform: uppercase; }
+.powers.n3 .power .pname { font-size: 15px; }
+.power .pcost { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 16px; letter-spacing: .4px; }
+.power:disabled { opacity: .85; filter: grayscale(.4) brightness(.92); }
+.power.ready:not(:disabled)::after { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 12.5px; letter-spacing: 1px; }
+.shotbtn { border-radius: 9px; box-shadow: 0 3px 0 rgba(0, 0, 0, .5); }
+.shotbtn span { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 15px; letter-spacing: 1.2px; border-radius: 6px; }
+.fieldbtn { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 17px; letter-spacing: 1px; text-transform: uppercase; border-radius: 9px; }
+.banterbtn { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 24px; letter-spacing: 1.3px; text-transform: uppercase; border-radius: 9px; border-width: 2.5px; box-shadow: 0 4px 0 rgba(0, 0, 0, .5); transform: none; }
+.banterbtn.cool { transform: none; }
+.overpick-card h3 { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 30px; letter-spacing: 1.2px; text-transform: uppercase; }
+.overpick-sub { font-family: var(--ui); font-weight: 600; font-size: 15px; letter-spacing: .5px; text-transform: uppercase; }
+.overpick-btn { border-radius: 9px; }
+.overpick-btn b { font-family: var(--ui); font-weight: 800; font-size: 20px; letter-spacing: .4px; text-transform: uppercase; }
+.overpick-btn span { font-family: var(--ui); font-weight: 600; font-size: 15px; letter-spacing: .4px; }
+.overpick-btn small { font-family: var(--ui); font-weight: 700; font-size: 14px; letter-spacing: .4px; text-transform: uppercase; }
+.coach-name { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 17px; letter-spacing: 1.2px; text-transform: uppercase; }
+.coach-bubble p { font-family: var(--ui); font-weight: 600; font-size: 19px; line-height: 1.25; letter-spacing: .2px; }
+.coach-btns button { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 18px; letter-spacing: 1px; text-transform: uppercase; }
+.taunt-name { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 15px; letter-spacing: 1.2px; }
+.taunt-text { font-family: var(--ui); font-weight: 700; font-size: 19px; line-height: 1.15; letter-spacing: .2px; }
+.heat { top: calc(var(--safe-t) + 134px); width: min(58%, 226px); }
+.heat-label { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 14px; letter-spacing: 1.2px; text-transform: uppercase; color: #ffd9a8; -webkit-text-stroke: 0; text-shadow: 0 2px 0 rgba(0, 0, 0, .7); }
