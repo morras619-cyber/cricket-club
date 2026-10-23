@@ -93,9 +93,9 @@ function drawCreases(g, cam, PX) {
 }
 // Grounds with a painted strip of their own, fresh and late (img/ground/<club>/pitch-fresh.webp, pitch-late.webp): the strip
 // fades from one to the other as the match wears (js/pitches.js pitchLate). The others keep the shared strip.
-const OWN_PITCH = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix'];   // (their order in img/ground/pitches.webp: a strip 320 px wide, fresh then late, for each)
+const OWN_PITCH = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals'];   // (their order in img/ground/pitches.webp: a strip 320 px wide, fresh then late, for each)
 // the painted strips with their own ink edge are drawn whole; the rest have ragged edges that are trimmed
-const PITCH_TRIM = { thunder: 0 };
+const PITCH_TRIM = { thunder: 0, cyclones: 0, vipers: 0, eagles: 0, phoenix: 0, titans: 0, storm: 0, royals: 0 };
 // a strip that carries its own ink edge is drawn a little wider than the rendered pitch under it, so its edge covers the old one
 const edgeOf = art => (art.pitchFresh && (PITCH_TRIM[art.team] ?? 0.04) === 0 ? 0.06 : 0);
 const trimOf = art => (art.pitchFresh ? (PITCH_TRIM[art.team] ?? 0.04) : 0.04);
