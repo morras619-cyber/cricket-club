@@ -12,7 +12,7 @@ export const GROUNDS = {
     name: 'The Thunderdome', time: 'day', landmark: 'bolts',
     sky: ['#1f56c0', '#2f7be0', '#9fd0ff'], skyline: '#0b1640', windows: ['#ffd23f', '#9fd8ff'],
     grass: ['#1c7a3e', '#2a9a4a'], pitchCol: '#e2c27f',
-    pitch: { id: 'flat', name: 'Flat road', report: 'Rock hard, true bounce, and shots carry: time it and it flies. Expect sixes.', bat: 1.08, ai: 0.92, swing: 0.8, seam: 0.8, turn: 0.85, carry: 1.05, lookWear: 0.3 },
+    pitch: { id: 'flat', name: 'Flat road', report: 'Rock hard, true bounce, and shots carry: time it and it flies. Expect sixes.', bat: 1.08, ai: 0.92, swing: 0.8, seam: 0.8, turn: 0.85, carry: 1.05, lookWear: 0.6 },
   },
   cyclones: {
     name: 'Cyclone Park', time: 'day', landmark: 'turbines',
