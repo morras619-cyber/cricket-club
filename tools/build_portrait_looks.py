@@ -19,6 +19,8 @@ HAIR_FIX = {
     'yasir-abbasi': '#8a8580', 'ethan-van-der-berg': '#a8844e', 'tendai-moyo': '#1a1412', 'marco-pienaar': '#b89a64',
     # the last batch: a turban, a helmet and a headband hide the hair
     'rohit-grewal': '#141010', 'faizan-paracha': '#141010', 'rhys-mckenzie': '#9a7a48',
+    # (a flat cap, a headband and a bat)
+    'bilal-noorzai': '#1c1410', 'jermaine-granger': '#141010',
 }
 
 

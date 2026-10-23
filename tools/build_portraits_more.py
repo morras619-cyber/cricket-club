@@ -5,7 +5,7 @@ background). Adds them to js/portraits-list.js (the keys, and how old each looks
 js/portrait-faces.js (the square of the picture that is his head, for the small squad photos). Then run
 tools/build_portrait_looks.py for the skin and hair the player on the pitch takes from his picture.
 
-usage: python3 tools/build_portraits_more.py S1 S2 S3 S7 S8 S9     (the six sheet files, in that order)
+usage: python3 tools/build_portraits_more.py S1 S2 S3 S7 S8 S9 S10 S11     (the eight sheet files, in that order)
 
 Each picture sits in a cell of its sheet (row, column of a grid; sheet 7 by pixels). The background is the sheet's white
 (A) or its painted-on checkerboard (W): taken away from the edges in, up to the dark outline of the figure. Needs numpy,
@@ -41,6 +41,9 @@ PLAYERS = {
     'mason-barlow': 'W5', 'darcy-penrith': 'W4',
     # England
     'archie-holloway': 'W9', 'oscar-marsden': 'W10',
+    # the second batch: sheet 10 (South Asian) and sheet 11 (Caribbean)
+    'tanmay-bhalla': 'B2', 'sahan-kumara': 'B3', 'shohag-chowdhury': 'B1', 'bilal-noorzai': 'B4',
+    'tevin-hollis': 'C1', 'jermaine-granger': 'C2', 'jermaine-belgrave': 'C6', 'tevin-clarke': 'C4', 'romario-clarke': 'C5', 'akeem-bascombe': 'C3',
 }
 FACES = {
     'A1': (1, ('g', 0, 0, 4, 2), 'white', 34), 'A2': (1, ('g', 0, 1, 4, 2), 'white', 38), 'A3': (1, ('g', 0, 2, 4, 2), 'white', 28),
@@ -56,8 +59,14 @@ FACES = {
     'W7': (9, ('g', 0, 1, 3, 2), 'checker', 32), 'W8': (9, ('g', 0, 2, 3, 2), 'checker', 25), 'W9': (9, ('g', 1, 0, 3, 2), 'checker', 29),
     'W10': (9, ('g', 1, 2, 3, 2), 'checker', 27),
 }
+FACES.update({
+    'B1': (10, ('g', 0, 1, 4, 2), 'white', 28), 'B2': (10, ('g', 0, 3, 4, 2), 'white', 24),
+    'B3': (10, ('g', 1, 0, 4, 2), 'white', 26), 'B4': (10, ('g', 1, 1, 4, 2), 'white', 28),
+    'C1': (11, ('g', 0, 0, 4, 2), 'white', 24), 'C2': (11, ('g', 0, 3, 4, 2), 'white', 25), 'C3': (11, ('g', 0, 1, 4, 2), 'white', 27),
+    'C4': (11, ('g', 1, 0, 4, 2), 'white', 26), 'C5': (11, ('g', 1, 1, 4, 2), 'white', 33), 'C6': (11, ('g', 1, 3, 4, 2), 'white', 22),
+})
 HOLES = {'A17', 'A18'}   # the white seen through the crook of an arm is background too (nothing white is held in them)
-SHEETS = {1: 0, 2: 1, 3: 2, 7: 3, 8: 4, 9: 5}   # sheet number -> its place on the command line
+SHEETS = {1: 0, 2: 1, 3: 2, 7: 3, 8: 4, 9: 5, 10: 6, 11: 7}   # sheet number -> its place on the command line
 
 
 def cell(im, spec):
