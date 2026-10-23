@@ -730,16 +730,16 @@ export class Game {
       this.hud(inn);
       this.phaseBanner(ballNo);
       const wk = inn.wkts;
-      // a no-ball from the AI's bowler (a third short ball in the over, or now and then an overstep): +1 run, the ball is played as a free hit,
+      // a no-ball from the AI's bowler (now and then an overstep): +1 run, the ball is played as a free hit,
       // and the replacement ball is a free hit too
       const spec = redo?.spec || script[ballNo - 1];
-      const nb = redo || spec.power || this.mode === 'tutorial' ? null : this.shortCall(inn, spec.length) ? 'short' : makeRng((this.seed * 977 + ballNo * 131 + (this.rebowls || 0) * 7) >>> 0).chance(0.025) ? 'step' : null;
+      const nb = redo || spec.power || this.mode === 'tutorial' ? null : makeRng((this.seed * 977 + ballNo * 131 + (this.rebowls || 0) * 7) >>> 0).chance(0.025) ? 'step' : null;
       await this.batBall(inn, ballNo, spec, { noBall: nb, freeHit: !!nb || !!redo });
       if (nb) { inn.nbPlay = false; this.rebowls = (this.rebowls || 0) + 1; }
       if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
       if (!inn.done()) this.prepPlayers(inn); // the pair after any change of strike, before the next ball
-      redo = nb ? { spec: nb === 'short' ? { ...spec, length: 'good' } : spec } : null;
+      redo = nb ? { spec } : null;
       if (nb) { await this.sleepReal(this.bot ? 50 : 450); continue; }
       if (inn.balls % 6 === 0 && !inn.done()) {
         const runs = inn.log.slice(-6).reduce((s, r) => s + (r === 'W' ? 0 : Number(r)), 0);
@@ -748,16 +748,6 @@ export class Game {
       } else await this.sleepReal(this.bot ? 80 : 450);
     }
     this.ui.shotButton(false);
-  }
-
-  // Two short balls (short or bouncer) an over: the third is a no-ball. Counted per over; says whether this one is the no-ball. (n: how many so far)
-  shortCall(inn, length, count = true) {
-    const key = this.innings.length * 100 + Math.floor(inn.balls / 6);
-    if (this.shorts?.key !== key) this.shorts = { key, n: 0 };
-    if (length !== 'short' && length !== 'bouncer') return false;
-    if (this.shorts.n >= 2) return true;
-    if (count) this.shorts.n++;
-    return false;
   }
 
   aiFieldPreset(ballNo) { return ballNo <= 12 ? 'attack' : ballNo <= 24 ? 'balanced' : 'defend'; }
@@ -854,7 +844,7 @@ export class Game {
     if (opt.waitPower) await opt.waitPower();
     if (opt.noBall) {
       inn.extra(1, true); inn.nbPlay = true;
-      this.ui.banner('NO BALL!', opt.noBall === 'short' ? 'A third short ball in the over: +1 run, free hit' : 'He overstepped: +1 run, free hit', 1700);
+      this.ui.banner('NO BALL!', 'He overstepped: +1 run, free hit', 1700);
       sfx.whoosh();
     } else if (opt.freeHit) this.ui.banner('FREE HIT', 'They can only be run out', 1400);
     await this.sleepReal(this.bot ? 150 : aiPower ? 1700 : 650);
@@ -1875,11 +1865,9 @@ export class Game {
     if (myC === 'steady' && (rg === 'loose' || rg === 'bad')) rg = 'good';   // Steady Hands: a Good release, however I flick it
     if (bowler.ability === 'deathKing' && ballNo >= 25 && (rg === 'loose' || rg === 'bad')) rg = 'good'; // never sprays it at the death
     if (opt.forceRelease) rg = opt.forceRelease(rg);
-    // a no-ball: overstepping (a flick that was too fast) or a third short ball in the over. The ball is still bowled and played
+    // a no-ball: overstepping (a flick that was too fast). The ball is still bowled and played
     let noBall = null;
     if (rg === 'bad') { noBall = 'step'; rg = 'loose'; }
-    else if (!opt.scripted && !this.armed.bouncer && this.shortCall(inn, G.length)) noBall = 'short';
-    else if (!opt.scripted && !this.bot && !this.armed.bouncer && this.shorts?.n === 2 && (G.length === 'short' || G.length === 'bouncer')) this.fx.word('NEXT SHORT BALL IS A NO BALL', this.W / 2, this.H * 0.3, { size: 30, color: '#fff4da', stroke: INK, dur: 1600 });
     // finish the run-up
     const left = Math.max(0, 700 - (this.realTime - S.runStart));
     const z0 = S.bowler.z;
@@ -1888,7 +1876,7 @@ export class Game {
 
     const words = { perfect: '#ffd23f', good: '#fff4da', loose: '#ff8a8a', bad: '#e8343b' };
     // the release, read out in a tag up top so nothing covers the ball
-    const label = noBall === 'step' ? 'OVERSTEPPED!' : noBall === 'short' ? 'THIRD SHORT BALL!' : rg === 'loose' ? (G.hesitated ? 'HESITATED…' : 'SPRAYED IT!') : `${G.type.toUpperCase()} · ${speedText(G.kmh * paceFor(bowler.bowlSkill) * (btype.spin ? 1 : this.pitch.kmh))}${rg === 'perfect' ? ' · PERFECT' : ''}`;
+    const label = noBall === 'step' ? 'OVERSTEPPED!' : rg === 'loose' ? (G.hesitated ? 'HESITATED…' : 'SPRAYED IT!') : `${G.type.toUpperCase()} · ${speedText(G.kmh * paceFor(bowler.bowlSkill) * (btype.spin ? 1 : this.pitch.kmh))}${rg === 'perfect' ? ' · PERFECT' : ''}`;
     if (!this.bot) this.showTag(label, words[rg], 1600);
     if (rg === 'perfect') this.charge.award('perfectRelease', 'RELEASE');
     this.charge.timingStreak(rg === 'perfect');
@@ -1897,7 +1885,7 @@ export class Game {
       inn.extra(1, true); inn.nbPlay = true; this.nbBall = noBall;
       this.freeHit = true;
       if (this.myTeam.id === this.home) this.boo(0.1); // the free hit goes to the visitors
-      this.ui.banner('NO BALL!', noBall === 'step' ? 'Too fast: you overstepped. +1 run, free hit' : 'A third short ball in the over. +1 run, free hit', 1700);
+      this.ui.banner('NO BALL!', 'Too fast: you overstepped. +1 run, free hit', 1700);
       sfx.trombone();
     }
 
