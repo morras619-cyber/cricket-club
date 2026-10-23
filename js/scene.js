@@ -128,6 +128,19 @@ function fetchImg(im, src, ok, fail, tries = 0) {
   };
   im.src = tries ? `${src}${src.includes('?') ? '&' : '?'}retry=${tries}` : src;
 }
+// the strip halved again and again until it is just over the size it is drawn at (cached for the current wear and size)
+function shrunk(art, pt, w, h) {
+  const key = `${art.pitchQ}:${Math.round(w)}x${Math.round(h)}`;
+  if (art.shrunkKey === key) return art.shrunkImg;
+  let src = pt;
+  while (pw(src) > w * 2 && ph(src) > h * 2) {
+    const c = document.createElement('canvas'); c.width = Math.ceil(pw(src) / 2); c.height = Math.ceil(ph(src) / 2);
+    const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, c.width, c.height);
+    src = c;
+  }
+  art.shrunkKey = key; art.shrunkImg = src;
+  return src;
+}
 const pw = p => p.naturalWidth || p.width, ph = p => p.naturalHeight || p.height;
 function loadArt(team) {
   const T = teamById(team), key = artKey(team), dir = T.custom ? `own${T.stadium}` : team;
@@ -1129,8 +1142,13 @@ export class OutfieldView {
     ctx.beginPath(); ctx.ellipse(c.x, c.y, 27 * k, 27 * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     if (art) {
       const e = edgeOf(art), a = this.to(-1.52 - e, 22), b = this.to(1.52 + e, -2), pt = pitchNow(art);
-      ctx.drawImage(pt, pw(pt) * trimOf(art), 0, pw(pt) * (1 - 2 * trimOf(art)), ph(pt), a.x, a.y, b.x - a.x, b.y - a.y);
-      ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      const tr = trimOf(art), sc = ctx.getTransform().a;
+      const sm = art.pitchFresh ? shrunk(art, pt, (b.x - a.x) * sc, (b.y - a.y) * sc) : pt;   // (a strip drawn small is shrunk in steps: one big jump leaves it speckled and the bands and edges lost)
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(sm, pw(sm) * tr, 0, pw(sm) * (1 - 2 * tr), ph(sm), a.x, a.y, b.x - a.x, b.y - a.y);
+      if (art.pitchFresh) { ctx.strokeStyle = 'rgb(20,16,24)'; ctx.lineWidth = Math.max(1.2, 0.09 * this.k); }   // (the strip's ink edge, as heavy as in the match views)
+      else { ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; }
+      ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
       const a = this.to(-1.5, 21.4), b = this.to(1.5, -1.4);
       ctx.fillStyle = groundOf(HOME).pitchCol; ctx.strokeStyle = 'rgba(20,16,24,0.5)'; ctx.lineWidth = 1.5;
