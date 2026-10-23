@@ -1074,9 +1074,3 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .pg-i { font-style: normal; color: #6a22c4; font-weight: 900; }
 /* the match intro: the score and buttons wait, the pitch report banner stays up over its first shot */
 #hud.intro-on > *:not(.banner) { visibility: hidden; }
-/* the match intro's player cards, over the shot, above the bottom bar */
-.intro-cards { position: absolute; left: 0; right: 0; bottom: calc(7.5% + 8px); display: flex; justify-content: center; gap: 6px; pointer-events: none; z-index: 6; }
-.intro-cards[hidden] { display: none; }
-.intro-cards .mcard { width: min(35vw, 150px); }
-.intro-cards .mcard:nth-child(2) { animation-delay: .14s; animation-fill-mode: both; }
-.intro-cards.solo .mcard { width: min(46vw, 190px); }
