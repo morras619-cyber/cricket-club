@@ -781,8 +781,8 @@ async function startMatch(opts) {
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
   let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null, home = null;
   if (mode === 'tutorial' && opts.story) {
-    // the story: you, a Division 3 side nobody has heard of, away at the Thunderdome against the unbeaten Thunder Strikers
-    team = 'jaguars'; opp = 'thunder'; home = 'thunder'; levels = {};
+    // the story: you, the Green Cyclones, away at the Thunderdome against the unbeaten Thunder Strikers
+    team = 'cyclones'; opp = 'thunder'; home = 'thunder'; levels = {};
     sq = { bat: heroById('meher'), bowl: heroById('zara'), field: heroById('rani') };
     rival = { bat: heroById('raja'), bowl: heroById('imran'), field: null };
   } else if (mode === 'tutorial') {
