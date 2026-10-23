@@ -296,6 +296,7 @@ export class UI {
     }
     box.hidden = !on;
     $('powers').hidden = on;
+    $('hint').style.visibility = on ? 'hidden' : '';   // (the hint would sit on top of the buttons)
     if (!on) { this.onCounter = null; return; }
     const row = box.querySelector('.banter-row');
     row.innerHTML = '';
