@@ -1025,7 +1025,7 @@ export class Game {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs');
       this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
       inn.ball({ runs: 0 });
-      this.charge.dot();
+      if (res.outcome === 'beaten') this.charge.missed(); else this.charge.dot();   // (a swing and a miss costs charge; a leave, like a block, keeps it level)
     } else if (res.outcome === 'edge') {
       const caught = !fx.lucky && rng.chance(keeperEdgeP(res.offset));   // (Lucky Break: it drops)
       if (caught) {
@@ -1337,6 +1337,7 @@ export class Game {
   wicketCrowd() {
     this.bowlCrowd('wicket');
     if (this.homeBat) this.homeWicket();
+    else if (this.homeOut) crowdResolve('dot');   // (the home crowd's "hooo" as its own batter goes)
   }
   wicketFx(text, at) {
     this.wicketCrowd();
@@ -1396,6 +1397,7 @@ export class Game {
   // being hit apart); when the visitors are running away with it, their fours get booed as well as their sixes
   crowdHeat(inn, homeBatting, iBat) {
     this.homeBat = homeBatting && !iBat; // (set when I bowl at the home side: a wicket I take is theirs to groan at)
+    this.homeOut = homeBatting && iBat;   // (I bat at home: my own wicket is the crowd's to groan at)
     this.heat = heat(inn.log, homeBatting); ambienceMood(this.heat);
   }
   // a wicket I take against the home side: the crowd groans at once (the hoooo), then boos
@@ -2097,7 +2099,7 @@ export class Game {
     this.dotsAgainst(inn);
     this.homeClaps(inn, runs, wicketFell, false);
     const goodBall = wicketFell || (runs === 0 && (res.outcome !== 'hit' || rg === 'perfect' || (mods?.tags.some(t => t.charge > 0) ?? false)));
-    await this.bowlingBanter({ runs, wicketFell, goodBall, rng, inn });
+    await this.bowlingBanter({ runs, wicketFell, goodBall, rng, inn, missed: res.outcome === 'beaten' });
     await this.sleepReal(this.bot ? 50 : 400);
   }
 
@@ -2305,10 +2307,10 @@ export class Game {
     return pick || 'cool';
   }
 
-  async bowlingBanter({ runs, wicketFell, goodBall, rng, inn }) {
+  async bowlingBanter({ runs, wicketFell, goodBall, rng, inn, missed = false }) {
     const duelWas = this.pairOn();   // (was a duel on with this batter before the ball? a wicket settles it)
     this.heatAfter(inn, { runs, wicketFell, beaten: goodBall && runs === 0 && !wicketFell, good: runs === 0 });
-    this.mind?.earn({ batting: true, runs, wicket: wicketFell, grade: this.hitGrade });
+    this.mind?.earn({ batting: true, runs, wicket: wicketFell, grade: this.hitGrade, missed });
     const hotNow = this.pairHot();
     if (inn.done() && !wicketFell) return;
     // banter lines are keyed by hero (regulars use the generic lines); how a sledge lands

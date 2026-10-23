@@ -26,6 +26,7 @@ export const CFG = {
     streakStep: 2, streakCap: 10,
     overheatAt: 60, overheatDecay: 1,
     wicketLoss: 20,
+    missLoss: 5,   // (batting: swinging and missing costs this; a block or a leave keeps the meter level)
     carryPct: 0.25, carryMax: 25,
     finaleFrom: 25, finaleDiscount: 0.2,
   },

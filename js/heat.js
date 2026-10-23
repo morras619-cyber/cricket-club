@@ -99,10 +99,11 @@ export class Mind {
   get value() { return this.charge.value; }
 
   // what happened on a ball for the AI side: its batter hit well or boundaries, its bowler a dot or a wicket, a wicket it lost
-  earn({ batting, runs = 0, wicket = false, grade = null }) {
+  earn({ batting, runs = 0, wicket = false, grade = null, missed = false }) {
     const S = CFG.charge.sources, add = n => this.charge.add(n * this.gain, 'ai');
     if (batting) {
       if (wicket) { this.charge.wicketLost(); return; }
+      if (missed) { this.charge.missed(); return; }   // (swung and missed: it costs him what it costs you)
       if (grade === 'perfect') add(S.perfectBat);
       else if (grade === 'good') add(S.goodBat);
       if (runs === 4) add(S.four);

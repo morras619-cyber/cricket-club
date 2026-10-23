@@ -60,6 +60,9 @@ export class Charge {
 
   wicketLost() { this.add(-this.cfg.wicketLoss, 'WICKET −20'); }
 
+  // a swing and a miss
+  missed() { this.add(-(this.cfg.missLoss || 0), `MISSED −${this.cfg.missLoss}`); }
+
   carryOver() {
     return Math.min(this.cfg.carryMax, Math.floor(this.value * this.cfg.carryPct));
   }
