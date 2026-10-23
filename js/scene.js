@@ -139,6 +139,25 @@ function shrunk(art, pt, w, h) {
   art.shrunkKey = key; art.shrunkImg = src;
   return src;
 }
+// Grounds without strips of their own (the lower divisions, the national sides, your own club) lay the strip that suits
+// their pitch: strip-only art objects, loaded once from the same atlas
+const STRIP_BY_PITCH = { flat: 0, swing: 1, turner: 2, bouncy: 3, dew: 4, green: 5, slow: 6, quick: 7 };
+const STRIP_ONLY = {};
+function stripOnly(team) {
+  const idx = STRIP_BY_PITCH[groundOf(team).pitch?.id] ?? 0;
+  let a = STRIP_ONLY[idx];
+  if (a) return a.pitchFresh ? a : null;
+  a = STRIP_ONLY[idx] = { team: OWN_PITCH[idx] };
+  const at = new Image();
+  fetchImg(at, 'img/ground/pitches.webp', () => {
+    const cut = x => { const c = document.createElement('canvas'); c.width = 320; c.height = at.naturalHeight; c.getContext('2d').drawImage(at, x, 0, 320, at.naturalHeight, 0, 0, 320, at.naturalHeight); return c; };
+    a.pitchFresh = cut(idx * 640); a.pitchLate = cut(idx * 640 + 320);
+    groundListener?.();
+  }, () => {});
+  return null;
+}
+// the strip that is laid for the home ground: its own, or the one that suits its pitch
+const stripFor = art => (art?.pitchFresh ? art : stripOnly(HOME));
 const pw = p => p.naturalWidth || p.width, ph = p => p.naturalHeight || p.height;
 function loadArt(team) {
   const T = teamById(team), key = artKey(team), dir = T.custom ? `own${T.stadium}` : team;
@@ -226,7 +245,7 @@ function renderPainted(cam, art) {
   const G = groundOf(HOME), T = teamById(HOME);
   const night = NIGHT[G.time] ?? 1;
   const c = document.createElement('canvas');
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = Math.min(3, window.devicePixelRatio || 1);   // (a sharp strip edge on a 3x phone)
   c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
   const g = c.getContext('2d');
   g.scale(dpr, dpr);
@@ -329,6 +348,21 @@ function renderPainted(cam, art) {
 // A ground rendered in Blender from this very camera (tools/blender/thunderdome.py): the picture
 // was taken with focal length v.f px, the horizon v.above px from its top, so scaled by f / v.f and
 // pinned on the horizon it lines up with everything the game projects (players, ball, stumps).
+// the painted strip laid into the camera's perspective one screen row at a time, then the creases on it
+function layStrip(g, cam, art, W, hy, H, dpr) {
+  const pt = pitchNow(art), PZ0 = -2, PZ1 = 22, PX = 1.52 + edgeOf(art), rowH = 1 / dpr;
+  const ptx0 = pw(pt) * trimOf(art), ptw = pw(pt) * (1 - 2 * trimOf(art));
+  for (let y = hy; y < H; y += rowH) {
+    const gp = cam.groundAt(W / 2, y + rowH / 2);
+    if (!gp || gp.z <= PZ0 || gp.z >= PZ1) continue;
+    const d = cam.depth(gp.z), a = cam.project(-PX, 0, gp.z), b = cam.project(PX, 0, gp.z);
+    if (!a || !b) continue;
+    const v = ((PZ1 - gp.z) / (PZ1 - PZ0)) * ph(pt);
+    const span = Math.max(1, (ph(pt) / (PZ1 - PZ0)) * (rowH * d * d) / (cam.cy * cam.f));
+    g.drawImage(pt, ptx0, Math.min(v, ph(pt) - span), ptw, span, Math.min(a.x, b.x), y, Math.abs(b.x - a.x), rowH + 0.4);
+  }
+  drawCreases(g, cam, 1.52);
+}
 function renderBuilt(cam, art, v, im) {
   const { W, H, hy, f } = cam;
   const G = groundOf(HOME), night = NIGHT[G.time] ?? 1;
@@ -348,20 +382,8 @@ function renderBuilt(cam, art, v, im) {
   if (dy + dh < H) { g.fillStyle = v.bottom; g.fillRect(0, dy + dh - 1, W, H - dy - dh + 1); }
   g.drawImage(im, dx, dy, dw, dh);
   // a ground with a strip of its own: it is laid over the rendered one, row by row, in this camera's perspective
-  if (art.pitchFresh) {
-    const pt = pitchNow(art), PZ0 = -2, PZ1 = 22, PX = 1.52 + edgeOf(art), rowH = 1 / dpr;
-    const ptx0 = pw(pt) * trimOf(art), ptw = pw(pt) * (1 - 2 * trimOf(art));
-    for (let y = hy; y < H; y += rowH) {
-      const gp = cam.groundAt(W / 2, y + rowH / 2);
-      if (!gp || gp.z <= PZ0 || gp.z >= PZ1) continue;
-      const d = cam.depth(gp.z), a = cam.project(-PX, 0, gp.z), b = cam.project(PX, 0, gp.z);
-      if (!a || !b) continue;
-      const v = ((PZ1 - gp.z) / (PZ1 - PZ0)) * ph(pt);
-      const span = Math.max(1, (ph(pt) / (PZ1 - PZ0)) * (rowH * d * d) / (cam.cy * cam.f));
-      g.drawImage(pt, ptx0, Math.min(v, ph(pt) - span), ptw, span, Math.min(a.x, b.x), y, Math.abs(b.x - a.x), rowH + 0.4);
-    }
-    drawCreases(g, cam, 1.52);   // (the strip covers the rendered ground's creases: they are drawn again on it)
-  }
+  const sa = stripFor(art);
+  if (sa) layStrip(g, cam, sa, W, hy, H, dpr);   // (it is laid over the rendered pitch: the creases are drawn again on it)
   if (dy > 0) {
     const gr = g.createLinearGradient(0, dy, 0, dy + dh * 0.06);
     gr.addColorStop(0, v.top); gr.addColorStop(1, 'rgba(0,0,0,0)');
@@ -559,37 +581,42 @@ function renderBackground(cam) {
   ring(g, cam, R, T.trim === '#1c1c1c' || T.trim === '#1a1a1a' ? T.suit : T.trim, 3, []);
   ring(g, cam, 27, 'rgba(255,255,255,0.45)', 1.5, [6, 6]);
 
-  // the pitch in its own colour: dust and cracks on the turner, a green tinge on the seamer
-  quad(g, cam, -1.5, 1.5, -1.6, 21.6, G.pitchCol);
-  const corners = [[-1.5, -1.6], [1.5, -1.6], [1.5, 21.6], [-1.5, 21.6]].map(([x, z]) => cam.project(x, 0, z));
-  if (corners.every(Boolean)) {
-    g.save(); g.beginPath(); corners.forEach((p, k) => (k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y))); g.closePath(); g.clip();
-    const green = G.pitch.id === 'green';
-    for (let n = 0; n < (hi ? 1400 : 500); n++) {
-      const x = -1.5 + rnd() * 3, z = -1.6 + rnd() * 23.2, p = cam.project(x, 0, z);
-      if (!p) continue;
-      g.fillStyle = green ? (rnd() < 0.6 ? 'rgba(40,110,40,0.3)' : 'rgba(255,240,200,0.15)') : rnd() < 0.5 ? 'rgba(120,80,30,0.18)' : 'rgba(255,240,200,0.22)';
-      const sz = Math.max(1, p.k * 0.035);
-      g.fillRect(p.x, p.y, sz * 1.4, sz);
-    }
-    if (G.pitch.id === 'turner') {
-      g.strokeStyle = 'rgba(90,55,20,0.55)'; g.lineWidth = 1;
-      for (let n = 0; n < 26; n++) {
-        let x = -1.3 + rnd() * 2.6, z = rnd() * 21;
-        let p = cam.project(x, 0, z);
+  // the painted strip that suits its pitch (once loaded); until then the pitch is painted by code
+  const sa = stripOnly(HOME);
+  if (sa) layStrip(g, cam, sa, W, hy, H, dpr);
+  else {
+    // the pitch in its own colour: dust and cracks on the turner, a green tinge on the seamer
+    quad(g, cam, -1.5, 1.5, -1.6, 21.6, G.pitchCol);
+    const corners = [[-1.5, -1.6], [1.5, -1.6], [1.5, 21.6], [-1.5, 21.6]].map(([x, z]) => cam.project(x, 0, z));
+    if (corners.every(Boolean)) {
+      g.save(); g.beginPath(); corners.forEach((p, k) => (k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y))); g.closePath(); g.clip();
+      const green = G.pitch.id === 'green';
+      for (let n = 0; n < (hi ? 1400 : 500); n++) {
+        const x = -1.5 + rnd() * 3, z = -1.6 + rnd() * 23.2, p = cam.project(x, 0, z);
         if (!p) continue;
-        g.beginPath(); g.moveTo(p.x, p.y);
-        for (let s = 0; s < 4; s++) { x += (rnd() - 0.5) * 0.4; z += (rnd() - 0.5) * 0.8; p = cam.project(x, 0, z); if (p) g.lineTo(p.x, p.y); }
-        g.stroke();
+        g.fillStyle = green ? (rnd() < 0.6 ? 'rgba(40,110,40,0.3)' : 'rgba(255,240,200,0.15)') : rnd() < 0.5 ? 'rgba(120,80,30,0.18)' : 'rgba(255,240,200,0.22)';
+        const sz = Math.max(1, p.k * 0.035);
+        g.fillRect(p.x, p.y, sz * 1.4, sz);
       }
+      if (G.pitch.id === 'turner') {
+        g.strokeStyle = 'rgba(90,55,20,0.55)'; g.lineWidth = 1;
+        for (let n = 0; n < 26; n++) {
+          let x = -1.3 + rnd() * 2.6, z = rnd() * 21;
+          let p = cam.project(x, 0, z);
+          if (!p) continue;
+          g.beginPath(); g.moveTo(p.x, p.y);
+          for (let s = 0; s < 4; s++) { x += (rnd() - 0.5) * 0.4; z += (rnd() - 0.5) * 0.8; p = cam.project(x, 0, z); if (p) g.lineTo(p.x, p.y); }
+          g.stroke();
+        }
+      }
+      quad(g, cam, -0.45, 0.45, 0, 20, 'rgba(160,110,50,0.18)');
+      g.restore();
     }
-    quad(g, cam, -0.45, 0.45, 0, 20, 'rgba(160,110,50,0.18)');
-    g.restore();
+    quad(g, cam, -1.5, 1.5, -1.6, 21.6, null, 'rgba(20,16,24,0.55)');
+    for (const z of [1.22, 20 - 1.22]) line(g, cam, -1.4, z, 1.4, z, '#fffbe8', 2);
+    for (const z of [0, 20]) line(g, cam, -1.4, z, 1.4, z, '#fffbe8', 1.5);
+    for (const x of [-1.32, 1.32]) { line(g, cam, x, -1.2, x, 2.4, '#fffbe8', 1.5); line(g, cam, x, 17.6, x, 21.2, '#fffbe8', 1.5); }
   }
-  quad(g, cam, -1.5, 1.5, -1.6, 21.6, null, 'rgba(20,16,24,0.55)');
-  for (const z of [1.22, 20 - 1.22]) line(g, cam, -1.4, z, 1.4, z, '#fffbe8', 2);
-  for (const z of [0, 20]) line(g, cam, -1.4, z, 1.4, z, '#fffbe8', 1.5);
-  for (const x of [-1.32, 1.32]) { line(g, cam, x, -1.2, x, 2.4, '#fffbe8', 1.5); line(g, cam, x, 17.6, x, 21.2, '#fffbe8', 1.5); }
 
   // vignette, darker after dark
   gr = g.createRadialGradient(W / 2, H * 0.55, H * 0.3, W / 2, H * 0.55, H * 0.78);
@@ -1138,13 +1165,14 @@ export class OutfieldView {
     }
     ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, 27 * k, 27 * k * 0.78, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    if (art) {
-      const e = edgeOf(art), a = this.to(-1.52 - e, 22), b = this.to(1.52 + e, -2), pt = pitchNow(art);
-      const tr = trimOf(art), sc = ctx.getTransform().a;
-      const sm = art.pitchFresh ? shrunk(art, pt, (b.x - a.x) * sc, (b.y - a.y) * sc) : pt;   // (a strip drawn small is shrunk in steps: one big jump leaves it speckled and the bands and edges lost)
+    const sa = stripFor(art);
+    if (sa) {
+      const e = edgeOf(sa), a = this.to(-1.52 - e, 22), b = this.to(1.52 + e, -2), pt = pitchNow(sa);
+      const tr = trimOf(sa), sc = ctx.getTransform().a;
+      const sm = sa.pitchFresh ? shrunk(sa, pt, (b.x - a.x) * sc, (b.y - a.y) * sc) : pt;   // (a strip drawn small is shrunk in steps: one big jump leaves it speckled and the bands and edges lost)
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(sm, pw(sm) * tr, 0, pw(sm) * (1 - 2 * tr), ph(sm), a.x, a.y, b.x - a.x, b.y - a.y);
-      if (art.pitchFresh) { ctx.strokeStyle = 'rgb(20,16,24)'; ctx.lineWidth = Math.max(1, 0.055 * this.k); }   // (the strip's ink edge, as fine as in the match views)
+      if (sa.pitchFresh) { ctx.strokeStyle = 'rgb(20,16,24)'; ctx.lineWidth = Math.max(1, 0.055 * this.k); }   // (the strip's ink edge, as fine as in the match views)
       else { ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; }
       ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
