@@ -95,7 +95,7 @@ export const DEV = {
     "You need 12 off 4 balls. That's it. I believe in you, beta.",
   ],
   storyBlocked: [
-    "Cool as ice! Did you see Johan's face? They didn't expect that.",
+    "Cool as ice! Did you see Ian's face? They didn't expect that.",
   ],
   storyMid: [
     "TWELVE off four, in the Thunderdome! Hear that? Listen. The crowd has gone quiet.",
