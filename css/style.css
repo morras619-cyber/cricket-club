@@ -1072,3 +1072,5 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .pg-tips b { font-family: var(--display); letter-spacing: .5px; color: #6a22c4; font-size: 15px; }
 .pitchlink { cursor: pointer; }
 .pg-i { font-style: normal; color: #6a22c4; font-weight: 900; }
+/* the match intro: the score and buttons wait, the pitch report banner stays up over its first shot */
+#hud.intro-on > *:not(.banner) { visibility: hidden; }

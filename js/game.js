@@ -29,6 +29,7 @@ import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
 import { drawKitFielder } from './kitsprite.js';
+import { MatchIntro } from './intro.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -283,7 +284,8 @@ export class Game {
     this.innings = [];
     try {
       if (mode === 'tutorial') return await this.runTutorial();
-      await this.pitchReport();
+      const intro = !this.bot && this.settings.intro !== false && mode !== 'daily' && mode !== 'challenge';   // (the match intro plays as the match starts)
+      await this.pitchReport(intro);
       const script = aiBowlingScript(this.seed, this.aiPlan, this.rival.bowl?.power.kind);
       if (mode === 'daily') {
         // join the match late: the scoreboard, the over and the batter are already set
@@ -303,6 +305,7 @@ export class Game {
       } else if (opts.order === 'bowl') {
         const first = new Innings('ai');
         this.innings.push(first);
+        if (intro) await this.matchIntro(first, false);
         await this.bowlingInnings(first);
         const carry = this.charge.carryOver();
         await this.inningsBreak(first, carry);
@@ -314,6 +317,7 @@ export class Game {
       } else {
         const first = new Innings('player');
         this.innings.push(first);
+        if (intro) await this.matchIntro(first, true);
         await this.introBanner('YOU BAT FIRST', `${this.myTeam.name} v ${this.oppTeam.name} · ${this.mySide.order[0].name} opens`);
         await this.battingInnings(first, script);
         const carry = this.charge.carryOver();
@@ -334,13 +338,50 @@ export class Game {
   }
 
   // before the first ball: where we are, and what the pitch will do
-  async pitchReport() {
+  // (with the match intro to follow, the banner stays up over its opening shot and the report doesn't wait)
+  async pitchReport(introNext = false) {
     this.view = 'bat';
     this.S = this.freshScene();
     const at = this.home === this.myTeam.id ? 'HOME' : 'AWAY';
     this.ui.banner(`${this.ground.name.toUpperCase()} · ${at}`, `Pitch report: ${this.pitch.name}. ${this.pitch.report}`, 3000);
     sfx.crowd(this.home === this.myTeam.id ? 1.3 : 0.7);
-    await this.sleepReal(this.bot ? 150 : 2800);
+    await this.sleepReal(this.bot ? 150 : introNext ? 50 : 2800);
+  }
+  // The intro shots (js/intro.js): over the stadium, the opening batter close up, the opening bowler close up. A tap skips.
+  async matchIntro(inn, batting) {
+    const striker = this.batterOf(inn), bowler = this.bowlerOf(inn);
+    this.introScene(inn, batting, striker, bowler);
+    this.prepPlayers(inn);
+    masksReady(4000);
+    const I = this.I = new MatchIntro(this, { batting, my: this.myTeam, opp: this.oppTeam, striker: { name: striker.name, ovr: ovr(striker) }, bowler: { name: bowler.name, ovr: ovr(bowler) } });
+    this.view = 'intro';
+    document.getElementById('hud').classList.add('intro-on');   // (the score and buttons wait; the pitch report banner stays)
+    this.onInput = type => { if (type === 'down') I.skip(); };
+    try { await this.until(() => I.finished(this.realTime)); }
+    finally { this.onInput = null; this.I = null; document.getElementById('hud').classList.remove('intro-on'); }
+  }
+  // the scene as the first ball will show it: the openers, the bowler at the start of his run-up, the field
+  introScene(inn, batting, striker, bowler) {
+    const S = this.S = this.freshScene(), btype = bowlType(bowler.bowl);
+    if (batting) {
+      S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = striker.hero?.emblem || null;
+      S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
+      S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler);
+      const partner = this.nonStrikerOf(inn);
+      S.nonStriker = partner ? { team: this.myTeam, people: lookOf(partner) } : null;
+      S.bowler.x = btype.left ? -0.6 : 0.6; S.bowler.z = 20.6 + 6.9 * btype.runup;
+      S.field3d = buildField(this.aiFieldPreset(1), true).filter(f => !f.keeper && f.id !== 'bowler');
+      this.view = 'bat';
+    } else {
+      S.batter.look = teamLook(this.oppTeam); S.batter.team = this.oppTeam.id; S.batter.emblem = null; S.batter.x = -0.5;
+      S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.myTeam); S.bowler.emblem = bowler.hero?.emblem || null;
+      S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
+      S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler);
+      S.keeper.look = this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
+      S.keeper.people = this.keeperPeople();
+      S.field3d = this.currentField(1).filter(f => !f.keeper && f.id !== 'bowler');
+      this.view = 'bowl';
+    }
   }
   // How this pitch plays right now (js/pitches.js): it changes as the match goes on (spin grips, the seam flattens, the
   // ball ages, the dew settles)
@@ -2695,6 +2736,7 @@ export class Game {
     ctx.clearRect(0, 0, W, H);
     ctx.translate(ox, oy);
     if (this.view === 'fieldedit' && this.E) this.renderFieldEditor();
+    else if (this.view === 'intro' && this.I) this.I.draw(ctx, this.realTime);
     else if (this.view === 'outfield' && this.O) this.renderOutfield();
     else if (this.view === 'bat' || this.view === 'bowl' || this.view === 'keeper') this.render3D(this.view);
     else this.renderIdle();
