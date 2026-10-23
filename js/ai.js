@@ -95,6 +95,19 @@ function planScript(seed, plan, powerKind) {
   return out;
 }
 
+// What the AI batter is trying to do this ball: 'defend' (his wicket matters more than the runs), 'build' (keep it on the ground and tick over)
+// or 'attack' (he needs runs, or it is the death). ctx: { need, ballsLeft, wicketsLeft, ballNo, batType, freeHit }
+export function aiIntent(ctx) {
+  if (ctx.freeHit) return 'attack';
+  const rate = (ctx.need ?? 0) / Math.max(1, ctx.ballsLeft ?? 1), wk = ctx.wicketsLeft ?? 3, type = ctx.batType;
+  if (rate > 1.9 || ((ctx.ballsLeft ?? 30) <= 6 && rate > 0.9)) return 'attack';       // behind the rate, or the last over with runs to get
+  if (type === 'power') return wk > 1 && rate > 1.0 ? 'attack' : wk > 1 ? 'build' : 'defend';
+  if (wk <= (type === 'anchor' ? 2 : 1) && rate < 1.6) return 'defend';                // the last wickets, and no need to risk them
+  if (rate < 1.0 || type === 'anchor') return 'build';
+  if (type === 'finisher') return (ctx.ballNo ?? 1) >= 22 ? 'attack' : 'build';
+  return (ctx.ballNo ?? 1) >= 25 ? 'attack' : 'build';
+}
+
 // How the AI batter picks a shot direction for a delivery.
 function chooseShot(d, ctx, rng) {
   const short = d.length === 'short' || d.length === 'bouncer';
@@ -112,6 +125,8 @@ function chooseShot(d, ctx, rng) {
   const rate = ctx.need / Math.max(1, ctx.ballsLeft);
   if (rate > 1.8) loftP += 0.25;
   if (ctx.wicketsLeft <= 1) loftP -= 0.2;
+  const intent = aiIntent(ctx);
+  if (intent === 'build') loftP *= 0.6; else if (intent === 'attack') loftP = Math.min(0.9, loftP + 0.2); else loftP *= 0.4;   // (building keeps it on the ground; attacking goes over the top)
   if (d.length === 'yorker') loftP *= 0.4;
   // a free hit: nothing to lose, so he goes over the top for six, mostly straight or over cow corner
   if (ctx.freeHit) return { kind: 'drive', angle: rng.chance(0.6) ? rng.range(-0.25, 0.2) : rng.range(-0.9, -0.5), loft: true, len: 200 };
@@ -131,6 +146,8 @@ export function aiBat(d, ctx, rng) {
   if (ctx.power === 'thunder') sigma *= ctx.brace ? 0.85 : 0.7;   // (a braced bowler halves it)
   if (ctx.freeHit) sigma *= 0.85; // he picks his spot and commits to it
   if (ctx.hot) sigma *= HOT_BAT.sigma; // the duel is hot: he swings as hard as he can, and misses more
+  const intent = aiIntent(ctx);
+  if (intent === 'attack' && !ctx.freeHit) sigma *= 1.08;   // (going for it: a little more mistimed)
   const mods = ctx.mods || {};
   sigma *= mods.sigmaMul || 1;
   // my star's tricks (a braced one does about half of it)
@@ -150,6 +167,15 @@ export function aiBat(d, ctx, rng) {
   if (ctx.hot && !ctx.freeHit && !shot.loft && rng.chance(HOT_BAT.loft)) shot.loft = true;
   // ...unless it is a good ball: then he can block it
   if (ctx.hot && !ctx.freeHit && (ctx.release === 'good' || ctx.release === 'perfect') && ['good', 'full', 'yorker'].includes(d.length) && rng.chance(HOT_BAT.blockP)) {
+    const block = { kind: 'defend', angle: 0, loft: false };
+    return { errMs, shot: block, grade: 'defend', res: resolveContact({ grade: 'defend', errMs, shot: block, d, fx: ctx.fx || {}, rng, strength: 1 }) };
+  }
+
+  // defending: he leaves the wide ones and blocks what threatens him (a looser ball he still punishes), with a wider window than a drive has
+  if (intent === 'defend' && !ctx.hot && !ctx.freeHit && !ctx.fx?.maya && ctx.release !== 'loose' && d.length !== 'fulltoss' && !(d.length === 'short' && d.xt > 0.3)) {
+    if (!d.onStumps && Math.abs(d.xt) > 0.4) return { errMs, shot: { kind: 'leave' }, grade: 'leave', res: { outcome: 'leave', grade: 'leave' } };
+    const g = gradeTiming(errMs * 0.6, w, false);
+    if (g === 'miss') return { errMs, shot: { kind: 'defend' }, grade: 'miss', res: { outcome: d.onStumps ? 'bowled' : 'beaten', grade: 'miss' } };
     const block = { kind: 'defend', angle: 0, loft: false };
     return { errMs, shot: block, grade: 'defend', res: resolveContact({ grade: 'defend', errMs, shot: block, d, fx: ctx.fx || {}, rng, strength: 1 }) };
   }

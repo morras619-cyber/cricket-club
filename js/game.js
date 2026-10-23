@@ -2,7 +2,7 @@ import { CFG, phaseFor } from './config.js';
 import { makeRng } from './rng.js';
 import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
-import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK } from './heroes.js';
+import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
@@ -1969,7 +1969,7 @@ export class Game {
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * (pf.ai / pf.bat) ** 1.5 * aiHome };   // (raised: the pitch has to be felt)
     const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length });
     const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
-    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
     if (fxFlags.bouncer && ai.res.outcome === 'hit' && ai.res.grade !== 'defend' && !(ai.grade === 'perfect' || (fxFlags.bouncerBrace && ai.grade === 'good'))) {
       ai.res = { ...ai.res, loft: true, launchDeg: 55 + rng.range(0, 12), v: Math.min(ai.res.v || 20, 20), forced: { chance: true }, label: 'SKIED!' };
@@ -2063,7 +2063,7 @@ export class Game {
       }
     } else {
       this.hitGrade = ai.grade;
-      await this.bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit, { yorker: d.length === 'yorker', gamble: ballNo >= 26 || need / Math.max(1, inn.ballsLeft) > 1.7 });   // (the AI gambles on a close second run only when it needs the runs)
+      await this.bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit, { yorker: d.length === 'yorker', gamble: inn.maxWkts - inn.wkts > 1 && (ballNo >= 26 || need / Math.max(1, inn.ballsLeft) > 1.7) });   // (the AI gambles on a close second run only when it needs the runs and has a wicket to spare)
     }
     this.view = 'bowl';
     this.hud(inn);
