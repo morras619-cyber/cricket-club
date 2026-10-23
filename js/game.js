@@ -2,11 +2,11 @@ import { CFG, phaseFor } from './config.js';
 import { makeRng } from './rng.js';
 import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
-import { SPARKS, heroById, AI_LOOK } from './heroes.js';
+import { SPARKS, HUNT, SHORT, heroById, AI_LOOK } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
-import { simulateHit, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
+import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
@@ -19,14 +19,14 @@ import { cardFor } from './cards.js';
 import { hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
-import { FX, INK, drawEffect, preloadEffects } from './fx.js';
+import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { TAUNTS, pick } from './story.js';
-import { Duels, gainOf, hotSpec, Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './heat.js';
+import { Duels, FULL, HOLD, gainOf, hotSpec, Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './heat.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -270,7 +270,8 @@ export class Game {
     this.charge = new Charge(0);
     this.charge.on(ev => this.onCharge(ev));
     this.ui.charge(0);
-    this.armed = { mirror: 0, elastic: 0 };
+    this.armed = { mirror: 0, elastic: 0, storm: 0 };
+    this.showdown = 0; this.huntOpen = false;   // (Showdown: balls left of the forced face-off; Hat-trick Hunt: a wicket has just fallen)
     this.fieldState = { events: 0, lastEventBall: -9, setting: this.settings.fielding };
     this.moments = [];
     this.rebowls = 0;
@@ -429,7 +430,7 @@ export class Game {
   }
   // a signature power's charge cost, cheaper as its hero levels up (Sparks cost the same for all)
   price(def, hero) {
-    const spark = Object.values(SPARKS).includes(def);
+    const spark = Object.values(SPARKS).includes(def) || def === HUNT;
     return spark || !hero ? def.cost : def.cost - powerDiscount(this.levels?.[hero.id] || 1);
   }
   // the hero whose face and colours a slot's buttons use: its hero, else the captain
@@ -609,17 +610,27 @@ export class Game {
     const mk = (key, def, hero, pose, armed, extraOk = true) => {
       const cost = this.charge.cost(this.price(def, hero), ball);
       const state = armed ? 'armed' : this.powerLock || !extraOk || this.charge.value < cost ? 'off' : 'ready';
-      return { key, name: def.name, cost, hero, pose, state, team: this.myTeam, onTap: () => this.activate(key) };
+      return { key, name: def.name, short: SHORT[def.kind], cost, hero, pose, state, team: this.myTeam, onTap: () => this.activate(key) };
     };
     const A = this.armed;
     if (this.phase === 'bat') {
       const list = [mk('focus', SPARKS.bat, this.heroFor('bat'), 'bat', A.focus)];
       if (this.team.bat && (this.heroIn('bat') || A.thunder || A.meteor || A.mirror > 0)) list.push(mk('bat', this.team.bat.power, this.team.bat, 'bat', A.thunder || A.meteor || A.mirror > 0));
+      // the star's other powers (they too only work while he bats)
+      for (const alt of this.team.bat?.alts || []) {
+        const on = this.altArmed(alt.kind);
+        if (this.heroIn('bat') || on) list.push(mk('bat:' + alt.kind, alt, this.team.bat, 'bat', on));
+      }
       return list;
     }
     if (this.phase === 'bowl') {
-      const list = [mk('pinpoint', SPARKS.bowl, this.heroFor('bowl'), 'bowl', A.pinpoint)];
+      // right after a wicket the Pinpoint Spark's place goes to Hat-trick Hunt
+      const list = [this.huntOpen || A.hunt ? mk('hunt', HUNT, this.heroFor('bowl'), 'bowl', A.hunt) : mk('pinpoint', SPARKS.bowl, this.heroFor('bowl'), 'bowl', A.pinpoint)];
       if (this.team.bowl && (this.heroIn('bowl') || A.tornado || A.maya || A.shatter)) list.push(mk('bowlpower', this.team.bowl.power, this.team.bowl, 'bowl', A.tornado || A.maya || A.shatter));
+      for (const alt of this.team.bowl?.alts || []) {
+        const on = this.altArmed(alt.kind);
+        if (this.heroIn('bowl') || on) list.push(mk('bowl:' + alt.kind, alt, this.team.bowl, 'bowl', on));
+      }
       if (this.team.field) list.push(mk('fieldpower', this.team.field.power, this.team.field, 'keeper', A.elastic > 0 || A.relay));
       const ult = this.team.field?.ultimate;
       if (ult && (A.freeze || this.charge.value >= this.charge.cost(ult.cost, ball))) list.push(mk('fieldult', ult, this.team.field, 'keeper', A.freeze));
@@ -639,21 +650,31 @@ export class Game {
       case 'focus': def = SPARKS.bat; hero = this.heroFor('bat'); break;
       case 'bat': def = this.team.bat?.power; hero = this.team.bat; break;
       case 'pinpoint': def = SPARKS.bowl; hero = this.heroFor('bowl'); break;
+      case 'hunt': def = HUNT; hero = this.heroFor('bowl'); break;
       case 'bowlpower': def = this.team.bowl?.power; hero = this.team.bowl; break;
       case 'fieldpower': def = this.team.field?.power; hero = this.team.field; break;
       case 'fieldult': def = this.team.field?.ultimate; hero = this.team.field; break;
       case 'burst': def = SPARKS.field; hero = this.heroFor('field'); break;
-      default: return;
+      default: {
+        const side = key.startsWith('bat:') ? 'bat' : key.startsWith('bowl:') ? 'bowl' : null;
+        if (!side) return;
+        hero = this.team[side]; def = hero?.alts?.find(a => a.kind === key.slice(side.length + 1));
+      }
     }
     if (!def || !hero) return;
     if (this.powerLock && key !== 'burst') return;
-    if ((key === 'bat' && !this.heroIn('bat')) || (key === 'bowlpower' && !this.heroIn('bowl'))) return;
+    const own = key === 'bat' || key.startsWith('bat:') ? 'bat' : key === 'bowlpower' || key.startsWith('bowl:') ? 'bowl' : null;
+    if (own && !this.heroIn(own)) return;
+    if (key.includes(':') && this.altArmed(def.kind)) return;   // (already on: not paid for twice)
     if (!this.charge.spend(this.price(def, hero), ball, def.name)) return;
     color = hero.look.trim;
     const kindMap = { focus: 'focus', pinpoint: 'pinpoint', burst: 'burst' };
     const kind = kindMap[key] || def.kind;
     if (kind === 'mirror') A.mirror = 3;
     else if (kind === 'elastic') A.elastic = 2;
+    else if (kind === 'storm') A.storm = 3;
+    else if (kind === 'showdown') this.startShowdown();
+    else if (kind === 'hunt') { A.hunt = true; A.pinpoint = true; }
     else A[kind] = true;
     this.stats.powers++;
     this.starPower(this.myTeam);
@@ -671,7 +692,7 @@ export class Game {
     this.powerFxUntil = this.realTime + (this.bot ? 0 : 1400);
     if (def.ultimate || def.cost >= 100) sfx.boom(); else sfx.full();
     buzz([40, 30, 80]);
-    if (this.phase === 'bowl' && this.aiBatPower && (key === 'bowlpower' || key === 'pinpoint')) {
+    if (this.phase === 'bowl' && this.aiBatPower && (key === 'bowlpower' || key === 'pinpoint' || key === 'hunt' || key.startsWith('bowl:'))) {
       this.fx.word('POWER CLASH!', this.W / 2, this.H * 0.3, { size: 54, color: '#3ec6ff', stroke: INK, dur: 1400 });
       this.clash = true;
     }
@@ -710,6 +731,7 @@ export class Game {
   // ---------- batting innings ----------
   async battingInnings(inn, script) {
     this.phase = 'bat';
+    this.showdown = 0; this.showdownBrace = false;
     this.overStarted = -1;
     this.fillCrease(inn);
     this.hud(inn);
@@ -735,10 +757,38 @@ export class Game {
 
   aiFieldPreset(ballNo) { return ballNo <= 12 ? 'attack' : ballNo <= 24 ? 'balanced' : 'defend'; }
 
+  // is this extra power of a star on (armed, or running for a few balls)?
+  altArmed(kind) { const A = this.armed; return kind === 'storm' ? A.storm > 0 : kind === 'showdown' ? this.showdown > 0 : !!A[kind]; }
+  // Showdown: a full face-off for 6 balls, whether or not they were sledging
+  startShowdown() {
+    this.showdown = HOLD; this.showdownBrace = false;
+    const inn = this.innings[this.innings.length - 1];
+    if (!this.heatOn || !inn) return;
+    const b = this.batterOf(inn), w = this.bowlerOf(inn);
+    if (!b || !w) return;
+    this.duels.start(b.id, w.id);
+    this.duels.add(b.id, w.id, FULL);
+    this.duels.state(b.id, w.id).hold = HOLD;
+    this.heatShow(inn);
+  }
+  // Gap Finder: the shot heads for the biggest gap in their field; a Good timing (a braced one needs a Perfect) is a sure four
+  gapShot(res, grade, field, braced, rng) {
+    const sure = braced ? grade === 'perfect' : grade === 'perfect' || grade === 'good';
+    const out = { ...res, angle: gapAngle(field) + rng.range(-0.04, 0.04), loft: false, launchDeg: 0, label: 'FOUND THE GAP' };
+    if (sure) { out.v = Math.max(res.v || 0, 30); out.forced = { four: true, uncatchable: true }; }
+    return out;
+  }
+  // Read the Bowler: where the ball will land, worked out from the delivery he is about to bowl
+  readInfo(spec, btype, inn) {
+    const s = this.duelHot(inn) ? hotSpec(spec, btype.spin) : spec;
+    const d = makeDelivery(this.pitched({ ...s, rx: s.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
+    return d.bounce ? { x: d.bounce.x, z: d.bounce.z, name: LENGTH_LABEL[lengthForBounce(d.bounce.z)] } : { none: true };
+  }
+
   consumeBatEffects() {
     const A = this.armed;
-    const fx = { focus: !!A.focus, thunder: !!A.thunder, meteor: !!A.meteor, mirror: A.mirror > 0 };
-    A.focus = false; A.thunder = false; A.meteor = false;
+    const fx = { focus: !!A.focus, thunder: !!A.thunder, meteor: !!A.meteor, mirror: A.mirror > 0, gap: !!A.gapfinder, lucky: !!A.luckybreak, read: !!A.readbowler };
+    A.focus = false; A.thunder = false; A.meteor = false; A.gapfinder = false; A.luckybreak = false; A.readbowler = false;
     if (A.mirror > 0) A.mirror--;
     return fx;
   }
@@ -806,6 +856,7 @@ export class Game {
     await this.until(() => {
       const dt = this.gameTime - last; last = this.gameTime;
       if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / (850 * (0.55 + 0.45 * btype.runup) * (btype.spin ? SPIN_RUNUP : 1));
+      if (this.armed.readbowler && S.read === undefined) { S.read = this.readInfo(spec, btype, inn); S.readPre = !S.read.none; }   // (Read the Bowler: the landing spot shows before he lets go)
       const p = Math.min(1, prog);
       S.bowler.z = 20.6 + 6.9 * btype.runup * (1 - p); S.bowler.pose = POSES.run(p * 13); S.bowler.spr = { anim: 'run', p };
       return p >= 1;
@@ -816,7 +867,9 @@ export class Game {
     this.refreshPowers();
     const fx = this.consumeBatEffects();
     const ac = this.takeAiCounter('bat');   // his answer to MY power, if I fired one
-    if (ac && (fx.focus || fx.thunder || fx.meteor || fx.mirror)) fx.counter = ac;
+    fx.showdown = this.showdown > 0;
+    if (ac && (fx.focus || fx.thunder || fx.meteor || fx.mirror || fx.gap)) fx.counter = ac;
+    if (ac === 'brace' && fx.showdown) this.showdownBrace = true;
     if (fx.thunder) S.batter.glow = '#5fc8ff';
     if (fx.meteor) S.batter.glow = '#ff7a1a';
     if (fx.mirror) this.fx.flash('#7a3fe0', 0.25);
@@ -830,6 +883,8 @@ export class Game {
     if (myC === 'brace' && aiPower === 'tornado') spec = { ...spec, kmh: BRACE.tornadoKmh };
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
+    S.readPre = false;
+    if (fx.read && S.read === undefined) S.read = d.bounce ? { x: d.bounce.x, z: d.bounce.z, name: LENGTH_LABEL[lengthForBounce(d.bounce.z)] } : { none: true };
     this.fx.bubbles = [];
     if (!this.bot && !opt.hint) this.showTag(`${speedText(d.kmh)} · ${String(spec.type || '').toUpperCase()}`);
     S.bowler.pose = POSES.bowl(1); S.bowler.spr = { anim: 'deliver', t0: this.gameTime };
@@ -901,8 +956,9 @@ export class Game {
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
       const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
-      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) });
+      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
       if (aiPower === 'tornado' && myC !== 'brace' && grade === 'miss') res.outcome = 'bowled';
+      if (fx.gap && swing && !swing.defend && res.outcome === 'hit') res = this.gapShot(res, grade, aiField, fx.counter === 'brace', rng);
     }
     if (opt.assist) res = opt.assist(res, grade) || res;
     this.timeScale = 1;
@@ -939,17 +995,23 @@ export class Game {
     if (res.outcome === 'bowled') {
       S.stumps[0] = { dir: rng.range(-1, 1) };
       this.stumpsBurst(this.oppTeam, 'bat');
-      this.wicketFx(res.mayaFooled ? 'FOOLED!' : 'BOWLED!', cs);
-      inn.ball({ wicket: true });
-      this.charge.wicketLost();
-      if (opt.onOut) opt.onOut();
+      if (fx.lucky) {   // Lucky Break: a free hit, the stumps are spared
+        this.fx.word('FREE HIT · NOT OUT', this.W / 2, this.H * 0.4, { size: 40 });
+        inn.ball({ runs: 0 });
+        this.charge.dot();
+      } else {
+        this.wicketFx(res.mayaFooled ? 'FOOLED!' : 'BOWLED!', cs);
+        inn.ball({ wicket: true });
+        this.charge.wicketLost();
+        if (opt.onOut) opt.onOut();
+      }
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs');
       this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
       inn.ball({ runs: 0 });
       this.charge.dot();
     } else if (res.outcome === 'edge') {
-      const caught = rng.chance(keeperEdgeP(res.offset));
+      const caught = !fx.lucky && rng.chance(keeperEdgeP(res.offset));   // (Lucky Break: it drops)
       if (caught) {
         sfx.glove(); this.wicketFx('CAUGHT BEHIND!', cs);
         S.bowler.spr = { anim: 'celebrate', t0: this.realTime };
@@ -968,6 +1030,7 @@ export class Game {
     this.afterWicket = inn.wkts > before.wkts;
     this.homeClaps(inn, inn.runs - before.runs, inn.wkts > before.wkts, true);
     this.hud(inn);
+    if (this.showdown > 0 && (--this.showdown === 0 || inn.wkts > before.wkts)) { this.showdown = 0; this.showdownBrace = false; }   // (a wicket settles it)
     if (!opt.assist) await this.battingBanter({ runs: inn.runs - before.runs, wicketFell: inn.wkts > before.wkts, beaten: res.outcome === 'beaten' || (res.outcome === 'edge' && inn.wkts === before.wkts), rng, inn });
     await this.sleepReal(this.bot ? 50 : 650);
   }
@@ -1008,7 +1071,7 @@ export class Game {
   // I have fired a power: the AI may answer it, from its own hidden charge (you are only told if it does)
   aiAnswers(key, kind) {
     if (!this.mindOn) return;
-    const side = key === 'focus' || key === 'bat' ? 'bat' : key === 'pinpoint' || key === 'bowlpower' ? 'bowl' : null;
+    const side = key === 'focus' || key === 'bat' || key.startsWith('bat:') ? 'bat' : key === 'pinpoint' || key === 'hunt' || key === 'bowlpower' || key.startsWith('bowl:') ? 'bowl' : null;
     if (!side) return;
     const inn = this.innings[this.innings.length - 1];
     const id = this.mind.counter(kind, { wicketsLeft: inn ? inn.maxWkts - inn.wkts : 3 });
@@ -1052,7 +1115,7 @@ export class Game {
   }
 
   // ---------- the heat between a batter and his bowler ----------
-  duelHot(inn) { if (!this.heatOn) return false; return this.duels.hot(this.batterOf(inn)?.id, this.bowlerOf(inn)?.id); }
+  duelHot(inn) { if (this.showdown > 0) return true; if (!this.heatOn) return false; return this.duels.hot(this.batterOf(inn)?.id, this.bowlerOf(inn)?.id); }
   // the meter on the screen: this pair's heat
   heatShow(inn) {
     if (!this.heatOn) return;
@@ -1366,7 +1429,7 @@ export class Game {
     if (!sim.catch) this.bowlCrowd(res.grade === 'defend' ? 'dot' : 'runs'); else this.bowlCrowdSoften(); // (a block gets the groan; a catch chance only softens the build-up)
     let caught = false, saved = false, dropped = false;
     if (sim.catch) {
-      caught = rng.chance(sim.catch.p * 0.92);
+      caught = !fx.lucky && rng.chance(sim.catch.p * 0.92);   // (Lucky Break: a free hit, so it drops)
       dropped = !caught && sim.catch.p >= 0.3;
     }
     if (!caught && sim.save) saved = rng.chance(sim.save.p * 0.5);
@@ -1650,6 +1713,7 @@ export class Game {
   async bowlingInnings(inn) {
     this.phase = 'bowl';
     this.freeHit = false;
+    this.huntOpen = false;
     this.overStarted = -1;
     this.aiPowerBalls = new Set([16, 26]);
     this.lastBowlerId = null;
@@ -1774,6 +1838,7 @@ export class Game {
     const ac = this.takeAiCounter('bowl');                // his answer to MY power, if I fired one
     let rg = G.hesitated ? 'loose' : G.grade;
     const pinpoint = !!this.armed.pinpoint;
+    const hunt = !!this.armed.hunt; this.armed.hunt = false;   // (Hat-trick Hunt is a Pinpoint ball and more)
     if (pinpoint) { rg = ac === 'brace' ? 'good' : 'perfect'; this.armed.pinpoint = false; }
     if (myC === 'steady' && (rg === 'loose' || rg === 'bad')) rg = 'good';   // Steady Hands: a Good release, however I flick it
     if (bowler.ability === 'deathKing' && ballNo >= 25 && (rg === 'loose' || rg === 'bad')) rg = 'good'; // never sprays it at the death
@@ -1821,6 +1886,23 @@ export class Game {
     if (A.tornado) { Object.assign(spec, { length: 'yorker', bounce: 0.9, h: 0.12, x: 0, kmh: ac === 'brace' ? BRACE.tornadoKmh : 160, swing: 0.05, move: 0 }); fxFlags.tornado = ac !== 'brace'; A.tornado = false; usedPower = 'tornado'; }
     if (A.maya) { fxFlags.maya = true; fxFlags.mayaBrace = ac === 'brace'; A.maya = false; usedPower = 'maya'; }
     if (A.shatter) { spec.move = 0.3; fxFlags.shatter = true; fxFlags.shatterHalf = ac === 'brace'; A.shatter = false; usedPower = 'shatter'; }
+    // the star's other powers
+    let usedTrick = null;
+    if (A.bouncer) { Object.assign(spec, { length: 'bouncer', bounce: 10.5, h: 1.75, kmh: Math.max(spec.kmh, 138), swing: 0.05, move: 0 }); fxFlags.bouncer = true; fxFlags.bouncerBrace = ac === 'brace'; A.bouncer = false; usedPower = 'bouncer'; }
+    if (A.googly) {   // it turns the other way: whichever way it would have turned, now the opposite, and more
+      const mv = spec.move || 0;
+      spec.move = -(Math.sign(mv) || (btype.left ? 1 : -1)) * Math.max(0.34, Math.abs(mv) * 1.5);
+      fxFlags.googly = true; fxFlags.googlyBrace = ac === 'brace'; A.googly = false; usedTrick = 'googly';
+    }
+    if (A.cutter) { spec.kmh = Math.min(spec.kmh * 0.65, 94); spec.swing *= 0.5; G.slower = true; fxFlags.cutter = true; fxFlags.cutterBrace = ac === 'brace'; A.cutter = false; usedTrick = 'cutter'; }
+    if (A.storm > 0) {   // three balls that swing and seam twice as much
+      if (ac === 'brace' && A.storm === 3) this.stormBrace = true;
+      const k = this.stormBrace ? 1.5 : 2;
+      spec.swing *= k; spec.move *= k; fxFlags.storm = true; fxFlags.stormBrace = !!this.stormBrace;
+      if (--A.storm === 0) this.stormBrace = false;
+      usedTrick = usedTrick || 'storm';
+    }
+    if (hunt) fxFlags.hunt = ac !== 'brace';
     if (!usedPower) Object.assign(spec, this.pitched(spec, btype));
     // the ball pitches on the ring; seam and spin move it after the bounce (x is its line at the stumps)
     if (!usedPower && spec.bounce != null) spec.x = spec.x + (spec.move || 0);
@@ -1879,6 +1961,10 @@ export class Game {
     const pf = this.feel();
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * pf.ai * aiHome / pf.bat };
     let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
+    if (fxFlags.bouncer && ai.res.outcome === 'hit' && ai.res.grade !== 'defend' && !(ai.grade === 'perfect' || (fxFlags.bouncerBrace && ai.grade === 'good'))) {
+      ai.res = { ...ai.res, loft: true, launchDeg: 55 + rng.range(0, 12), v: Math.min(ai.res.v || 20, 20), forced: { chance: true }, label: 'SKIED!' };
+    }
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || (ai.grade === 'good' && myC !== 'brace'))) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
@@ -1929,8 +2015,9 @@ export class Game {
       S.stumps[0] = { dir: rng.range(-1, 1) };
       this.stumpsBurst(this.myTeam, 'bowl');
       const comboTag = mods?.tags.find(t => t.id === 'setup' || t.id === 'swingtrap' || t.id === 'changeup');
-      const powerWord = usedPower ? { tornado: 'TORNADO YORKER!', maya: 'MAYA BALL!', shatter: 'SHATTERED!' }[usedPower] : comboTag ? comboTag.label : null;
-      wicket(res.mayaFooled ? 'FOOLED BY MAYA!' : 'BOWLED!', usedPower || comboTag ? 'twoWickets' : 'wicket', bowlerHero, { word: powerWord || 'BOWLED!', detail: powerWord ? `${powerWord.replace('!', '').toLowerCase()} wicket` : 'stumps cartwheeling' });
+      const trickWord = { googly: 'GOOGLY!', cutter: 'CUTTER!', storm: 'STORM!' }[usedTrick];
+      const powerWord = usedPower ? { tornado: 'TORNADO YORKER!', maya: 'MAYA BALL!', shatter: 'SHATTERED!', bouncer: 'BOUNCER!' }[usedPower] : trickWord || (comboTag ? comboTag.label : null);
+      wicket(res.mayaFooled ? 'FOOLED BY MAYA!' : 'BOWLED!', usedPower || usedTrick || comboTag ? 'twoWickets' : 'wicket', bowlerHero, { word: powerWord || 'BOWLED!', detail: powerWord ? `${powerWord.replace('!', '').toLowerCase()} wicket` : 'stumps cartwheeling' });
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs'); // (a miss gets the groan; a ball left alone only lets the build-up fade)
       this.fx.word(res.outcome === 'leave' ? 'LEFT ALONE' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
@@ -1973,6 +2060,7 @@ export class Game {
     this.hud(inn);
 
     const runs = inn.runs - before.runs, wicketFell = inn.wkts > before.wkts;
+    this.huntOpen = wicketFell;   // (Hat-trick Hunt is on offer for the next ball)
     this.bowlCrowd(wicketFell ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     this.afterWicket = wicketFell;
     this.dotsAgainst(inn);
@@ -3128,6 +3216,8 @@ export class Game {
     for (const it of items) it.fn();
     if (kind === 'bowl') this.drawBowlOverlay(cam);
 
+    // Read the Bowler: where it will land
+    if (kind === 'bat' && S.read && !S.read.none && (S.readPre || (S.delivery && this.gameTime - S.ballT0 < (S.delivery.bounceT ?? 0) + 0.05))) this.drawReadMark(cam);
     // timing ring (batting)
     if (kind === 'bat' && S.ring && S.delivery) this.drawTimingRing(cam);
     if ((kind === 'bat' || kind === 'bowl') && S.field3d && !S.delivery && !S.flight) this.drawFieldMap(S.field3d, kind);
@@ -3182,6 +3272,23 @@ export class Game {
       ctx.fillText('OFF SIDE →', x + w - 34, y + h - 4);
       ctx.fillText('← LEG SIDE', x + 34, y + h - 4);
     }
+    ctx.restore();
+  }
+
+  drawReadMark(cam) {
+    const ctx = this.ctx, R = this.S.read;
+    const p = cam.project(R.x, 0, R.z);
+    if (!p) return;
+    const pulse = 1 + Math.sin(this.realTime / 110) * 0.1, r = Math.max(10, 0.26 * p.k) * pulse;
+    ctx.save();
+    ctx.strokeStyle = INK; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r * 0.45, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r * 0.45, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.font = `800 italic 13px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.fillStyle = '#ffd23f';
+    const t = `LANDS ${String(R.name || '').toUpperCase()}`;
+    ctx.strokeText(t, p.x, p.y - r * 0.6); ctx.fillText(t, p.x, p.y - r * 0.6);
     ctx.restore();
   }
 

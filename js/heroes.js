@@ -1,5 +1,26 @@
 // The eight launch heroes. slot decides which squad slot they fill.
 // power.kind is the id the game logic switches on.
+// Extra powers a star carries besides his signature one (`alts` on each hero below). All last one ball unless the text says otherwise.
+const LUCKY = { kind: 'luckybreak', name: 'Lucky Break', cost: 30, word: 'LUCKY!',
+  desc: 'Next ball is a free hit: nothing can get you out (a catch drops, the stumps are spared).' };
+const GAP = { kind: 'gapfinder', name: 'Gap Finder', cost: 50, word: 'FOUND IT!',
+  desc: 'Your next shot heads for the biggest gap in their field. Good timing or better is a four.' };
+const READ = { kind: 'readbowler', name: 'Read the Bowler', cost: 30, word: 'READ IT!',
+  desc: 'See where the next ball will land before he even lets go of it.' };
+const SHOWDOWN = { kind: 'showdown', name: 'Showdown', cost: 70, word: 'SHOWDOWN!',
+  desc: 'Starts a full face-off for 6 balls: you hit 15% harder, he bowls faster or turns it more.' };
+const BOUNCER = { kind: 'bouncer', name: 'Bouncer Barrage', cost: 60, word: 'BOUNCER!',
+  desc: 'A rib-high bouncer. Any hit short of a Perfect goes up in the air: a catch chance, every time.' };
+const GOOGLY = { kind: 'googly', name: 'Googly Switch', cost: 50, word: 'WRONG\'UN!',
+  desc: 'Turns the opposite way after it pitches. The batter reads it wrong and mistimes far more.' };
+const CUTTER = { kind: 'cutter', name: 'Cutter', cost: 50, word: 'CUTTER!',
+  desc: 'Looks quick, arrives slow. The batter swings early and skies it.' };
+const STORM = { kind: 'storm', name: 'Swing Storm', cost: 60, word: 'STORM!',
+  desc: 'The next 3 balls swing and seam twice as much. The batter can\'t read them.' };
+// Hat-trick Hunt: right after a wicket it takes the place of the Pinpoint Spark (any bowler), cheaper
+export const HUNT = { kind: 'hunt', name: 'Hat-trick Hunt', cost: 20, word: 'HUNT!',
+  desc: 'After a wicket: a Perfect release, and the new batter is rattled and mistimes more.' };
+
 export const HEROES = [
   {
     id: 'raja', name: 'Thunder Raja', slot: 'bat', role: 'Power batter', emblem: 'bolt',
@@ -8,6 +29,7 @@ export const HEROES = [
     ai: { weak: { lengths: ['yorker'], lanes: ['stumps', 'leg'] }, label: 'can\'t dig out yorkers on the stumps', honesty: 0.85, fire: 0.55, rattle: 0.3 },
     power: { kind: 'thunder', name: 'Thunderclap Six', cost: 60, word: 'KRAKOOOM!',
       desc: 'Next Good-or-better shot is a six. A mistimed shot still goes for four.' },
+    alts: [LUCKY],
   },
   {
     id: 'meher', name: 'Mirage Mehul', slot: 'bat', role: 'Touch batter', emblem: 'crescent',
@@ -16,6 +38,7 @@ export const HEROES = [
     ai: { weak: { lengths: ['short', 'bouncer'], lanes: null }, label: 'hates the short ball', honesty: 0.5, fire: 0.2, rattle: 0.3 },
     power: { kind: 'mirror', name: 'Mirror Gap', cost: 60, word: 'SHIMMER!',
       desc: 'For 3 balls, well-timed ground shots run to the rope for four. Wider timing.' },
+    alts: [GAP, READ],
   },
   {
     id: 'comet', name: 'Captain Comet', slot: 'bat', role: 'Finisher', emblem: 'star',
@@ -24,6 +47,7 @@ export const HEROES = [
     ai: { weak: { lengths: ['good', 'full'], lanes: ['wideoff'] }, label: 'chases wide ones outside off', honesty: 0.7, fire: 0.35, rattle: 0.45 },
     power: { kind: 'meteor', name: 'Meteor Six', cost: 100, ultimate: true, word: 'BOOOOM!',
       desc: 'Ultimate. Tap as the ring closes: Perfect 8, Good 6, Miss 4.' },
+    alts: [SHOWDOWN],
   },
   {
     id: 'zara', name: 'Cyclone Zaheer', slot: 'bowl', role: 'Fast bowler', emblem: 'swirl', bowls: 'pace',
@@ -31,6 +55,7 @@ export const HEROES = [
     quote: 'Your innings? Also complete.',
     power: { kind: 'tornado', name: 'Tornado Yorker', cost: 60, word: 'WHOOOSH!',
       desc: '160 km/h yorker. Halves the batter\'s timing. A miss is bowled; a hit makes 2 at most.' },
+    alts: [BOUNCER],
   },
   {
     id: 'babar', name: 'Mystic Babar Bhai', slot: 'bowl', role: 'Spin bowler', emblem: 'eye', bowls: 'spin',
@@ -38,6 +63,7 @@ export const HEROES = [
     quote: 'Son, the ball has its own mind.',
     power: { kind: 'maya', name: 'Maya Ball', cost: 60, word: 'POOF!',
       desc: 'The ball splits in two. Pick the fake and you\'re out.' },
+    alts: [GOOGLY],
   },
   {
     id: 'imran', name: 'Iron Wall Ian', slot: 'bowl', role: 'Seam bowler', emblem: 'hex', bowls: 'pace',
@@ -45,6 +71,7 @@ export const HEROES = [
     quote: 'Calculated.',
     power: { kind: 'shatter', name: 'Shatter Seam', cost: 60, word: 'KRAK!',
       desc: 'Seams so hard that any Good-or-worse contact edges to the keeper.' },
+    alts: [CUTTER, STORM],
   },
   {
     id: 'rani', name: 'Rubber Rocket Rory', slot: 'field', role: 'Wicket-keeper', emblem: 'spring',
@@ -69,6 +96,13 @@ export const SPARKS = {
   bat: { kind: 'focus', name: 'Focus Spark', cost: 30, word: 'FOCUS!', desc: 'Next ball comes 40% slower, your timing window is much bigger, and you can\'t edge it.' },
   bowl: { kind: 'pinpoint', name: 'Pinpoint Spark', cost: 30, word: 'PINPOINT!', desc: 'Next ball: a Perfect release that moves 50% more and is far harder for the batter to time.' },
   field: { kind: 'burst', name: 'Speed Burst', cost: 30, word: 'ZOOM!', desc: 'Your fielder sprints at double speed, with a much wider window to catch or pick up.' },
+};
+
+// the one-word names a crowded powers row shows (five or six buttons across a phone)
+export const SHORT = {
+  thunder: 'Thunder', mirror: 'Mirror', meteor: 'Meteor', tornado: 'Tornado', maya: 'Maya', shatter: 'Shatter', elastic: 'Elastic', relay: 'Relay', freeze: 'Freeze',
+  focus: 'Focus', pinpoint: 'Pinpoint', burst: 'Burst', hunt: 'Hunt', luckybreak: 'Lucky', gapfinder: 'Gap', readbowler: 'Read', showdown: 'Showdown',
+  bouncer: 'Bouncer', googly: 'Googly', cutter: 'Cutter', storm: 'Storm',
 };
 
 export const heroById = id => HEROES.find(h => h.id === id);

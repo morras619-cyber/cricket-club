@@ -1171,3 +1171,14 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .power.cnt.ready:not(:disabled)::after { content: none; }
 .power.cnt .pname { font-size: 15px; }
 .hint.up { bottom: calc(var(--safe-b) + 150px); }
+
+/* four or more powers: narrow cards, the face above the name */
+.powers.n4, .powers.n5 { gap: 6px; }
+.powers.n4 .power, .powers.n5 .power { flex-direction: column; justify-content: center; text-align: center; gap: 1px; padding: 4px 3px 3px; }
+.powers.n4 .power > span, .powers.n5 .power > span { flex: none; width: 100%; }
+.powers.n4 .power canvas.powerface, .powers.n5 .power canvas.powerface { width: 30px; height: 30px; }
+.powers.n4 .power .pname { font-size: 12.5px; }
+.powers.n5 .power .pname { font-size: 12px; }
+.powers.n4 .power .pcost, .powers.n5 .power .pcost { font-size: 12px; display: block; }
+.powers.n5 .power .pcost { font-size: 11px; }
+.powers.n4 .power.ready:not(:disabled)::after, .powers.n5 .power.ready:not(:disabled)::after { content: none; }

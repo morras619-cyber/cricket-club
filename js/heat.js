@@ -77,7 +77,9 @@ export const affordable = value => COUNTER_IDS.filter(id => value >= COUNTERS[id
 // ---- what each answer does (game.js reads these) ----
 // Brace halves the power on whoever it is aimed at:
 //   thunder (six) only on a Perfect, mirror's forced four only on a Perfect, meteor two runs less, focus half its window and slow-down,
-//   tornado is no longer 160 km/h nor halves the timing, shatter spares a Good contact, maya fools half as often, pinpoint is only Good
+//   tornado is no longer 160 km/h nor halves the timing, shatter spares a Good contact, maya fools half as often, pinpoint is only Good,
+//   gap finder's sure four only on a Perfect, showdown +7% instead of +15%, bouncer spares a Good contact (skied only below that),
+//   googly / storm / hunt rattle him about half as much, cutter: he swings less early
 // Steady Hands lifts the answerer's own timing to Good (a batter's shot, a bowler's release)
 export const BRACE = { focusWindow: 0.5, focusSlow: 0.8, meteorLess: 2, tornadoKmh: 140, mayaFooled: 0.25, pinpointSigma: 1.3 };
 // when the AI bowler answers your power with Steady Hands his ball is exactly where he wants it: your windows shrink
@@ -131,12 +133,13 @@ export class Mind {
     return score >= 2 || (score >= 1 && this.value >= cost) || (ctx.ball >= 24 && this.value >= cost);
   }
 
-  // Should it answer a power you fired? power: 'thunder'|'mirror'|'meteor'|'focus'|'tornado'|'maya'|'shatter'|'pinpoint'.
+  // Should it answer a power you fired? power: 'thunder'|'mirror'|'meteor'|'focus'|'tornado'|'maya'|'shatter'|'pinpoint'|... (a star's other powers too).
   // Returns a counter id or null (it pays for it itself).
   counter(power, ctx = {}) {
     const ids = affordable(this.value);
     if (!ids.length) return null;
-    const big = ['thunder', 'meteor', 'tornado', 'shatter'].includes(power);
+    if (['luckybreak', 'readbowler'].includes(power)) return null;   // (nothing to answer: a free hit, or only a look at the ball)
+    const big = ['thunder', 'meteor', 'tornado', 'shatter', 'showdown', 'bouncer'].includes(power);
     const cheap = ['focus', 'pinpoint'].includes(power);
     // a Spark is worth answering only from a full tank; a big power nearly always
     if (cheap && this.value < 50) return null;

@@ -491,6 +491,7 @@ function heroCard(hero, { on, locked, note, onTap }) {
   pw.append(el('em', '', `${hero.power.cost - powerDiscount(lv.lv)}⚡`));
   b.append(top, el('div', 'herolv', `Level ${lv.lv}${lv.next ? ` · ${lv.next} XP to next` : ' · max'} · ${levelPerks(lv.lv)}`), pw, el('div', 'desc', hero.power.desc));
   if (hero.ultimate) b.append(el('div', 'desc', `Ultimate · ${hero.ultimate.name} (${hero.ultimate.cost}⚡): ${hero.ultimate.desc}`));
+  for (const alt of hero.alts || []) b.append(el('div', 'desc', `Also · ${alt.name} (${alt.cost - powerDiscount(lv.lv)}⚡): ${alt.desc}`));
   const statLine = heroStatLine(hero);
   if (statLine) b.append(el('div', 'herostat', statLine));
   if (note) b.append(el('div', 'herostat', note));

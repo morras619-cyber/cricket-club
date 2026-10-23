@@ -190,7 +190,9 @@ function effect(ctx, kind, hx, hy, s, rnd, t, W) {
       }
       break;
     }
-    case 'tornado': {
+    case 'showdown': glow('#ff9f1c', 22); bolts(['#fff0c9', '#ff7a1a'], Q(0, 60), 12, 110); break;
+    case 'bouncer': glow('#e8343b', 16); bolts(['#ffd9d9', '#e8343b'], Q(40, 40), 9, 100); break;
+    case 'tornado': case 'storm': {
       ctx.strokeStyle = 'rgba(200,240,255,0.85)'; ctx.lineWidth = 4; glow('#5ff0ff', 14);
       const [cx, cy] = Q(52, 66);
       for (let k = 0; k < 6; k++) { const r = (20 + k * 16) * s * 0.5, a = t / 120 + k; ctx.beginPath(); ctx.ellipse(cx, cy - k * 10, r, r * 0.35, -0.2, a, a + Math.PI * 1.3); ctx.stroke(); }

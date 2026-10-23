@@ -128,13 +128,20 @@ export function aiBat(d, ctx, rng) {
   if (ctx.hot) sigma *= HOT_BAT.sigma; // the duel is hot: he swings as hard as he can, and misses more
   const mods = ctx.mods || {};
   sigma *= mods.sigmaMul || 1;
+  // my star's tricks (a braced one does about half of it)
+  const f = ctx.fx || {};
+  if (f.googly) sigma *= f.googlyBrace ? 1.18 : 1.4;         // he reads it turning the wrong way
+  if (f.storm) sigma *= f.stormBrace ? 1.2 : 1.4;             // swing and seam he can't read
+  if (f.hunt) sigma *= 1.15;                                  // the new batter is rattled
+  const cutterBias = f.cutter ? (f.cutterBrace ? -50 : -105) : 0;   // looks quick, arrives slow: he swings early
   const w = { ...CFG.timing };
   if (ctx.release === 'loose') for (const k in w) w[k] *= 1.2;
   if (ctx.repeats >= 3) for (const k in w) w[k] += 20;
   if (ctx.fx?.tornado) w.perfect /= 2;
-  const errMs = rng.normal() * sigma + 6 + (mods.bias || 0);
+  const errMs = rng.normal() * sigma + 6 + (mods.bias || 0) + cutterBias;
   const shot = chooseShot(d, ctx, rng);
   if (mods.loftAdd && !shot.loft && rng.chance(mods.loftAdd)) shot.loft = true;
+  if (f.cutter && !shot.loft && rng.chance(f.cutterBrace ? 0.3 : 0.6)) shot.loft = true;   // (an early swing skies it)
   if (ctx.hot && !ctx.freeHit && !shot.loft && rng.chance(HOT_BAT.loft)) shot.loft = true;
   // ...unless it is a good ball: then he can block it
   if (ctx.hot && !ctx.freeHit && (ctx.release === 'good' || ctx.release === 'perfect') && ['good', 'full', 'yorker'].includes(d.length) && rng.chance(HOT_BAT.blockP)) {

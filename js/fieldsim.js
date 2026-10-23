@@ -73,6 +73,23 @@ export function buildFieldFrom(positions, powerplay) {
   return list;
 }
 
+// The direction (a shot angle, 0 straight, + the off side) with the most room in a field: for each line, how near the closest
+// fielder stands to it (his distance across the ball's path); the best line is the one where that is greatest. In front of the wicket
+// and a little behind square.
+export function gapAngle(fielders) {
+  const men = fielders.filter(f => !f.keeper && f.id !== 'bowler');
+  let best = 0, bestNear = -1;
+  for (let a = -1.45; a <= 1.451; a += 0.05) {
+    let near = Infinity;
+    for (const f of men) {
+      const r = Math.hypot(f.x, f.y), da = Math.abs(Math.atan2(f.x, f.y) - a);
+      near = Math.min(near, da < Math.PI / 2 ? r * Math.sin(da) : r);
+    }
+    if (near > bestNear) { bestNear = near; best = a; }
+  }
+  return best;
+}
+
 export function boundaryDist(angle) {
   const dx = Math.sin(angle), dy = Math.cos(angle);
   const b = -CY * dy;
@@ -158,7 +175,8 @@ export function simulateHit(res, fielders, rng, opts = {}) {
       const p = sigmoid(margin);
       if (!best || p > best.p) best = { fielder: f, p, margin, t: path.T, point: L };
     }
-    if (best && best.p >= F.minP && !res.forced?.uncatchable) out.catch = best;
+    if (best && res.forced?.chance) out.catch = { ...best, p: Math.max(best.p, 0.55) };   // (Bouncer Barrage: a catch chance, every time)
+    else if (best && best.p >= F.minP && !res.forced?.uncatchable) out.catch = best;
     // landed just in front of someone: the replay shows him diving and falling short
     else if (best && best.margin > -4) out.nearMiss = { fielder: best.fielder, point: L, t: path.T, short: -best.margin };
   }

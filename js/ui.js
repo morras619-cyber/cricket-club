@@ -160,6 +160,8 @@ export class UI {
       this.powerKeys = keys;
       box.innerHTML = '';
       box.classList.toggle('n3', list.length >= 3);
+      box.classList.toggle('n4', list.length === 4);
+      box.classList.toggle('n5', list.length >= 5);   // (four or more: narrow cards, the face over the name)
       for (const p of list) {
         const b = document.createElement('button');
         b.className = p.key.startsWith('cnt-') ? 'power cnt' : 'power';   // (cnt: an answer to a power, swapped in for a few seconds)
@@ -183,8 +185,9 @@ export class UI {
       const b = box.querySelector(`[data-key="${p.key}"]`);
       const pn = b.querySelector('.pname');
       // refit when the name or the card width changes (the SET FIELD button narrows the row)
-      const fitKey = `${p.name}|${pn.clientWidth}`;
-      if (pn.dataset.fit !== fitKey) { setFit(pn, p.name); pn.dataset.fit = `${p.name}|${pn.clientWidth}`; }
+      const label = list.length >= 5 && p.short ? p.short : p.name;   // (a crowded row: the one-word names)
+      const fitKey = `${label}|${pn.clientWidth}`;
+      if (pn.dataset.fit !== fitKey) { setFit(pn, label); pn.dataset.fit = `${label}|${pn.clientWidth}`; }
       b.querySelector('.pcost').textContent = p.state === 'armed' ? 'ARMED' : p.cost == null ? (p.sub || '') : `${p.cost} ⚡`;
       b.disabled = p.state === 'off';
       b.classList.toggle('armed', p.state === 'armed');
