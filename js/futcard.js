@@ -1,5 +1,6 @@
 // Super League player cards (only the Super League uses these): the tier frame by overall rating,
 // the player's portrait in his club kit, his real league numbers and his ability.
+import { CARD_ICONS } from './packed.js';
 import { ovr, bowlType } from './squads.js';
 import { flag, nationName } from './nations.js';
 import { faceEl } from './looks.js';
@@ -115,7 +116,7 @@ export const risingStar = p => !p.heroId && p.age <= 22 && (p.pot || 0) - ovr(p)
 
 const ROLE = { bat: 'BAT', bowl: 'BOWL', all: 'AR', wk: 'WK' };
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const icon = name => { const i = new Image(); i.src = `img/cards/icons/${name}.webp`; i.alt = ''; return i; };
+const icon = name => { const i = new Image(); i.src = CARD_ICONS[name]; i.alt = ''; return i; };
 
 // size: the card's width in px (everything inside scales with it)
 export function futCard(p, { size = 220, frame = null } = {}) {

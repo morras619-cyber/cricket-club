@@ -3,6 +3,7 @@
 // tier: 1 (underdogs) to 4 (giants). Stronger squads, and in the career a club unlocks in
 // season <tier>. star: the team's own hero. style: how the AI plays them (loft = extra chance of going aerial,
 // sigma = timing spread, late = extra loft from ball 19, field = fielders' speed).
+import { CLUB_LOGOS } from './packed.js';
 export const TEAMS = [
   { id: 'thunder', tier: 4, name: 'Thunder Strikers', suit: '#1f5fd6', trim: '#ffd23f', star: 'raja',
     style: { tag: 'Big hitters', desc: 'Swing at everything. Six or out.', loft: 0.2, sigma: 1.06 } },
@@ -80,7 +81,7 @@ export function setMyClub(m) {
 }
 export const myClub = () => MINE;
 export const setLogo = (id, src) => (src ? LOGOS.set(id, src) : LOGOS.delete(id));
-export const logoSrc = id => LOGOS.get(id) || `img/logo-${id}.webp`;
+export const logoSrc = id => LOGOS.get(id) || CLUB_LOGOS[id] || `img/logo-${id}.webp`;
 export const teamById = id => (MINE && id === MINE.id ? MINE : null) || TEAMS.find(t => t.id === id) || LEAGUE_CLUBS.find(t => t.id === id) || NATIONAL.find(t => t.id === id) || TEAMS[0];
 // the club whose drawn sheets a side uses (its own, or the one a national side borrows)
 export const sheetOf = id => teamById(id).sheet || id;

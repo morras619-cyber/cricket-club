@@ -1,11 +1,12 @@
 // The coin toss, painted (img/toss/, tools/build_toss_art.py): the coin hovers over the pitch in
 // a gold swirl; called, it leaps up spinning through its flip frames with streaks of light, comes
 // down and lands with a burst, the winning face up in a column of light.
+import { COIN_FRAMES } from './packed.js';
 const IMG = {};
 const NAMES = ['coin-heads', 'coin-tails', ...[1, 2, 3, 4, 5, 6, 7].map(i => `coin-flip${i}`),
   'fx-swirl', 'fx-swirl2', 'fx-ring', 'fx-spiral', 'fx-star', 'fx-streak', 'fx-dust', 'fx-burst', 'fx-pad', 'fx-rays'];
 export function loadToss() {
-  for (const n of NAMES) if (!IMG[n]) { IMG[n] = new Image(); IMG[n].src = `img/toss/${n}.webp`; }
+  for (const n of NAMES) if (!IMG[n]) { IMG[n] = new Image(); IMG[n].src = COIN_FRAMES[n] || `img/toss/${n}.webp`; }
 }
 const ok = im => im && im.complete && im.naturalWidth > 0;
 // a full turn of the coin: heads, over the edge to tails, and back round
