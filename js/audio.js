@@ -179,27 +179,30 @@ function loadMood() {
   }
   return moodLoading;
 }
-// Two or three runs for the home side: a soft swell of cheer as the ball runs away (a third of a six's roar, and no pop at the end of
-// it), then the crowd applauds. A four or a six has its own roar (cheerStart); one or no run is only the quiet clap that follows.
-export function crowdRuns(delay = 0) {
+// Two or three runs for the home side: the four's cheer (it builds as the ball runs, then the pop), but soft, and directly after it one
+// round of applause at the same level. A four or a six keeps its full roar (cheerStart); one run or none is only the quiet clap that follows.
+const RUNS_POWER = 0.55;    // (a four is 1.1)
+export function crowdRuns(delay = 0, sec = 1.3) {
   if (!ready()) return;
   if (!cheerBuf) { loadCheer(); return; }
   if (!moodBufs) { loadMood(); return; }
   const now = ac.currentTime, t = now + Math.max(0, delay);
   if (t < clapUntil || now < roarUntil) return;
   cheerStop(0.15); singDuck(0.4);
-  // the held part of the boundary cheer (after its rise and its pop, which is left out), faded in and out, played low...
-  const from = CUE + 0.5, len = 3, src = ac.createBufferSource(), g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(RUNS_CHEER, t + 0.5); g.gain.setValueAtTime(RUNS_CHEER, t + len - 1.3); g.gain.linearRampToValueAtTime(0.0001, t + len);
-  src.buffer = cheerBuf; src.connect(g).connect(master); src.start(t, from, len + 0.05);
-  // ...with one round of applause looped in under it
-  const clap = moodBufs.claps[clapNext++ % moodBufs.claps.length], cs = ac.createBufferSource(), cg = ac.createGain();
-  cg.gain.setValueAtTime(0.0001, t + 0.1); cg.gain.linearRampToValueAtTime(RUNS_CLAP, t + 0.6);
-  cs.buffer = clap; cs.connect(cg).connect(master); cs.start(t + 0.1);
-  clapUntil = t + 0.1 + clap.duration;
-  roarUntil = Math.max(roarUntil, t + len * 0.8);                                  // (the synthetic crowd stays quiet under it)
+  const from = Math.max(0, CUE - sec), vol = RUNS_POWER * CHEER_SOFT;
+  const src = ac.createBufferSource(), g = ac.createGain();
+  g.gain.setValueAtTime(vol, t);
+  if (from > 0) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + Math.max(0.3, Math.min(0.8, sec * 0.5))); }
+  g.gain.setValueAtTime(vol, t + sec + 0.9); g.gain.linearRampToValueAtTime(0.0001, t + sec + 1.4);   // (it gives way to the applause soon after the pop)
+  src.buffer = cheerBuf; src.connect(g).connect(master); src.start(t, from, sec + 1.5);
+  // the applause, level with the cheer it follows (the clap recording is quieter, so it plays louder to match)
+  const clap = moodBufs.claps[clapNext++ % moodBufs.claps.length], cs = ac.createBufferSource(), cg = ac.createGain(), tc = t + sec + 0.7;
+  cg.gain.setValueAtTime(0.0001, tc); cg.gain.linearRampToValueAtTime(Math.min(1, vol * CHEER_LEVEL / CLAP_LEVEL), tc + 0.25);
+  cs.buffer = clap; cs.connect(cg).connect(master); cs.start(tc);
+  clapUntil = tc + clap.duration;
+  roarUntil = Math.max(roarUntil, tc + clap.duration * 0.7);                   // (the synthetic crowd stays quiet under it)
 }
-const RUNS_CHEER = 0.42, RUNS_CLAP = 0.3;
+const CHEER_LEVEL = 0.25, CLAP_LEVEL = 0.1;   // (the average level of the held cheer and of the applause recording)
 
 // ---------- each club's own song ----------
 // snd/crowd-songs.mp3 holds the eight main clubs' songs one after another (SONG_SLOT seconds apart, SONG_LEN of song in each;

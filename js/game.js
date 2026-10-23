@@ -1592,7 +1592,7 @@ export class Game {
       cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
       if (six) this.sing(tClear / ballK / 1.6 + 2.2, 4.5, 0.45); // (the roar dies down into a few seconds of song)
     } else if ((runs === 2 || runs === 3) && !o.caught && (o.side === 'ai' ? this.myTeam : this.oppTeam).id === this.home) {
-      crowdRuns(0.2); this.runsCheered = true;   // (two or three for the home side: a soft cheer with applause under it, not a boundary's roar)
+      crowdRuns(0.1); this.runsCheered = true;   // (two or three for the home side: a soft four's cheer, then applause at the same level)
     } else if ((six || (toRope && this.heat <= RUNAWAY)) && (o.side === 'ai' ? this.myTeam : this.oppTeam).id !== this.home) {
       let tClear = end;
       for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
@@ -2282,6 +2282,7 @@ export class Game {
   }
 
   async bowlingBanter({ runs, wicketFell, goodBall, rng, inn }) {
+    const duelWas = this.pairOn();   // (was a duel on with this batter before the ball? a wicket settles it)
     this.heatAfter(inn, { runs, wicketFell, beaten: goodBall && runs === 0 && !wicketFell, good: runs === 0 });
     this.mind?.earn({ batting: true, runs, wicket: wicketFell, grade: this.hitGrade });
     const hotNow = this.pairHot();
@@ -2313,6 +2314,19 @@ export class Game {
       await this.sleepReal(this.bot ? 50 : 1300);
       // you may answer him: it starts a duel
       if (this.heatOn && !this.pairOn()) await this.duelChoice(inn, line('sledge', me.id, rng), bowl(), 'ANSWER HIM?', 'Talk back to start a duel');
+      return;
+    }
+    // a duel that ended in his wicket: no compliments. You won it: your send-off, and he storms off
+    if (wicketFell && duelWas) {
+      this.lastBanterBall = inn.balls;
+      this.fx.word('DUEL WON!', this.W / 2, this.H * 0.3, { size: 60, color: '#ffd23f', stroke: '#e8343b', dur: 1400 });
+      this.fx.bubble(line('sendoff', me.id, rng), bowl().x, bowl().y, { dur: 1800 });
+      this.charge.add(8, 'DUEL WON');
+      sfx.crowd(0.9);
+      await this.sleepReal(this.bot ? 50 : 800);
+      this.fx.bubble(line('departing', them.id, rng), bat().x, bat().y, { dur: 1500 });
+      this.batterMood = { state: 'calm', balls: 0 };
+      await this.sleepReal(this.bot ? 50 : 900);
       return;
     }
     if (!goodBall) return;
