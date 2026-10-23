@@ -123,7 +123,7 @@ export function futCard(p, { size = 220, frame = null } = {}) {
   card.append(rate);
   // what he is
   const info = mk('div', 'fut-info');
-  info.append(mk('span', 'fut-flag', `${flag(p)} ${nationName(p)}`), mk('span', '', `Age ${p.age}`), mk('span', '', p.label));
+  info.append(mk('span', 'fut-flag', `${flag(p)} ${nationName(p)}`), ...(p.age != null ? [mk('span', '', `Age ${p.age}`)] : []), mk('span', '', p.label));
   if (p.bowl) info.append(mk('span', '', bowlType(p.bowl).short || bowlType(p.bowl).name));
   info.append(mk('span', 'fut-pot', '★★★★★'.slice(0, potentialStars(p)) + '☆☆☆☆☆'.slice(0, 5 - potentialStars(p))));
   card.append(info);
