@@ -59,6 +59,11 @@ export function applyPower(d, powerKind) {
   if (powerKind === 'tornado') Object.assign(d, { length: 'yorker', lane: 'stumps', x: 0, kmh: 160, swing: 0.05, move: 0, type: 'Tornado Yorker', slower: false });
   if (powerKind === 'shatter') Object.assign(d, { length: 'good', lane: 'off', x: 0.2, move: 0.3, type: 'Shatter Seam', slower: false });
   if (powerKind === 'maya') Object.assign(d, { length: 'good', type: 'Maya Ball' });
+  // the type powers of the other bowlers (the game doubles Swing Storm's swing for its three balls)
+  if (powerKind === 'bouncer') Object.assign(d, { length: 'bouncer', lane: 'stumps', x: 0.05, kmh: Math.max(d.kmh || 135, 138), swing: 0.05, move: 0, type: 'Bouncer Barrage', slower: false });
+  if (powerKind === 'googly') { const mv = d.move || 0; Object.assign(d, { move: -(Math.sign(mv) || -1) * Math.max(0.34, Math.abs(mv) * 1.5), type: 'Googly Switch' }); }
+  if (powerKind === 'cutter') Object.assign(d, { kmh: 92, swing: (d.swing || 0) * 0.5, type: 'Cutter', slower: true });
+  if (powerKind === 'storm') d.type = 'Swing Storm';
 }
 
 function planScript(seed, plan, powerKind) {

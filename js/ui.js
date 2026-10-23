@@ -167,7 +167,7 @@ export class UI {
         b.className = p.key.startsWith('cnt-') ? 'power cnt' : 'power';   // (cnt: an answer to a power, swapped in for a few seconds)
         b.dataset.key = p.key;
         // the hero's painted face in the club's colours (it draws itself once its picture has loaded); the drawn figure if he has none
-        const face = p.hero?.id && portraitFace({ heroId: p.hero.id }, p.team || null, 40);
+        const face = (p.player && portraitFace(p.player, p.team || null, 40)) || (p.hero?.id && portraitFace({ heroId: p.hero.id }, p.team || null, 40));
         if (face) { face.className = 'powerface'; b.append(face); }
         else {
           const pc = this.portraitFor(p.hero, p.pose).cloneNode();

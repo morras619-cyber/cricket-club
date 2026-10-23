@@ -2,7 +2,7 @@ import { CFG, phaseFor } from './config.js';
 import { makeRng } from './rng.js';
 import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
-import { SPARKS, HUNT, SHORT, heroById, AI_LOOK } from './heroes.js';
+import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
@@ -11,7 +11,6 @@ import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
-import { powerDiscount } from './progress.js';
 import { lookOf, faceCanvas, masksReady } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
@@ -271,7 +270,7 @@ export class Game {
     this.charge.on(ev => this.onCharge(ev));
     this.ui.charge(0);
     this.armed = { mirror: 0, elastic: 0, storm: 0 };
-    this.showdown = 0; this.huntOpen = false;   // (Showdown: balls left of the forced face-off; Hat-trick Hunt: a wicket has just fallen)
+    this.showdown = 0; this.aiShowdown = 0; this.aiStorm = 0; this.huntOpen = false;   // (Showdown: balls left of the forced face-off; Hat-trick Hunt: a wicket has just fallen)
     this.fieldState = { events: 0, lastEventBall: -9, setting: this.settings.fielding };
     this.moments = [];
     this.rebowls = 0;
@@ -421,18 +420,19 @@ export class Game {
     const att = this.sideOf(inn, false).attack;
     return att.find(p => p.id === inn.curBowler) || att.find(p => p.hero) || att[0];
   }
-  // is this star on the field right now (his power only works while he bats or bowls)?
-  heroIn(slot) {
-    const inn = this.innings[this.innings.length - 1];
-    if (!inn) return true;
-    const p = slot === 'bat' ? this.batterOf(inn) : this.bowlerOf(inn);
-    return !!p && p.id === this.team[slot]?.id;
-  }
-  // a signature power's charge cost, cheaper as its hero levels up (Sparks cost the same for all)
-  price(def, hero) {
+  // a type power's charge cost: cheaper for a better player (a 93 pays 3 less, a 53 pays full); Sparks cost the same for all
+  price(def, player) {
     const spark = Object.values(SPARKS).includes(def) || def === HUNT;
-    return spark || !hero ? def.cost : def.cost - powerDiscount(this.levels?.[hero.id] || 1);
+    return spark || !player ? def.cost : def.cost - Math.max(0, Math.round((ovr(player) - 70) / 8));
   }
+  // a player as the power buttons and the cut-in panel show him: his team's colours, his own skin and hair
+  asHero(p, team, slot) {
+    if (!p) return this.captain;
+    const lk = lookOf(p) || {};
+    return { id: p.id, name: p.name, slot, emblem: null, quote: p.nick ? `${p.nick} time!` : 'Watch this!', look: { ...teamLook(team), skin: lk.skin || teamLook(team).skin, hair: lk.hair || teamLook(team).hair } };
+  }
+  // my wicket-keeper (his face is on the keeper powers)
+  keeperPlayer() { return this.fieldingXI([{ keeper: true }], 'player')[0]; }
   // the hero whose face and colours a slot's buttons use: its hero, else the captain
   heroFor(slot) { return this.team[slot] || this.captain; }
   typeLine(p) { const T = bowlType(p.bowl); return `${T.name} · ${speedRange(T.kmh)}`; }
@@ -607,36 +607,32 @@ export class Game {
 
   powerList() {
     const ball = this.ballNo();
-    const mk = (key, def, hero, pose, armed, extraOk = true) => {
-      const cost = this.charge.cost(this.price(def, hero), ball);
+    const inn = this.innings[this.innings.length - 1];
+    const mk = (key, def, player, pose, armed, extraOk = true) => {
+      const cost = this.charge.cost(this.price(def, player), ball);
       const state = armed ? 'armed' : this.powerLock || !extraOk || this.charge.value < cost ? 'off' : 'ready';
-      return { key, name: def.name, short: SHORT[def.kind], cost, hero, pose, state, team: this.myTeam, onTap: () => this.activate(key) };
+      return { key, name: def.name, short: SHORT[def.kind], cost, player, hero: this.asHero(player, this.myTeam, pose), pose, state, team: this.myTeam, onTap: () => this.activate(key) };
     };
     const A = this.armed;
     if (this.phase === 'bat') {
-      const list = [mk('focus', SPARKS.bat, this.heroFor('bat'), 'bat', A.focus)];
-      if (this.team.bat && (this.heroIn('bat') || A.thunder || A.meteor || A.mirror > 0)) list.push(mk('bat', this.team.bat.power, this.team.bat, 'bat', A.thunder || A.meteor || A.mirror > 0));
-      // the star's other powers (they too only work while he bats)
-      for (const alt of this.team.bat?.alts || []) {
-        const on = this.altArmed(alt.kind);
-        if (this.heroIn('bat') || on) list.push(mk('bat:' + alt.kind, alt, this.team.bat, 'bat', on));
-      }
+      // the Spark, and the power of the man at the crease (his type's)
+      const me = inn && this.batterOf(inn), pw = me && powersOf(me).bat;
+      const list = [mk('focus', SPARKS.bat, me, 'bat', A.focus)];
+      if (pw) list.push(mk('bat', pw, me, 'bat', this.altArmed(pw.kind)));
       return list;
     }
     if (this.phase === 'bowl') {
+      const me = inn && this.bowlerOf(inn), pw = me && powersOf(me).bowl;
       // right after a wicket the Pinpoint Spark's place goes to Hat-trick Hunt
-      const list = [this.huntOpen || A.hunt ? mk('hunt', HUNT, this.heroFor('bowl'), 'bowl', A.hunt) : mk('pinpoint', SPARKS.bowl, this.heroFor('bowl'), 'bowl', A.pinpoint)];
-      if (this.team.bowl && (this.heroIn('bowl') || A.tornado || A.maya || A.shatter)) list.push(mk('bowlpower', this.team.bowl.power, this.team.bowl, 'bowl', A.tornado || A.maya || A.shatter));
-      for (const alt of this.team.bowl?.alts || []) {
-        const on = this.altArmed(alt.kind);
-        if (this.heroIn('bowl') || on) list.push(mk('bowl:' + alt.kind, alt, this.team.bowl, 'bowl', on));
-      }
-      if (this.team.field) list.push(mk('fieldpower', this.team.field.power, this.team.field, 'keeper', A.elastic > 0 || A.relay));
-      const ult = this.team.field?.ultimate;
-      if (ult && (A.freeze || this.charge.value >= this.charge.cost(ult.cost, ball))) list.push(mk('fieldult', ult, this.team.field, 'keeper', A.freeze));
+      const list = [this.huntOpen || A.hunt ? mk('hunt', HUNT, me, 'bowl', A.hunt) : mk('pinpoint', SPARKS.bowl, me, 'bowl', A.pinpoint)];
+      if (pw) list.push(mk('bowlpower', pw, me, 'bowl', this.altArmed(pw.kind)));
+      // the keeper's powers
+      const kp = this.keeperPlayer();
+      list.push(mk('fieldpower', POWERS.elastic, kp, 'keeper', A.elastic > 0));
+      if (A.freeze || this.charge.value >= this.charge.cost(POWERS.freeze.cost, ball)) list.push(mk('fieldult', POWERS.freeze, kp, 'keeper', A.freeze));
       return list;
     }
-    if (this.phase === 'event') return [mk('burst', SPARKS.field, this.heroFor('field'), 'keeper', A.burst, this.eventAllowsBurst)];
+    if (this.phase === 'event') return [mk('burst', SPARKS.field, this.keeperPlayer(), 'keeper', A.burst, this.eventAllowsBurst)];
     return [];
   }
 
@@ -645,28 +641,24 @@ export class Game {
   activate(key) {
     const ball = this.ballNo();
     const A = this.armed;
-    let def, hero, color;
+    const inn = this.innings[this.innings.length - 1];
+    let def, player, slot = 'bat', color;
     switch (key) {
-      case 'focus': def = SPARKS.bat; hero = this.heroFor('bat'); break;
-      case 'bat': def = this.team.bat?.power; hero = this.team.bat; break;
-      case 'pinpoint': def = SPARKS.bowl; hero = this.heroFor('bowl'); break;
-      case 'hunt': def = HUNT; hero = this.heroFor('bowl'); break;
-      case 'bowlpower': def = this.team.bowl?.power; hero = this.team.bowl; break;
-      case 'fieldpower': def = this.team.field?.power; hero = this.team.field; break;
-      case 'fieldult': def = this.team.field?.ultimate; hero = this.team.field; break;
-      case 'burst': def = SPARKS.field; hero = this.heroFor('field'); break;
-      default: {
-        const side = key.startsWith('bat:') ? 'bat' : key.startsWith('bowl:') ? 'bowl' : null;
-        if (!side) return;
-        hero = this.team[side]; def = hero?.alts?.find(a => a.kind === key.slice(side.length + 1));
-      }
+      case 'focus': player = inn && this.batterOf(inn); def = SPARKS.bat; break;
+      case 'bat': player = inn && this.batterOf(inn); def = player && powersOf(player).bat; break;
+      case 'pinpoint': player = inn && this.bowlerOf(inn); def = SPARKS.bowl; slot = 'bowl'; break;
+      case 'hunt': player = inn && this.bowlerOf(inn); def = HUNT; slot = 'bowl'; break;
+      case 'bowlpower': player = inn && this.bowlerOf(inn); def = player && powersOf(player).bowl; slot = 'bowl'; break;
+      case 'fieldpower': player = this.keeperPlayer(); def = POWERS.elastic; slot = 'keeper'; break;
+      case 'fieldult': player = this.keeperPlayer(); def = POWERS.freeze; slot = 'keeper'; break;
+      case 'burst': player = this.keeperPlayer(); def = SPARKS.field; slot = 'keeper'; break;
+      default: return;
     }
-    if (!def || !hero) return;
+    if (!def || !player) return;
+    const hero = this.asHero(player, this.myTeam, slot);
     if (this.powerLock && key !== 'burst') return;
-    const own = key === 'bat' || key.startsWith('bat:') ? 'bat' : key === 'bowlpower' || key.startsWith('bowl:') ? 'bowl' : null;
-    if (own && !this.heroIn(own)) return;
-    if (key.includes(':') && this.altArmed(def.kind)) return;   // (already on: not paid for twice)
-    if (!this.charge.spend(this.price(def, hero), ball, def.name)) return;
+    if ((key === 'bat' || key === 'bowlpower') && this.altArmed(def.kind)) return;   // (already on: not paid for twice)
+    if (!this.charge.spend(this.price(def, player), ball, def.name)) return;
     color = hero.look.trim;
     const kindMap = { focus: 'focus', pinpoint: 'pinpoint', burst: 'burst' };
     const kind = kindMap[key] || def.kind;
@@ -692,7 +684,7 @@ export class Game {
     this.powerFxUntil = this.realTime + (this.bot ? 0 : 1400);
     if (def.ultimate || def.cost >= 100) sfx.boom(); else sfx.full();
     buzz([40, 30, 80]);
-    if (this.phase === 'bowl' && this.aiBatPower && (key === 'bowlpower' || key === 'pinpoint' || key === 'hunt' || key.startsWith('bowl:'))) {
+    if (this.phase === 'bowl' && this.aiBatPower && (key === 'bowlpower' || key === 'pinpoint' || key === 'hunt')) {
       this.fx.word('POWER CLASH!', this.W / 2, this.H * 0.3, { size: 54, color: '#3ec6ff', stroke: INK, dur: 1400 });
       this.clash = true;
     }
@@ -731,7 +723,7 @@ export class Game {
   // ---------- batting innings ----------
   async battingInnings(inn, script) {
     this.phase = 'bat';
-    this.showdown = 0; this.showdownBrace = false;
+    this.showdown = 0; this.showdownBrace = false; this.aiStorm = 0;
     this.overStarted = -1;
     this.fillCrease(inn);
     this.hud(inn);
@@ -802,6 +794,7 @@ export class Game {
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? (braced ? 20 : 40) : 0);
     if (fx.focus) { const h = braced ? BRACE.focusWindow : 1; w.perfect += 55 * h; w.good += 45 * h; }
     if (tornado) w.perfect /= 2;
+    if (fx.squeeze) { w.perfect *= fx.squeeze; w.good *= fx.squeeze; }
     if (fx.counter === 'steady') { w.perfect *= STEADY_SQUEEZE; w.good *= STEADY_SQUEEZE; }   // (his Steady Hands: the ball is exactly where he wants it)
     w.good = Math.max(w.good, w.perfect + 20);
     return w;
@@ -824,13 +817,16 @@ export class Game {
     const rng = this.ballRng(ballNo);
     const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
     S.field3d = aiField.filter(f => !f.keeper && f.id !== 'bowler');
-    spec = this.mindBowlPower(inn, ballNo, spec, striker, bowler, opt);   // (with a mind it may fire its star's power now)
+    spec = this.mindBowlPower(inn, ballNo, spec, striker, bowler, opt);   // (with a mind it may fire the power of its bowler's type now)
+    if (spec.power === 'storm') this.aiStorm = 3;
+    const stormNow = this.aiStorm > 0 && !opt.scripted;   // (Swing Storm: three balls that swing and seam twice as much)
+    if (stormNow) { spec = { ...spec, swing: (spec.swing || 0) * 2, move: (spec.move || 0) * 2 }; this.aiStorm--; }
     const aiPower = spec.power;
     this.powerLock = false;
     this.refreshPowers();
 
     if (aiPower) {
-      const star = this.rival.bowl, pw = star.power;
+      const star = this.asHero(bowler, this.oppTeam, 'bowl'), pw = POWERS[aiPower];
       if (this.bot) this.ui.banner(`${pw.name.toUpperCase()}!`, `${star.name} powers up`, 1600);
       else { this.showCutIn(star, pw); this.powerFxUntil = this.realTime + 1400; }
       this.starPower(this.oppTeam);
@@ -881,6 +877,7 @@ export class Game {
     if (hotBall) { spec = hotSpec(spec, btype.spin); this.fx.word(btype.spin ? 'HE\'S TURNING IT!' : 'HE\'S BOWLING FASTER!', this.W / 2, this.H * 0.3, { size: 36, color: '#ff9f1c', stroke: INK, dur: 1100 }); }
     const myC = this.myCounter; this.myCounter = null;   // my answer to his power
     if (myC === 'brace' && aiPower === 'tornado') spec = { ...spec, kmh: BRACE.tornadoKmh };
+    fx.squeeze = aiPower === 'googly' || stormNow ? (myC === 'brace' ? 0.93 : 0.85) : 0;   // (he reads it wrong, so my timing is that much tighter)
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
     S.readPre = false;
@@ -959,6 +956,8 @@ export class Game {
       res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
       if (aiPower === 'tornado' && myC !== 'brace' && grade === 'miss') res.outcome = 'bowled';
       if (fx.gap && swing && !swing.defend && res.outcome === 'hit') res = this.gapShot(res, grade, aiField, fx.counter === 'brace', rng);
+      // his Bouncer Barrage: a hit short of a Perfect (a braced one spares a Good) goes up in the air, a catch chance every time
+      if (aiPower === 'bouncer' && res.outcome === 'hit' && res.grade !== 'defend' && !(grade === 'perfect' || (myC === 'brace' && grade === 'good'))) res = { ...res, loft: true, launchDeg: 55 + rng.range(0, 12), v: Math.min(res.v || 20, 20), forced: { chance: true }, label: 'SKIED!' };
     }
     if (opt.assist) res = opt.assist(res, grade) || res;
     this.timeScale = 1;
@@ -1036,42 +1035,42 @@ export class Game {
   }
 
   // ---------- counter-powers and the AI's mind (the end of js/heat.js) ----------
-  // The AI bowler may fire his star's power now (only the star bowler, and only if his hidden charge allows and the moment is right)
+  // The AI bowler may fire the power of his own type now (if his hidden charge allows and the moment is right)
   mindBowlPower(inn, ballNo, spec, striker, bowler, opt) {
     if (!this.mindOn || spec.power || opt.scripted || opt.assist) return spec;
-    const star = this.rival.bowl, pw = star?.power;
-    if (!pw?.kind || bowler.hero?.id !== star.id) return spec;
+    const pw = powersOf(bowler).bowl;
+    if (!pw?.kind) return spec;
     const left = Math.max(1, inn.ballsLeft), last = inn.log.at(-1);
     const ctx = {
-      kind: pw.kind, cost: this.mind.charge.cost(pw.cost, ballNo), ball: ballNo,
+      kind: pw.kind, cost: this.mind.charge.cost(this.price(pw, bowler), ballNo), ball: ballNo,
       lastRuns: last == null || last === 'W' ? 0 : Number(last), setBat: inn.cur.balls >= 5 && inn.cur.runs >= 10,
       pressure: inn.target != null ? (inn.target - inn.runs) / left < 1.4 : inn.runs / Math.max(1, inn.balls) > 1.7,
       yourCharge: this.charge.value, wicketsLeft: inn.maxWkts - inn.wkts,
     };
-    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(pw.cost, ballNo)) return spec;
+    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(this.price(pw, bowler), ballNo)) return spec;
     this.mind.fired++;
     const s = { ...spec };
     applyPower(s, pw.kind);
     return s;
   }
-  // The AI batter may fire his star's power now
+  // The AI batter may fire the power of his own type now (returns it, or null). Read the Bowler is no use to a computer.
   mindBatPower(inn, ballNo, striker, need) {
-    const star = this.rival.bat, pw = star?.power;
-    if (!pw?.kind || striker.id !== star.id) return false;
+    const pw = powersOf(striker).bat;
+    if (!pw?.kind || pw.kind === 'readbowler') return null;
     const last = inn.log.at(-1);
     const ctx = {
-      kind: pw.kind, cost: this.mind.charge.cost(pw.cost, ballNo), ball: ballNo,
+      kind: pw.kind, cost: this.mind.charge.cost(this.price(pw, striker), ballNo), ball: ballNo,
       lastRuns: last == null || last === 'W' ? 0 : Number(last), setBat: inn.cur.balls >= 5 && inn.cur.runs >= 10,
       pressure: need / Math.max(1, inn.ballsLeft) > 1.3, yourCharge: this.charge.value, wicketsLeft: inn.maxWkts - inn.wkts,
     };
-    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(pw.cost, ballNo)) return false;
+    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(this.price(pw, striker), ballNo)) return null;
     this.mind.fired++;
-    return true;
+    return pw;
   }
   // I have fired a power: the AI may answer it, from its own hidden charge (you are only told if it does)
   aiAnswers(key, kind) {
     if (!this.mindOn) return;
-    const side = key === 'focus' || key === 'bat' || key.startsWith('bat:') ? 'bat' : key === 'pinpoint' || key === 'hunt' || key === 'bowlpower' || key.startsWith('bowl:') ? 'bowl' : null;
+    const side = key === 'focus' || key === 'bat' ? 'bat' : key === 'pinpoint' || key === 'hunt' || key === 'bowlpower' ? 'bowl' : null;
     if (!side) return;
     const inn = this.innings[this.innings.length - 1];
     const id = this.mind.counter(kind, { wicketsLeft: inn ? inn.maxWkts - inn.wkts : 3 });
@@ -1115,7 +1114,7 @@ export class Game {
   }
 
   // ---------- the heat between a batter and his bowler ----------
-  duelHot(inn) { if (this.showdown > 0) return true; if (!this.heatOn) return false; return this.duels.hot(this.batterOf(inn)?.id, this.bowlerOf(inn)?.id); }
+  duelHot(inn) { if ((inn.side === 'player' ? this.showdown : this.aiShowdown) > 0) return true; if (!this.heatOn) return false; return this.duels.hot(this.batterOf(inn)?.id, this.bowlerOf(inn)?.id); }
   // the meter on the screen: this pair's heat
   heatShow(inn) {
     if (!this.heatOn) return;
@@ -1713,7 +1712,7 @@ export class Game {
   async bowlingInnings(inn) {
     this.phase = 'bowl';
     this.freeHit = false;
-    this.huntOpen = false;
+    this.huntOpen = false; this.aiShowdown = 0;
     this.overStarted = -1;
     this.aiPowerBalls = new Set([16, 26]);
     this.lastBowlerId = null;
@@ -1784,18 +1783,25 @@ export class Game {
     this.aiBatPower = null; this.clash = false;
     // batting first, the AI paces itself to a par score; in a super over or the shoot-out it swings
     const need = inn.kind !== 'main' ? 6 * inn.ballsLeft : inn.target != null ? inn.target - inn.runs : Math.max(12, 48 - inn.runs);
-    if (!opt.scripted && (this.mindOn ? this.mindBatPower(inn, ballNo, striker, need) : (this.aiPowerBalls.has(ballNo) && striker.id === this.rival.bat?.id && need / Math.max(1, inn.ballsLeft) > 1.0))) {
-      this.aiPowerBalls.delete(ballNo);
-      const k = this.rival.bat.power.kind;
-      this.aiBatPower = k === 'meteor' ? 'thunder' : k;
-      const pw = this.rival.bat.power;
-      if (!this.bot) { this.showCutIn(this.rival.bat, pw); this.powerFxUntil = this.realTime + 1400; }
+    let aiDef = null;
+    if (!opt.scripted) {
+      if (this.mindOn) aiDef = this.mindBatPower(inn, ballNo, striker, need);
+      else if (this.aiPowerBalls.has(ballNo) && striker.id === this.rival.bat?.id && need / Math.max(1, inn.ballsLeft) > 1.0) { this.aiPowerBalls.delete(ballNo); aiDef = this.rival.bat.power; }
+    }
+    if (aiDef) {
+      const k = aiDef.kind, star = this.asHero(striker, this.oppTeam, 'bat');
+      if (!this.bot) { this.showCutIn(star, aiDef); this.powerFxUntil = this.realTime + 1400; }
       this.starPower(this.oppTeam);
-      this.ui.banner(`${this.rival.bat.name.toUpperCase()}: ${pw.name.toUpperCase()}!`, 'Answer with a power of your own', 2000);
-      if (this.aiBatPower === 'mirror') this.aiMirror = 3;
+      this.ui.banner(`${star.name.toUpperCase()}: ${aiDef.name.toUpperCase()}!`, k === 'showdown' || k === 'luckybreak' ? 'A power for him' : 'Answer with a power of your own', 2000);
       sfx.whoosh();
-      // his power is announced: you may answer it (if you have the charge)
-      if (this.mindOn) { await this.powerPause(); this.myCounter = await this.counterWindow(this.aiBatPower); }
+      if (k === 'showdown') { this.aiShowdown = HOLD; if (this.heatOn) { this.duels.start(striker.id, bowler.id); this.duels.add(striker.id, bowler.id, FULL); this.duels.state(striker.id, bowler.id).hold = HOLD; this.heatShow(inn); } }
+      else if (k === 'luckybreak') this.freeHit = true;   // (a free hit: nothing can get him out)
+      else {
+        this.aiBatPower = k === 'meteor' ? 'thunder' : k === 'gapfinder' ? 'mirror' : k;
+        if (this.aiBatPower === 'mirror') this.aiMirror = k === 'gapfinder' ? 1 : 3;
+        // his power is announced: you may answer it (if you have the charge)
+        if (this.mindOn) { await this.powerPause(); this.myCounter = await this.counterWindow(this.aiBatPower); }
+      }
     }
     const aiPower = this.aiBatPower || (this.aiMirror > 0 ? 'mirror' : null);
     const stance = opt.stance || aiStance(kind, rng);
@@ -2061,6 +2067,7 @@ export class Game {
 
     const runs = inn.runs - before.runs, wicketFell = inn.wkts > before.wkts;
     this.huntOpen = wicketFell;   // (Hat-trick Hunt is on offer for the next ball)
+    if (this.aiShowdown > 0 && (--this.aiShowdown === 0 || wicketFell)) this.aiShowdown = 0;
     this.bowlCrowd(wicketFell ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     this.afterWicket = wicketFell;
     this.dotsAgainst(inn);
