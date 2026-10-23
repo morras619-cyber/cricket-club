@@ -2063,7 +2063,7 @@ export class Game {
       }
     } else {
       this.hitGrade = ai.grade;
-      await this.bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit);
+      await this.bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit, d.length === 'yorker');
     }
     this.view = 'bowl';
     this.hud(inn);
@@ -2380,12 +2380,12 @@ export class Game {
 
   noteEvent(ballNo) { this.fieldState.events++; this.fieldState.lastEventBall = ballNo; }
 
-  async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit) {
+  async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit, yorker = false) {
     const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field * fieldSpeed(this.sideRating(this.mySide)), riskyRun: res.risky ? 1 : undefined });
     const ctl = ch => playerControls(ch, this.fieldState, ballNo);
-    // a block gets the groan; a ball hit away only lets the build-up fade. With a catch chance the build-up softens
-    // while it is decided (a catch taken is a wicket: the roar comes then)
-    if (!sim.catch && !sim.runOut && !sim.save) this.bowlCrowd(res.grade === 'defend' ? 'dot' : 'runs');
+    // a block gets the groan, and so does a yorker that is only just kept out (a run at most); a ball hit away only lets the build-up fade.
+    // With a catch chance the build-up softens while it is decided (a catch taken is a wicket: the roar comes then)
+    if (!sim.catch && !sim.runOut && !sim.save) this.bowlCrowd(res.grade === 'defend' || (yorker && sim.runs <= 1) ? 'dot' : 'runs');
     else this.bowlCrowdSoften();
 
     if (sim.catch) {
