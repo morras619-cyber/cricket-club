@@ -23,7 +23,7 @@ import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdSong, crowdBoo, crowdClap, ambienceMood } from './audio.js';
+import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdSong, crowdRuns, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { TAUNTS, pick } from './story.js';
 import { Duels, FULL, HOLD, gainOf, hotSpec, Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './heat.js';
@@ -1386,7 +1386,7 @@ export class Game {
   // opened the over (or came after a wicket: the one with the build-up) if it scores nothing, then every second dot
   homeClaps(inn, runs, wicket, iBat) {
     if (wicket) { this.clapDots = 0; return; }
-    if ((iBat ? this.myTeam : this.oppTeam).id === this.home) { if (runs >= 1 && runs <= 3) crowdClap(); return; }
+    if ((iBat ? this.myTeam : this.oppTeam).id === this.home) { if (runs >= 1 && runs <= 3 && !this.runsCheered) crowdClap(); this.runsCheered = false; return; }
     if (runs > 0) { this.clapDots = 0; return; }
     this.clapDots = (this.clapDots || 0) + 1;
     if (this.crowdBuild || this.clapDots >= 2) { this.clapDots = 0; crowdClap(); }
@@ -1591,6 +1591,8 @@ export class Game {
       if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
       cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
       if (six) this.sing(tClear / ballK / 1.6 + 2.2, 4.5, 0.45); // (the roar dies down into a few seconds of song)
+    } else if ((runs === 2 || runs === 3) && !o.caught && (o.side === 'ai' ? this.myTeam : this.oppTeam).id === this.home) {
+      crowdRuns(0.1); this.runsCheered = true;   // (two or three for the home side: its own cheer, with the applause riding it)
     } else if ((six || (toRope && this.heat <= RUNAWAY)) && (o.side === 'ai' ? this.myTeam : this.oppTeam).id !== this.home) {
       let tClear = end;
       for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
