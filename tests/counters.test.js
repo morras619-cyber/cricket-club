@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Mind, COUNTERS, affordable, cheapest, BRACE } from '../js/counters.js';
+import { Mind, COUNTERS, affordable, cheapest, BRACE } from '../js/heat.js';
 import { aiBat } from '../js/ai.js';
 import { resolveContact } from '../js/shots.js';
 import { makeDelivery } from '../js/physics.js';

@@ -26,8 +26,7 @@ import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { TAUNTS, pick } from './story.js';
-import { Duels, gainOf, hotSpec } from './heat.js';
-import { Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './counters.js';
+import { Duels, gainOf, hotSpec, Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './heat.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -286,7 +285,7 @@ export class Game {
     this.innings = [];
     // the heat between a batter and his bowler (js/heat.js): full matches only, not the fixed challenges, the war or the tutorial
     this.duels = new Duels(); this.heatOn = ['quick', 'league', 'cup', 'career'].includes(mode); this.ui.heat(null);
-    // the AI's hidden mind (js/counters.js): its own charge, when it fires its star's power, and its answers to yours; the same modes as the heat
+    // the AI's hidden mind (the end of js/heat.js): its own charge, when it fires its star's power, and its answers to yours; the same modes as the heat
     this.mindOn = this.heatOn; this.mind = this.mindOn ? new Mind(makeRng((this.seed ^ 0x5bd1e995) >>> 0)) : null; this.myCounter = null; this.aiCounterNow = null;
     try {
       if (mode === 'tutorial') return await this.runTutorial(!!opts.story);
@@ -973,7 +972,7 @@ export class Game {
     await this.sleepReal(this.bot ? 50 : 650);
   }
 
-  // ---------- counter-powers and the AI's mind (js/counters.js) ----------
+  // ---------- counter-powers and the AI's mind (the end of js/heat.js) ----------
   // The AI bowler may fire his star's power now (only the star bowler, and only if his hidden charge allows and the moment is right)
   mindBowlPower(inn, ballNo, spec, striker, bowler, opt) {
     if (!this.mindOn || spec.power || opt.scripted || opt.assist) return spec;
