@@ -27,6 +27,7 @@ import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, 
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { TAUNTS, pick } from './story.js';
 import { Duels, gainOf, hotSpec } from './heat.js';
+import { Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './counters.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -285,10 +286,12 @@ export class Game {
     this.innings = [];
     // the heat between a batter and his bowler (js/heat.js): full matches only, not the fixed challenges, the war or the tutorial
     this.duels = new Duels(); this.heatOn = ['quick', 'league', 'cup', 'career'].includes(mode); this.ui.heat(null);
+    // the AI's hidden mind (js/counters.js): its own charge, when it fires its star's power, and its answers to yours; the same modes as the heat
+    this.mindOn = this.heatOn; this.mind = this.mindOn ? new Mind(makeRng((this.seed ^ 0x5bd1e995) >>> 0)) : null; this.myCounter = null; this.aiCounterNow = null;
     try {
       if (mode === 'tutorial') return await this.runTutorial(!!opts.story);
       await this.pitchReport();
-      const script = aiBowlingScript(this.seed, this.aiPlan, this.rival.bowl?.power.kind);
+      const script = aiBowlingScript(this.seed, this.aiPlan, this.mindOn ? null : this.rival.bowl?.power.kind);   // (with a mind the AI chooses its own moment for the power)
       if (mode === 'daily') {
         // join the match late: the scoreboard, the over and the batter are already set
         const sc = this.scenario = opts.scenario;
@@ -374,6 +377,8 @@ export class Game {
   pitchBat() { return this.feel().bat; }
 
   newCharge(value) {
+    if (this.mind) this.mind.charge.value = this.mind.charge.carryOver();   // (the AI's meter carries a quarter over too: a new innings)
+    this.aiCounterNow = null; this.myCounter = null;
     this.charge = new Charge(value);
     this.charge.on(ev => this.onCharge(ev));
     this.ui.charge(value);
@@ -653,6 +658,7 @@ export class Game {
     else A[kind] = true;
     this.stats.powers++;
     this.starPower(this.myTeam);
+    this.aiAnswers(key, kind);
     if (def.cost >= 60 && !this.bot) {
       // signature powers get a full comic cut-in panel
       this.showCutIn(hero, def);
@@ -743,9 +749,11 @@ export class Game {
   windowsFor(fx, extra = 0, tornado = false, skill = 75, bowlSkill = 75) {
     const w = { ...CFG.timing };
     const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1);
-    for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? 40 : 0);
-    if (fx.focus) { w.perfect += 55; w.good += 45; }
+    const braced = fx.counter === 'brace';   // (the bowler answered this power with Brace: half of it)
+    for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? (braced ? 20 : 40) : 0);
+    if (fx.focus) { const h = braced ? BRACE.focusWindow : 1; w.perfect += 55 * h; w.good += 45 * h; }
     if (tornado) w.perfect /= 2;
+    if (fx.counter === 'steady') { w.perfect *= STEADY_SQUEEZE; w.good *= STEADY_SQUEEZE; }   // (his Steady Hands: the ball is exactly where he wants it)
     w.good = Math.max(w.good, w.perfect + 20);
     return w;
   }
@@ -767,6 +775,7 @@ export class Game {
     const rng = this.ballRng(ballNo);
     const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
     S.field3d = aiField.filter(f => !f.keeper && f.id !== 'bowler');
+    spec = this.mindBowlPower(inn, ballNo, spec, striker, bowler, opt);   // (with a mind it may fire its star's power now)
     const aiPower = spec.power;
     this.powerLock = false;
     this.refreshPowers();
@@ -786,6 +795,9 @@ export class Game {
     if (opt.waitPower) await opt.waitPower();
     await this.sleepReal(this.bot ? 150 : aiPower ? 1700 : 650);
     await this.powerPause();
+    // his power is announced: you may answer it (if you have the charge)
+    this.myCounter = null;
+    if (aiPower && this.mindOn && !opt.assist) this.myCounter = await this.counterWindow(aiPower);
     this.crowdBuild = this.wantBuild(ballNo) && !this.lastOverChorus(inn, ballNo, true);
     this.crowdHeat(inn, this.myTeam.id === this.home, true);
     this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
@@ -804,15 +816,19 @@ export class Game {
     this.powerLock = true;
     this.refreshPowers();
     const fx = this.consumeBatEffects();
+    const ac = this.takeAiCounter('bat');   // his answer to MY power, if I fired one
+    if (ac && (fx.focus || fx.thunder || fx.meteor || fx.mirror)) fx.counter = ac;
     if (fx.thunder) S.batter.glow = '#5fc8ff';
     if (fx.meteor) S.batter.glow = '#ff7a1a';
     if (fx.mirror) this.fx.flash('#7a3fe0', 0.25);
-    this.timeScale = (opt.slow ?? 1) * (fx.focus ? 0.6 : 1);
-    if (fx.focus) this.fx.speed = 0.6;
+    this.timeScale = (opt.slow ?? 1) * (fx.focus ? (fx.counter === 'brace' ? BRACE.focusSlow : 0.6) : 1);
+    if (fx.focus) this.fx.speed = fx.counter === 'brace' ? BRACE.focusSlow : 0.6;
 
     // a hot duel: a quick bowls faster, a spinner turns it more
     const hotBall = !opt.assist && this.duelHot(inn);
     if (hotBall) { spec = hotSpec(spec, btype.spin); this.fx.word(btype.spin ? 'HE\'S TURNING IT!' : 'HE\'S BOWLING FASTER!', this.W / 2, this.H * 0.3, { size: 36, color: '#ff9f1c', stroke: INK, dur: 1100 }); }
+    const myC = this.myCounter; this.myCounter = null;   // my answer to his power
+    if (myC === 'brace' && aiPower === 'tornado') spec = { ...spec, kmh: BRACE.tornadoKmh };
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
     this.fx.bubbles = [];
@@ -864,29 +880,30 @@ export class Game {
     if (striker.ability === 'eagleEye') skill += 12;
     if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
     if (bowler.ability === 'mystery') skill -= 12;
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado', skill, bowler.bowlSkill || 75);
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowler.bowlSkill || 75);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
-    if (fx.focus && grade === 'edge') grade = 'late'; // focused: no edges
+    if (fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
+    if (myC === 'steady' && swing && !swing.defend && grade !== 'perfect' && grade !== 'good') grade = 'good';   // Steady Hands: a Good timing, however he bowls it
     // defending is forgiving: anywhere in the wide window keeps the ball out
     if (swing?.defend) grade = Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
     this.lastTiming = { err, grade };
     let res;
     if (fx.meteor) {
       const e = tap ? Math.abs((tap.t - (S.ballT0 + d.tContact)) * 1000) / this.timeScale : 999;
-      const runs = e <= 60 ? 8 : e <= 130 ? 6 : 4;
+      const runs = Math.max(2, (e <= 60 ? 8 : e <= 130 ? 6 : 4) - (fx.counter === 'brace' ? BRACE.meteorLess : 0));
       grade = e <= 60 ? 'perfect' : e <= 130 ? 'good' : 'late';
       res = { outcome: 'hit', grade, meteorRuns: runs, angle: rng.range(-0.3, 0.3), loft: true, launchDeg: 36, v: 40, forced: { six: true } };
       S.batter.swingT0 = this.realTime;
       S.batter.shot = { anim: 'drive', t0: this.realTime };
-    } else if (S.maya && swing && !swing.defend && (S.maya.picked ? S.maya.picked !== S.maya.real : rng.chance(0.5))) {
+    } else if (S.maya && swing && !swing.defend && (S.maya.picked ? S.maya.picked !== S.maya.real : rng.chance(myC === 'brace' ? BRACE.mayaFooled : 0.5))) {
       // Maya Baja: only a shot can be fooled. Defending (a tap) is always safe; play at the wrong
       // ball, or swing without picking one, and the real one goes through you
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
       const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
-      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, tornado: aiPower === 'tornado', shatter: aiPower === 'shatter', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) });
-      if (aiPower === 'tornado' && grade === 'miss') res.outcome = 'bowled';
+      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) });
+      if (aiPower === 'tornado' && myC !== 'brace' && grade === 'miss') res.outcome = 'bowled';
     }
     if (opt.assist) res = opt.assist(res, grade) || res;
     this.timeScale = 1;
@@ -946,7 +963,7 @@ export class Game {
       }
     } else {
       this.hitGrade = grade;
-      await this.battingHit(inn, ballNo, res, grade, aiField, rng, fx);
+      await this.battingHit(inn, ballNo, res, grade, aiField, rng, fx.counter === 'brace' && grade !== 'perfect' ? { ...fx, thunder: false } : fx);
     }
     this.bowlCrowd(inn.wkts > before.wkts ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
     this.afterWicket = inn.wkts > before.wkts;
@@ -954,6 +971,78 @@ export class Game {
     this.hud(inn);
     if (!opt.assist) await this.battingBanter({ runs: inn.runs - before.runs, wicketFell: inn.wkts > before.wkts, beaten: res.outcome === 'beaten' || (res.outcome === 'edge' && inn.wkts === before.wkts), rng, inn });
     await this.sleepReal(this.bot ? 50 : 650);
+  }
+
+  // ---------- counter-powers and the AI's mind (js/counters.js) ----------
+  // The AI bowler may fire his star's power now (only the star bowler, and only if his hidden charge allows and the moment is right)
+  mindBowlPower(inn, ballNo, spec, striker, bowler, opt) {
+    if (!this.mindOn || spec.power || opt.scripted || opt.assist) return spec;
+    const star = this.rival.bowl, pw = star?.power;
+    if (!pw?.kind || bowler.hero?.id !== star.id) return spec;
+    const left = Math.max(1, inn.ballsLeft), last = inn.log.at(-1);
+    const ctx = {
+      kind: pw.kind, cost: this.mind.charge.cost(pw.cost, ballNo), ball: ballNo,
+      lastRuns: last == null || last === 'W' ? 0 : Number(last), setBat: inn.cur.balls >= 5 && inn.cur.runs >= 10,
+      pressure: inn.target != null ? (inn.target - inn.runs) / left < 1.4 : inn.runs / Math.max(1, inn.balls) > 1.7,
+      yourCharge: this.charge.value, wicketsLeft: inn.maxWkts - inn.wkts,
+    };
+    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(pw.cost, ballNo)) return spec;
+    this.mind.fired++;
+    const s = { ...spec };
+    applyPower(s, pw.kind);
+    return s;
+  }
+  // The AI batter may fire his star's power now
+  mindBatPower(inn, ballNo, striker, need) {
+    const star = this.rival.bat, pw = star?.power;
+    if (!pw?.kind || striker.id !== star.id) return false;
+    const last = inn.log.at(-1);
+    const ctx = {
+      kind: pw.kind, cost: this.mind.charge.cost(pw.cost, ballNo), ball: ballNo,
+      lastRuns: last == null || last === 'W' ? 0 : Number(last), setBat: inn.cur.balls >= 5 && inn.cur.runs >= 10,
+      pressure: need / Math.max(1, inn.ballsLeft) > 1.3, yourCharge: this.charge.value, wicketsLeft: inn.maxWkts - inn.wkts,
+    };
+    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(pw.cost, ballNo)) return false;
+    this.mind.fired++;
+    return true;
+  }
+  // I have fired a power: the AI may answer it, from its own hidden charge (you are only told if it does)
+  aiAnswers(key, kind) {
+    if (!this.mindOn) return;
+    const side = key === 'focus' || key === 'bat' ? 'bat' : key === 'pinpoint' || key === 'bowlpower' ? 'bowl' : null;
+    if (!side) return;
+    const inn = this.innings[this.innings.length - 1];
+    const id = this.mind.counter(kind, { wicketsLeft: inn ? inn.maxWkts - inn.wkts : 3 });
+    if (!id) return;
+    this.aiCounterNow = { id, side };
+    const say = () => { this.ui.banner('THEY ANSWERED!', `${COUNTERS[id].name}: ${COUNTERS[id].desc.toLowerCase()}`, 1700); this.fx.word(COUNTERS[id].name.toUpperCase() + '!', this.W / 2, this.H * 0.3, { size: 44, color: '#3ec6ff', stroke: INK, dur: 1300 }); };
+    if (this.bot) say(); else this.sleepReal(1500).then(say).catch(() => {});
+  }
+  takeAiCounter(side) {
+    const c = this.aiCounterNow;
+    if (!c || c.side !== side) return null;
+    this.aiCounterNow = null;
+    return c.id;
+  }
+  // The window to answer a power fired at me: Brace and Steady Hands, if I have the charge. Resolves with the one I took, or null.
+  async counterWindow(power) {
+    const ids = affordable(this.charge.value);
+    if (this.bot) {
+      const pick = ids.length && Math.random() < 0.6 ? ids[Math.floor(Math.random() * ids.length)] : null;
+      if (pick) this.charge.spend(COUNTERS[pick].cost, 0, COUNTERS[pick].name);
+      return pick;
+    }
+    let pick = null;
+    this.ui.counterChoice(true, { charge: this.charge.value, power, onPick: c => { pick = c; sfx.click(); } });
+    const t0 = this.realTime, limit = ids.length ? COUNTER_WINDOW_MS : 2200;   // (with no charge to answer with the buttons only show, greyed, for a moment)
+    await this.until(() => {
+      this.ui.counterTimer(1 - (this.realTime - t0) / limit);
+      return pick || this.realTime - t0 > limit;
+    });
+    this.ui.counterChoice(false);
+    const id = pick === 'none' ? null : pick;
+    if (id && this.charge.spend(COUNTERS[id].cost, 0, COUNTERS[id].name)) { this.fx.word(COUNTERS[id].name.toUpperCase() + '!', this.W / 2, this.H * 0.3, { size: 44, color: '#3ec6ff', stroke: INK, dur: 1300 }); return id; }
+    return null;
   }
 
   // ---------- the heat between a batter and his bowler ----------
@@ -1013,6 +1102,7 @@ export class Game {
   // The AI bowler talks while you bat. Answer a sledge with a boundary for REVENGE.
   async battingBanter({ runs, wicketFell, beaten, rng, inn }) {
     this.heatAfter(inn, { runs, wicketFell, beaten, good: runs === 0 });
+    this.mind?.earn({ batting: false, runs, wicket: wicketFell });
     const hotNow = this.pairHot();
     if (inn.done()) return;
     const p = this.cams.bat.project(this.S.bowler.x, 1.9, this.S.bowler.z);
@@ -1624,7 +1714,7 @@ export class Game {
     this.aiBatPower = null; this.clash = false;
     // batting first, the AI paces itself to a par score; in a super over or the shoot-out it swings
     const need = inn.kind !== 'main' ? 6 * inn.ballsLeft : inn.target != null ? inn.target - inn.runs : Math.max(12, 48 - inn.runs);
-    if (!opt.scripted && this.aiPowerBalls.has(ballNo) && striker.id === this.rival.bat?.id && need / Math.max(1, inn.ballsLeft) > 1.0) {
+    if (!opt.scripted && (this.mindOn ? this.mindBatPower(inn, ballNo, striker, need) : (this.aiPowerBalls.has(ballNo) && striker.id === this.rival.bat?.id && need / Math.max(1, inn.ballsLeft) > 1.0))) {
       this.aiPowerBalls.delete(ballNo);
       const k = this.rival.bat.power.kind;
       this.aiBatPower = k === 'meteor' ? 'thunder' : k;
@@ -1634,6 +1724,8 @@ export class Game {
       this.ui.banner(`${this.rival.bat.name.toUpperCase()}: ${pw.name.toUpperCase()}!`, 'Answer with a power of your own', 2000);
       if (this.aiBatPower === 'mirror') this.aiMirror = 3;
       sfx.whoosh();
+      // his power is announced: you may answer it (if you have the charge)
+      if (this.mindOn) { await this.powerPause(); this.myCounter = await this.counterWindow(this.aiBatPower); }
     }
     const aiPower = this.aiBatPower || (this.aiMirror > 0 ? 'mirror' : null);
     const stance = opt.stance || aiStance(kind, rng);
@@ -1672,9 +1764,12 @@ export class Game {
     this.thinks = null;
     if (stance === 'charge') this.fx.word('CHARGING DOWN!', this.W / 2, this.H * 0.22, { size: 30, color: '#fff4da', stroke: INK, rot: 0, dur: 900 });
 
+    const myC = this.myCounter; this.myCounter = null;   // my answer to his power
+    const ac = this.takeAiCounter('bowl');                // his answer to MY power, if I fired one
     let rg = G.hesitated ? 'loose' : G.grade;
     const pinpoint = !!this.armed.pinpoint;
-    if (pinpoint) { rg = 'perfect'; this.armed.pinpoint = false; }
+    if (pinpoint) { rg = ac === 'brace' ? 'good' : 'perfect'; this.armed.pinpoint = false; }
+    if (myC === 'steady' && (rg === 'loose' || rg === 'bad')) rg = 'good';   // Steady Hands: a Good release, however I flick it
     if (bowler.ability === 'deathKing' && ballNo >= 25 && (rg === 'loose' || rg === 'bad')) rg = 'good'; // never sprays it at the death
     if (opt.forceRelease) rg = opt.forceRelease(rg);
     // finish the run-up
@@ -1710,16 +1805,16 @@ export class Game {
       if (spec.bounce != null) { spec.bounce = clamp(spec.bounce + rng.range(-0.4, 0.4), 0.7, 11.5); spec.length = lengthForBounce(spec.bounce); spec.h = heightForBounce(spec.bounce); }
     }
     if (rg === 'perfect') { spec.swing *= 1.15; spec.move *= 1.15; }
-    if (pinpoint) { spec.swing *= 1.5; spec.move *= 1.5; } // the Pinpoint Spark: it moves much more too
+    if (pinpoint) { const k = ac === 'brace' ? 1.25 : 1.5; spec.swing *= k; spec.move *= k; } // the Pinpoint Spark: it moves much more too
     // a better bowler moves it more and bowls quicker
     spec.swing *= movementFor(bowler.bowlSkill); spec.move *= movementFor(bowler.bowlSkill); spec.kmh *= paceFor(bowler.bowlSkill);
     if (bowler.ability === 'swingMaster') { spec.swing *= 1.3; spec.move *= 1.3; }
     const fxFlags = {};
     const A = this.armed;
     let usedPower = null;
-    if (A.tornado) { Object.assign(spec, { length: 'yorker', bounce: 0.9, h: 0.12, x: 0, kmh: 160, swing: 0.05, move: 0 }); fxFlags.tornado = true; A.tornado = false; usedPower = 'tornado'; }
-    if (A.maya) { fxFlags.maya = true; A.maya = false; usedPower = 'maya'; }
-    if (A.shatter) { spec.move = 0.3; fxFlags.shatter = true; A.shatter = false; usedPower = 'shatter'; }
+    if (A.tornado) { Object.assign(spec, { length: 'yorker', bounce: 0.9, h: 0.12, x: 0, kmh: ac === 'brace' ? BRACE.tornadoKmh : 160, swing: 0.05, move: 0 }); fxFlags.tornado = ac !== 'brace'; A.tornado = false; usedPower = 'tornado'; }
+    if (A.maya) { fxFlags.maya = true; fxFlags.mayaBrace = ac === 'brace'; A.maya = false; usedPower = 'maya'; }
+    if (A.shatter) { spec.move = 0.3; fxFlags.shatter = true; fxFlags.shatterHalf = ac === 'brace'; A.shatter = false; usedPower = 'shatter'; }
     if (!usedPower) Object.assign(spec, this.pitched(spec, btype));
     // the ball pitches on the ring; seam and spin move it after the bounce (x is its line at the stumps)
     if (!usedPower && spec.bounce != null) spec.x = spec.x + (spec.move || 0);
@@ -1777,8 +1872,8 @@ export class Game {
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const pf = this.feel();
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * pf.ai * aiHome / pf.bat };
-    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * 1.6 } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
-    if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
+    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || (ai.grade === 'good' && myC !== 'brace'))) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
     if (opt.findHit) { const r = this.findHit(opt.findHit, field); if (r) ai = { ...ai, grade: 'good', res: r }; }
@@ -2087,6 +2182,7 @@ export class Game {
 
   async bowlingBanter({ runs, wicketFell, goodBall, rng, inn }) {
     this.heatAfter(inn, { runs, wicketFell, beaten: goodBall && runs === 0 && !wicketFell, good: runs === 0 });
+    this.mind?.earn({ batting: true, runs, wicket: wicketFell, grade: this.hitGrade });
     const hotNow = this.pairHot();
     if (inn.done() && !wicketFell) return;
     // banter lines are keyed by hero (regulars use the generic lines); how a sledge lands

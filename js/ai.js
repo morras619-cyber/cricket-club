@@ -123,7 +123,7 @@ export function aiBat(d, ctx, rng) {
   if (ctx.release === 'perfect') sigma *= 1.2;
   if (ctx.release === 'loose') sigma *= 0.8;
   if (ctx.repeats >= 3) sigma *= 0.8;
-  if (ctx.power === 'thunder') sigma *= 0.7;
+  if (ctx.power === 'thunder') sigma *= ctx.brace ? 0.85 : 0.7;   // (a braced bowler halves it)
   if (ctx.freeHit) sigma *= 0.85; // he picks his spot and commits to it
   if (ctx.hot) sigma *= HOT_BAT.sigma; // the duel is hot: he swings as hard as he can, and misses more
   const mods = ctx.mods || {};
@@ -142,12 +142,13 @@ export function aiBat(d, ctx, rng) {
     return { errMs, shot: block, grade: 'defend', res: resolveContact({ grade: 'defend', errMs, shot: block, d, fx: ctx.fx || {}, rng, strength: 1 }) };
   }
 
-  if (ctx.fx?.maya && !rng.chance(0.5)) {
+  if (ctx.fx?.maya && !rng.chance(ctx.fx.mayaBrace ? 0.75 : 0.5)) {
     return { errMs, shot, grade: 'miss', res: { outcome: 'bowled', grade: 'miss', mayaFooled: true } };
   }
   let grade = gradeTiming(errMs, w, d.xt > 0.08);
+  if (ctx.steady && grade !== 'perfect') grade = 'good';   // his Steady Hands: a Good timing, however it is bowled
   if (mods.edgeBoost && ['good', 'early', 'late'].includes(grade) && d.xt > -0.05 && rng.chance(mods.edgeBoost)) grade = 'edge';
-  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder' }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) });
+  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder', braced: !!ctx.brace }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) });
   // through the gate: a mistimed swing at a full, straight ball can miss it and lose the stumps.
   // A weaker batter is beaten more often; a yorker on the stumps is the hardest to keep out.
   if ((grade === 'early' || grade === 'late' || grade === 'edge') && !ctx.freeHit && d.onStumps && ['good', 'full', 'yorker', 'fulltoss'].includes(d.length)) {

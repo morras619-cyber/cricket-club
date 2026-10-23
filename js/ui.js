@@ -285,5 +285,32 @@ export class UI {
     });
   }
 
+  // The answer to a power fired at you: Brace and Steady Hands (greyed when you lack the charge), or take it. onPick gets 'brace', 'steady' or 'none'.
+  counterChoice(on, { charge = 0, power = '', onPick } = {}) {
+    let box = $('counterBox');
+    if (!box) {
+      if (!on) return;
+      box = document.createElement('div'); box.id = 'counterBox'; box.className = 'banter counters'; box.hidden = true;
+      box.innerHTML = '<b class="counter-head"></b><div class="banter-row"></div><div class="banter-timer"><i id="counterBar"></i></div>';
+      $('banterBox').parentNode.insertBefore(box, $('banterBox'));
+    }
+    box.hidden = !on;
+    $('powers').hidden = on;
+    if (!on) { this.onCounter = null; return; }
+    const row = box.querySelector('.banter-row');
+    row.innerHTML = '';
+    const mk = (id, label, cost, cls) => {
+      const b = document.createElement('button');
+      b.className = `banterbtn counterbtn ${cls}`;
+      b.innerHTML = cost ? `${label}<small>${cost} ⚡</small>` : label;
+      b.disabled = cost > charge;
+      b.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); if (!b.disabled) this.onCounter?.(id); });
+      row.append(b);
+    };
+    mk('brace', 'Brace', 20, 'smack'); mk('steady', 'Steady Hands', 25, 'smack'); mk('none', 'Take it', 0, 'cool');
+    box.querySelector('.counter-head').textContent = charge >= 20 ? 'ANSWER THE POWER?' : 'NOT ENOUGH CHARGE TO ANSWER';
+    this.onCounter = onPick;
+  }
+  counterTimer(p) { const b = $('counterBar'); if (b) b.style.width = `${Math.max(0, p) * 100}%`; }
   banterTimer(p) { $('banterBar').style.width = `${Math.max(0, p) * 100}%`; }
 }

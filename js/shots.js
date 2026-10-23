@@ -44,7 +44,7 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
     return { outcome: 'hit', grade: 'defend', angle: rng.range(-0.6, 0.6), loft: false, launchDeg: 0, v: 5 + rng.range(0, 4), forced: { cap: rng.chance(0.25) ? 1 : 0 } }; // mostly a dot, sometimes a nudged single
   }
 
-  if (fx.shatter && grade !== 'perfect') grade = 'edge';
+  if (fx.shatter && grade !== 'perfect' && !(fx.shatterHalf && grade === 'good')) grade = 'edge';   // (braced: a Good contact is spared)
   if (grade === 'edge') {
     return {
       outcome: 'edge', grade,
@@ -92,10 +92,11 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
 
   let forced = null;
   const good = grade === 'perfect' || grade === 'good';
+  const powerOk = fx.braced ? grade === 'perfect' : good;   // (a braced power only works at its best, on a Perfect)
   if (fx.thunder) {
-    forced = good ? { six: true } : { four: true, uncatchable: true };
-    angle = shot.angle; loft = good; launchDeg = good ? 34 : 0; power = 1;
-  } else if (fx.mirror && !loft && good) {
+    forced = powerOk ? { six: true } : { four: true, uncatchable: true };
+    angle = shot.angle; loft = powerOk; launchDeg = powerOk ? 34 : 0; power = 1;
+  } else if (fx.mirror && !loft && powerOk) {
     forced = { four: true, uncatchable: true };
   }
   let v = (14 + 20 * power) * (1 + rng.range(-0.04, 0.04)) * strength * (fx.pitch?.carry || 1);   // (the pitch: shots carry on a flat deck, die on a slow one)
