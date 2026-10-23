@@ -34,10 +34,10 @@ test('every song fades in, holds a steady level for seconds, and fades out', { s
   assert.ok(all.length / rate > 8 * 10.5 - 1, 'eight slots');
   for (let slot = 0; slot < 8; slot++) {
     const m = all.subarray(Math.round(slot * 10.5 * rate), Math.round((slot * 10.5 + 10) * rate)), c = { mono: m, rate };
-    const mid = at(c, 4, 0.5);
+    const levels = [1, 2, 3, 4, 5, 6, 7, 8].map(t => at(c, t)), mid = [...levels].sort((x, y) => x - y)[4];   // (the typical level: some songs chant in phrases with short pauses)
     assert.ok(mid > 0.05, `slot ${slot}: a clear crowd`);
     assert.ok(at(c, 0, 0.05) < mid * 0.3, `slot ${slot}: it fades in, not a sudden start`);
-    for (const t of [3, 5, 7]) assert.ok(at(c, t) > mid * 0.25 && at(c, t) < mid * 2.6, `slot ${slot}: a crowd (not a gap) at ${t}s`);
+    for (const l of levels) assert.ok(l > mid * 0.1 && l < mid * 2.2, `slot ${slot}: a crowd, never silent and never a spike`);
     assert.ok(at(c, 9.85, 0.1) < mid * 0.15, `slot ${slot}: it fades out, not cut off`);
   }
 });
