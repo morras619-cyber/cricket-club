@@ -1966,7 +1966,7 @@ export class Game {
     const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const pf = this.feel();
-    const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * pf.ai * aiHome / pf.bat };
+    const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * (pf.ai / pf.bat) ** 1.5 * aiHome };   // (raised: the pitch has to be felt)
     const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length });
     const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
     let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
@@ -2063,7 +2063,7 @@ export class Game {
       }
     } else {
       this.hitGrade = ai.grade;
-      await this.bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit, d.length === 'yorker');
+      await this.bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit, { yorker: d.length === 'yorker', gamble: ballNo >= 26 || need / Math.max(1, inn.ballsLeft) > 1.7 });   // (the AI gambles on a close second run only when it needs the runs)
     }
     this.view = 'bowl';
     this.hud(inn);
@@ -2380,8 +2380,9 @@ export class Game {
 
   noteEvent(ballNo) { this.fieldState.events++; this.fieldState.lastEventBall = ballNo; }
 
-  async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit, yorker = false) {
-    const sim = simulateHit(res, field, rng, { aiBatting: true, speed: this.pitch.field * fieldSpeed(this.sideRating(this.mySide)), riskyRun: res.risky ? 1 : undefined });
+  async bowlingHit(inn, ballNo, res, field, rng, wicket, freeHit, info = {}) {
+    const yorker = !!info.yorker;
+    const sim = simulateHit(res, field, rng, { aiBatting: true, gamble: info.gamble, speed: this.pitch.field * fieldSpeed(this.sideRating(this.mySide)), riskyRun: res.risky ? 1 : undefined });
     const ctl = ch => playerControls(ch, this.fieldState, ballNo);
     // a block gets the groan, and so does a yorker that is only just kept out (a run at most); a ball hit away only lets the build-up fade.
     // With a catch chance the build-up softens while it is decided (a catch taken is a wicket: the roar comes then)
@@ -2421,7 +2422,7 @@ export class Game {
       let r;
       if (ctl(ch)) { this.noteEvent(ballNo); r = await this.runOutEvent(sim, field); }
       else {
-        const out = rng.chance(ch.p * 0.8);
+        const out = rng.chance(ch.p * 0.45);   // (a throw you leave to the fielders is not a sure run-out: tap to take part)
         await this.showAutoPlay(sim, field, { side: 'player', runOut: out });
         r = { out, runs: out ? sim.runOut.attempt - 1 : sim.runOut.attempt, auto: true };
         // a run out you didn't take part in still has to be seen: say who's gone

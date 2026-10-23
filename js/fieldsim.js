@@ -154,7 +154,7 @@ export function runOutMargins(t, p, runsDone) {
 }
 
 // Simulates where the ball goes and what chances it creates.
-// opts.aiBatting: the AI is batting, so it may attempt a risky extra run.
+// opts.aiBatting: the AI is batting, so it may attempt an extra run (opts.gamble: it needs the runs, so it takes a close one too).
 export function simulateHit(res, fielders, rng, opts = {}) {
   const path = makePath(res);
   const out = { path, kind: 'field', runs: 0, catch: null, intercept: null, save: null, runOut: null, duration: 2 };
@@ -216,7 +216,9 @@ export function simulateHit(res, fielders, rng, opts = {}) {
       if (opts.aiBatting && out.runs < 3) {
         const m = runOutMargins(t, p, out.runs);
         const worst = Math.min(m.striker, m.bowler);
-        if (worst > -0.6 && worst < 0.6 && rng.chance(opts.riskyRun ?? 0.55)) {
+        // the AI takes a second run only when it looks no worse than a gamble; it gambles on a close one only when it must have the runs
+        const lo = opts.riskyRun != null ? -0.6 : opts.gamble ? -0.5 : -0.3;
+        if (worst > lo && worst < 0.6 && rng.chance(opts.riskyRun ?? 0.55)) {
           out.runOut = { margins: m, point: p, t, fielder: hit, attempt: out.runs + 1 };
         }
       }

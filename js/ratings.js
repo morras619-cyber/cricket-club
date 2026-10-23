@@ -16,7 +16,7 @@ export const bowlerSqueeze = bowlSkill => clamp(1 - ((bowlSkill ?? 75) - 75) / 3
 
 // the computer batting: how widely his timing strays (bigger = more mistimed). A 94 is
 // clean almost every ball, a 64 mistimes plenty; a good bowler (yours) makes him mistime more
-export const aiSpread = skill => clamp(1 + (75 - (skill ?? 75)) / 100, 0.92, 1.4);
+export const aiSpread = skill => clamp(1 + (75 - (skill ?? 75)) / 90, 0.9, 1.45);
 export const bowlerTrouble = bowlSkill => clamp(1 + ((bowlSkill ?? 75) - 75) / 150, 0.85, 1.15);
 
 // your bowler: a better one moves it more and bowls quicker
@@ -35,7 +35,7 @@ export const keeperEase = r => clamp(1 + ((r ?? 75) - 75) / 100, 0.8, 1.2);
 const strengthOf = r => 0.4 + 0.6 * clamp(((r ?? 75) - 50) / 45, 0, 1);
 const weaknessOf = r => 1 - 0.6 * clamp(((r ?? 75) - 50) / 45, 0, 1);
 // the pitch: a bowler with seam, swing or turn wins on a pitch that gives it (f above 1), loses on one that does not
-const exploit = (f, s, w) => (f > 1 ? 1 - 0.1 * s * clamp((f - 1) / 0.3, 0, 1) : 1 + 0.1 * w * clamp((1 - f) / 0.3, 0, 1));
+const exploit = (f, s, w) => (f > 1 ? 1 - 0.18 * s * clamp((f - 1) / 0.3, 0, 1) : 1 + 0.18 * w * clamp((1 - f) / 0.3, 0, 1));
 
 // batter: { bat (rating), role... } as a player; bowler: a player; ctx: { feel (pitchFeel), ballNo, length }
 // -> { win: his timing windows (1 = no change, below 1 favours the bowler), power: how hard he hits it, edgeP: an extra chance of an edge }
@@ -48,35 +48,40 @@ export function matchup(batter, bowler, ctx = {}) {
   // the batter's type
   switch (type) {
     case 'power':
-      out.power *= 1 + 0.08 * bs;
-      if (bowler.bowl === 'swing' || bowler.bowl === 'leftpace') out.win *= 1 - 0.15 * bw * q;   // struggles against quality swing
+      out.power *= 1 + 0.16 * bs;
+      if (bowler.bowl === 'swing' || bowler.bowl === 'leftpace') out.win *= 1 - 0.3 * bw * q;   // struggles against quality swing
       break;
-    case 'tactical': out.win *= 1 + 0.05 * bs; out.power *= 1 - 0.04 * bw; break;
+    case 'tactical': out.win *= 1 + 0.1 * bs; out.power *= 1 - 0.08 * bw; break;
     case 'touch':
-      out.win *= 1 + 0.08 * bs;
-      if (ctx.length === 'short' || ctx.length === 'bouncer') out.win *= 1 - 0.12 * bw;   // hates the short ball
+      out.win *= 1 + 0.16 * bs;
+      if (ctx.length === 'short' || ctx.length === 'bouncer') out.win *= 1 - 0.25 * bw;   // hates the short ball
       break;
     case 'finisher':
-      if (ball >= 25) { out.win *= 1 + 0.1 * bs; out.power *= 1 + 0.05 * bs; }
-      else if (ball <= 8) out.win *= 1 - 0.1 * bw;                                         // a slow starter
+      if (ball >= 25) { out.win *= 1 + 0.2 * bs; out.power *= 1 + 0.1 * bs; }
+      else if (ball <= 8) out.win *= 1 - 0.2 * bw;                                         // a slow starter
       break;
     case 'opener':
-      if (ball <= 12) out.power *= 1 + 0.06 * bs;
-      if (ball <= 8) out.edgeP += 0.06 * bw;                                               // loses wickets early
+      if (ball <= 12) { out.power *= 1 + 0.12 * bs; out.win *= 1 + 0.12 * bs; }   // scores fast early
+      if (ball <= 8) out.edgeP += 0.12 * bw;                                               // loses wickets early
       break;
-    case 'anchor': out.win *= 1 + 0.04 * bs; out.power *= 1 - 0.06 * bw; break;
-    case 'keeper': out.win *= 1 + 0.04 * bs; out.power *= 1 - 0.05 * bw; break;
+    case 'anchor': out.win *= 1 + 0.1 * bs; out.power *= 1 - 0.12 * bw; break;
+    case 'keeper': out.win *= 1 + 0.08 * bs; out.power *= 1 - 0.1 * bw; break;
     default: break;
   }
   // the bowler's type
   switch (bowler.bowl) {
-    case 'express': out.win *= 1 - 0.04 * ws; if (ball >= 25) out.win *= 1 + 0.05 * ww; break;   // tires at the death
+    case 'express': out.win *= 1 - 0.08 * ws; if (ball >= 25) out.win *= 1 + 0.1 * ww; break;   // tires at the death
     case 'swing': out.win *= exploit(f.swing ?? 1, ws, ww); break;
     case 'seam': out.win *= exploit(f.seam ?? 1, ws, ww); break;
-    case 'leftpace': out.win *= 1 - 0.04 * ws; break;
+    case 'leftpace': out.win *= 1 - 0.08 * ws; break;
     case 'offspin': out.win *= exploit(f.turn ?? 1, ws, ww); break;
-    case 'legspin': out.win *= exploit(f.turn ?? 1, ws, ww) * (1 - 0.03 * ws); break;
+    case 'legspin': out.win *= exploit(f.turn ?? 1, ws, ww) * (1 - 0.06 * ws); break;
     default: break;
   }
+  // the pitch itself, whoever bowls: an uneven one is hard to time, a low or slow one holds the ball up, a bouncy one finds the edge
+  if (f.uneven) out.win *= 1 - 1.0 * f.uneven;
+  if (f.bounce < 1) out.win *= 1 - 0.3 * (1 - f.bounce);
+  if (f.bounce > 1 && ctx.length !== 'yorker' && ctx.length !== 'fulltoss') out.edgeP += 0.5 * (f.bounce - 1);
+  if (f.skid < 1) out.win *= 1 - 0.5 * (1 - f.skid);
   return out;
 }
