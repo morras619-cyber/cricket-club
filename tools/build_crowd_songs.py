@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""The eight home crowds' songs (snd/crowd-songs.mp3), from tools/audio/src/song-<club>.mp3. Each recording is 3 s and loud at both
+"""The home crowds' songs (snd/crowd-songs.mp3), from tools/audio/src/song-<club>.mp3. Each recording is 3 s and loud at both
 ends (cut off), so each is made the way tools/build_crowd_mood.py makes the default singing: the whistle line near 6 kHz taken out,
 the steady middle carried on (folded over itself with crossfades) to 10 s, faded in and out, and levelled to the default singing.
-The eight are laid end to end, one slot of SLOT seconds each in CLUBS order, in a single file (the published game is at its file
+The seven are laid end to end (Thunder Strikers sing the default, snd/crowd-sing.wav), one slot of SLOT seconds each in CLUBS order, in a single file (the published game is at its file
 limit): js/audio.js cuts the home club's song out of it. Keep CLUBS and SLOT in step with js/audio.js.
 usage: python3 tools/build_crowd_songs.py   (needs ffmpeg with libmp3lame, numpy, scipy)
 """
@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'audio', 'src')
 OUT = os.path.join(HERE, '..', 'snd')
 SR = 32000
-CLUBS = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals']
+CLUBS = ['cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals']
 SONG_LEN, SLOT = 10.0, 10.5      # seconds of song, and the slot it sits in (the gap is silence: room for the mp3 encoder's delay)
 SING_IN, SING_OUT = 0.35, 1.6
 TARGET_RMS = 0.185               # the default singing (snd/crowd-sing.wav), both channels

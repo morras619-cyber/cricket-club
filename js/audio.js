@@ -179,14 +179,37 @@ function loadMood() {
   }
   return moodLoading;
 }
+// Two or three runs for the home side: a soft swell of cheer as the ball runs away (a third of a six's roar, and no pop at the end of
+// it), then the crowd applauds. A four or a six has its own roar (cheerStart); one or no run is only the quiet clap that follows.
+export function crowdRuns(delay = 0) {
+  if (!ready()) return;
+  if (!cheerBuf) { loadCheer(); return; }
+  if (!moodBufs) { loadMood(); return; }
+  const now = ac.currentTime, t = now + Math.max(0, delay);
+  if (t < clapUntil || now < roarUntil) return;
+  cheerStop(0.15); singDuck(0.4);
+  // the rise of the boundary cheer, before its peak (the pop that comes at CUE is left out), played low and faded away
+  const from = Math.max(0, CUE - 2.6), len = 1.9, src = ac.createBufferSource(), g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(RUNS_CHEER, t + 0.8); g.gain.setValueAtTime(RUNS_CHEER, t + 1.1); g.gain.linearRampToValueAtTime(0.0001, t + len);
+  src.buffer = cheerBuf; src.connect(g).connect(master); src.start(t, from, len + 0.05);
+  // ...and the applause, coming in as the swell goes
+  const clap = moodBufs.claps[clapNext++ % moodBufs.claps.length], cs = ac.createBufferSource(), cg = ac.createGain();
+  cg.gain.setValueAtTime(0.0001, t + 0.7); cg.gain.linearRampToValueAtTime(RUNS_CLAP, t + 1.3);
+  cs.buffer = clap; cs.connect(cg).connect(master); cs.start(t + 0.7);
+  clapUntil = t + 0.7 + clap.duration;
+  roarUntil = Math.max(roarUntil, t + 0.7 + clap.duration * 0.7);                 // (the synthetic crowd stays quiet under it)
+}
+const RUNS_CHEER = 0.3, RUNS_CLAP = 0.28;
+
 // ---------- each club's own song ----------
 // snd/crowd-songs.mp3 holds the eight main clubs' songs one after another (SONG_SLOT seconds apart, SONG_LEN of song in each;
 // tools/build_crowd_songs.py). The home crowd sings its club's song; a club without one sings the default.
-const SONG_CLUBS = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals'], SONG_SLOT = 10.5, SONG_LEN = 10;
+const SONG_CLUBS = ['cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals'], SONG_SLOT = 10.5, SONG_LEN = 10;
 let song = null, songFor = null, songTried = null;
 export function crowdSong(teamId) {
   songFor = teamId; song = null; songTried = null;
   const i = SONG_CLUBS.indexOf(teamId);
+  if (ac) { loadCheer(); loadMood(); }   // (ready for the first cheer and applause of the match)
   if (i < 0 || !ac) return;
   songTried = teamId;
   fetch('snd/crowd-songs.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no))).then(all => {
