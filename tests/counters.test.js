@@ -34,8 +34,8 @@ test('the AI earns charge from play, fires only when it can pay, and holds some 
   for (let i = 0; i < 6; i++) m.earn({ batting: false, runs: 0 });
   m.earn({ batting: false, wicket: true });
   assert.ok(m.value > 30, 'dots and a wicket fill it');
-  m.earn({ batting: true, wicket: true });
-  assert.ok(m.value < 70);
+  m.charge.value = 50; m.earn({ batting: true, wicket: true });
+  assert.equal(m.value, 30, 'losing a wicket costs it 20');
   const base = { kind: 'tornado', cost: 60, ball: 20, lastRuns: 4, setBat: true, pressure: false, yourCharge: 0, wicketsLeft: 3 };
   const low = new Mind(makeRng(7)); low.charge.value = 59;
   assert.equal(low.wantsToFire(base), false, 'cannot afford it');

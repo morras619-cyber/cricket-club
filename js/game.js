@@ -797,7 +797,7 @@ export class Game {
     await this.powerPause();
     // his power is announced: you may answer it (if you have the charge)
     this.myCounter = null;
-    if (aiPower && this.mindOn && !opt.assist) this.myCounter = await this.counterWindow(aiPower);
+    if (aiPower && this.mindOn && !opt.assist) this.myCounter = await this.counterWindow(aiPower, opt.hint !== undefined ? opt.hint : 'SPECIAL BALL! TAP TO DEFEND');
     this.crowdBuild = this.wantBuild(ballNo) && !this.lastOverChorus(inn, ballNo, true);
     this.crowdHeat(inn, this.myTeam.id === this.home, true);
     this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
@@ -1024,22 +1024,29 @@ export class Game {
     this.aiCounterNow = null;
     return c.id;
   }
-  // The window to answer a power fired at me: Brace and Steady Hands, if I have the charge. Resolves with the one I took, or null.
-  async counterWindow(power) {
+  // The window to answer a power fired at me. Brace and Steady Hands take the place of my powers at the bottom (with my hero's face),
+  // greyed if I lack the charge, for a few seconds; my powers come back after. Resolves with the one I took, or null.
+  async counterWindow(power, restoreHint = null) {
     const ids = affordable(this.charge.value);
     if (this.bot) {
       const pick = ids.length && Math.random() < 0.6 ? ids[Math.floor(Math.random() * ids.length)] : null;
       if (pick) this.charge.spend(COUNTERS[pick].cost, 0, COUNTERS[pick].name);
       return pick;
     }
+    const batting = this.phase === 'bat', hero = this.heroFor(batting ? 'bat' : 'bowl'), pose = batting ? 'bat' : 'bowl';
     let pick = null;
-    this.ui.counterChoice(true, { charge: this.charge.value, power, onPick: c => { pick = c; sfx.click(); } });
-    const t0 = this.realTime, limit = ids.length ? COUNTER_WINDOW_MS : 2200;   // (with no charge to answer with the buttons only show, greyed, for a moment)
+    const card = (id, name, cost) => ({ key: `cnt-${id}`, name, cost, hero, pose, team: this.myTeam, state: !cost || this.charge.value >= cost ? 'ready' : 'off', sub: cost ? null : '', onTap: () => { pick = id; sfx.click(); } });
+    this.ui.powers([card('brace', COUNTERS.brace.name, COUNTERS.brace.cost), card('steady', COUNTERS.steady.name, COUNTERS.steady.cost), card('none', 'Take it', null)]);
+    this.ui.hint(ids.length ? 'ANSWER THE POWER?' : 'NOT ENOUGH CHARGE TO ANSWER');
+    this.ui.counterBar(true);
+    const t0 = this.realTime, limit = ids.length ? COUNTER_WINDOW_MS : 2200;   // (with no charge to answer with, the greyed cards show for a moment)
     await this.until(() => {
       this.ui.counterTimer(1 - (this.realTime - t0) / limit);
       return pick || this.realTime - t0 > limit;
     });
-    this.ui.counterChoice(false);
+    this.ui.counterBar(false);
+    this.ui.hint(restoreHint);
+    this.refreshPowers();
     const id = pick === 'none' ? null : pick;
     if (id && this.charge.spend(COUNTERS[id].cost, 0, COUNTERS[id].name)) { this.fx.word(COUNTERS[id].name.toUpperCase() + '!', this.W / 2, this.H * 0.3, { size: 44, color: '#3ec6ff', stroke: INK, dur: 1300 }); return id; }
     return null;

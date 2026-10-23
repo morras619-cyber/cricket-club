@@ -162,7 +162,7 @@ export class UI {
       box.classList.toggle('n3', list.length >= 3);
       for (const p of list) {
         const b = document.createElement('button');
-        b.className = 'power';
+        b.className = p.key.startsWith('cnt-') ? 'power cnt' : 'power';   // (cnt: an answer to a power, swapped in for a few seconds)
         b.dataset.key = p.key;
         // the hero's painted face in the club's colours (it draws itself once its picture has loaded); the drawn figure if he has none
         const face = p.hero?.id && portraitFace({ heroId: p.hero.id }, p.team || null, 40);
@@ -185,7 +185,7 @@ export class UI {
       // refit when the name or the card width changes (the SET FIELD button narrows the row)
       const fitKey = `${p.name}|${pn.clientWidth}`;
       if (pn.dataset.fit !== fitKey) { setFit(pn, p.name); pn.dataset.fit = `${p.name}|${pn.clientWidth}`; }
-      b.querySelector('.pcost').textContent = p.state === 'armed' ? 'ARMED' : `${p.cost} ⚡`;
+      b.querySelector('.pcost').textContent = p.state === 'armed' ? 'ARMED' : p.cost == null ? (p.sub || '') : `${p.cost} ⚡`;
       b.disabled = p.state === 'off';
       b.classList.toggle('armed', p.state === 'armed');
       b.classList.toggle('ready', p.state === 'ready');
@@ -285,32 +285,17 @@ export class UI {
     });
   }
 
-  // The answer to a power fired at you: Brace and Steady Hands (greyed when you lack the charge), or take it. onPick gets 'brace', 'steady' or 'none'.
-  counterChoice(on, { charge = 0, power = '', onPick } = {}) {
-    let box = $('counterBox');
-    if (!box) {
+  // While you may answer a power fired at you, a timer bar sits over the buttons (the buttons themselves are the powers row, swapped: game.js)
+  counterBar(on) {
+    let bar = $('counterTimerBar');
+    if (!bar) {
       if (!on) return;
-      box = document.createElement('div'); box.id = 'counterBox'; box.className = 'banter counters'; box.hidden = true;
-      box.innerHTML = '<b class="counter-head"></b><div class="banter-row"></div><div class="banter-timer"><i id="counterBar"></i></div>';
-      $('banterBox').parentNode.insertBefore(box, $('banterBox'));
+      bar = document.createElement('div'); bar.id = 'counterTimerBar'; bar.className = 'banter-timer counter-timer'; bar.hidden = true;
+      bar.innerHTML = '<i id="counterBar"></i>';
+      $('powers').closest('.actionrow').before(bar);
     }
-    box.hidden = !on;
-    $('powers').hidden = on;
-    $('hint').style.visibility = on ? 'hidden' : '';   // (the hint would sit on top of the buttons)
-    if (!on) { this.onCounter = null; return; }
-    const row = box.querySelector('.banter-row');
-    row.innerHTML = '';
-    const mk = (id, label, cost, cls) => {
-      const b = document.createElement('button');
-      b.className = `banterbtn counterbtn ${cls}`;
-      b.innerHTML = cost ? `${label}<small>${cost} ⚡</small>` : label;
-      b.disabled = cost > charge;
-      b.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); if (!b.disabled) this.onCounter?.(id); });
-      row.append(b);
-    };
-    mk('brace', 'Brace', 20, 'smack'); mk('steady', 'Steady Hands', 25, 'smack'); mk('none', 'Take it', 0, 'cool');
-    box.querySelector('.counter-head').textContent = charge >= 20 ? 'ANSWER THE POWER?' : 'NOT ENOUGH CHARGE TO ANSWER';
-    this.onCounter = onPick;
+    bar.hidden = !on;
+    $('hint').classList.toggle('up', on);   // (the timer bar makes the row taller: the hint rises with it)
   }
   counterTimer(p) { const b = $('counterBar'); if (b) b.style.width = `${Math.max(0, p) * 100}%`; }
   banterTimer(p) { $('banterBar').style.width = `${Math.max(0, p) * 100}%`; }
