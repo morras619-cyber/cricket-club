@@ -63,7 +63,22 @@ export class Innings {
     if (this.curBowler) this.figs[this.curBowler].runs += runs;
   }
 
+  // A no-ball that is played (nbPlay): the runs off the bat count (the extra is already in) but it is not a legal ball, and only a run-out ends the batter's innings
+  noBallPlay({ runs = 0, wicket = false, runOut = false }) {
+    this.runs += runs;
+    const c = this.cur;
+    c.runs += runs; c.balls++;
+    if (runs === 4) c.fours++;
+    if (runs === 6) c.sixes++;
+    this.bowler.runs += runs;
+    const f = this.curBowler && this.figs[this.curBowler];
+    if (f) f.runs += runs;
+    if (wicket && runOut && !this.sixes) { this.wkts++; this.stints.push({ ...c, out: true, how: 'run out' }); this.cur = freshStint(); }
+    else if (runs % 2 === 1) this.swapStrike();
+  }
+
   ball({ runs = 0, wicket = false, runOut = false }) {
+    if (this.nbPlay) return this.noBallPlay({ runs, wicket, runOut });
     if (this.sixes) wicket = false; // (out doesn't count in the shoot-out: the ball just isn't a six)
     this.balls++;
     this.runs += runs;
