@@ -1337,7 +1337,7 @@ export class Game {
   wicketCrowd() {
     this.bowlCrowd('wicket');
     if (this.homeBat) this.homeWicket();
-    else if (this.homeOut) crowdResolve('dot');   // (the home crowd's "hooo" as its own batter goes)
+    else if (this.homeOut) { crowdResolve('dot'); this.angry(1.3, true); }   // (the home crowd's "hooo" as its own batter goes, then a boo)
   }
   wicketFx(text, at) {
     this.wicketCrowd();
