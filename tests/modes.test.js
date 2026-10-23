@@ -4,7 +4,7 @@ import { TEAMS, teamById } from '../js/teams.js';
 import { roster, starSquad, playerSquad, isUnlocked } from '../js/squads.js';
 import { roundRobin, newLeague, newCup, nextFixture, advance, table, finish, simMatch } from '../js/tournament.js';
 import { dailyScenario, dailyOutcome, updateStreak } from '../js/daily.js';
-import { heroLevel, powerDiscount, addHeroXp, checkAchievements, ACHIEVEMENTS } from '../js/progress.js';
+import { checkAchievements, ACHIEVEMENTS } from '../js/progress.js';
 import { makeRng } from '../js/rng.js';
 import { Innings } from '../js/match.js';
 
@@ -85,19 +85,11 @@ test('the daily challenge is the same for everyone and alternates chase and defe
   updateStreak(p, '2026-10-23'); assert.equal(p.dailyStreak.count, 1); assert.equal(p.dailyStreak.best, 2);
 });
 
-test('heroes level up with XP and their powers get cheaper', () => {
-  assert.equal(heroLevel(0), 1); assert.equal(heroLevel(60), 2); assert.equal(heroLevel(1e9), 10);
-  assert.equal(powerDiscount(1), 0); assert.equal(powerDiscount(4), 6);
-  const p = {};
-  assert.deepEqual(addHeroXp(p, { raja: 70 }), [{ id: 'raja', from: 1, to: 2 }]);
-  assert.deepEqual(addHeroXp(p, { raja: 10 }), []);
-});
-
 test('achievements unlock once and pay their coins', () => {
   const p = { coins: 0, team: 'thunder' };
-  const got = checkAchievements(p, { events: ['league', 'sign'] });
-  assert.deepEqual(got.map(a => a.id).sort(), ['league', 'signStar']);
-  assert.equal(p.coins, ACHIEVEMENTS.find(a => a.id === 'league').coins + ACHIEVEMENTS.find(a => a.id === 'signStar').coins);
+  const got = checkAchievements(p, { events: ['league', 'cup'] });
+  assert.deepEqual(got.map(a => a.id).sort(), ['cup', 'league']);
+  assert.equal(p.coins, ACHIEVEMENTS.find(a => a.id === 'league').coins + ACHIEVEMENTS.find(a => a.id === 'cup').coins);
   assert.deepEqual(checkAchievements(p, { events: ['league'] }), []);
   assert.ok(teamById('royals').style.field > 1);
 });

@@ -810,8 +810,8 @@ export class Game {
     const before = { runs: inn.runs, wkts: inn.wkts };
     const striker = this.batterOf(inn), bowler = this.bowlerOf(inn), btype = bowlType(bowler.bowl);
     this.heatShow(inn);
-    S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = striker.hero?.emblem || null;
-    S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
+    S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = null;
+    S.bowler.look = teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler); // their own skin and hair on the drawn sprites
     const partner = this.nonStrikerOf(inn);
     S.nonStriker = partner ? { team: this.myTeam, people: lookOf(partner) } : null;
@@ -1501,8 +1501,8 @@ export class Game {
       ...f,
       look: side === 'ai'
         ? teamLook(this.oppTeam, i)
-        : (f.keeper && this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, i)),
-      emblem: side === 'ai' ? null : (f.keeper && this.team.field?.id === 'rani' ? this.team.field.emblem : null),
+        : teamLook(this.myTeam, i),
+      emblem: null,
       pose: f.keeper ? POSES.keeper() : POSES.crouch(),
     }));
   }
@@ -1770,11 +1770,11 @@ export class Game {
     if (!inn.curBowler) inn.setBowler(this.bowlerOf(inn));
     const bowler = this.bowlerOf(inn), striker = this.batterOf(inn), btype = bowlType(bowler.bowl);
     this.heatShow(inn);
-    S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.myTeam); S.bowler.emblem = bowler.hero?.emblem || null;
+    S.bowler.look = teamLook(this.myTeam); S.bowler.emblem = null;
     // right-arm over, a little wide of the stumps so the ball leaves his hand; left-armers from the other side
     S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler);
-    S.keeper.look = this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1);
+    S.keeper.look = teamLook(this.myTeam, 1);
     S.keeper.people = this.keeperPeople();
     const kind = bowler.bowl || 'swing';
     const profile = striker.ai;
@@ -2485,7 +2485,7 @@ export class Game {
     S.delivery = null; S.ball = null; S.flight = null;
     S.kball = null;
     S.reticle = null;
-    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: this.team.field?.id === 'rani' ? this.team.field.look : teamLook(this.myTeam, 1), emblem: this.team.field?.id === 'rani' ? this.team.field.emblem : null, people: this.keeperPeople() };
+    S.keeper = { x: 0.3, z: -2.4, pose: POSES.keeper(), look: teamLook(this.myTeam, 1), emblem: null, people: this.keeperPeople() };
     // Enter the keeper view before showing advice, so the previous bowling view cannot
     // remain visible behind the coach card and appear to snap when the advice closes.
     if (this.mode === 'tutorial') await this.coach?.('tutKeeper');
@@ -2563,7 +2563,7 @@ export class Game {
       this.hitStop(120); sfx.glove(); buzz(60);
       this.fx.burst(hs.x, hs.y, { color: '#ffe14d', r: 220 });
       this.fx.word('SNAFFLED!', hs.x, hs.y - 40, { size: 60 });
-      this.fx.bubble(this.team.field?.id === 'rani' ? 'Oh, try harder!' : 'Got it!', this.W * 0.55, this.H * 0.55);
+      this.fx.bubble('Got it!', this.W * 0.55, this.H * 0.55);
     } else {
       S.kball.done = false; S.kball.miss = true;
       this.fx.word('BUTTERFINGERS!', this.W / 2, this.H * 0.32, { size: 52 });
@@ -2610,12 +2610,12 @@ export class Game {
   }
 
   // ---------- Outfield Mode ----------
-  controlledLook() { return this.team.field?.id === 'bilal' ? this.team.field.look : teamLook(this.myTeam); }
+  controlledLook() { return teamLook(this.myTeam); }
 
   startEvent(field, fielderId) {
     const fs = this.setupOutfield(field, 'player');
     const me = fs.find(f => f.id === fielderId);
-    me.look = this.controlledLook(); me.emblem = this.team.field?.id === 'bilal' ? this.team.field.emblem : null; me.ctrl = true;
+    me.look = this.controlledLook(); me.emblem = null; me.ctrl = true;
     this.phase = 'event';
     this.powerLock = false;
     this.eventAllowsBurst = true;

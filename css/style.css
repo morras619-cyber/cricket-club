@@ -1182,3 +1182,5 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .powers.n4 .power .pcost, .powers.n5 .power .pcost { font-size: 12px; display: block; }
 .powers.n5 .power .pcost { font-size: 11px; }
 .powers.n4 .power.ready:not(:disabled)::after, .powers.n5 .power.ready:not(:disabled)::after { content: none; }
+
+.ptype { display: block; margin-top: 2px; font-size: 12.5px; font-style: italic; font-weight: 700; color: #8a3a00; }

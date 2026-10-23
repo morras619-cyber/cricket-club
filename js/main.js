@@ -1,6 +1,6 @@
 import { UI } from './ui.js';
 import { Game } from './game.js';
-import { SPARKS, HEROES, heroById, heroesFor } from './heroes.js';
+import { HEROES, heroById, heroesFor, BAT_TYPES, POWERS, batTypeOf, bowlPowerOf } from './heroes.js';
 import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero, logoSrc, setMyClub, setLogo } from './teams.js';
 import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
@@ -14,7 +14,7 @@ import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, u
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
   value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
-import { heroXpFromMatch, addHeroXp, heroLevels, levelProgress, levelPerks, powerDiscount, checkAchievements, ACHIEVEMENTS } from './progress.js';
+import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
@@ -57,8 +57,13 @@ async function quickTip() {
   if (next) return coachOnce(next[0], [next[1]]);
   if (Math.random() < 0.25) return coachSay([QUICK_TIPS[Math.floor(Math.random() * QUICK_TIPS.length)][1]]);
 }
-// heroes already picked before unlocks existed stay unlocked (signed)
-for (const id of Object.values(profile.squad || {})) if (id && !profile.unlocked.includes(id)) profile.unlocked.push(id);
+// heroes are retired: the coins spent signing other teams' stars come back (once), and hero levels are gone
+if (!profile.heroesRetired) {
+  profile.coins = (profile.coins || 0) + UNLOCK_COST * (profile.unlocked || []).length;
+  profile.unlocked = []; profile.squad = { bat: null, bowl: null, field: null }; profile.heroXp = {};
+  profile.heroesRetired = true;
+  saveProfile(profile);
+}
 // careers saved before players had countries
 if (profile.career) { migrateCareer(profile.career); setMyClub(profile.career.custom); }
 // start downloading the bowler sheets (pace and spin) while the menus are up
@@ -456,49 +461,27 @@ function renderStats() {
     table('Batting heroes', 'bat', 'bat', [['Runs', t => t.runs], ['HS', fmt.hs], ['Avg', t => fmt.avg(t.runs, t.inns - t.notOuts)], ['SR', t => fmt.sr(t.runs, t.balls)], ['Ducks', t => t.ducks]]),
     table('Bowling heroes', 'bowl', 'bowl', [['Wkts', t => t.wkts], ['Best', fmt.best], ['Overs', t => fmt.overs(t.balls)], ['Runs', t => t.runs], ['Econ', t => fmt.econ(t.runs, t.balls)]])]]]);
 }
-function heroStatLine(hero) {
-  const s = careerStats(profile).heroes[hero.id];
-  if (hero.slot === 'bat' && s?.bat?.inns) return `${s.bat.runs} runs · HS ${fmt.hs(s.bat)} · Avg ${fmt.avg(s.bat.runs, s.bat.inns - s.bat.notOuts)}`;
-  if (hero.slot === 'bowl' && s?.bowl?.inns) return `${s.bowl.wkts} wkts · Best ${fmt.best(s.bowl)} · Econ ${fmt.econ(s.bowl.runs, s.bowl.balls)}`;
-  return hero.slot === 'field' ? null : 'No matches yet';
-}
 
-// a player's face (heroes keep their full portrait) beside his details
+// what a player is good at and bad at, and the power his type brings
+function typeLine(p) {
+  const out = [], bt = batTypeOf(p), bp = bowlPowerOf(p);
+  if (bt) out.push(`${BAT_TYPES[bt].name}: ${POWERS[BAT_TYPES[bt].power].name} · ${BAT_TYPES[bt].strong.toLowerCase()}; ${BAT_TYPES[bt].weak.toLowerCase()}`);
+  if (bp) out.push(`${bowlType(p.bowl).short}: ${POWERS[bp].name}`);
+  return out.join(' · ');
+}
+// a player's face beside his details
 const kitOf = p => (p.team ? teamById(p.team) : { suit: '#f3efe2', trim: '#3a3a4a' });
 function withFace(p, size, ...parts) {
   const row = el('div', 'facerow'), txt = el('div');
   // his painted portrait if he has one, else the drawn face (heroes keep their full portrait)
-  const pic = p.heroId || (p.hero && typeof p.hero === 'object') ? portrait(heroById(p.heroId || p.hero.id), size, 'celebrate') : portraitFace(p, p.team ? teamById(p.team) : null, size) || faceEl(p, kitOf(p), size);
+  const pic = portraitFace(p, p.team ? teamById(p.team) : null, size) || (p.heroId || (p.hero && typeof p.hero === 'object') ? portrait(heroById(p.heroId || p.hero.id), size, 'celebrate') : faceEl(p, kitOf(p), size));
   pic.classList.add('face'); pic.style.width = pic.style.height = `${size}px`;
   txt.append(...parts);
   row.append(pic, txt);
   return row;
 }
 
-// ---------- My Team: the team, its star, signings and the team sheet ----------
-const SLOTS = [['bat', 'Batting hero'], ['bowl', 'Bowling hero'], ['field', 'Fielding hero']];
-function heroCard(hero, { on, locked, note, onTap }) {
-  const b = document.createElement('button');
-  b.className = 'hero' + (on ? ' on' : '') + (locked ? ' locked' : '');
-  b.setAttribute('aria-pressed', !!on);
-  const top = el('div', 'htop');
-  top.append(portrait(hero, 72, hero.slot === 'bat' ? 'bat' : hero.slot === 'bowl' ? 'bowl' : 'celebrate'));
-  const nm = el('div');
-  nm.append(el('b', '', hero.name), el('span', 'role', `${hero.role} · ${teamOfHero(hero.id)?.name || ''}`));
-  top.append(nm);
-  const lv = levelProgress(profile.heroXp?.[hero.id] || 0);
-  const pw = el('div', 'pw', hero.power.name);
-  pw.append(el('em', '', `${hero.power.cost - powerDiscount(lv.lv)}⚡`));
-  b.append(top, el('div', 'herolv', `Level ${lv.lv}${lv.next ? ` · ${lv.next} XP to next` : ' · max'} · ${levelPerks(lv.lv)}`), pw, el('div', 'desc', hero.power.desc));
-  if (hero.ultimate) b.append(el('div', 'desc', `Ultimate · ${hero.ultimate.name} (${hero.ultimate.cost}⚡): ${hero.ultimate.desc}`));
-  for (const alt of hero.alts || []) b.append(el('div', 'desc', `Also · ${alt.name} (${alt.cost - powerDiscount(lv.lv)}⚡): ${alt.desc}`));
-  const statLine = heroStatLine(hero);
-  if (statLine) b.append(el('div', 'herostat', statLine));
-  if (note) b.append(el('div', 'herostat', note));
-  if (locked) b.append(el('div', 'unlock', `🔒 Sign · ${UNLOCK_COST} coins`));
-  if (onTap) b.addEventListener('click', onTap);
-  return b;
-}
+// ---------- My Team: the team and the team sheet ----------
 // ---------- Choose your team: the clubs as a carousel of cards, their ratings below ----------
 // o: { teams, start (team id), squads ({ id: players }, for the ratings), go (button label),
 //      locked (t => reason or null), note, onGo(id), onBack() }
@@ -601,56 +584,22 @@ function renderSquad() {
     $('squad').scrollTop = 0;
     return;
   }
-  const t = myTeam(), star = heroById(t.star);
+  const t = myTeam();
   $('squadTitle').textContent = t.name;
-  $('squadLede').firstChild.textContent = 'Your star always plays. Sign stars from other teams for the other hero slots, then set your batting order and bowling attack. ';
-  // the team's own star always plays
+  $('squadLede').firstChild.textContent = 'Set your batting order and bowling attack. Every player brings the power of his type. ';
   const starWrap = el('div', 'slot');
   const G = groundOf(t.id);
   starWrap.append(el('h3', '', `${t.name} · ${t.style.tag}`), el('p', 'sheetnote', t.style.desc),
     pitchLink(el('p', 'sheetnote venue', `🏟 Home ground: ${G.name} · Pitch: ${G.pitch.name}. ${G.pitch.report}`), G.pitch.id));
-  const starRow = el('div', 'slot-row');
-  starRow.append(heroCard(star, { on: true, note: `★ Your star · plays every match` }));
-  starWrap.append(starRow);
   rows.append(starWrap);
-  for (const [slot, label] of SLOTS) {
-    if (slot === star.slot) continue;
-    const wrap = el('div', 'slot');
-    wrap.append(el('h3', '', `${label} · signing (optional)`));
-    const row = el('div', 'slot-row');
-    for (const hero of heroesFor(slot)) {
-      if (hero === star) continue;
-      const locked = !isUnlocked(profile, hero.id);
-      const on = profile.squad[slot] === hero.id && !locked;
-      row.append(heroCard(hero, {
-        on, locked, note: on ? 'Signed · plays for you (not against his own team)' : null,
-        onTap: () => {
-          if (!isUnlocked(profile, hero.id)) {
-            if (!unlockHero(profile, hero.id, UNLOCK_COST)) { ui.toast(`You need ${UNLOCK_COST - profile.coins} more coins to sign ${hero.name}`); return; }
-            ui.toast(`${hero.name} signed!`); sfx.full();
-            awardAchievements({ events: ['sign'] });
-          } else sfx.click();
-          profile.squad[slot] = on ? null : hero.id; // tap your signing again to leave the slot empty
-          saveProfile(profile);
-          renderSquad();
-        },
-      }));
-    }
-    wrap.append(row);
-    if (!profile.squad[slot] || !isUnlocked(profile, profile.squad[slot])) wrap.append(el('p', 'sheetnote', `No ${label.toLowerCase()} signed: your ${SPARKS[slot].name} still works.`));
-    rows.append(wrap);
-    const onCard = row.querySelector('.on');
-    if (onCard) requestAnimationFrame(() => { row.scrollLeft = onCard.offsetLeft - 8; });
-  }
   rows.append(teamSheet());
 }
 
 // ---------- team sheet: batting order and bowling attack ----------
 function currentLineup() {
   const id = profile.team || 'thunder', heroes = squad();
-  const levels = heroLevels(profile);
-  const r = resolveLineup(id, heroes, profile.lineups?.[id], levels);
-  return { id, heroes, pool: squadPool(id, heroes, levels), order: r.order, attack: r.attack };
+  const r = resolveLineup(id, heroes, profile.lineups?.[id], {});
+  return { id, heroes, pool: squadPool(id, heroes, {}), order: r.order, attack: r.attack };
 }
 function saveLineup(order, attack) {
   const id = profile.team || 'thunder';
@@ -694,7 +643,7 @@ function teamSheet() {
   squadList.append(el('h3', '', 'The squad'));
   for (const p of roster(L.id)) {
     const r = el('div', 'squadrow');
-    r.append(withFace(p, 44, el('b', '', flagName(p)), el('span', '', `${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · ${p.trait}`)));
+    r.append(withFace(p, 44, el('b', '', flagName(p)), el('span', '', `${nationName(p)} · ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''} · ${p.trait}`), el('span', 'ptype', typeLine(p))));
     squadList.append(r);
   }
   wrap.append(
@@ -736,8 +685,9 @@ function teamPicker() {
 }
 
 // your side for a match: your team's star plus your signings (who sit out against their own team)
-function squad(teamId = profile.team || 'thunder', oppId = null) {
-  return playerSquad(teamId, profile.squad, profile.unlocked || [], oppId);
+// a team's own star: its one special player (heroes you could sign are retired)
+function squad(teamId = profile.team || 'thunder') {
+  return starSquad(teamId);
 }
 
 // ---------- tutorial cover ----------
@@ -780,7 +730,7 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   const mode = opts.mode;
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
-  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null, home = null;
+  let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = {}, pools = null, rival = null, home = null;
   if (mode === 'tutorial' && opts.story) {
     // the story: you, the Green Cyclones, away at the Thunderdome against the unbeaten Thunder Strikers
     team = 'cyclones'; opp = 'thunder'; home = 'thunder'; levels = {};
@@ -1693,7 +1643,7 @@ $('dailyGo').addEventListener('click', () => {
   startMatch({ mode: 'daily', scenario: sc });
 });
 
-// ---------- trophies: cabinet, hero levels, achievements ----------
+// ---------- trophies: cabinet, achievements ----------
 function renderTrophies() {
   ui.show('trophies');
   const body = $('trophyBody');
@@ -1705,26 +1655,16 @@ function renderTrophies() {
   const shelf = el('div', 'shelf');
   for (const x of tr) shelf.append(el('div', 'cup' + (x.kind === 'league' ? ' gold' : ''), `🏆 ${x.kind === 'league' ? 'Super League' : 'Knockout Cup'}${x.unbeaten ? ' · unbeaten' : ''} · ${teamById(x.team).name} · ${x.date}`));
   cab.append(shelf);
-  const heroes = el('div', 'panel paper statcard');
-  heroes.append(el('h3', '', 'Hero levels'));
-  heroes.append(el('p', 'sheetnote', 'Heroes earn XP when they play: runs, wickets, catches and wins. Each level makes their signature power 2 charge cheaper and their batting or bowling a point better.'));
-  for (const h of HEROES) {
-    const p = levelProgress(profile.heroXp?.[h.id] || 0);
-    const row = el('div', 'lvrow');
-    const bar = el('div', 'xpbar'); const fill = el('div'); fill.style.width = `${Math.round(p.progress * 100)}%`; bar.append(fill);
-    row.append(el('b', '', `${h.name}`), el('span', '', `Lv ${p.lv}`), bar);
-    heroes.append(row);
-  }
   const ach = el('div', 'panel paper statcard');
   const got = profile.achievements || {};
-  ach.append(el('h3', '', `Achievements · ${Object.keys(got).length}/${ACHIEVEMENTS.length}`));
+  ach.append(el('h3', '', `Achievements · ${ACHIEVEMENTS.filter(a => got[a.id]).length}/${ACHIEVEMENTS.length}`));
   const rows = ACHIEVEMENTS.map(a => {
     const row = el('div', 'achrow' + (got[a.id] ? ' got' : ''));
     row.append(el('b', '', `${got[a.id] ? '★' : '☆'} ${a.name}`), el('span', '', `${a.desc} · ${a.coins} coins${got[a.id] ? ` · ${got[a.id]}` : ''}`));
     return row;
   });
   ach.append(carousel(rows, 5));
-  pager(body, [['Trophies', cab], ['Heroes', heroes], ['Medals', ach]]);
+  pager(body, [['Trophies', cab], ['Medals', ach]]);
 }
 $('trophiesBack').addEventListener('click', renderHome);
 
@@ -1792,8 +1732,6 @@ function showResult(summary) {
   const counts = mode !== 'tutorial' && mode !== 'daily'; // full matches go in the career record
   const rec = counts ? recordStats(profile, summary) : null;
   const win = summary.result.outcome === 'win';
-  // heroes level up by playing
-  const ups = counts ? addHeroXp(profile, heroXpFromMatch(summary)) : [];
   if (counts && win && !summary.oppTeam.national) profile.beaten = [...new Set([...(profile.beaten || []), summary.oppTeam.id])];
   const events = [];
   let notes = [];
@@ -1841,7 +1779,6 @@ function showResult(summary) {
   }
   const extra = [];
   if (got.length) extra.push(...got.map(a => `🏅 ${a.name} +${a.coins}`));
-  if (ups.length) extra.push(...ups.map(u => `⬆ ${heroById(u.id).name} level ${u.to}`));
   if (rewards.pass) extra.push(`Season Pass tier ${rewards.pass}!`);
   const rewardLine = `+${rewards.xp} XP · +${rewards.coins} coins${rewards.gems ? ` · +${rewards.gems} 💎` : ''} · Level ${level(profile.xp).lv}`;
   $('resRewards').textContent = [rewardLine, ...extra].join(' · ');
@@ -1850,8 +1787,7 @@ function showResult(summary) {
   ms.innerHTML = '';
   for (const n of notes) ms.append(el('div', 'row notes', n));
   for (const a of got) { const r = el('div', 'row'); r.append(el('span', 'badge', 'ACHIEVEMENT'), el('b', '', a.name), el('span', '', `${a.desc} · +${a.coins} coins`)); ms.append(r); }
-  for (const u of ups) { const r = el('div', 'row'); r.append(el('span', 'badge', 'LEVEL UP'), el('b', '', heroById(u.id).name), el('span', '', `Level ${u.to} · ${levelPerks(u.to)}`)); ms.append(r); }
-  ms.hidden = !rec?.batting && !rec?.bowling && !notes.length && !got.length && !ups.length;
+  ms.hidden = !rec?.batting && !rec?.bowling && !notes.length && !got.length;
   const isHero = (id, slot) => id && id === summary.team?.[slot]?.id;
   if (rec?.batting) {
     const runs = rec.batting.reduce((a, b) => a + b.runs, 0), balls = rec.batting.reduce((a, b) => a + b.balls, 0);
