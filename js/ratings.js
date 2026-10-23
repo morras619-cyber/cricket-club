@@ -54,7 +54,7 @@ export function matchup(batter, bowler, ctx = {}) {
     case 'tactical': out.win *= 1 + 0.1 * bs; out.power *= 1 - 0.08 * bw; break;
     case 'touch':
       out.win *= 1 + 0.16 * bs;
-      if (ctx.length === 'short' || ctx.length === 'bouncer') out.win *= 1 - 0.25 * bw;   // hates the short ball
+      if (ctx.length === 'short' || ctx.length === 'bouncer') out.win *= 1 - 0.12 * bw;   // hates the short ball
       break;
     case 'finisher':
       if (ball >= 25) { out.win *= 1 + 0.2 * bs; out.power *= 1 + 0.1 * bs; }
@@ -81,7 +81,7 @@ export function matchup(batter, bowler, ctx = {}) {
   // the pitch itself, whoever bowls: an uneven one is hard to time, a low or slow one holds the ball up, a bouncy one finds the edge
   if (f.uneven) out.win *= 1 - 1.0 * f.uneven;
   if (f.bounce < 1) out.win *= 1 - 0.3 * (1 - f.bounce);
-  if (f.bounce > 1 && ctx.length !== 'yorker' && ctx.length !== 'fulltoss') out.edgeP += 0.5 * (f.bounce - 1);
+  if (f.bounce > 1 && (ctx.length === 'good' || ctx.length === 'full')) out.edgeP += 0.5 * (f.bounce - 1);   // (not on the short ball: that one is hard enough to play)
   if (f.skid < 1) out.win *= 1 - 0.5 * (1 - f.skid);
   return out;
 }
