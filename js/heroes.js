@@ -10,7 +10,7 @@ export const HEROES = [
       desc: 'Next Good-or-better shot is a six. A mistimed shot still goes for four.' },
   },
   {
-    id: 'meher', name: 'Mirage Meher', slot: 'bat', role: 'Touch batter', emblem: 'crescent',
+    id: 'meher', name: 'Mirage Mehul', slot: 'bat', role: 'Touch batter', emblem: 'crescent',
     look: { suit: '#7a3fe0', trim: '#ff8ad8', cape: '#3a1680', skin: '#c48a64', hair: '#2a1a14', mask: '#ff8ad8' , style: 'long' },
     quote: 'You blinked.',
     ai: { weak: { lengths: ['short', 'bouncer'], lanes: null }, label: 'hates the short ball', honesty: 0.5, fire: 0.2, rattle: 0.3 },
@@ -26,7 +26,7 @@ export const HEROES = [
       desc: 'Ultimate. Tap as the ring closes: Perfect 8, Good 6, Miss 4.' },
   },
   {
-    id: 'zara', name: 'Cyclone Zara', slot: 'bowl', role: 'Fast bowler', emblem: 'swirl', bowls: 'pace',
+    id: 'zara', name: 'Cyclone Zaheer', slot: 'bowl', role: 'Fast bowler', emblem: 'swirl', bowls: 'pace',
     look: { suit: '#3c4653', trim: '#5ff0ff', cape: '#1a2230', skin: '#c99273', hair: '#0f0f14', mask: '#5ff0ff' , style: 'ponytail' },
     quote: 'Your innings? Also complete.',
     power: { kind: 'tornado', name: 'Tornado Yorker', cost: 60, word: 'WHOOOSH!',
@@ -47,7 +47,7 @@ export const HEROES = [
       desc: 'Seams so hard that any Good-or-worse contact edges to the keeper.' },
   },
   {
-    id: 'rani', name: 'Rubber Rocket Rani', slot: 'field', role: 'Wicket-keeper', emblem: 'spring',
+    id: 'rani', name: 'Rubber Rocket Ravi', slot: 'field', role: 'Wicket-keeper', emblem: 'spring',
     look: { suit: '#e0245e', trim: '#ffe14d', cape: '#7d0f33', skin: '#c48a64', hair: '#2a1a14', mask: '#ffe14d' , style: 'bun' },
     quote: 'Oh, try harder!',
     power: { kind: 'elastic', name: 'Elastic Grab', cost: 60, word: 'BOING!',

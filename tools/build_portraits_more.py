@@ -22,25 +22,27 @@ from scipy import ndimage as ndi
 # face: (sheet, how to cut the cell, background, age he looks)
 #   grid cell: ('g', row, col, columns, rows)      sheet 7: ('px', x0, y0, x1, y1)   keep: optional fractions of the figure to keep
 # who gets it: key -> face
+# (the seven heroes took their pictures from low-ranked players of the lower clubs, who went back to their drawn faces:
+#  Wahid Noorzai, Haris Paracha, Reyansh Saxena, Zubair Noorzai, Archie Holloway, Dewald Pienaar, Imon Molla)
 PLAYERS = {
     # India
-    'rohit-grewal': 'A8', 'varun-iyer': 'A3', 'pranav-iyer': 'A14', 'aditya-nanda': 'A17', 'reyansh-saxena': 'A19',
+    'rohit-grewal': 'A8', 'varun-iyer': 'A3', 'pranav-iyer': 'A14', 'aditya-nanda': 'A17', 'mirage-mehul': 'A19',
     # Bangladesh
-    'sajid-chowdhury': 'A5', 'sajid-bhuiyan': 'A13', 'nazmul-bhuiyan': 'A18', 'imon-molla': 'A12',
+    'sajid-chowdhury': 'A5', 'sajid-bhuiyan': 'A13', 'nazmul-bhuiyan': 'A18', 'blur-bilal': 'A12',
     # Sri Lanka
     'malith-jayasena': 'A9', 'chathura-wickramasinghe': 'A10', 'tharindu-wickramasinghe': 'A15',
     # Pakistan
-    'haris-paracha': 'A1', 'muneeb-awan': 'A7', 'faizan-paracha': 'A11',
+    'captain-comet': 'A1', 'muneeb-awan': 'A7', 'faizan-paracha': 'A11',
     # Afghanistan
-    'zubair-noorzai': 'A4', 'naveed-barakzai': 'A6', 'wahid-noorzai': 'A2',
+    'cyclone-zaheer': 'A4', 'naveed-barakzai': 'A6', 'mystic-babar-bhai': 'A2',
     # New Zealand
     'corbin-galloway': 'W2', 'rhys-mckenzie': 'W8', 'ollie-dunlop': 'W6',
     # South Africa
-    'tristan-coetzee': 'W1', 'dewald-pienaar': 'W3', 'wiaan-coetzee': 'W7',
+    'tristan-coetzee': 'W1', 'iron-wall-imran': 'W3', 'wiaan-coetzee': 'W7',
     # Australia
     'mason-barlow': 'W5', 'darcy-penrith': 'W4',
     # England
-    'archie-holloway': 'W9', 'oscar-marsden': 'W10',
+    'rubber-rocket-ravi': 'W9', 'oscar-marsden': 'W10',
     # the second batch: sheet 10 (South Asian) and sheet 11 (Caribbean)
     'tanmay-bhalla': 'B2', 'sahan-kumara': 'B3', 'shohag-chowdhury': 'B1', 'bilal-noorzai': 'B4',
     'tevin-hollis': 'C1', 'jermaine-granger': 'C2', 'jermaine-belgrave': 'C6', 'tevin-clarke': 'C4', 'romario-clarke': 'C5', 'akeem-bascombe': 'C3',
@@ -66,6 +68,7 @@ FACES.update({
     'C4': (11, ('g', 1, 0, 4, 2), 'white', 26), 'C5': (11, ('g', 1, 1, 4, 2), 'white', 33), 'C6': (11, ('g', 1, 3, 4, 2), 'white', 22),
 })
 HOLES = {'A17', 'A18'}   # the white seen through the crook of an arm is background too (nothing white is held in them)
+REMOVED = ['wahid-noorzai', 'haris-paracha', 'reyansh-saxena', 'zubair-noorzai', 'archie-holloway', 'dewald-pienaar', 'imon-molla']   # (their pictures went to heroes)
 SHEETS = {1: 0, 2: 1, 3: 2, 7: 3, 8: 4, 9: 5, 10: 6, 11: 7}   # sheet number -> its place on the command line
 
 
@@ -131,6 +134,8 @@ def main():
     keys = set(re.findall(r"'([a-z0-9-]+)'", lst.split('PORTRAIT_AGE')[0]))
     ages = dict((k, int(v)) for k, v in re.findall(r"'([a-z0-9-]+)': (\d+)", lst.split('PORTRAIT_AGE')[1]))
     assert len(set(PLAYERS.values())) == len(PLAYERS), 'a face used twice'
+    for k in REMOVED:
+        keys.discard(k); ages.pop(k, None); faces.pop(k, None)
     made = {}
     for key, fid in PLAYERS.items():
         sheet, spec, kind, age, *keep = FACES[fid]

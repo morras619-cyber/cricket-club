@@ -22,7 +22,7 @@ test('your star always plays; signings fill the other slots but never face their
   assert.deepEqual(Object.keys(starSquad('vipers')).filter(k => starSquad('vipers')[k]), ['bowl']);
   const sq = playerSquad('thunder', { bowl: 'zara', field: 'rani' }, ['zara', 'rani'], 'vipers');
   assert.equal(sq.bat.id, 'raja'); assert.equal(sq.bowl.id, 'zara'); assert.equal(sq.field.id, 'rani');
-  assert.equal(playerSquad('thunder', { bowl: 'zara' }, ['zara'], 'cyclones').bowl, null); // Zara is a Cyclone
+  assert.equal(playerSquad('thunder', { bowl: 'zara' }, ['zara'], 'cyclones').bowl, null); // Zaheer is a Cyclone
   assert.equal(playerSquad('thunder', { bowl: 'zara' }, [], 'vipers').bowl, null); // not signed
   assert.ok(isUnlocked({ team: 'storm', unlocked: [] }, 'meher'));
   assert.ok(!isUnlocked({ team: 'storm', unlocked: [] }, 'raja'));
