@@ -237,10 +237,10 @@ function cutSong(all, slot) {
   for (let c = 0; c < all.numberOfChannels; c++) out.copyToChannel(all.getChannelData(c).subarray(from, from + n), c);
   return out;
 }
-// Two or three runs for the home side: snd/crowd-runs.mp3 (a cheer that eases off, then swells again) with the applause coming in under
-// the dip and riding the swell with it, so the two sound as one crowd. A four or a six keeps its full roar (cheerStart); one run or
+// Two or three runs for the home side: snd/crowd-runs.mp3 (a cheer that eases off, then swells again), played from the swell (the opening
+// cheer is left out: it stops short) with the applause coming in as it builds, so the two sound as one crowd. A four or a six keeps its full roar (cheerStart); one run or
 // none is only the quiet clap.
-const RUNS_GAIN = 2.5, RUNS_CLAP = 0.55, RUNS_CLAP_AT = 1.0;   // (the recording is quiet: it plays up, and the applause is set to the same level)
+const RUNS_GAIN = 2.5, RUNS_CLAP = 0.55, RUNS_CLAP_AT = 0.4, RUNS_FROM = 1.35;   // (the recording is quiet: it plays up, and the applause is set to the same level)
 let runsBuf = null, runsLoading = null;
 function loadRuns() {
   if (!runsLoading) runsLoading = fetch('snd/crowd-runs.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
@@ -253,10 +253,10 @@ export function crowdRuns(delay = 0) {
   const now = ac.currentTime, t = now + Math.max(0, delay);
   if (t < clapUntil || now < roarUntil) return;
   cheerStop(0.15); singDuck(0.4);
-  const d = runsBuf.duration, src = ac.createBufferSource(), g = ac.createGain();
+  const d = runsBuf.duration - RUNS_FROM, src = ac.createBufferSource(), g = ac.createGain();
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(RUNS_GAIN, t + 0.04);
   g.gain.setValueAtTime(RUNS_GAIN, t + d - 0.45); g.gain.linearRampToValueAtTime(0.0001, t + d);   // (the recording is cut short: let it fade out)
-  src.buffer = runsBuf; src.connect(g).connect(master); src.start(t);
+  src.buffer = runsBuf; src.connect(g).connect(master); src.start(t, RUNS_FROM);
   const clap = moodBufs.claps[clapNext++ % moodBufs.claps.length], cs = ac.createBufferSource(), cg = ac.createGain(), tc = t + RUNS_CLAP_AT;
   cg.gain.setValueAtTime(0.0001, tc); cg.gain.linearRampToValueAtTime(RUNS_CLAP, tc + 0.5);
   cs.buffer = clap; cs.connect(cg).connect(master); cs.start(tc);
