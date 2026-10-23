@@ -1590,7 +1590,7 @@ export class Game {
       let tClear = end;
       if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
       cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
-      if (six && !sixMusic(tClear / ballK / 1.6)) this.sing(tClear / ballK / 1.6 + 2.2, 4.5, 0.45); // (the celebration music as the ball clears the rope; failing that, the roar dies down into a few seconds of song)
+      if (six) { const sec = tClear / ballK / 1.6; this.sing(sec + (sixMusic(sec) || 2.2), 4.5, 0.45); } // (the celebration music as the ball clears the rope, then directly after it the crowd sings a few seconds)
     } else if ((runs === 2 || runs === 3) && !o.caught && (o.side === 'ai' ? this.myTeam : this.oppTeam).id === this.home) {
       crowdRuns(0.1); this.runsCheered = true;   // (two or three for the home side: its own cheer, with the applause riding it)
     } else if ((six || (toRope && this.heat <= RUNAWAY)) && (o.side === 'ai' ? this.myTeam : this.oppTeam).id !== this.home) {

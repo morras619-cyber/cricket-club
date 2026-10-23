@@ -264,7 +264,7 @@ export function crowdRuns(delay = 0) {
   roarUntil = Math.max(roarUntil, tc + clap.duration * 0.7);                   // (the synthetic crowd stays quiet under it)
 }
 // A six for the home side: the stadium's celebration music (snd/six-celebration.mp3), started as the ball clears the rope and riding over the roar.
-// The recording is cut short, so it fades out at its end. Says whether it played (if not, the caller's song takes its place).
+// The recording is cut short, so it fades out at its end. Says how long it plays (0 if it did not), so the singing can follow it.
 const SIX_MUSIC_VOL = 0.5;
 let sixBuf = null, sixLoading = null;
 function loadSix() {
@@ -273,14 +273,14 @@ function loadSix() {
   return sixLoading;
 }
 export function sixMusic(sec = 0) {
-  if (!ready()) return false;
-  if (!sixBuf) { loadSix(); return false; }
+  if (!ready()) return 0;
+  if (!sixBuf) { loadSix(); return 0; }
   const t = ac.currentTime + Math.max(0, sec), d = sixBuf.duration, src = ac.createBufferSource(), g = ac.createGain();
   singDuck(0.4);
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(SIX_MUSIC_VOL, t + 0.05);
   g.gain.setValueAtTime(SIX_MUSIC_VOL, t + d - 0.6); g.gain.linearRampToValueAtTime(0.0001, t + d);
   src.buffer = sixBuf; src.connect(g).connect(master); src.start(t);
-  return true;
+  return d;
 }
 // the crowd of this club sings from now on (called as a match is made: its song is fetched in the background)
 export function crowdSong(teamId) {
