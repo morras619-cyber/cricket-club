@@ -266,7 +266,7 @@ export const flagName = p => `${flag(p)} ${fullName(p)}`.trim();
 // The star heroes as players: batting heroes bat like stars; bowling heroes bowl their type.
 const HERO_PLAYER = {
   raja: { bat: 92, nation: 'IN' }, meher: { bat: 90, nation: 'PK' }, comet: { bat: 91, nation: 'IN' },
-  zara: { bat: 24, bowl: 'express', bowlSkill: 92, nation: 'BD' }, babar: { bat: 30, bowl: 'offspin', bowlSkill: 92, nation: 'PK' }, imran: { bat: 34, bowl: 'seam', bowlSkill: 92, nation: 'PK' },
+  zara: { bat: 24, bowl: 'express', bowlSkill: 92, nation: 'BD' }, babar: { bat: 30, bowl: 'offspin', bowlSkill: 92, nation: 'PK' }, imran: { bat: 34, bowl: 'seam', bowlSkill: 92, nation: 'ZA' },
   rani: { bat: 66, keeper: true, nation: 'AU' }, bilal: { bat: 58, nation: 'PK' },
 };
 // lv: the hero's level (progress.js); each level above 1 adds a point to his batting or bowling

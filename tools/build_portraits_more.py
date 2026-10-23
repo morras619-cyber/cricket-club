@@ -38,7 +38,7 @@ PLAYERS = {
     # New Zealand
     'corbin-galloway': 'W2', 'rhys-mckenzie': 'W8', 'ollie-dunlop': 'W6',
     # South Africa
-    'tristan-coetzee': 'W1', 'iron-wall-imran': 'W3', 'wiaan-coetzee': 'W7',
+    'tristan-coetzee': 'W1', 'iron-wall-johan': 'W3', 'wiaan-coetzee': 'W7',
     # Australia
     'mason-barlow': 'W5', 'darcy-penrith': 'W4',
     # England

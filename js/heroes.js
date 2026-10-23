@@ -40,7 +40,7 @@ export const HEROES = [
       desc: 'The ball splits in two. Pick the fake and you\'re out.' },
   },
   {
-    id: 'imran', name: 'Iron Wall Imran', slot: 'bowl', role: 'Seam bowler', emblem: 'hex', bowls: 'pace',
+    id: 'imran', name: 'Iron Wall Johan', slot: 'bowl', role: 'Seam bowler', emblem: 'hex', bowls: 'pace',
     look: { suit: '#8a95a5', trim: '#ff3b3b', cape: '#3a4250', skin: '#b07a58', hair: '#202020', mask: '#ff3b3b' , style: 'short' },
     quote: 'Calculated.',
     power: { kind: 'shatter', name: 'Shatter Seam', cost: 60, word: 'KRAK!',
