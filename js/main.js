@@ -26,6 +26,7 @@ import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
+import { storyIntro, taunt } from './story.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
 import { TossAnim, loadToss } from './toss.js';
@@ -48,6 +49,7 @@ initCoach({
 // a quick match: his next tip, now and then once he has given them all
 // in the tutorial he speaks whenever his tips are on (always the first time); elsewhere, once each
 let tutTips = true;
+game.taunt = taunt;
 game.coach = key => (game.mode === 'tutorial' ? (tutTips && !window.__SIXCHARGE_BOT ? coachSay(DEV[key]) : Promise.resolve()) : coachOnce(key, DEV[key]));
 async function quickTip() {
   if (window.__SIXCHARGE_BOT) return;
@@ -231,11 +233,11 @@ function renderTitle() {
   $('tName').textContent = t.name;
   $('tStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
 }
-// (a player who has not done the tutorial goes to it first)
-$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) showCover(); else renderHome(); });
+// (a player who has not done the tutorial goes to it first: the story of the Thunder Strikers)
+$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) startStory(); else renderHome(); });
 $('tSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
 for (const id of ['tCoinPill', 'tGemPill']) $(id).addEventListener('click', () => { unlockAudio(); renderShop(); });
-$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) showCover(); else renderHome(); });
+$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) startStory(); else renderHome(); });
 
 // ---------- home: the hub ----------
 function renderHome() {
@@ -760,6 +762,14 @@ function coverTipsShow() {
 $('coverTips').addEventListener('click', () => { tutTips = !tutTips; profile.tutTips = tutTips; saveProfile(profile); sfx.click(); coverTipsShow(); });
 $('coverGo').addEventListener('click', () => startMatch({ mode: 'tutorial' }));
 
+// ---------- the first-time story ----------
+// Uncle Dev tells it (a few panels), then the match at the Thunderdome against the unbeaten Thunder Strikers
+async function startStory() {
+  tutTips = true;   // (his advice can't be turned off the first time)
+  if (!window.__SIXCHARGE_BOT) { ui.show(null); await storyIntro(); }
+  startMatch({ mode: 'tutorial', story: true });
+}
+
 // ---------- match ----------
 // opts.mode: 'quick' | 'challenge' | 'tutorial' | 'league' | 'cup' | 'daily'
 async function startMatch(opts) {
@@ -770,7 +780,12 @@ async function startMatch(opts) {
   const mode = opts.mode;
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
   let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = heroLevels(profile), pools = null, rival = null, home = null;
-  if (mode === 'tutorial') {
+  if (mode === 'tutorial' && opts.story) {
+    // the story: you, a Division 3 side nobody has heard of, away at the Thunderdome against the unbeaten Thunder Strikers
+    team = 'jaguars'; opp = 'thunder'; home = 'thunder'; levels = {};
+    sq = { bat: heroById('meher'), bowl: heroById('zara'), field: heroById('rani') };
+    rival = { bat: heroById('raja'), bowl: heroById('imran'), field: null };
+  } else if (mode === 'tutorial') {
     team = 'thunder'; home = 'thunder'; sq = { bat: heroById('raja'), bowl: heroById('zara'), field: heroById('rani') }; levels = {};
   } else if (mode === 'war' || mode === 'warmup') {
     // the national sides: your country (picked once) against the other, at your country's ground
@@ -814,7 +829,7 @@ async function startMatch(opts) {
   let summary;
   try {
     summary = await game.runMatch({
-      mode, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+      mode, story: !!opts.story, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
       records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
     });
   } finally {
@@ -825,7 +840,7 @@ async function startMatch(opts) {
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
   if (summary.result?.outcome === 'win' && summary.home && summary.home === summary.myTeam?.id) crowdSing(0.4, 10, 0.5); // a win at home: the crowd sings
-  if (mode === 'tutorial' && tutTips && !window.__SIXCHARGE_BOT) coachSay(DEV.tutDone);
+  if (mode === 'tutorial' && tutTips && !window.__SIXCHARGE_BOT) coachSay(opts.story ? DEV.storyDone : DEV.tutDone);
 }
 
 $('btnPause').addEventListener('pointerdown', e => {

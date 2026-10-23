@@ -25,6 +25,7 @@ import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGrou
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
+import { TAUNTS, pick } from './story.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -282,7 +283,7 @@ export class Game {
     this.ui.hud(true);
     this.innings = [];
     try {
-      if (mode === 'tutorial') return await this.runTutorial();
+      if (mode === 'tutorial') return await this.runTutorial(!!opts.story);
       await this.pitchReport();
       const script = aiBowlingScript(this.seed, this.aiPlan, this.rival.bowl?.power.kind);
       if (mode === 'daily') {
@@ -2567,15 +2568,35 @@ export class Game {
   }
 
   // ---------- Issue #1: the tutorial over ----------
-  async runTutorial() {
-    const inn = new Innings('player', 14);
+  // story: the first-time version (js/story.js): the same moves, at the Thunderdome against the Thunder Strikers, who taunt you
+  async runTutorial(story = false) {
+    const NEED = story ? 12 : 14;   // (the story's batter has no six to fire: four, a block, four, and his power's four)
+    const inn = new Innings('player', NEED);
     inn.balls = 26; inn.runs = 0; inn.log = [];
     this.innings.push(inn);
     this.phase = 'bat';
     this.charge.value = 40; this.ui.charge(40);
+    // their captain bats last of the three who come in, so he is the wicket you finish on
+    const isRaja = p => p.id === 'raja' || p.hero?.id === 'raja';
+    const them = this.oppSide.order;
+    if (story) { const i = them.findIndex(isRaja); if (i >= 0 && i !== 3) { const [r] = them.splice(i, 1); them.splice(3, 0, r); } }
+    const raja = them.find(isRaja), opener = them[0], mate = them[1], bowlerP = story ? this.bowlerOf(inn) : null;
+    // one of them speaks (a line pops up over the play); nothing in the bot's runs
+    const say = (p, group, opt) => (story && !this.bot && this.taunt ? this.taunt(p, this.oppTeam, pick(TAUNTS[group]), opt) : Promise.resolve());
     this.hud(inn);
-    this.ui.banner('ISSUE #1', `${this.team.bat.name} needs 14 off the last 4 balls`, 2200);
-    await this.sleepReal(this.bot ? 100 : 2200);
+    if (story) {
+      this.ui.banner('THE THUNDERDOME', `Thunder Strikers v you · ${NEED} off 4 balls to win`, 2600);
+      if (!this.bot) { crowdBoo(0.2); crowdBoo(1.5); }
+      await this.sleepReal(this.bot ? 100 : 2600);
+      await this.coach?.('storyWalk');
+      await say(raja, 'welcome');
+      await say(bowlerP, 'bowler', { side: 'right' });
+      await say(mate, 'mate');
+      await this.coach?.('storyCalm');
+    } else {
+      this.ui.banner('ISSUE #1', `${this.team.bat.name} needs 14 off the last 4 balls`, 2200);
+      await this.sleepReal(this.bot ? 100 : 2200);
+    }
     await this.coach?.('tutBat');
     const straight = { x: 0.02, length: 'full', kmh: 128, swing: 0.02, move: 0, type: 'Half-volley' };
     const assistHit = (res, grade) => {
@@ -2601,6 +2622,7 @@ export class Game {
     };
     // ball 1: assisted
     await fair(straight, () => ({ slow: 0.5, extra: 120, assist: assistHit, hint: 'HOLD · SWIPE UP · LIFT ON THE RING' }));
+    if (inn.runs > 0) await say(bowlerP, 'lucky');
     // ball 2: their star bowler powers up. Block it, or (if you dare) go for it
     // (their own star if he bowls; else Mystic Babar Bhai and his Maya Ball)
     if (!this.rival.bowl?.power) this.rival = { ...this.rival, bowl: heroById('babar') };
@@ -2610,12 +2632,14 @@ export class Game {
       applyPower(special, star.power.kind);
       await fair(special, () => ({
         extra: 60, hint: 'TAP TO DEFEND · OR GO FOR IT!',
-        waitPower: () => this.coach?.('tutBlock'),
+        waitPower: async () => { await say(bowlerP, 'power', { side: 'right' }); await this.coach?.('tutBlock'); },
         ok: keep => inn.wkts === keep.wkts, // survive it and it's done, whatever it scored
       }), 3, 'He never saw that no-ball. Again!');
+      if (story) { if (!this.bot) crowdBoo(); await this.coach?.('storyBlocked'); await say(raja, 'blocked'); }
     }
     // ball 3: assisted
     await fair(straight, () => ({ extra: 60, assist: assistHit, hint: 'SAME AGAIN — TIME IT!' }));
+    await say(mate, 'stunned', { side: 'right' });
     // ball 4: the power
     if (this.charge.value < 60) this.charge.add(60 - this.charge.value, 'CROWD ROAR');
     await this.coach?.('tutPower');
@@ -2632,6 +2656,7 @@ export class Game {
       assist: (res, grade) => (res.outcome === 'hit' ? null : assistHit(res, grade === 'miss' ? 'late' : grade)),
     });
     this.hud(inn);
+    if (story) { crowdStop(); await say(raja, 'six'); await this.coach?.('storyMid'); }
 
     // the defence: three balls, they need 10. A catch, a run out, then the keeper
     this.phase = 'bowl';
@@ -2642,8 +2667,9 @@ export class Game {
     this.fieldState.setting = 'all';
     this.tutorialKeeper = { window: 600, approach: 1100 };
     this.hud(def);
-    this.ui.banner('NOW DEFEND IT!', 'They need 10 off the last 3 balls', 2000);
+    this.ui.banner(story ? 'NOW THEY CHASE' : 'NOW DEFEND IT!', story ? 'Defend 10 off 3 balls. Their captain is coming...' : 'They need 10 off the last 3 balls', 2000);
     await this.sleepReal(this.bot ? 100 : 2000);
+    if (story) await this.coach?.('storyDefend');
     await this.coach?.('tutBowl');
     // each one until the wicket falls (a miss is undone: this over can't be lost)
     const take = async (ballNo, opt, tries, again) => {
@@ -2666,8 +2692,15 @@ export class Game {
       }
     };
     const plain = { scripted: true, stance: 'normal', hint: 'SWIPE FROM YOUR BOWLER UP THE PITCH', forceRelease: rg => (rg === 'bad' ? 'loose' : rg) };
+    await say(opener, 'chase');
     await take(28, () => ({ ...plain, findHit: 'catch' }), 3, ['HE GOT AWAY WITH IT!']);
+    await say(them[2], 'chase', { side: 'right' });
     await take(29, () => ({ ...plain, findHit: 'runout' }), 3, ['THEY MADE IT!']);
+    if (story && raja) {   // their captain walks in: he takes the last ball
+      if (def.other.id === raja.id) def.swapStrike();
+      this.prepPlayers(def);
+      await say(raja, 'captain');
+    }
     await this.coach?.('tutYorker');
     await take(30, attempt => ({
       scripted: true, stance: 'normal', glow: { lane: 'stumps', length: 'yorker' },
@@ -2679,12 +2712,13 @@ export class Game {
         : { ...ai, res: { outcome: 'bowled', grade: 'miss' } }),
     }), 3, [`${this.team.field?.id === 'rani' ? 'RANI' : 'THE KEEPER'} GETS ANOTHER GO!`, 'ONE LAST CHANCE']);
     this.tutorialKeeper = null;
-    this.ui.banner('YOU WON ISSUE #1!', 'Your first superhero win', 2000);
-    sfx.crowd(1.4);
+    if (story) { crowdStop(); await say(raja, 'out'); }
+    this.ui.banner(story ? 'YOU BEAT THE THUNDER STRIKERS!' : 'YOU WON ISSUE #1!', story ? 'Unbeaten no more' : 'Your first superhero win', 2000);
+    if (!story) sfx.crowd(1.4);
     await this.sleepReal(this.bot ? 100 : 1800);
     const sorted = [...this.moments].sort((x, y) => y.score - x.score);
     if (!sorted.length) sorted.push({ kind: 'powerSix', title: `YOUR FIRST ${this.team.bat.power.name.toUpperCase()}!`, word: this.team.bat.power.word, heroId: this.team.bat.id, score: 70 });
-    return { mode: 'tutorial', innings: this.innings, result: { outcome: 'win', text: 'Issue #1 complete — the over is won!' }, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats };
+    return { mode: 'tutorial', innings: this.innings, result: { outcome: 'win', text: story ? 'You beat the unbeatable Thunder Strikers!' : 'Issue #1 complete — the over is won!' }, moments: sorted, team: this.team, rival: this.rival, seed: this.seed, stats: this.stats };
   }
 
   // ---------- rendering ----------

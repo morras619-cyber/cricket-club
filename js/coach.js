@@ -85,6 +85,32 @@ export const DEV = {
     "Now we bowl. They need 10 off the last 3 balls. Swipe from your bowler up the pitch to where you want the ball to land.",
     "Bowl well and they'll make mistakes. When the ball comes to your fielders, I'll tell you what to do.",
   ],
+  // the first-time story (js/story.js)
+  storyWalk: [
+    "Hear that, beta? Twenty thousand Thunder fans, and not one of them is on your side.",
+    "Breathe. Boos are only noise. The ball is all that matters: watch the ring, not the crowd.",
+  ],
+  storyCalm: [
+    "They're laughing now. Let them. Every great player was laughed at once.",
+    "You need 12 off 4 balls. That's it. I believe in you, beta.",
+  ],
+  storyBlocked: [
+    "Cool as ice! Did you see Imran's face? They didn't expect that.",
+  ],
+  storyMid: [
+    "TWELVE off four, in the Thunderdome! Hear that? Listen. The crowd has gone quiet.",
+    "But the Strikers aren't finished. Now THEY chase, and their captain is coming out.",
+  ],
+  storyDefend: [
+    "They need 10 off 3 balls, and Thunder Raja himself will be walking out.",
+    "Take them out one ball at a time. You can do it, beta. I promise the crowd will go quiet.",
+  ],
+  storyDone: [
+    "YOU DID IT! You beat the Thunder Strikers, in their own house! Do you know how long people have waited to see that?",
+    "But it was one match. They'll be back, stronger and angrier. And they will never forget your face.",
+    "Build a squad, climb through the divisions and reach the Super League. That's where you meet them again. And that's where you beat them for good.",
+    "Tap Play, then Super League. Your career starts now, beta.",
+  ],
   tutDone: [
     "What did I tell you? A natural!",
     "Quick Game is for a single match. When you're ready for a whole career, come and find me in the Super League.",
