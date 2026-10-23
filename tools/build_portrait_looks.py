@@ -25,7 +25,8 @@ HAIR_FIX = {
 
 
 # skin misread (a lit face on a dark painting): the tone to use instead
-SKIN_FIX = {'andre-belgrave': '#7a4a2e', 'captain-comet': '#c27a52', 'cyclone-zaheer': '#cd8458'}
+SKIN_FIX = {'andre-belgrave': '#7a4a2e', 'captain-comet': '#c27a52', 'cyclone-zaheer': '#cd8458',
+            'iron-wall-ian': '#f3cfb0', 'rubber-rocket-rory': '#f3cfb0'}   # (the two fair Westerners: the game's lightest tone)
 
 
 def hsv(rgb):
