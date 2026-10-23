@@ -19,6 +19,7 @@ import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
 import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
+import { levelOf, levelName, learn, adaptScale } from './adapt.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
@@ -781,7 +782,7 @@ async function startMatch(opts) {
   try {
     summary = await game.runMatch({
       mode, story: !!opts.story, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
-      records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field,
+      records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill),
     });
   } finally {
     game.matchActive = false;
@@ -1729,6 +1730,9 @@ function showResult(summary) {
   lastSummary = summary;
   const mode = summary.mode;
   const rewards = matchRewards(profile, summary);
+  // the AI learns from how you played (not in the fixed modes), and says where it is playing now
+  const adapts = adaptScale(mode) > 0;
+  if (adapts) profile.skill = learn(profile.skill, summary);
   const counts = mode !== 'tutorial' && mode !== 'daily'; // full matches go in the career record
   const rec = counts ? recordStats(profile, summary) : null;
   const win = summary.result.outcome === 'win';
@@ -1754,6 +1758,7 @@ function showResult(summary) {
     profile.dailyChallenge = { key: summary.scenario.key, won: o.won, line: o.line, balls: o.balls };
     events.push('daily');
   }
+  if (adapts) notes = [...notes, `The AI is playing at ${levelName(levelOf(profile.skill))} level, and it keeps learning how you play.`];
   const got = mode === 'tutorial' ? [] : checkAchievements(profile, { summary, rec, events });
   saveProfile(profile);
   $('resStash').append($('shareFig'), $('shareBox'), $('resStats')); // (back to the stash: the pages below are rebuilt each match)

@@ -12,6 +12,7 @@ const fresh = () => ({
   dailyChallenge: null, dailyStreak: { last: '', count: 0, best: 0 },
   daily: { day: 0, last: '' },
   pass: { season: 1, xp: 0, claimed: 0 }, // the season pass: tiers reached by playing, rewards claimed
+  skill: { est: 50, n: 0 }, // how well you play, as the AI has learned it (js/adapt.js)
   settings: { sound: true, haptics: true, fielding: 'key', units: 'kmh' },
 });
 

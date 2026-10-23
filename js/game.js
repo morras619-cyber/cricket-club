@@ -22,6 +22,7 @@ import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { adaptScale, NO_DIALS, dialsFor } from './adapt.js';
 import { DISCO_MS, DISCO_LEAD_MS, discoColors, drawDisco } from './disco.js';
 import { quality } from './quality.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
@@ -278,7 +279,7 @@ export class Game {
     this.fieldState = { events: 0, lastEventBall: -9, setting: this.settings.fielding };
     this.moments = [];
     this.rebowls = 0;
-    this.stats = { fieldingWins: 0, perfects: 0, powers: 0, longestSix: 0 };
+    this.stats = { fieldingWins: 0, perfects: 0, powers: 0, longestSix: 0, swings: 0, swingGood: 0, rel: 0, relGood: 0 };
     this.recordSix = opts.records?.longestSix || 0; // career longest six going into the match
     this.lastBanterBall = -99; this.lastBatBanter = -99; this.thinks = null;
     this.bowlChoice = { field: opts.field?.preset || 'balanced', custom: opts.field?.custom || null };
@@ -290,7 +291,9 @@ export class Game {
     // the heat between a batter and his bowler (js/heat.js): full matches only, not the fixed challenges, the war or the tutorial
     this.duels = new Duels(); this.heatOn = ['quick', 'league', 'cup', 'career'].includes(mode); this.ui.heat(null);
     // the AI's hidden mind (the end of js/heat.js): its own charge, when it fires its star's power, and its answers to yours; the same modes as the heat
-    this.mindOn = this.heatOn; this.mind = this.mindOn ? new Mind(makeRng((this.seed ^ 0x5bd1e995) >>> 0)) : null; this.myCounter = null; this.aiCounterNow = null;
+    // how well the player plays, as the AI has learned it: the dials it turns on its own side (js/adapt.js); read once, so a match never changes mid-way
+    this.adapt = opts.level != null ? dialsFor(opts.level, adaptScale(mode)) : NO_DIALS;
+    this.mindOn = this.heatOn; this.mind = this.mindOn ? new Mind(makeRng((this.seed ^ 0x5bd1e995) >>> 0), { gain: this.adapt.mind }) : null; this.myCounter = null; this.aiCounterNow = null;
     try {
       if (mode === 'tutorial') return await this.runTutorial(!!opts.story);
       await this.pitchReport();
@@ -941,10 +944,12 @@ export class Game {
     if (striker.ability === 'eagleEye') skill += 12;
     if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
     if (bowler.ability === 'mystery') skill -= 12;
-    fx.match = matchup(striker, bowler, { feel: this.feel(), ballNo, length: spec.length });
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowler.bowlSkill || 75);
+    const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;   // (his bowler is a little better or worse, as you play)
+    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length });
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
+    if (swing && !swing.defend) { this.stats.swings++; if (grade === 'perfect' || grade === 'good') this.stats.swingGood++; }   // (what the AI learns your skill from)
     if (fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
     if (fx.match.edgeP && (grade === 'early' || grade === 'late') && rng.chance(fx.match.edgeP)) grade = 'edge';   // (an aggressive opener early on)
     if (myC === 'steady' && swing && !swing.defend && grade !== 'perfect' && grade !== 'good') grade = 'good';   // Steady Hands: a Good timing, however he bowls it
@@ -1436,7 +1441,7 @@ export class Game {
       this.addMoment('ultimate', `METEOR ${runs}!`, 'BOOOOM!', this.heroFor('bat'), { ballNo, perfect: runs === 8, detail: `${runs} runs off one ball` });
       return;
     }
-    const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: (this.oppStyle.field || 1) * this.pitch.field * fieldSpeed(this.sideRating(this.oppSide)) });
+    const sim = simulateHit(res, aiField, rng, { aiBatting: false, speed: this.adapt.field * (this.oppStyle.field || 1) * this.pitch.field * fieldSpeed(this.sideRating(this.oppSide)) });
     if (!sim.catch) this.bowlCrowd(res.grade === 'defend' ? 'dot' : 'runs'); else this.bowlCrowdSoften(); // (a block gets the groan; a catch chance only softens the build-up)
     let caught = false, saved = false, dropped = false;
     if (sim.catch) {
@@ -1859,6 +1864,7 @@ export class Game {
     const myC = this.myCounter; this.myCounter = null;   // my answer to his power
     const ac = this.takeAiCounter('bowl');                // his answer to MY power, if I fired one
     let rg = G.hesitated ? 'loose' : G.grade;
+    if (!opt.scripted) { this.stats.rel++; if (rg === 'perfect' || rg === 'good') this.stats.relGood++; }   // (what the AI learns your skill from)
     const pinpoint = !!this.armed.pinpoint;
     const hunt = !!this.armed.hunt; this.armed.hunt = false;   // (Hat-trick Hunt is a Pinpoint ball and more)
     if (pinpoint) { rg = ac === 'brace' ? 'good' : 'perfect'; this.armed.pinpoint = false; }
@@ -1977,7 +1983,7 @@ export class Game {
     if (mood.balls > 0 && --mood.balls === 0) mood.state = 'calm';
 
     // the AI batter's ability, and how hard my bowler is to read
-    const aiSkill = striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
+    const aiSkill = this.adapt.bat + striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const pf = this.feel();
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * (pf.ai / pf.bat) ** 1.5 * aiHome };   // (raised: the pitch has to be felt)
