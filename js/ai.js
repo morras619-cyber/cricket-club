@@ -160,7 +160,7 @@ export function aiBat(d, ctx, rng) {
   let grade = gradeTiming(errMs, w, d.xt > 0.08);
   if (ctx.steady && grade !== 'perfect') grade = 'good';   // his Steady Hands: a Good timing, however it is bowled
   if (mods.edgeBoost && ['good', 'early', 'late'].includes(grade) && d.xt > -0.05 && rng.chance(mods.edgeBoost)) grade = 'edge';
-  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder', braced: !!ctx.brace }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) });
+  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder', braced: !!ctx.brace }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) * (ctx.powerMul || 1) });
   // through the gate: a mistimed swing at a full, straight ball can miss it and lose the stumps.
   // A weaker batter is beaten more often; a yorker on the stumps is the hardest to keep out.
   if ((grade === 'early' || grade === 'late' || grade === 'edge') && !ctx.freeHit && d.onStumps && ['good', 'full', 'yorker', 'fulltoss'].includes(d.length)) {

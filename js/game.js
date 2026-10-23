@@ -16,7 +16,7 @@ import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
 import { portraitFace } from './futcard.js';
-import { hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
+import { matchup, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
@@ -796,6 +796,7 @@ export class Game {
     if (fx.focus) { const h = braced ? BRACE.focusWindow : 1; w.perfect += 55 * h; w.good += 45 * h; }
     if (tornado) w.perfect /= 2;
     if (fx.squeeze) { w.perfect *= fx.squeeze; w.good *= fx.squeeze; }
+    if (fx.match) { w.perfect *= fx.match.win; w.good *= fx.match.win; }   // (what his type is good and bad against: ratings.js matchup)
     if (fx.counter === 'steady') { w.perfect *= STEADY_SQUEEZE; w.good *= STEADY_SQUEEZE; }   // (his Steady Hands: the ball is exactly where he wants it)
     w.good = Math.max(w.good, w.perfect + 20);
     return w;
@@ -932,10 +933,12 @@ export class Game {
     if (striker.ability === 'eagleEye') skill += 12;
     if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
     if (bowler.ability === 'mystery') skill -= 12;
+    fx.match = matchup(striker, bowler, { feel: this.feel(), ballNo, length: spec.length });
     const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowler.bowlSkill || 75);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
     if (fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
+    if (fx.match.edgeP && (grade === 'early' || grade === 'late') && rng.chance(fx.match.edgeP)) grade = 'edge';   // (an aggressive opener early on)
     if (myC === 'steady' && swing && !swing.defend && grade !== 'perfect' && grade !== 'good') grade = 'good';   // Steady Hands: a Good timing, however he bowls it
     // defending is forgiving: anywhere in the wide window keeps the ball out
     if (swing?.defend) grade = Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
@@ -954,7 +957,7 @@ export class Game {
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
       const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
-      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
+      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * fx.match.power * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
       if (aiPower === 'tornado' && myC !== 'brace' && grade === 'miss') res.outcome = 'bowled';
       if (fx.gap && swing && !swing.defend && res.outcome === 'hit') res = this.gapShot(res, grade, aiField, fx.counter === 'brace', rng);
       // his Bouncer Barrage: a hit short of a Perfect (a braced one spares a Good) goes up in the air, a catch chance every time
@@ -1967,7 +1970,9 @@ export class Game {
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const pf = this.feel();
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * pf.ai * aiHome / pf.bat };
-    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length });
+    const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
+    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
     if (fxFlags.bouncer && ai.res.outcome === 'hit' && ai.res.grade !== 'defend' && !(ai.grade === 'perfect' || (fxFlags.bouncerBrace && ai.grade === 'good'))) {
       ai.res = { ...ai.res, loft: true, launchDeg: 55 + rng.range(0, 12), v: Math.min(ai.res.v || 20, 20), forced: { chance: true }, label: 'SKIED!' };

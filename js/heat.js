@@ -88,7 +88,7 @@ export const STEADY_SQUEEZE = 0.85;
 // ---- the AI's mind ----
 const FIRE_AT = { thunder: 'bat', mirror: 'bat', tornado: 'bowl', maya: 'bowl', shatter: 'bowl' };
 export class Mind {
-  constructor(rng, { gain = 3, start = 40 } = {}) {
+  constructor(rng, { gain = 2.2, start = 40 } = {}) {
     this.charge = new Charge(start);   // hidden: never shown (it starts a little warm, and fills faster than yours: it has one star to feed)
     this.gain = gain;
     this.rng = rng;
