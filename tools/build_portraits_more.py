@@ -42,7 +42,7 @@ PLAYERS = {
     # Australia
     'mason-barlow': 'W5', 'darcy-penrith': 'W4',
     # England
-    'rubber-rocket-ravi': 'W9', 'oscar-marsden': 'W10',
+    'rubber-rocket-rory': 'W9', 'oscar-marsden': 'W10',
     # the second batch: sheet 10 (South Asian) and sheet 11 (Caribbean)
     'tanmay-bhalla': 'B2', 'sahan-kumara': 'B3', 'shohag-chowdhury': 'B1', 'bilal-noorzai': 'B4',
     'tevin-hollis': 'C1', 'jermaine-granger': 'C2', 'jermaine-belgrave': 'C6', 'tevin-clarke': 'C4', 'romario-clarke': 'C5', 'akeem-bascombe': 'C3',

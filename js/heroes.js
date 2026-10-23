@@ -47,7 +47,7 @@ export const HEROES = [
       desc: 'Seams so hard that any Good-or-worse contact edges to the keeper.' },
   },
   {
-    id: 'rani', name: 'Rubber Rocket Ravi', slot: 'field', role: 'Wicket-keeper', emblem: 'spring',
+    id: 'rani', name: 'Rubber Rocket Rory', slot: 'field', role: 'Wicket-keeper', emblem: 'spring',
     look: { suit: '#e0245e', trim: '#ffe14d', cape: '#7d0f33', skin: '#c48a64', hair: '#2a1a14', mask: '#ffe14d' , style: 'bun' },
     quote: 'Oh, try harder!',
     power: { kind: 'elastic', name: 'Elastic Grab', cost: 60, word: 'BOING!',

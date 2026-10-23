@@ -2803,7 +2803,7 @@ export class Game {
       forceAi: (d, ai) => (attempt < 2
         ? { ...ai, res: { outcome: 'edge', grade: 'edge', offset: { x: attempt ? 0.3 : 1.0, y: 0.7 } } }
         : { ...ai, res: { outcome: 'bowled', grade: 'miss' } }),
-    }), 3, [`${this.team.field?.id === 'rani' ? 'RAVI' : 'THE KEEPER'} GETS ANOTHER GO!`, 'ONE LAST CHANCE']);
+    }), 3, [`${this.team.field?.id === 'rani' ? 'RORY' : 'THE KEEPER'} GETS ANOTHER GO!`, 'ONE LAST CHANCE']);
     this.tutorialKeeper = null;
     if (story) { crowdStop(); await say(raja, 'out'); }
     this.ui.banner(story ? 'YOU BEAT THE THUNDER STRIKERS!' : 'YOU WON ISSUE #1!', story ? 'Unbeaten no more' : 'Your first superhero win', 2000);
