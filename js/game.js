@@ -318,7 +318,7 @@ export class Game {
         const first = new Innings('player');
         this.innings.push(first);
         if (intro) await this.matchIntro(first, true);
-        await this.introBanner('YOU BAT FIRST', `${this.myTeam.name} v ${this.oppTeam.name} · ${this.mySide.order[0].name} opens`);
+        if (!first.introShown) await this.introBanner('YOU BAT FIRST', `${this.myTeam.name} v ${this.oppTeam.name} · ${this.mySide.order[0].name} opens`);   // (the intro has said it)
         await this.battingInnings(first, script);
         const carry = this.charge.carryOver();
         await this.inningsBreak(first, carry);
@@ -347,18 +347,27 @@ export class Game {
     sfx.crowd(this.home === this.myTeam.id ? 1.3 : 0.7);
     await this.sleepReal(this.bot ? 150 : introNext ? 50 : 2800);
   }
-  // The intro shots (js/intro.js): over the stadium, the opening batter close up, the opening bowler close up. A tap skips.
+  // The intro shots (js/intro.js): over the stadium with the two sides facing off, the opening batters close up, then (batting
+  // first, when the opening bowler is known) the opening bowler. Their cards are shown there, so not again after it. A tap skips.
   async matchIntro(inn, batting) {
-    const striker = this.batterOf(inn), bowler = this.bowlerOf(inn);
-    this.introScene(inn, batting, striker, bowler);
+    const striker = this.batterOf(inn), partner = this.nonStrikerOf(inn);
+    const bowler = batting ? this.aiPlan[0] : null;   // (bowling first, you choose the bowler yourself after it)
+    this.introScene(inn, batting, striker, bowler || this.bowlerOf(inn));
     this.prepPlayers(inn);
     masksReady(4000);
-    const I = this.I = new MatchIntro(this, { batting, my: this.myTeam, opp: this.oppTeam, striker: { name: striker.name, ovr: ovr(striker) }, bowler: { name: bowler.name, ovr: ovr(bowler) } });
+    const batTeam = batting ? this.myTeam : this.oppTeam, bowlTeam = batting ? this.oppTeam : this.myTeam;
+    const cards = { openers: [striker, partner].filter(Boolean).map(p => cardFor(p, batTeam)), bowler: bowler ? cardFor(bowler, bowlTeam) : null };
+    const I = this.I = new MatchIntro(this, { batting, my: this.myTeam, opp: this.oppTeam, cards, order: batting ? 'YOU BAT FIRST' : 'YOU BOWL FIRST' });
+    inn.introShown = inn.openersShown = true;
     this.view = 'intro';
     document.getElementById('hud').classList.add('intro-on');   // (the score and buttons wait; the pitch report banner stays)
     this.onInput = type => { if (type === 'down') I.skip(); };
     try { await this.until(() => I.finished(this.realTime)); }
-    finally { this.onInput = null; this.I = null; document.getElementById('hud').classList.remove('intro-on'); }
+    finally {
+      this.onInput = null; this.I = null; I.end();
+      document.getElementById('hud').classList.remove('intro-on');
+      this.view = batting ? 'bat' : 'bowl'; this.S = this.freshScene();
+    }
   }
   // the scene as the first ball will show it: the openers, the bowler at the start of his run-up, the field
   introScene(inn, batting, striker, bowler) {
@@ -495,11 +504,15 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
-    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 2300, cardFor(p, inn.side === 'player' ? this.oppTeam : this.myTeam));
-    await this.sleepReal(50); // let the banner show first
+    // (the match intro has shown the AI's opening bowler's card: it isn't shown again)
+    const seen = inn.introShown && inn.side === 'player' && over === 0;
+    if (!seen) {
+      this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 2300, cardFor(p, inn.side === 'player' ? this.oppTeam : this.myTeam));
+      await this.sleepReal(50); // let the banner show first
+    }
     this.prepPlayers(inn);
     // play only starts once the card has been read and has gone
-    await this.sleepReal(this.bot ? 10 : 2600);
+    await this.sleepReal(this.bot ? 10 : seen ? 300 : 2600);
   }
 
   // the openers walk out: their cards (if they have them) side by side
@@ -1519,7 +1532,7 @@ export class Game {
     this.fillCrease(inn);
     this.hud(inn);
     if (inn.intro) await this.introBanner(...inn.intro);
-    else await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `${this.myTeam.name} v ${this.oppTeam.name} · keep them quiet` : `Defend ${inn.target - 1}`);
+    else if (!inn.introShown) await this.introBanner(inn.target == null ? 'YOU BOWL FIRST' : 'YOUR TURN TO BOWL', inn.target == null ? `${this.myTeam.name} v ${this.oppTeam.name} · keep them quiet` : `Defend ${inn.target - 1}`);
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
       if (inn.balls % 6 === 0 && this.overStarted !== inn.balls) { this.overStarted = inn.balls; await this.startOver(inn); }
