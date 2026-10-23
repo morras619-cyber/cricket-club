@@ -179,15 +179,35 @@ function loadMood() {
   }
   return moodLoading;
 }
+// ---------- each club's own song ----------
+// snd/crowd-songs.mp3 holds the eight main clubs' songs one after another (SONG_SLOT seconds apart, SONG_LEN of song in each;
+// tools/build_crowd_songs.py). The home crowd sings its club's song; a club without one sings the default.
+const SONG_CLUBS = ['thunder', 'cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals'], SONG_SLOT = 10.5, SONG_LEN = 10;
+let song = null, songFor = null, songTried = null;
+export function crowdSong(teamId) {
+  songFor = teamId; song = null; songTried = null;
+  const i = SONG_CLUBS.indexOf(teamId);
+  if (i < 0 || !ac) return;
+  songTried = teamId;
+  fetch('snd/crowd-songs.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no))).then(all => {
+    // (only this club's ten seconds are kept; the whole file is let go)
+    const sr = all.sampleRate, from = Math.round(i * SONG_SLOT * sr), n = Math.min(Math.round(SONG_LEN * sr), all.length - from);
+    const out = ac.createBuffer(all.numberOfChannels, n, sr);
+    for (let c = 0; c < all.numberOfChannels; c++) out.copyToChannel(all.getChannelData(c).subarray(from, from + n), c);
+    if (songFor === teamId) song = out;
+  }).catch(() => { /* the default singing stands in */ });
+}
 // sing for `sec` seconds starting `delay` seconds from now, at volume `vol`
 export function crowdSing(delay = 0, sec = 5, vol = 0.5) {
   if (!ready()) return;
   if (!moodBufs) { loadMood(); return; }
-  const t0 = ac.currentTime + Math.max(0, delay), len = Math.min(sec, moodBufs.sing.duration);
+  const buf = song || moodBufs.sing;
+  if (!song && songFor && songTried !== songFor) crowdSong(songFor);   // (asked for before the sound was switched on: fetch it now, it plays next time)
+  const t0 = ac.currentTime + Math.max(0, delay), len = Math.min(sec, buf.duration);
   const src = ac.createBufferSource(), g = ac.createGain(), stopG = ac.createGain();
   g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.6, len * 0.3));
   g.gain.setValueAtTime(vol, t0 + Math.max(0.7, len - 1.3)); g.gain.linearRampToValueAtTime(0.0001, t0 + len);
-  src.buffer = moodBufs.sing; src.connect(g).connect(stopG).connect(master); src.start(t0); src.stop(t0 + len + 0.05);
+  src.buffer = buf; src.connect(g).connect(stopG).connect(master); src.start(t0); src.stop(t0 + len + 0.05);
   singing.push({ src, stopG });
   setTimeout(() => { singing = singing.filter(x => x.src !== src); stopG.disconnect(); }, (delay + len + 0.5) * 1000);
 }

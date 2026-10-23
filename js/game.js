@@ -23,7 +23,7 @@ import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, crowdClap, ambienceMood } from './audio.js';
+import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdSong, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { TAUNTS, pick } from './story.js';
 import { Duels, FULL, HOLD, gainOf, hotSpec, Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './heat.js';
@@ -255,6 +255,7 @@ export class Game {
     this.oppStyle = this.oppTeam.style || {};
     // the home ground: its look, and how its pitch plays
     this.home = opts.home || homeFromSeed(this.seed, this.myTeam.id, this.oppTeam.id);
+    crowdSong(this.home);   // (the home crowd sings its own club's song)
     this.ground = groundOf(this.home);
     this.pitch = pitchOf(this.home);
     preloadEffects('electric');
