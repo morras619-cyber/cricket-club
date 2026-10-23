@@ -28,7 +28,7 @@ export const STEADY_SQUEEZE = 0.85;
 // ---- the AI's mind ----
 const FIRE_AT = { thunder: 'bat', mirror: 'bat', tornado: 'bowl', maya: 'bowl', shatter: 'bowl' };
 export class Mind {
-  constructor(rng, { gain = 2.2, start = 30 } = {}) {
+  constructor(rng, { gain = 3, start = 40 } = {}) {
     this.charge = new Charge(start);   // hidden: never shown (it starts a little warm, and fills faster than yours: it has one star to feed)
     this.gain = gain;
     this.rng = rng;
@@ -69,8 +69,8 @@ export class Mind {
     if (ctx.setBat) score++;                  // a batter who has got in
     if (ctx.pressure) score++;                // the AI is behind the rate (batting) or you are cruising (bowling)
     if (ctx.wicketsLeft != null && ctx.wicketsLeft <= 1) score++;
-    // a good moment, or plenty in the tank and a reason, or the death
-    return score >= 2 || (score >= 1 && this.value >= cost + 20) || (ctx.ball >= 24 && this.value >= cost);
+    // two reasons, or one reason with the charge in hand, or the death
+    return score >= 2 || (score >= 1 && this.value >= cost) || (ctx.ball >= 24 && this.value >= cost);
   }
 
   // Should it answer a power you fired? power: 'thunder'|'mirror'|'meteor'|'focus'|'tornado'|'maya'|'shatter'|'pinpoint'.
