@@ -48,10 +48,11 @@ export class CutIn {
 
     const sc = Math.min(W / 390, H / 844) * 2.15;
     const hx = W * 0.5, hy = y0 + (y1 - y0) * 0.62;
+    const draw = (x, k = 1) => (hero.face ? portraitCard(ctx, hero.face, x, (y0 + y1) / 2, Math.min(W * 0.6, (y1 - y0) * 0.78) * k, t) : bust(ctx, x, hy, sc * k, hero, rnd));
     if (power.kind === 'mirror') {
-      ctx.globalAlpha = 0.35; bust(ctx, hx - 60 * sc / 2.15, hy, sc, hero, rnd); bust(ctx, hx + 60 * sc / 2.15, hy, sc, hero, rnd); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.35; draw(hx - 60 * sc / 2.15); draw(hx + 60 * sc / 2.15); ctx.globalAlpha = 1;
     }
-    bust(ctx, hx, hy, sc, hero, rnd);
+    draw(hx);
     effect(ctx, power.kind, hx, hy, sc, rnd, t, W, H);
     ctx.restore();
 
@@ -108,6 +109,18 @@ function wrap(ctx, text, maxW) {
   return out;
 }
 
+// A player's painted portrait on a card, a little crooked, breathing in and out
+function portraitCard(ctx, face, cx, cy, size, t) {
+  const k = 1 + Math.sin(t / 140) * 0.012, w = size * k;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(-0.045);
+  ctx.fillStyle = '#fffbe8'; ctx.strokeStyle = INK; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.roundRect(-w / 2 - 9, -w / 2 - 9, w + 18, w + 18, 16); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(-w / 2, -w / 2, w, w, 10); ctx.save(); ctx.clip();
+  ctx.drawImage(face, -w / 2, -w / 2, w, w); ctx.restore();
+  ctx.lineWidth = 4; ctx.stroke();
+  ctx.restore();
+}
+
 // Head-and-shoulders portrait, front view, with the hero's prop.
 function bust(ctx, hx, hy, s, hero, rnd) {
   const look = hero.look;
@@ -129,7 +142,7 @@ function bust(ctx, hx, hy, s, hero, rnd) {
   ctx.save(); ctx.beginPath(); ctx.moveTo(...Q(-66, -70)); ctx.lineTo(...Q(-62, 14)); ctx.quadraticCurveTo(...Q(-58, 34), ...Q(-34, 38)); ctx.lineTo(...Q(-14, 44)); ctx.lineTo(...Q(-24, -70)); ctx.closePath(); ctx.fillStyle = shade(look.suit); ctx.fill(); ctx.restore();
   ctx.strokeStyle = 'rgba(255,248,214,0.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(...Q(60, 14)); ctx.lineTo(...Q(64, -66)); ctx.stroke();
   poly([[-24, 40], [24, 40], [16, 30], [-16, 30]], look.trim);
-  ctx.save(); ctx.translate(...Q(0, 0)); ctx.scale(s * 2.1, s * 2.1); emblem(ctx, 0, 0, 10, look, hero.emblem, 2); ctx.restore();
+  if (!hero.plain) { ctx.save(); ctx.translate(...Q(0, 0)); ctx.scale(s * 2.1, s * 2.1); emblem(ctx, 0, 0, 10, look, hero.emblem, 2); ctx.restore(); }
   // hands and props in front
   if (hero.slot === 'bat') {
     ctx.fillStyle = look.trim; ctx.strokeStyle = INK; ctx.lineWidth = 4;
@@ -151,7 +164,8 @@ function bust(ctx, hx, hy, s, hero, rnd) {
   ctx.save(); ctx.translate(...Q(0, 78)); ctx.scale(s * 2.15, s * 2.15); hair(ctx, 0, 0, look, false, 1.7); ctx.restore();
   // mask with angled eyes and brows
   const mask = look.mask || shade(look.suit, 0.1);
-  path(() => { ctx.moveTo(...Q(-24, 84)); ctx.lineTo(...Q(24, 84)); ctx.lineTo(...Q(22, 72)); ctx.lineTo(...Q(6, 70)); ctx.lineTo(...Q(0, 74)); ctx.lineTo(...Q(-6, 70)); ctx.lineTo(...Q(-22, 72)); }, mask, 3.5);
+  if (!hero.plain) path(() => { ctx.moveTo(...Q(-24, 84)); ctx.lineTo(...Q(24, 84)); ctx.lineTo(...Q(22, 72)); ctx.lineTo(...Q(6, 70)); ctx.lineTo(...Q(0, 74)); ctx.lineTo(...Q(-6, 70)); ctx.lineTo(...Q(-22, 72)); }, mask, 3.5);
+  if (hero.plain) poly([[-24, 70], [24, 70], [22, 66], [-22, 66]], shade(look.skin, 0.1), 1);   // (no mask: just the brow line)
   poly([[-18, 80], [-6, 77], [-7, 73], [-17, 74]], '#fffbe8', 2.5);
   poly([[18, 80], [6, 77], [7, 73], [17, 74]], '#fffbe8', 2.5);
   ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(...Q(-9.5, 76), 1.6 * s, 0, Math.PI * 2); ctx.arc(...Q(9.5, 76), 1.6 * s, 0, Math.PI * 2); ctx.fill();

@@ -15,6 +15,7 @@ import { lookOf, faceCanvas, masksReady } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
+import { portraitFace } from './futcard.js';
 import { hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
@@ -429,7 +430,7 @@ export class Game {
   asHero(p, team, slot) {
     if (!p) return this.captain;
     const lk = lookOf(p) || {};
-    return { id: p.id, name: p.name, slot, emblem: null, quote: p.nick ? `${p.nick} time!` : 'Watch this!', look: { ...teamLook(team), skin: lk.skin || teamLook(team).skin, hair: lk.hair || teamLook(team).hair } };
+    return { id: p.id, name: p.name, slot, emblem: null, plain: true, face: portraitFace(p, team, 240), quote: p.nick ? `${p.nick} time!` : 'Watch this!', look: { ...teamLook(team), skin: lk.skin || teamLook(team).skin, hair: lk.hair || teamLook(team).hair } };
   }
   // my wicket-keeper (his face is on the keeper powers)
   keeperPlayer() { return this.fieldingXI([{ keeper: true }], 'player')[0]; }
