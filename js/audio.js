@@ -188,18 +188,18 @@ export function crowdRuns(delay = 0) {
   const now = ac.currentTime, t = now + Math.max(0, delay);
   if (t < clapUntil || now < roarUntil) return;
   cheerStop(0.15); singDuck(0.4);
-  // the rise of the boundary cheer, before its peak (the pop that comes at CUE is left out), played low and faded away
-  const from = Math.max(0, CUE - 2.6), len = 1.9, src = ac.createBufferSource(), g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(RUNS_CHEER, t + 0.8); g.gain.setValueAtTime(RUNS_CHEER, t + 1.1); g.gain.linearRampToValueAtTime(0.0001, t + len);
+  // the held part of the boundary cheer (after its rise and its pop, which is left out), faded in and out, played low...
+  const from = CUE + 0.5, len = 3, src = ac.createBufferSource(), g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(RUNS_CHEER, t + 0.5); g.gain.setValueAtTime(RUNS_CHEER, t + len - 1.3); g.gain.linearRampToValueAtTime(0.0001, t + len);
   src.buffer = cheerBuf; src.connect(g).connect(master); src.start(t, from, len + 0.05);
-  // ...and the applause, coming in as the swell goes
+  // ...with one round of applause looped in under it
   const clap = moodBufs.claps[clapNext++ % moodBufs.claps.length], cs = ac.createBufferSource(), cg = ac.createGain();
-  cg.gain.setValueAtTime(0.0001, t + 0.7); cg.gain.linearRampToValueAtTime(RUNS_CLAP, t + 1.3);
-  cs.buffer = clap; cs.connect(cg).connect(master); cs.start(t + 0.7);
-  clapUntil = t + 0.7 + clap.duration;
-  roarUntil = Math.max(roarUntil, t + 0.7 + clap.duration * 0.7);                 // (the synthetic crowd stays quiet under it)
+  cg.gain.setValueAtTime(0.0001, t + 0.1); cg.gain.linearRampToValueAtTime(RUNS_CLAP, t + 0.6);
+  cs.buffer = clap; cs.connect(cg).connect(master); cs.start(t + 0.1);
+  clapUntil = t + 0.1 + clap.duration;
+  roarUntil = Math.max(roarUntil, t + len * 0.8);                                  // (the synthetic crowd stays quiet under it)
 }
-const RUNS_CHEER = 0.3, RUNS_CLAP = 0.28;
+const RUNS_CHEER = 0.42, RUNS_CLAP = 0.3;
 
 // ---------- each club's own song ----------
 // snd/crowd-songs.mp3 holds the eight main clubs' songs one after another (SONG_SLOT seconds apart, SONG_LEN of song in each;
