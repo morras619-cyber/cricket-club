@@ -76,20 +76,18 @@ const SHARED = new Set(['pitch', 'grass', 'stumps', 'stumps-broken']);
 // creases, kept on the pitch: white, with a fine ink edge only where they're big enough to
 // carry one (far away an edge turns a crease into a stack of stripes)
 function drawCreases(g, cam, PX) {
-  const crease = (x0, z0, x1, z1) => {
-    const p = cam.project(0, 0, (z0 + z1) / 2);
-    if (!p) return;
-    const w = 0.045 * p.k;
-    g.lineCap = 'square';   // (square ends reach each other's centre-line: no gaps at the corners)
-    if (w >= 3) line(g, cam, x0, z0, x1, z1, 'rgba(20,16,24,0.7)', w + 1.2);
-    line(g, cam, x0, z0, x1, z1, w >= 3 ? '#fffdf0' : 'rgba(255,253,240,0.7)', Math.max(0.9, w));
-  };
-  const PE = 1.32;   // (the popping crease runs out to the return creases and stops there: the lines meet in a clean corner)
+  // the lines run out to the pitch's sides; return creases meet them. All the ink edges are drawn first and all the
+  // white lines over them, so the lines join cleanly and the edge shows only round the outside of the whole shape
+  const segs = [];
   for (const [z, d] of [[0, 1], [20, -1]]) {
-    crease(-PE, z + 1.22 * d, PE, z + 1.22 * d); // popping crease
-    crease(-1.32, z, 1.32, z); // bowling crease, through the stumps
-    for (const x of [-1.32, 1.32]) crease(x, z + 1.22 * d, x, z - 1.22 * d); // return creases
+    segs.push([-PX, z + 1.22 * d, PX, z + 1.22 * d]); // popping crease
+    segs.push([-PX, z, PX, z]); // bowling crease, through the stumps
+    for (const x of [-1.32, 1.32]) segs.push([x, z + 1.22 * d, x, z - 1.22 * d]); // return creases
   }
+  const ws = segs.map(([x0, z0, x1, z1]) => { const p = cam.project(0, 0, (z0 + z1) / 2); return p ? 0.045 * p.k : 0; });
+  g.lineCap = 'square';   // (square ends reach each other's centre-line: no gaps at the corners)
+  segs.forEach(([x0, z0, x1, z1], i) => { if (ws[i] >= 3) line(g, cam, x0, z0, x1, z1, 'rgba(20,16,24,0.9)', ws[i] + 1.2); });
+  segs.forEach(([x0, z0, x1, z1], i) => { if (ws[i]) line(g, cam, x0, z0, x1, z1, ws[i] >= 3 ? '#fffdf0' : 'rgba(255,253,240,0.7)', Math.max(0.9, ws[i])); });
 }
 // Grounds with a painted strip of their own, fresh and late (img/ground/<club>/pitch-fresh.webp, pitch-late.webp): the strip
 // fades from one to the other as the match wears (js/pitches.js pitchLate). The others keep the shared strip.
@@ -1146,7 +1144,7 @@ export class OutfieldView {
       const sm = art.pitchFresh ? shrunk(art, pt, (b.x - a.x) * sc, (b.y - a.y) * sc) : pt;   // (a strip drawn small is shrunk in steps: one big jump leaves it speckled and the bands and edges lost)
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(sm, pw(sm) * tr, 0, pw(sm) * (1 - 2 * tr), ph(sm), a.x, a.y, b.x - a.x, b.y - a.y);
-      if (art.pitchFresh) { ctx.strokeStyle = 'rgb(20,16,24)'; ctx.lineWidth = Math.max(1.2, 0.09 * this.k); }   // (the strip's ink edge, as heavy as in the match views)
+      if (art.pitchFresh) { ctx.strokeStyle = 'rgb(20,16,24)'; ctx.lineWidth = Math.max(1, 0.055 * this.k); }   // (the strip's ink edge, as fine as in the match views)
       else { ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; }
       ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
@@ -1158,7 +1156,7 @@ export class OutfieldView {
     ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = Math.max(1, 0.06 * k);
     for (const [y, dir] of [[0, 1], [20, -1]]) {
       const pc = y + 1.22 * dir;
-      const l = this.to(-1.5, pc), r = this.to(1.5, pc), bl = this.to(-1.32, y), br = this.to(1.32, y);
+      const l = this.to(-1.5, pc), r = this.to(1.5, pc), bl = this.to(-1.5, y), br = this.to(1.5, y);
       ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(r.x, r.y);
       for (const x of [-1.32, 1.32]) { const a2 = this.to(x, pc + 0.6 * dir), b2 = this.to(x, y - 0.6 * dir); ctx.moveTo(a2.x, a2.y); ctx.lineTo(b2.x, b2.y); }
       ctx.moveTo(bl.x, bl.y); ctx.lineTo(br.x, br.y); // the bowling crease, through the stumps
