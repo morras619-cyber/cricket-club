@@ -3,7 +3,7 @@ let ac = null, master = null, noiseBuf = null;
 export const sound = { on: true, haptics: true };
 
 export function unlockAudio() {
-  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  if (ac) { if (ac.state === 'suspended') ac.resume(); musicSync(); return; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   ac = new AC();
@@ -13,9 +13,54 @@ export function unlockAudio() {
   noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
   const data = noiseBuf.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  musicSync();
 }
 
 function ready() { return ac && sound.on; }
+
+// ---------- the menu music ----------
+// snd/menu-music.mp3 (45 s, tools/build_menu_music.py) plays while a menu screen is up (ui.js says so: musicWanted) and fades away when a match
+// starts. Each play fades into the next over MUSIC_XF seconds, so it loops without a seam (and whatever the mp3 decoder does to its ends does
+// not matter). It is also off when the sound is.
+const MUSIC_VOL = 0.5, MUSIC_XF = 1.8;
+let musicWant = false, musicBuf = null, musicLoading = null, musicRun = null;
+export function musicWanted(on) { musicWant = !!on; musicSync(); }
+export function musicSync() {
+  if (musicWant && ready()) startMusic(); else stopMusic(0.8);
+}
+function loadMusic() {
+  if (!musicLoading) {
+    musicLoading = fetch('snd/menu-music.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
+      .then(buf => (musicBuf = buf)).catch(() => { musicLoading = null; return null; });
+  }
+  return musicLoading;
+}
+function startMusic() {
+  if (musicRun) return;
+  if (!musicBuf) { loadMusic().then(buf => { if (buf) musicSync(); }); return; }
+  const t = ac.currentTime + 0.05, gain = ac.createGain(), run = musicRun = { gain, srcs: [], nextAt: 0, timer: 0 };
+  gain.gain.setValueAtTime(0.0001, t); gain.gain.linearRampToValueAtTime(MUSIC_VOL, t + 1.5);
+  gain.connect(master);
+  const dur = musicBuf.duration;
+  const play = (at, first) => {   // one play of the track, fading in over the end of the last one and out over the start of the next
+    const src = ac.createBufferSource(), g = ac.createGain();
+    src.buffer = musicBuf; src.connect(g).connect(gain);
+    if (first) g.gain.setValueAtTime(1, at); else { g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(1, at + MUSIC_XF); }
+    g.gain.setValueAtTime(1, at + dur - MUSIC_XF); g.gain.linearRampToValueAtTime(0.0001, at + dur);
+    src.start(at); src.stop(at + dur + 0.1);
+    run.srcs.push(src); if (run.srcs.length > 3) run.srcs.shift();
+    run.nextAt = at + dur - MUSIC_XF;
+  };
+  play(t, true);
+  run.timer = setInterval(() => { if (musicRun === run && ac.currentTime > run.nextAt - 2) play(run.nextAt, false); }, 500);
+}
+function stopMusic(fade = 0.8) {
+  const run = musicRun; if (!run) return;
+  musicRun = null; clearInterval(run.timer);
+  const t = ac.currentTime;
+  run.gain.gain.cancelScheduledValues(t); run.gain.gain.setValueAtTime(Math.max(0.0001, run.gain.gain.value), t); run.gain.gain.linearRampToValueAtTime(0.0001, t + fade);
+  setTimeout(() => { for (const s of run.srcs) { try { s.stop(); } catch { /* already over */ } } run.gain.disconnect(); }, (fade + 0.2) * 1000);
+}
 
 function tone(freq, dur, { type = 'sine', gain = 0.3, to = null, delay = 0 } = {}) {
   if (!ready()) return;
@@ -168,42 +213,47 @@ export function crowdSoften() { crowdFade(0.8); }
 export function crowdStop() { crowdFade(0.2); singDuck(0.3); }
 
 // ---------- the crowd's moods: singing and booing ----------
-// snd/crowd-sing.wav (a happy crowd, 10 s, faded at both ends) plays as much as a moment needs, faded in and out so
-// it never starts or stops abruptly; snd/crowd-boo.wav (an angry crowd, whole). Singing ducks away under any of the
-// louder crowd sounds that come after it (the roar, a wicket, a groan, a boo). tools/build_crowd_mood.py.
+// snd/crowd-boo.wav (an angry crowd, whole) and the applause. The singing (below) ducks away under any of the louder crowd
+// sounds that come after it (the roar, a wicket, a groan, a boo). tools/build_crowd_mood.py.
 let moodBufs = null, moodLoading = null, singing = [];
 function loadMood() {
   if (!moodLoading) {
     const get = n => fetch(`snd/crowd-${n}.wav`).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)));
-    moodLoading = Promise.all([get('sing'), get('boo'), get('boo2'), get('boo3'), get('clap')]).then(([sing, boo, boo2, boo3, clap]) => (moodBufs = { sing, boos: [boo, boo2, boo3], claps: [clap] })).catch(() => { moodLoading = null; return null; });
+    moodLoading = Promise.all([get('boo'), get('boo2'), get('boo3'), get('clap')]).then(([boo, boo2, boo3, clap]) => (moodBufs = { boos: [boo, boo2, boo3], claps: [clap] })).catch(() => { moodLoading = null; return null; });
   }
   return moodLoading;
 }
 
-// ---------- each club's own song ----------
-// snd/crowd-songs.mp3 holds the eight main clubs' songs one after another (SONG_SLOT seconds apart, SONG_LEN of song in each;
-// tools/build_crowd_songs.py). The home crowd sings its club's song; a club without one sings the default.
-const SONG_CLUBS = ['cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals'], SONG_SLOT = 10.5, SONG_LEN = 10;
-let song = null, songFor = null, songTried = null;
+// ---------- the singing: the default one and each club's own song ----------
+// snd/crowd-songs.mp3 holds the singing one slot after another (SONG_SLOT seconds apart, SONG_LEN of song in each; tools/build_crowd_songs.py):
+// slot 0 is the default (Thunder Strikers, and any club without a song of its own), then the other seven main clubs. A happy crowd singing,
+// faded at both ends, plays as much as a moment needs. The home crowd sings its own club's song. Only the slots wanted are kept; the
+// whole file is let go once they are cut out.
+const SONG_SLOTS = ['default', 'cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals'], SONG_SLOT = 10.5, SONG_LEN = 10;
+let song = null, songTeam = null, defaultSong = null, songFor = null, songsLoading = null;
+function cutSong(all, slot) {
+  const sr = all.sampleRate, from = Math.round(slot * SONG_SLOT * sr), n = Math.min(Math.round(SONG_LEN * sr), all.length - from);
+  const out = ac.createBuffer(all.numberOfChannels, n, sr);
+  for (let c = 0; c < all.numberOfChannels; c++) out.copyToChannel(all.getChannelData(c).subarray(from, from + n), c);
+  return out;
+}
+// the crowd of this club sings from now on (called as a match is made: its song is fetched in the background)
 export function crowdSong(teamId) {
-  songFor = teamId; song = null; songTried = null;
-  const i = SONG_CLUBS.indexOf(teamId);
-  if (i < 0 || !ac) return;
-  songTried = teamId;
-  fetch('snd/crowd-songs.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no))).then(all => {
-    // (only this club's ten seconds are kept; the whole file is let go)
-    const sr = all.sampleRate, from = Math.round(i * SONG_SLOT * sr), n = Math.min(Math.round(SONG_LEN * sr), all.length - from);
-    const out = ac.createBuffer(all.numberOfChannels, n, sr);
-    for (let c = 0; c < all.numberOfChannels; c++) out.copyToChannel(all.getChannelData(c).subarray(from, from + n), c);
-    if (songFor === teamId) song = out;
-  }).catch(() => { /* the default singing stands in */ });
+  songFor = teamId;
+  const slot = Math.max(0, SONG_SLOTS.indexOf(teamId));
+  if (slot === 0) song = null;
+  if (!ac || (defaultSong && (slot === 0 || (song && songTeam === teamId)))) return;   // (nothing more to fetch)
+  if (songTeam !== teamId) song = null;
+  songsLoading = fetch('snd/crowd-songs.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no))).then(all => {
+    if (!defaultSong) defaultSong = cutSong(all, 0);
+    if (songFor === teamId && slot > 0) { song = cutSong(all, slot); songTeam = teamId; }
+  }).catch(() => { /* no singing this time */ }).finally(() => { songsLoading = null; });
 }
 // sing for `sec` seconds starting `delay` seconds from now, at volume `vol`
 export function crowdSing(delay = 0, sec = 5, vol = 0.5) {
   if (!ready()) return;
-  if (!moodBufs) { loadMood(); return; }
-  const buf = song || moodBufs.sing;
-  if (!song && songFor && songTried !== songFor) crowdSong(songFor);   // (asked for before the sound was switched on: fetch it now, it plays next time)
+  const buf = song || defaultSong;
+  if (!buf) { if (!songsLoading) crowdSong(songFor || 'thunder'); return; }   // (the singing has not arrived yet: it is fetched now and plays next time)
   const t0 = ac.currentTime + Math.max(0, delay), len = Math.min(sec, buf.duration);
   const src = ac.createBufferSource(), g = ac.createGain(), stopG = ac.createGain();
   g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.6, len * 0.3));

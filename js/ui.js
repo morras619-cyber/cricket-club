@@ -1,6 +1,7 @@
 import { portrait } from './figure.js';
 import { portraitFace } from './futcard.js';
 import { faceEl } from './looks.js';
+import { musicWanted } from './audio.js';
 import { drawEffect } from './fx.js';
 
 const $ = id => document.getElementById(id);
@@ -29,8 +30,9 @@ export class UI {
 
   show(id) {
     for (const s of this.screens) $(s).hidden = s !== id;
+    musicWanted(!!id && !['toss', 'pause', 'result'].includes(id));   // (the menu music plays on the menu screens, not at the toss, the pause or the result)
   }
-  hud(on) { $('hud').hidden = !on; }
+  hud(on) { $('hud').hidden = !on; if (on) musicWanted(false); }
   // the heat between this batter and bowler: a bar under the scorecard (null hides it)
   heat(info) {
     let box = $('heatMeter');

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""The crowd's moods (snd/crowd-sing.wav, crowd-boo.wav), from tools/audio/src/crowd-{sing,boo}.mp3 (js/audio.js plays them):
-  crowd-sing.wav  a happy crowd singing. The recording is 3 s, loud at both ends (cut off at both). Faded in, its middle
-                  section carried on (folded over itself with crossfades, no repeat heard) to 10 s, and faded out
+"""The crowd's moods (snd/crowd-boo.wav ...; the singing is tools/build_crowd_songs.py now), from tools/audio/src/crowd-{sing,boo}.mp3 (js/audio.js plays them):
   crowd-boo.wav   an angry crowd booing: attack, hold, a natural decay to silence (kept whole)
   crowd-clap.wav  a crowd applauding, 3 s, whole: a short fade in over the cut-off start, its own natural fade out. Levelled
                   to 0.8 of the boos' loudest moment (clapping sits under the other crowd sounds)
@@ -60,19 +58,6 @@ def save(name, x, peak=0.92):
 
 
 os.makedirs(OUT, exist_ok=True)
-sing = untone(load('crowd-sing.mp3'))
-mid = sing[int(0.4 * SR):int(2.7 * SR)]                 # the steady middle, away from the cut-off ends
-clip = mid
-rng = np.random.default_rng(21)
-want = int(SING_LEN * SR)
-while len(clip) < want:
-    skip = int(rng.uniform(0, 0.35) * SR)
-    clip = xfade_append(clip, mid[skip:], int(0.4 * SR))
-clip = clip[:want]
-n_in, n_out = int(SING_IN * SR), int(SING_OUT * SR)
-clip[:n_in] *= np.linspace(0, 1, n_in)[:, None] ** 1.5
-clip[-n_out:] *= (np.cos(np.linspace(0, np.pi / 2, n_out)) ** 2)[:, None]
-save('crowd-sing.wav', clip)
 boo = untone(load('crowd-boo.mp3'))
 n = int(0.04 * SR)
 boo[-n:] *= np.linspace(1, 0, n)[:, None]; boo[:n // 2] *= np.linspace(0, 1, n // 2)[:, None]
