@@ -22,6 +22,8 @@ import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { DISCO_MS, DISCO_LEAD_MS, discoColors, drawDisco } from './disco.js';
+import { quality } from './quality.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdSong, crowdRuns, sixMusic, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
@@ -1590,6 +1592,7 @@ export class Game {
       let tClear = end;
       if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
       cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
+      if (six) this.disco = { at: this.realTime + tClear / ballK / 1.6 * 1000 - DISCO_LEAD_MS, colors: discoColors(teamById(this.home)) };   // (disco lights in the club's colours, as the ball clears the rope)
       if (six) { const sec = tClear / ballK / 1.6; this.sing(sec + (sixMusic(sec) || 2.2), 4.5, 0.45); } // (the celebration music as the ball clears the rope, then directly after it the crowd sings a few seconds)
     } else if ((runs === 2 || runs === 3) && !o.caught && (o.side === 'ai' ? this.myTeam : this.oppTeam).id === this.home) {
       crowdRuns(0.1); this.runsCheered = true;   // (two or three for the home side: its own cheer, with the applause riding it)
@@ -3048,6 +3051,7 @@ export class Game {
     else this.renderIdle();
     ctx.restore();
     this.fx.draw(ctx, W, H);
+    if (this.disco) { if (this.realTime - this.disco.at > DISCO_MS) this.disco = null; else drawDisco(ctx, W, H, this.realTime - this.disco.at, this.disco.colors, quality.high); }
     if (this.view === 'bowl' && this.thinks) this.drawThinks(ctx, this.thinks);
     else if ((this.view === 'bowl' || this.view === 'bat') && this.tag && this.realTime < this.tag.until) this.drawThinks(ctx, this.tag.text, this.tag.color);
     // a full charge bar crackles
