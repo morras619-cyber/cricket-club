@@ -251,3 +251,11 @@ test('simulated matches have two batters at the crease: nobody faces all thirty 
     assert.ok(mine[0].runs >= mine[1].runs, 'their score is the higher');
   }
 });
+
+test('a saved career loses the impossible big scores (off more than 24 balls) from its records, and nothing else', () => {
+  const c = C.newCareer(43);
+  c.records.hs = [{ pid: 'a', runs: 71, balls: 30 }, { pid: 'b', runs: 55, balls: 20 }, { pid: 'c', runs: 40, balls: 24 }];
+  C.migrateCareer(c);
+  assert.deepEqual(c.records.hs.map(r => r.pid), ['b', 'c']);
+  assert.equal(Object.keys(c.players).length > 100, true, 'the players are untouched');
+});

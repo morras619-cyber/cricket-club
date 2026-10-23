@@ -244,6 +244,9 @@ export function migrateCareer(c) {
     c.divisions = startDivisions();
     for (const t of LEAGUE_CLUBS) addClub(c, t);
   }
+  // careers from before the simulated matches had two batters: a big score off more than 24 balls can't have happened, so it goes
+  // from the records lists (only those lists; players' own totals stay as they are)
+  if (c.records?.hs) c.records.hs = c.records.hs.filter(r => (r.balls || 0) <= 24);
   // painted players get the age they look (as of season 1, older by the seasons since)
   c.lookAges = c.lookAges || {};
   for (const p of Object.values(c.players)) {
