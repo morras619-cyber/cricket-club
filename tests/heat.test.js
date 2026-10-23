@@ -1,24 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Duels, FULL, HOLD, COOLED, gainOf, hotSpec } from '../js/heat.js';
+import { Duels, FULL, HOLD, COOLED, START, gainOf, hotSpec } from '../js/heat.js';
 import { aiBat } from '../js/ai.js';
 import { makeDelivery } from '../js/physics.js';
 import { makeRng } from '../js/rng.js';
 
-test('heat builds for a pair, runs down once it is full, and a wicket settles it', () => {
+test('a duel starts only with smack talk; then heat builds, runs down once it is full, and a wicket settles it', () => {
   const D = new Duels();
-  assert.equal(D.hot('a', 'b'), false);
+  assert.equal(D.add('a', 'b', gainOf('six')), false, 'play alone starts nothing');
+  assert.equal(D.heat('a', 'b'), 0);
+  assert.equal(D.on('a', 'b'), false);
+  assert.equal(D.start('a', 'b'), true, 'smack talk starts it');
+  assert.equal(D.start('a', 'b'), false, 'already on');
+  assert.equal(D.heat('a', 'b'), START);
   let full = false;
   for (let i = 0; i < 6 && !full; i++) full = D.add('a', 'b', gainOf('sledge'));
   assert.ok(full && D.hot('a', 'b'), 'enough sledges and boundaries make it full');
   assert.equal(D.heat('a', 'c'), 0, 'another bowler is another duel');
   for (let i = 0; i < HOLD; i++) D.ball('a', 'b');
   assert.ok(!D.hot('a', 'b') && D.heat('a', 'b') === COOLED, 'a full duel runs for a few balls, then cools');
-  D.add('a', 'b', gainOf('six'));
   D.settle('a', 'b');
-  assert.equal(D.heat('a', 'b'), 0, 'a wicket ends it');
-  const q = new Duels(); q.add('x', 'y', 30); q.ball('x', 'y'); assert.equal(q.heat('x', 'y'), 30, 'the ball it was added on does not cool it');
-  q.ball('x', 'y'); assert.ok(q.heat('x', 'y') < 30, 'a quiet ball cools it a little');
+  assert.ok(!D.on('a', 'b') && D.heat('a', 'b') === 0, 'a wicket ends it');
+  const q = new Duels(); q.start('x', 'y'); q.ball('x', 'y'); assert.equal(q.heat('x', 'y'), START, 'the ball it started on does not cool it');
+  q.ball('x', 'y'); assert.ok(q.heat('x', 'y') < START, 'a quiet ball cools it a little');
+  for (let i = 0; i < 20; i++) q.ball('x', 'y');
+  assert.ok(!q.on('x', 'y'), 'left quiet, the duel fizzles out');
   assert.ok(gainOf('sledge', 0.55) > gainOf('sledge', 0.2), 'a hot-head heats up faster');
   assert.ok(FULL === 100 && gainOf('six') > gainOf('four') && gainOf('four') > gainOf('dot'));
 });

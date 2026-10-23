@@ -986,6 +986,27 @@ export class Game {
     if (wicketFell) this.duels.settle(b.id, w.id); else this.duels.ball(b.id, w.id);
     this.ui.heat({ frac: this.duels.heat(b.id, w.id) / 100, hot: this.duels.hot(b.id, w.id), label: `${b.short || b.name} v ${w.short || w.name}` });
   }
+  // someone talked smack and it was answered: the duel is on, its heat starts building (already on: it rises)
+  duelStart(inn) {
+    if (!this.heatOn || !this.pair) return;
+    const [b, w] = this.pair;
+    if (this.duels.start(b.id, w.id)) {
+      this.ui.banner('THE DUEL IS ON!', `${b.short || b.name} v ${w.short || w.name} · the heat builds`, 1600);
+      sfx.dhol();
+      this.heatShow(inn);
+    } else this.heatEvent(inn, 'sledge');
+  }
+  // the choice to talk smack: yes (a line of yours, then the duel is on) or leave it. head/sub: what the banner says first (or none)
+  async duelChoice(inn, line1, at, head = null, sub = '') {
+    if (head) { this.ui.banner(head, sub, 1600); await this.sleepReal(this.bot ? 50 : 500); }
+    const c = await this.banterChoice();
+    if (c === 'smack') {
+      this.fx.bubble(line1, at.x, at.y, { dur: 1800 });
+      this.duelStart(inn);
+      await this.sleepReal(this.bot ? 50 : 900);
+    } else this.charge.add(3, 'COMPOSURE');
+  }
+  pairOn() { return !!this.heatOn && !!this.pair && this.duels.on(this.pair[0].id, this.pair[1].id); }
   // is the pair of the ball just played still hot?
   pairHot() { return !!this.heatOn && !!this.pair && this.duels.hot(this.pair[0].id, this.pair[1].id); }
 
@@ -1016,6 +1037,12 @@ export class Game {
     // the bowler speaks now and then, not every ball
     const balls = inn.balls;
     if (!wicketFell && balls - (this.lastBatBanter ?? -99) < 4) return;
+    // after a boundary you may talk smack to him: it starts a duel
+    if (runs >= 4 && this.heatOn && !this.pairOn() && rng.chance(0.3)) {
+      this.lastBatBanter = balls;
+      await this.duelChoice(inn, line('batterReply', this.batterOf(inn).hero?.id, rng), me, 'TALK SMACK?', 'Start a duel with the bowler');
+      return;
+    }
     if (runs >= 4 && rng.chance(0.25)) {
       this.lastBatBanter = balls;
       this.fx.bubble(line(rng.chance(0.5) ? 'bowlerCompliment' : 'bowlerAfterBoundary', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1700 });
@@ -1023,11 +1050,16 @@ export class Game {
     } else if ((beaten || wicketFell) && rng.chance(0.3)) {
       this.lastBatBanter = balls;
       this.fx.bubble(line('bowlerSledge', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1800 });
-      this.heatEvent(inn, 'sledge');
       if (!wicketFell || inn.wkts < CFG.wickets) {
         this.playerRevenge = true;
         if (this.oppTeam.id !== this.home) this.boo(0.2); // the home crowd boos the visiting sledger
         this.ui.banner('HE\'S TALKING', 'Hit a boundary next ball for +10 REVENGE', 1700);
+        // you may answer him: it starts a duel
+        if (!wicketFell && this.heatOn && !this.pairOn()) {
+          await this.sleepReal(this.bot ? 50 : 700);
+          await this.duelChoice(inn, line('batterReply', this.batterOf(inn).hero?.id, rng), me, 'ANSWER HIM?', 'Talk back to start a duel');
+          return;
+        }
       }
       await this.sleepReal(this.bot ? 50 : 900);
     }
@@ -2079,10 +2111,11 @@ export class Game {
     if (runs >= 4 && inn.balls - this.lastBanterBall >= 4 && rng.chance(0.3)) {
       this.lastBanterBall = inn.balls;
       this.fx.bubble(line('batterSledge', them.id, rng), bat().x, bat().y, { dur: 2000 });
-      this.heatEvent(inn, 'sledge');
       this.revenge = true;
       this.ui.banner('THEY\'RE TALKING', 'Dot ball or wicket next = +10 REVENGE', 1800);
       await this.sleepReal(this.bot ? 50 : 1300);
+      // you may answer him: it starts a duel
+      if (this.heatOn && !this.pairOn()) await this.duelChoice(inn, line('sledge', me.id, rng), bowl(), 'ANSWER HIM?', 'Talk back to start a duel');
       return;
     }
     if (!goodBall) return;
@@ -2102,7 +2135,7 @@ export class Game {
         return;
       }
       this.fx.bubble(line('sledge', me.id, rng), bowl().x, bowl().y, { dur: 1800 });
-      this.heatEvent(inn, 'sledge');
+      this.duelStart(inn);   // (it was answered or not by his mood below, but the duel is on: he has been called out)
       await this.sleepReal(this.bot ? 50 : 750);
       const r = sledgeOutcome(them.ai, rng);
       const h = bat();
