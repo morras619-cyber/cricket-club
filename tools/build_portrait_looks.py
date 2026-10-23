@@ -20,12 +20,12 @@ HAIR_FIX = {
     # the last batch: a turban, a helmet and a headband hide the hair
     'rohit-grewal': '#141010', 'faizan-paracha': '#141010', 'rhys-mckenzie': '#9a7a48',
     # (a flat cap, a headband and a bat)
-    'bilal-noorzai': '#1c1410', 'jermaine-granger': '#141010',
+    'bilal-noorzai': '#1c1410', 'jermaine-granger': '#141010', 'captain-comet': '#2a1a14', 'iron-wall-ian': '#2a1a14',
 }
 
 
 # skin misread (a lit face on a dark painting): the tone to use instead
-SKIN_FIX = {'andre-belgrave': '#7a4a2e'}
+SKIN_FIX = {'andre-belgrave': '#7a4a2e', 'captain-comet': '#c27a52', 'cyclone-zaheer': '#cd8458'}
 
 
 def hsv(rgb):
