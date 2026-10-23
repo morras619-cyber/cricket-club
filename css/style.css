@@ -1157,9 +1157,6 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .overpick-btn b { font-family: var(--ui); font-weight: 800; font-size: 20px; letter-spacing: .4px; text-transform: uppercase; }
 .overpick-btn span { font-family: var(--ui); font-weight: 600; font-size: 15px; letter-spacing: .4px; }
 .overpick-btn small { font-family: var(--ui); font-weight: 700; font-size: 14px; letter-spacing: .4px; text-transform: uppercase; }
-.coach-name { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 17px; letter-spacing: 1.2px; text-transform: uppercase; }
-.coach-bubble p { font-family: var(--ui); font-weight: 600; font-size: 19px; line-height: 1.25; letter-spacing: .2px; }
-.coach-btns button { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 18px; letter-spacing: 1px; text-transform: uppercase; }
 .taunt-name { font-family: var(--ui); font-style: italic; font-weight: 800; font-size: 15px; letter-spacing: 1.2px; }
 .taunt-text { font-family: var(--ui); font-weight: 700; font-size: 19px; line-height: 1.15; letter-spacing: .2px; }
 .heat { top: calc(var(--safe-t) + 134px); width: min(58%, 226px); }

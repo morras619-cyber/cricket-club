@@ -16,7 +16,7 @@ import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
 import { portraitFace } from './futcard.js';
-import { matchup, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
+import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
@@ -627,14 +627,9 @@ export class Game {
       // right after a wicket the Pinpoint Spark's place goes to Hat-trick Hunt
       const list = [this.huntOpen || A.hunt ? mk('hunt', HUNT, me, 'bowl', A.hunt) : mk('pinpoint', SPARKS.bowl, me, 'bowl', A.pinpoint)];
       if (pw) list.push(mk('bowlpower', pw, me, 'bowl', this.altArmed(pw.kind)));
-      // the keeper's powers
-      const kp = this.keeperPlayer();
-      list.push(mk('fieldpower', POWERS.elastic, kp, 'keeper', A.elastic > 0));
-      if (A.freeze || this.charge.value >= this.charge.cost(POWERS.freeze.cost, ball)) list.push(mk('fieldult', POWERS.freeze, kp, 'keeper', A.freeze));
       return list;
     }
-    if (this.phase === 'event') return [mk('burst', SPARKS.field, this.keeperPlayer(), 'keeper', A.burst, this.eventAllowsBurst)];
-    return [];
+    return [];   // (no fielding powers: a keeper's rating decides how easy his chances are, see keeperEase)
   }
 
   refreshPowers() { this.ui.powers(this.powerList()); }
@@ -650,14 +645,11 @@ export class Game {
       case 'pinpoint': player = inn && this.bowlerOf(inn); def = SPARKS.bowl; slot = 'bowl'; break;
       case 'hunt': player = inn && this.bowlerOf(inn); def = HUNT; slot = 'bowl'; break;
       case 'bowlpower': player = inn && this.bowlerOf(inn); def = player && powersOf(player).bowl; slot = 'bowl'; break;
-      case 'fieldpower': player = this.keeperPlayer(); def = POWERS.elastic; slot = 'keeper'; break;
-      case 'fieldult': player = this.keeperPlayer(); def = POWERS.freeze; slot = 'keeper'; break;
-      case 'burst': player = this.keeperPlayer(); def = SPARKS.field; slot = 'keeper'; break;
       default: return;
     }
     if (!def || !player) return;
     const hero = this.asHero(player, this.myTeam, slot);
-    if (this.powerLock && key !== 'burst') return;
+    if (this.powerLock) return;
     if ((key === 'bat' || key === 'bowlpower') && this.altArmed(def.kind)) return;   // (already on: not paid for twice)
     if (!this.charge.spend(this.price(def, player), ball, def.name)) return;
     color = hero.look.trim;
@@ -689,7 +681,6 @@ export class Game {
       this.fx.word('POWER CLASH!', this.W / 2, this.H * 0.3, { size: 54, color: '#3ec6ff', stroke: INK, dur: 1400 });
       this.clash = true;
     }
-    if (this.phase === 'event' && kind === 'burst') this.fx.word('ZOOM!', this.W / 2, this.H * 0.3, { size: 50 });
     this.refreshPowers();
   }
 
@@ -2476,8 +2467,10 @@ export class Game {
     const freeze = kind === 'stumping' && A.freeze;
     if (freeze) A.freeze = false;
     const tut = this.tutorialKeeper || {};
-    const windowMs = (opt.window ?? tut.window ?? (elastic ? F.elasticWindow : F.keeperWindow)) * (opt.shatter ? 1.3 : 1);
-    const approach = opt.approach ?? tut.approach ?? (kind === 'edge' ? 1050 : 1150);
+    // his keeper's rating: a high-rated keeper reacts better (the ball comes slower and the window is wider), a low-rated one is rushed
+    const ease = tut.window || opt.window ? 1 : keeperEase(ovr(this.keeperPlayer()));
+    const windowMs = (opt.window ?? tut.window ?? (elastic ? F.elasticWindow : F.keeperWindow)) * (opt.shatter ? 1.3 : 1) * ease;
+    const approach = (opt.approach ?? tut.approach ?? (kind === 'edge' ? 1050 : 1150)) * (tut.approach || opt.approach ? 1 : ease);
     const to = { x: clamp(offset.x * 0.8, -1.05, 1.05), y: clamp(offset.y, 0.25, 1.3), z: -2.0 };
     const from = kind === 'edge' ? { x: S.batter.x + 0.35, y: 0.75, z: 1.1 } : { x: d.xt * 0.6, y: 0.5, z: 1.3 };
     const tapReach = elastic ? 0.95 : 0.45;

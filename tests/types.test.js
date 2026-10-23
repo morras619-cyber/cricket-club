@@ -75,3 +75,10 @@ test('matchups: a 93 is never as weak as a 53 of the same type', () => {
     }
   }
 });
+
+import { keeperEase } from '../js/ratings.js';
+test('a better keeper gets more time and room, a poor one is rushed, and a 75 changes nothing', () => {
+  assert.equal(keeperEase(75), 1);
+  assert.ok(keeperEase(93) > 1.15 && keeperEase(53) < 0.85);
+  assert.equal(keeperEase(120), 1.2); assert.equal(keeperEase(10), 0.8);
+});

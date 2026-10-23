@@ -26,6 +26,9 @@ export const paceFor = bowlSkill => clamp(0.95 + (bowlSkill ?? 75) / 1500, 0.97,
 // a fielding side: how fast its men get to the ball, from the side's average overall
 export const fieldSpeed = avgOvr => clamp(1 + ((avgOvr ?? 72) - 72) / 120, 0.85, 1.15);
 
+// the wicket-keeper's rating: how much time and room his chances give you (1 for a 75: a 93 gets 18% more, a 53 is rushed by 20%)
+export const keeperEase = r => clamp(1 + ((r ?? 75) - 75) / 100, 0.8, 1.2);
+
 // ======== type matchups: what each batter and bowler type is good and bad against ========
 // Every effect is scaled by the player's rating: a 93 gets all of his strength and only a sliver of his weakness, a 53 the other way
 // round (strength 0.4 at 50 up to 1 at 95; weakness 1 at 50 down to 0.4 at 95).
