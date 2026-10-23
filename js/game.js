@@ -378,7 +378,7 @@ export class Game {
   pitchBat() { return this.feel().bat; }
 
   newCharge(value) {
-    if (this.mind) this.mind.charge.value = this.mind.charge.carryOver();   // (the AI's meter carries a quarter over too: a new innings)
+    if (this.mind) { this.mind.charge.value = this.mind.charge.carryOver(); this.mind.lastFire = -99; }   // (the AI's meter carries a quarter over too: a new innings)
     this.aiCounterNow = null; this.myCounter = null;
     this.charge = new Charge(value);
     this.charge.on(ev => this.onCharge(ev));
@@ -2849,12 +2849,13 @@ export class Game {
     this.timeScale = 0.6;
     const t0 = this.gameTime, P = s.point;
     let last = this.gameTime, input = null;
-    this.ui.hint('SWIPE TO DIVE AT THE ROPE!');
+    let hinted = false;   // (the dive hint comes when he is nearly there, not while he is still crossing the field)
     this.onInput = (type, g) => { if (type === 'up' && !input) input = { tg: this.realToGame(g.t), len: Math.hypot(g.dx, g.dy) }; };
     if (this.bot) this.sleep(s.t * 1000).then(() => this.botInput('up', { dx: 60, dy: -60 })).catch(() => {});
     await this.until(() => {
       const t = this.gameTime - t0, dt = this.gameTime - last; last = this.gameTime;
       if (t > F.react) this.moveFielder(me, P, dt, F.runSpeed * (this.armed.burst ? 2 : 1));
+      if (!hinted && (s.t - t < 0.9 || dist(me, P) < 8)) { hinted = true; this.ui.hint('SWIPE TO DIVE!'); }
       this.O.ball = path.ballAt(Math.min(t, s.t));
       this.O.ring = { x: P.x, y: P.y, r: 0.6 + 5 * clamp((s.t - t) / s.t, 0, 1), color: Math.abs(s.t - t) < 0.15 ? '#2ecc71' : '#fff4da' };
       this.of.focus([this.O.ball, me, P]);
@@ -2867,7 +2868,14 @@ export class Game {
     me.pose = POSES.dive(Math.sign(P.x - me.x) || 1);
     const p = this.of.to(P.x, P.y);
     if (saved) { this.O.ball = { x: me.x, y: me.y, h: 0.2 }; this.fx.word('SAVED!', p.x, p.y - 50, { size: 60 }); sfx.glove(); this.hitStop(100); }
-    else { this.fx.word('FOUR!', p.x, p.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); if (this.oppTeam.id === this.home) cheerStart(0.4, 1.1); sfx.crowd(0.6); }
+    else {
+      // he missed it: the ball runs on from where it was (a stride inside the rope) and the four is called when it crosses
+      const rt = sim.ropeT != null && sim.ropePoint ? sim.ropeT : null, run = rt != null ? Math.max(0.2, (rt - s.t) / this.timeScale) : 0.3;
+      if (this.oppTeam.id === this.home) cheerStart(run, 1.1);
+      if (rt != null) { const g0 = this.gameTime; await this.until(() => { const tt = Math.min(rt, s.t + (this.gameTime - g0)); this.O.ball = path.ballAt(tt); return tt >= rt; }); }
+      const pr = rt != null ? this.of.to(sim.ropePoint.x, sim.ropePoint.y) : p;
+      this.fx.word('FOUR!', pr.x, pr.y - 50, { size: 60, color: '#3ec6ff', stroke: INK }); sfx.crowd(0.6);
+    }
     await this.sleepReal(this.bot ? 100 : 1000);
     this.endEvent();
     return saved;

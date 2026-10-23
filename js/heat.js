@@ -88,11 +88,12 @@ export const STEADY_SQUEEZE = 0.85;
 // ---- the AI's mind ----
 const FIRE_AT = { thunder: 'bat', mirror: 'bat', tornado: 'bowl', maya: 'bowl', shatter: 'bowl' };
 export class Mind {
-  constructor(rng, { gain = 2.2, start = 40 } = {}) {
-    this.charge = new Charge(start);   // hidden: never shown (it starts a little warm, and fills faster than yours: it has one star to feed)
+  constructor(rng, { gain = 1, start = 0 } = {}) {
+    this.charge = new Charge(start);   // hidden: never shown. It fills exactly as yours does (the same sources, the same amounts), from empty
     this.gain = gain;
     this.rng = rng;
     this.counters = 0; this.fired = 0;
+    this.lastFire = -99;               // the ball it last fired a power on, this innings
   }
   get value() { return this.charge.value; }
 
@@ -119,6 +120,10 @@ export class Mind {
     const cost = ctx.cost;
     if (this.value < cost) return false;
     const finale = ctx.ball >= CFG.charge.finaleFrom;
+    // it spends like a player who thinks: a power at most once an over (every three balls at the death), never two in a row
+    if (ctx.ball - this.lastFire < (finale ? 3 : 6)) return false;
+    // Lucky Break is insurance: only with his wicket worth a lot (the last wickets) or the game on the line late on
+    if (ctx.kind === 'luckybreak' && !(ctx.wicketsLeft <= 2 || (ctx.pressure && ctx.ball >= 19))) return false;
     // keep an answer in reserve when you look able to fire a power, unless the end is near
     const youCouldFire = this.guess(ctx.yourCharge) >= 50;
     if (youCouldFire && this.value - cost < cheapest && !finale) return false;
@@ -153,5 +158,5 @@ export class Mind {
     return pick;
   }
 
-  pay(cost, ball) { return this.charge.spend(cost, ball, 'power'); }
+  pay(cost, ball) { const ok = this.charge.spend(cost, ball, 'power'); if (ok) this.lastFire = ball; return ok; }
 }
