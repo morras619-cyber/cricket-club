@@ -364,7 +364,7 @@ $('shopBack').addEventListener('click', () => renderHome());
 function renderPass() {
   ui.show('pass');
   const ps = passState(profile);
-  setTitle($('passTitle'), `Season ${ps.season} Pass`, 'seasonpass');
+  $('passTitle').textContent = `Season ${ps.season} Pass`;
   $('passLede').textContent = ps.tier >= PASS_TIERS ? 'Every tier reached! Claim the lot to start the next season.'
     : `Tier ${ps.tier} of ${PASS_TIERS} · ${Math.round((1 - ps.progress) * 100)} pass XP to the next (a win is 100, a loss 50)`;
   const claim = $('passClaim');
@@ -844,7 +844,7 @@ function renderTournament(notes = []) {
   if (!t) return renderHome();
   ui.show('league');
   const league = t.kind === 'league';
-  setTitle($('leagueTitle'), league ? 'Super League' : 'Knockout Cup', league ? null : 'knockoutcup');
+  $('leagueTitle').textContent = league ? 'Super League' : 'Knockout Cup';
   const f = nextFixture(t);
   const me = teamById(t.team);
   const place = finish(t);
@@ -1614,7 +1614,7 @@ $('recordsBack').addEventListener('click', () => renderCareer());
 function renderDaily() {
   ui.show('daily');
   const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key ? profile.dailyChallenge : null;
-  setTitle($('dailyTitle'), `Daily #${sc.no}`, 'daily');
+  $('dailyTitle').textContent = `Daily #${sc.no}`;
   const c = $('dailyCard');
   c.innerHTML = '';
   const logos = el('div', 'fixlogos');
@@ -1724,13 +1724,6 @@ function coinToss(opp, home) {
 function shareBase() {
   const meta = document.querySelector('meta[name="sixcharge:share-base"]')?.content;
   return meta || location.href.split('#')[0];
-}
-
-// a screen's heading: painted art (img/menu/title-*.webp) where there is some for it, plain text where there is not (the text is the art's alt)
-function setTitle(el, text, art) {
-  el.classList.toggle('title-art', !!art);
-  if (art) el.replaceChildren(Object.assign(document.createElement('img'), { src: `img/menu/title-${art}.webp`, alt: text, width: 720 }));
-  else el.textContent = text;
 }
 
 function showResult(summary) {
