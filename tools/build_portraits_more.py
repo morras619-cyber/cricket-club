@@ -122,6 +122,7 @@ def main():
     keys = set(re.findall(r"'([a-z0-9-]+)'", lst.split('PORTRAIT_AGE')[0]))
     ages = dict((k, int(v)) for k, v in re.findall(r"'([a-z0-9-]+)': (\d+)", lst.split('PORTRAIT_AGE')[1]))
     assert len(set(PLAYERS.values())) == len(PLAYERS), 'a face used twice'
+    made = {}
     for key, fid in PLAYERS.items():
         sheet, spec, kind, age, *keep = FACES[fid]
         p = cut_out(cell(sheets[sheet], spec), kind, fid in HOLES)
@@ -132,7 +133,17 @@ def main():
         p = p.resize((300, round(p.height * 300 / p.width)), Image.LANCZOS)
         p.save(f'img/cards/portraits/{key}.webp', 'WEBP', quality=88, method=6)
         faces[key] = face_square(p)
-        keys.add(key); ages[key] = age
+        keys.add(key); ages[key] = age; made[key] = p
+    # the whole batch in one picture (the game's file limit): a grid of 300 px cells, listed by key in js/portraits-list.js
+    COLS = 7
+    cellh = max(p.height for p in made.values())
+    rows = -(-len(made) // COLS)
+    atlas = Image.new('RGBA', (COLS * 300, rows * cellh), (0, 0, 0, 0))
+    where = {}
+    for i, (key, p) in enumerate(sorted(made.items())):
+        x, y = (i % COLS) * 300, (i // COLS) * cellh
+        atlas.paste(p, (x, y)); where[key] = [x, y, 300, p.height]
+    atlas.save('img/cards/portraits-more.webp', 'WEBP', quality=88, method=6)
     with open('js/portrait-faces.js', 'w') as f:
         f.write('export const PORTRAIT_FACES = ' + json.dumps(dict(sorted(faces.items())), separators=(',', ':')) + ';\n')
     with open('js/portraits-list.js', 'w') as f:
@@ -141,6 +152,8 @@ def main():
         f.write('export const PORTRAIT_KEYS = [' + ', '.join(f"'{k}'" for k in sorted(keys)) + '];\n')
         f.write('// how old each painted player looks: his Super League age in season 1\n')
         f.write('export const PORTRAIT_AGE = {' + ', '.join(f"'{k}': {v}" for k, v in ages.items()) + '};\n')
+        f.write('// the last batch lives in one picture, img/cards/portraits-more.webp: where each is, [x, y, w, h]\n')
+        f.write('export const PORTRAIT_ATLAS = ' + json.dumps(where, separators=(',', ':')) + ';\n')
     print(len(PLAYERS), 'portraits added;', len(keys), 'in all')
 
 
