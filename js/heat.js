@@ -94,6 +94,7 @@ export class Mind {
     this.rng = rng;
     this.counters = 0; this.fired = 0;
     this.lastFire = -99;               // the ball it last fired a power on, this innings
+    this.used = new Set();             // the powers it has fired this innings
   }
   get value() { return this.charge.value; }
 
@@ -123,7 +124,7 @@ export class Mind {
     // it spends like a player who thinks: a power at most once an over (every three balls at the death), never two in a row
     if (ctx.ball - this.lastFire < (finale ? 3 : 6)) return false;
     // Lucky Break is insurance: only with his wicket worth a lot (the last wickets) or the game on the line late on
-    if (ctx.kind === 'luckybreak' && !(ctx.wicketsLeft <= 2 || (ctx.pressure && ctx.ball >= 19))) return false;
+    if (ctx.kind === 'luckybreak' && (this.used.has('luckybreak') || !(ctx.wicketsLeft <= 1 || (ctx.pressure && ctx.ball >= 19 && ctx.wicketsLeft <= 2)))) return false;   // (a lifeline: once an innings)
     // keep an answer in reserve when you look able to fire a power, unless the end is near
     const youCouldFire = this.guess(ctx.yourCharge) >= 50;
     if (youCouldFire && this.value - cost < cheapest && !finale) return false;
@@ -158,5 +159,5 @@ export class Mind {
     return pick;
   }
 
-  pay(cost, ball) { const ok = this.charge.spend(cost, ball, 'power'); if (ok) this.lastFire = ball; return ok; }
+  pay(cost, ball, kind = null) { const ok = this.charge.spend(cost, ball, 'power'); if (ok) { this.lastFire = ball; if (kind) this.used.add(kind); } return ok; }
 }

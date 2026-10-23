@@ -378,7 +378,7 @@ export class Game {
   pitchBat() { return this.feel().bat; }
 
   newCharge(value) {
-    if (this.mind) { this.mind.charge.value = this.mind.charge.carryOver(); this.mind.lastFire = -99; }   // (the AI's meter carries a quarter over too: a new innings)
+    if (this.mind) { this.mind.charge.value = this.mind.charge.carryOver(); this.mind.lastFire = -99; this.mind.used.clear(); }   // (the AI's meter carries a quarter over too: a new innings)
     this.aiCounterNow = null; this.myCounter = null;
     this.charge = new Charge(value);
     this.charge.on(ev => this.onCharge(ev));
@@ -1043,7 +1043,7 @@ export class Game {
       pressure: inn.target != null ? (inn.target - inn.runs) / left < 1.4 : inn.runs / Math.max(1, inn.balls) > 1.7,
       yourCharge: this.charge.value, wicketsLeft: inn.maxWkts - inn.wkts,
     };
-    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(this.price(pw, bowler), ballNo)) return spec;
+    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(this.price(pw, bowler), ballNo, pw.kind)) return spec;
     this.mind.fired++;
     const s = { ...spec };
     applyPower(s, pw.kind);
@@ -1059,7 +1059,7 @@ export class Game {
       lastRuns: last == null || last === 'W' ? 0 : Number(last), setBat: inn.cur.balls >= 5 && inn.cur.runs >= 10,
       pressure: need / Math.max(1, inn.ballsLeft) > 1.3, yourCharge: this.charge.value, wicketsLeft: inn.maxWkts - inn.wkts,
     };
-    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(this.price(pw, striker), ballNo)) return null;
+    if (!this.mind.wantsToFire(ctx) || !this.mind.pay(this.price(pw, striker), ballNo, pw.kind)) return null;
     this.mind.fired++;
     return pw;
   }

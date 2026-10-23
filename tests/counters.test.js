@@ -66,3 +66,19 @@ test('Brace halves a power, Steady Hands lifts timing to Good', () => {
   assert.ok(plain > 0);
   assert.ok(BRACE.tornadoKmh < 160 && BRACE.mayaFooled < 0.5);
 });
+
+test('the AI spends its power like a player who thinks: not two in a row, and Lucky Break only as a once-an-innings lifeline', () => {
+  const m = new Mind(makeRng(31)); m.charge.value = 100;
+  const base = { kind: 'tornado', cost: 60, ball: 14, lastRuns: 4, setBat: true, pressure: true, yourCharge: 0, wicketsLeft: 3 };
+  assert.equal(m.wantsToFire(base), true);
+  assert.ok(m.pay(60, 14, 'tornado'));
+  m.charge.value = 100;
+  assert.equal(m.wantsToFire({ ...base, ball: 16 }), false, 'not again two balls later');
+  assert.equal(m.wantsToFire({ ...base, ball: 20 }), true, 'but an over on it may');
+  const lb = { ...base, kind: 'luckybreak', cost: 30, ball: 14, wicketsLeft: 3, pressure: false, setBat: false, lastRuns: 0 };
+  const k = new Mind(makeRng(32)); k.charge.value = 100;
+  assert.equal(k.wantsToFire({ ...lb, ball: 14 }), false, 'no lifeline with his wickets in hand');
+  assert.equal(k.wantsToFire({ ...lb, ball: 14, wicketsLeft: 1 }), true, 'but on his last wicket he takes it');
+  k.pay(30, 14, 'luckybreak'); k.charge.value = 100;
+  assert.equal(k.wantsToFire({ ...lb, ball: 26, wicketsLeft: 1 }), false, 'and only once an innings');
+});
