@@ -477,14 +477,17 @@ const dynastyMatch = c => (a, b, rng) => simCareerMatch(c, a, b, rng, DYNASTY);
 // new batter comes in on strike when one is out. Its cards are only written into the stats by commitInnings.
 function simInnings(c, batId, bowlId, rng, target = null, favour = null) {
   const L = lineupOf(c, batId), B = lineupOf(c, bowlId);
-  const plan = overPlan(B.attack.filter(Boolean), CFG.balls / 6);
+  // (a club whose bowlers have retired still bowls: its batters fill in, as part-timers)
+  const attack = B.attack.filter(Boolean);
+  const bowlers = attack.length ? attack : B.order.filter(Boolean).slice(0, 3).map(p => ({ ...p, bowlSkill: Math.min(p.bat, 55) - 10 }));
+  const plan = overPlan(bowlers, CFG.balls / 6);
   let runs = 0, wkts = 0, balls = 0, boundaries = 0;
   let strike = 0, other = 1, next = 2;
   const last = L.order.length - 1;
   const bat = new Map(), bowl = new Map();
   const card = (m, id) => m.get(id) || (m.set(id, { runs: 0, balls: 0, fours: 0, sixes: 0, out: false, wkts: 0 }), m.get(id));
   while (balls < CFG.balls && wkts < CFG.wickets && (target == null || runs < target)) {
-    const s = L.order[Math.min(strike, last)], bw = plan[Math.floor(balls / 6)];
+    const s = L.order[Math.min(strike, last)], bw = plan[Math.min(Math.floor(balls / 6), plan.length - 1)];
     balls++;
     const sc = card(bat, s.id), bc = card(bowl, bw.id);
     sc.balls++; bc.balls++;
