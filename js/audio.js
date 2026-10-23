@@ -263,9 +263,28 @@ export function crowdRuns(delay = 0) {
   clapUntil = tc + clap.duration;
   roarUntil = Math.max(roarUntil, tc + clap.duration * 0.7);                   // (the synthetic crowd stays quiet under it)
 }
+// A six for the home side: the stadium's celebration music (snd/six-celebration.mp3), started as the ball clears the rope and riding over the roar.
+// The recording is cut short, so it fades out at its end. Says whether it played (if not, the caller's song takes its place).
+const SIX_MUSIC_VOL = 0.5;
+let sixBuf = null, sixLoading = null;
+function loadSix() {
+  if (!sixLoading) sixLoading = fetch('snd/six-celebration.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
+    .then(b => (sixBuf = b)).catch(() => { sixLoading = null; return null; });
+  return sixLoading;
+}
+export function sixMusic(sec = 0) {
+  if (!ready()) return false;
+  if (!sixBuf) { loadSix(); return false; }
+  const t = ac.currentTime + Math.max(0, sec), d = sixBuf.duration, src = ac.createBufferSource(), g = ac.createGain();
+  singDuck(0.4);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(SIX_MUSIC_VOL, t + 0.05);
+  g.gain.setValueAtTime(SIX_MUSIC_VOL, t + d - 0.6); g.gain.linearRampToValueAtTime(0.0001, t + d);
+  src.buffer = sixBuf; src.connect(g).connect(master); src.start(t);
+  return true;
+}
 // the crowd of this club sings from now on (called as a match is made: its song is fetched in the background)
 export function crowdSong(teamId) {
-  if (ac) { loadRuns(); loadMood(); }   // (ready for the first cheer and applause of the match)
+  if (ac) { loadRuns(); loadMood(); loadSix(); }   // (ready for the first cheer and applause of the match)
   songFor = teamId;
   const slot = Math.max(0, SONG_SLOTS.indexOf(teamId));
   if (slot === 0) song = null;
