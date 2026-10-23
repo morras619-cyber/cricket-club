@@ -29,6 +29,9 @@ export const LINES = {
   bowlerSledge: ['Can\'t see it, can you?', 'Swing and a miss, hero!', 'Bat\'s just for decoration?', 'Too quick? Aww.', 'Plenty of air there.', 'Want me to bowl it slower?', 'You were miles away.', 'Nearly. Not really.', 'That bat has a hole in it.', 'Ball one, me. Ball two, also me.'],
   bowlerAfterBoundary: ['Lucky. Probably.', 'Enjoy it. It won\'t last.', 'Do that again, I dare you.', 'Top edge, that.', 'Fine. Have that one.', 'Even a broken clock is right twice a day.', 'Watch the next one.'],
   bowlerCompliment: ['Shot, hero. Shot.', 'Okay, that was good.', 'What a shot!', 'Fair play. Lovely hit.', 'That one deserved four.', 'Class.'],
+  // a hot duel: the AI bowler to you (batting), the AI batter to you (bowling)
+  heatBowler: ['This ball has your name on it!', 'I\'m coming for you. Right now.', 'One of us is walking off. It\'s not me.', 'Look me in the eye, hero.', 'Here comes the quick one!', 'You wanted a duel? Duck!'],
+  heatBatter: ['Bowl it! I\'ll send it to the moon!', 'Your best ball? I\'ll take it apart.', 'I\'m taking you down, bowler.', 'Come on then. Show me what you\'ve got!', 'Every ball is mine now.', 'You started this. I\'ll finish it.'],
   batterRevenge: ['Talk now, bowler!', 'That one\'s for you!', 'Sky high. Told you!', 'Go fetch.', 'Still talking?', 'Words, meet bat.'],
 };
 

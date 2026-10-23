@@ -26,6 +26,7 @@ import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { TAUNTS, pick } from './story.js';
+import { Duels, gainOf, hotSpec } from './heat.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
@@ -282,6 +283,8 @@ export class Game {
     this.bowlHints = 3; this.afterHints = 3;
     this.ui.hud(true);
     this.innings = [];
+    // the heat between a batter and his bowler (js/heat.js): full matches only, not the fixed challenges, the war or the tutorial
+    this.duels = new Duels(); this.heatOn = ['quick', 'league', 'cup', 'career'].includes(mode); this.ui.heat(null);
     try {
       if (mode === 'tutorial') return await this.runTutorial(!!opts.story);
       await this.pitchReport();
@@ -754,6 +757,7 @@ export class Game {
     this.timeScale = 1;
     const before = { runs: inn.runs, wkts: inn.wkts };
     const striker = this.batterOf(inn), bowler = this.bowlerOf(inn), btype = bowlType(bowler.bowl);
+    this.heatShow(inn);
     S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = striker.hero?.emblem || null;
     S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler); // their own skin and hair on the drawn sprites
@@ -806,6 +810,9 @@ export class Game {
     this.timeScale = (opt.slow ?? 1) * (fx.focus ? 0.6 : 1);
     if (fx.focus) this.fx.speed = 0.6;
 
+    // a hot duel: a quick bowls faster, a spinner turns it more
+    const hotBall = !opt.assist && this.duelHot(inn);
+    if (hotBall) { spec = hotSpec(spec, btype.spin); this.fx.word(btype.spin ? 'HE\'S TURNING IT!' : 'HE\'S BOWLING FASTER!', this.W / 2, this.H * 0.3, { size: 36, color: '#ff9f1c', stroke: INK, dur: 1100 }); }
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
     this.fx.bubbles = [];
@@ -949,8 +956,43 @@ export class Game {
     await this.sleepReal(this.bot ? 50 : 650);
   }
 
+  // ---------- the heat between a batter and his bowler ----------
+  duelHot(inn) { if (!this.heatOn) return false; return this.duels.hot(this.batterOf(inn)?.id, this.bowlerOf(inn)?.id); }
+  // the meter on the screen: this pair's heat
+  heatShow(inn) {
+    if (!this.heatOn) return;
+    const b = this.batterOf(inn), w = this.bowlerOf(inn);
+    if (!b || !w) return this.ui.heat(null);
+    this.pair = [b, w];   // (the pair of this ball: after it the strike may have changed, or the batter gone)
+    this.ui.heat({ frac: this.duels.heat(b.id, w.id) / 100, hot: this.duels.hot(b.id, w.id), label: `${b.short || b.name} v ${w.short || w.name}` });
+  }
+  // something happened between them: its heat added (the AI player's temper makes it faster); full is announced
+  heatEvent(inn, kind) {
+    if (!this.heatOn || !kind || !this.pair) return;
+    const [b, w] = this.pair;
+    const ai = inn.side === 'player' ? w : b;
+    if (this.duels.add(b.id, w.id, gainOf(kind, ai.ai?.fire ?? 0.3))) {
+      this.ui.banner('FACE-OFF!', `${b.short || b.name} v ${w.short || w.name} · the heat is full`, 1700);
+      this.fx.word('HEAT!', this.W / 2, this.H * 0.3, { size: 60, color: '#ff9f1c', stroke: '#e8343b', dur: 1200 });
+      sfx.dhol();
+    }
+    this.heatShow(inn);
+  }
+  // a ball is over: what it was adds to the heat, a wicket settles the duel, and the heat runs down a little
+  heatAfter(inn, { runs, wicketFell, beaten, good }) {
+    if (!this.heatOn || !this.pair) return;
+    const [b, w] = this.pair;
+    this.heatEvent(inn, runs >= 6 ? 'six' : runs >= 4 ? 'four' : beaten ? 'beaten' : good ? 'dot' : null);
+    if (wicketFell) this.duels.settle(b.id, w.id); else this.duels.ball(b.id, w.id);
+    this.ui.heat({ frac: this.duels.heat(b.id, w.id) / 100, hot: this.duels.hot(b.id, w.id), label: `${b.short || b.name} v ${w.short || w.name}` });
+  }
+  // is the pair of the ball just played still hot?
+  pairHot() { return !!this.heatOn && !!this.pair && this.duels.hot(this.pair[0].id, this.pair[1].id); }
+
   // The AI bowler talks while you bat. Answer a sledge with a boundary for REVENGE.
   async battingBanter({ runs, wicketFell, beaten, rng, inn }) {
+    this.heatAfter(inn, { runs, wicketFell, beaten, good: runs === 0 });
+    const hotNow = this.pairHot();
     if (inn.done()) return;
     const p = this.cams.bat.project(this.S.bowler.x, 1.9, this.S.bowler.z);
     const bowl = p ? { x: p.x, y: p.y } : { x: this.W / 2, y: this.H * 0.4 };
@@ -965,6 +1007,12 @@ export class Game {
         return;
       }
     }
+    // a hot duel: he has more to say
+    if (hotNow && !wicketFell && rng.chance(0.75)) {
+      this.fx.bubble(line('heatBowler', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1700 });
+      await this.sleepReal(this.bot ? 50 : 800);
+      return;
+    }
     // the bowler speaks now and then, not every ball
     const balls = inn.balls;
     if (!wicketFell && balls - (this.lastBatBanter ?? -99) < 4) return;
@@ -975,6 +1023,7 @@ export class Game {
     } else if ((beaten || wicketFell) && rng.chance(0.3)) {
       this.lastBatBanter = balls;
       this.fx.bubble(line('bowlerSledge', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1800 });
+      this.heatEvent(inn, 'sledge');
       if (!wicketFell || inn.wkts < CFG.wickets) {
         this.playerRevenge = true;
         if (this.oppTeam.id !== this.home) this.boo(0.2); // the home crowd boos the visiting sledger
@@ -1525,6 +1574,7 @@ export class Game {
     S.batter.look = teamLook(this.oppTeam); S.batter.team = this.oppTeam.id; S.batter.emblem = null; S.batter.x = -0.5;
     if (!inn.curBowler) inn.setBowler(this.bowlerOf(inn));
     const bowler = this.bowlerOf(inn), striker = this.batterOf(inn), btype = bowlType(bowler.bowl);
+    this.heatShow(inn);
     S.bowler.look = bowler.hero ? bowler.hero.look : teamLook(this.myTeam); S.bowler.emblem = bowler.hero?.emblem || null;
     // right-arm over, a little wide of the stumps so the ball leaves his hand; left-armers from the other side
     S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
@@ -1695,7 +1745,7 @@ export class Game {
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const pf = this.feel();
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * pf.ai * aiHome / pf.bat };
-    let ai = aiBat(d, { skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * 1.6 } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, mods: pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * 1.6 } : mods, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     if (aiPower === 'mirror' && ai.res.outcome === 'hit' && !ai.res.loft && (ai.grade === 'perfect' || ai.grade === 'good')) ai.res.forced = { four: true, uncatchable: true };
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
@@ -2004,6 +2054,8 @@ export class Game {
   }
 
   async bowlingBanter({ runs, wicketFell, goodBall, rng, inn }) {
+    this.heatAfter(inn, { runs, wicketFell, beaten: goodBall && runs === 0 && !wicketFell, good: runs === 0 });
+    const hotNow = this.pairHot();
     if (inn.done() && !wicketFell) return;
     // banter lines are keyed by hero (regulars use the generic lines); how a sledge lands
     // depends on the batter's own temperament
@@ -2018,9 +2070,16 @@ export class Game {
         await this.sleepReal(this.bot ? 50 : 900);
       } else if (runs >= 4) this.revenge = false;
     }
+    // a hot duel: the batter has more to say
+    if (hotNow && !wicketFell && rng.chance(0.7)) {
+      this.fx.bubble(line('heatBatter', them.id, rng), bat().x, bat().y, { dur: 1800 });
+      await this.sleepReal(this.bot ? 50 : 850);
+      return;
+    }
     if (runs >= 4 && inn.balls - this.lastBanterBall >= 4 && rng.chance(0.3)) {
       this.lastBanterBall = inn.balls;
       this.fx.bubble(line('batterSledge', them.id, rng), bat().x, bat().y, { dur: 2000 });
+      this.heatEvent(inn, 'sledge');
       this.revenge = true;
       this.ui.banner('THEY\'RE TALKING', 'Dot ball or wicket next = +10 REVENGE', 1800);
       await this.sleepReal(this.bot ? 50 : 1300);
@@ -2043,6 +2102,7 @@ export class Game {
         return;
       }
       this.fx.bubble(line('sledge', me.id, rng), bowl().x, bowl().y, { dur: 1800 });
+      this.heatEvent(inn, 'sledge');
       await this.sleepReal(this.bot ? 50 : 750);
       const r = sledgeOutcome(them.ai, rng);
       const h = bat();

@@ -4,6 +4,7 @@ import { LANES } from './physics.js';
 import { gradeTiming, resolveContact } from './shots.js';
 import { bowlType, deliveryParams } from './squads.js';
 import { aiSpread, bowlerTrouble, hitStrength, movementFor } from './ratings.js';
+import { HOT_BAT } from './heat.js';
 
 function weighted(rng, table) {
   const total = table.reduce((s, [, w]) => s + w, 0);
@@ -124,6 +125,7 @@ export function aiBat(d, ctx, rng) {
   if (ctx.repeats >= 3) sigma *= 0.8;
   if (ctx.power === 'thunder') sigma *= 0.7;
   if (ctx.freeHit) sigma *= 0.85; // he picks his spot and commits to it
+  if (ctx.hot) sigma *= HOT_BAT.sigma; // the duel is hot: he swings as hard as he can, and misses more
   const mods = ctx.mods || {};
   sigma *= mods.sigmaMul || 1;
   const w = { ...CFG.timing };
@@ -133,6 +135,12 @@ export function aiBat(d, ctx, rng) {
   const errMs = rng.normal() * sigma + 6 + (mods.bias || 0);
   const shot = chooseShot(d, ctx, rng);
   if (mods.loftAdd && !shot.loft && rng.chance(mods.loftAdd)) shot.loft = true;
+  if (ctx.hot && !ctx.freeHit && !shot.loft && rng.chance(HOT_BAT.loft)) shot.loft = true;
+  // ...unless it is a good ball: then he can block it
+  if (ctx.hot && !ctx.freeHit && (ctx.release === 'good' || ctx.release === 'perfect') && ['good', 'full', 'yorker'].includes(d.length) && rng.chance(HOT_BAT.blockP)) {
+    const block = { kind: 'defend', angle: 0, loft: false };
+    return { errMs, shot: block, grade: 'defend', res: resolveContact({ grade: 'defend', errMs, shot: block, d, fx: ctx.fx || {}, rng, strength: 1 }) };
+  }
 
   if (ctx.fx?.maya && !rng.chance(0.5)) {
     return { errMs, shot, grade: 'miss', res: { outcome: 'bowled', grade: 'miss', mayaFooled: true } };

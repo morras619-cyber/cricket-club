@@ -1105,3 +1105,13 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .taunt-bubble { position: relative; background: #fff4da; color: var(--ink); border: 3px solid var(--ink); border-radius: 14px; padding: 6px 12px 8px; box-shadow: 0 4px 0 rgba(0,0,0,.35); max-width: 78%; }
 .taunt-name { display: block; font-family: var(--display); font-size: 14px; letter-spacing: 1px; color: #e8262b; }
 .taunt-text { margin: 1px 0 0; font-weight: 800; font-size: 16px; line-height: 1.25; }
+
+/* the heat between a batter and his bowler */
+.heat { position: absolute; left: var(--gut-l); top: calc(var(--safe-t) + 160px); width: min(58%, 230px); pointer-events: none; }
+.heat[hidden] { display: none; }
+.heat-label { display: block; font-family: var(--display); font-size: 12px; letter-spacing: 1px; color: #ffd9a8; -webkit-text-stroke: .5px var(--ink); text-shadow: 1px 1px 0 var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.heat-bar { height: 9px; margin-top: 2px; border-radius: 5px; background: rgba(20, 16, 24, .7); border: 2px solid var(--ink); overflow: hidden; }
+.heat-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb347, #ff6a1a 60%, #e8262b); transition: width .35s; }
+.heat.hot .heat-label { color: #fff; animation: heatpulse .7s ease-in-out infinite alternate; }
+.heat.hot .heat-bar { border-color: #e8262b; box-shadow: 0 0 8px #ff6a1a; }
+@keyframes heatpulse { from { opacity: .75; } to { opacity: 1; } }

@@ -29,6 +29,21 @@ export class UI {
     for (const s of this.screens) $(s).hidden = s !== id;
   }
   hud(on) { $('hud').hidden = !on; }
+  // the heat between this batter and bowler: a bar under the scorecard (null hides it)
+  heat(info) {
+    let box = $('heatMeter');
+    if (!box) {
+      if (!info) return;
+      box = document.createElement('div'); box.id = 'heatMeter'; box.className = 'heat';
+      box.innerHTML = '<b class="heat-label"></b><div class="heat-bar"><i></i></div>';
+      $('hud').append(box);
+    }
+    box.hidden = !info || (info.frac <= 0.02 && !info.hot);
+    if (!info) return;
+    box.querySelector('.heat-label').textContent = info.hot ? `FACE-OFF! · ${info.label}` : `HEAT · ${info.label}`;
+    box.querySelector('i').style.width = `${Math.round(Math.min(1, info.frac) * 100)}%`;
+    box.classList.toggle('hot', !!info.hot);
+  }
 
   score(inn, { label, need, phase, heroLine = '', logo }) {
     const lg = $('hudLogo');
