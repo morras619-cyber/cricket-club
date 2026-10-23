@@ -457,6 +457,20 @@ function lineupOf(c, teamId) {
   const byId = id => pool.find(p => p.id === id);
   return { order: l.order.map(byId), attack: l.attack.map(byId) };
 }
+// The Thunder Strikers' dynasty: until you reach the Super League nobody can beat them, so they take the title every year and you
+// build up to meeting them there. They are simply better in those matches, and if one still goes against them its scores are
+// turned round. Once you are in the Super League its matches are played as normal.
+const DYNASTY = 'thunder';
+let dynasty = false;
+function dynastyMatch(c) {
+  return (a, b, rng) => {
+    dynasty = true;
+    let m;
+    try { m = simCareerMatch(c, a, b, rng); } finally { dynasty = false; }
+    if ((a !== DYNASTY && b !== DYNASTY) || m.winner === DYNASTY) return m;
+    return { ...m, ia: m.ib, ib: m.ia, winner: DYNASTY };
+  };
+}
 function simInnings(c, batId, bowlId, rng, target = null) {
   const L = lineupOf(c, batId), B = lineupOf(c, bowlId);
   const plan = overPlan(B.attack.filter(Boolean), CFG.balls / 6);
@@ -469,6 +483,7 @@ function simInnings(c, batId, bowlId, rng, target = null) {
     const sc = card(bat, s.id), bc = card(bowl, bw.id);
     sc.balls++; bc.balls++;
     let d = (s.bat - bw.bowlSkill) / 100;
+    if (dynasty) d += (batId === DYNASTY ? 0.1 : 0) - (bowlId === DYNASTY ? 0.1 : 0);
     if (s.ability === 'eagleEye') d += 0.05;
     if (bw.ability === 'mystery' || bw.ability === 'swingMaster') d -= 0.04;
     if (rng.chance(Math.max(0.03, Math.min(0.16, 0.075 - 0.08 * d)))) { wkts++; sc.out = true; bc.wkts++; continue; }
@@ -582,7 +597,7 @@ export function endSeason(c) {
   const notes = [];
   // the other two divisions play their seasons too
   const leagues = { [myDiv]: L };
-  for (const d of DIV_ORDER) if (d !== myDiv) leagues[d] = simLeague(c.divisions[d], hashStr(`${c.seed}-${d}-${c.season}`), (a, b, rng) => simCareerMatch(c, a, b, rng));
+  for (const d of DIV_ORDER) if (d !== myDiv) leagues[d] = simLeague(c.divisions[d], hashStr(`${c.seed}-${d}-${c.season}`), d === 'asl' ? dynastyMatch(c) : (a, b, rng) => simCareerMatch(c, a, b, rng));
   for (const d of DIV_ORDER) {
     const ord = d === myDiv ? order : finalOrder(leagues[d]), k = DIV_MONEY[d];
     ord.forEach((id, i) => {
@@ -592,6 +607,7 @@ export function endSeason(c) {
     });
   }
   c.titles[leagues.asl.champion] = (c.titles[leagues.asl.champion] || 0) + 1;
+  if (myDiv !== 'asl' && leagues.asl.champion === DYNASTY) notes.push(`⚡ ${teamById(DYNASTY).name} win the Asian Super League again: title number ${c.titles[DYNASTY]}. They look unbeatable. Climb to the Super League and take them on!`);
   const season = Object.values(c.players);
   const top = (f) => season.filter(p => p.stats.season.m).sort((a, b) => f(b) - f(a))[0];
   const orange = top(p => p.stats.season.runs), purple = top(p => p.stats.season.wkts * 1000 - p.stats.season.bruns);

@@ -200,3 +200,33 @@ test('your own ground: three levels, the Arena only out of Division 3, ticket mo
   assert.ok(C.upgradeStadium(c)); assert.equal(C.stadiumLevel(c), 3); assert.equal(C.upgradeBlock(c), 'top');
   setMyClub(null);
 });
+
+test('the Thunder Strikers take the Super League every year until you join it, and you play it as normal after', () => {
+  const c = C.newCareer(31);
+  C.chooseClub(c, 'kites'); C.finishAuction(c);
+  for (let s = 1; s <= 4; s++) {
+    playSeason(c, s);
+    // (the season ends in Division 3, or it would wait for you: stay there)
+    assert.equal(c.history.at(-1).champions.asl, 'thunder', `season ${s}`);
+    assert.ok(c.divisions.asl.includes('thunder'), 'they never go down');
+    if (c.divisions.d3.includes(c.club) === false) break; // (promoted: the rest of the test is the other half)
+    C.nextSeason(c); C.finishAuction(c);
+  }
+  assert.ok((c.titles.thunder || 0) >= 1);
+  // the other half: with you in the Super League, nothing is turned for them
+  const d = C.newCareer(32);
+  C.chooseClub(d, 'harbour');
+  d.divisions.asl = d.divisions.asl.filter(x => x !== 'royals').concat('harbour');
+  d.divisions.d3 = d.divisions.d3.filter(x => x !== 'harbour').concat('royals');
+  C.finishAuction(d);
+  assert.equal(C.divisionOf(d, 'harbour'), 'asl');
+  let lost = 0;
+  for (let s = 1; s <= 3 && d.phase !== 'playoff'; s++) {
+    playSeason(d, s + 10);
+    if (d.phase === 'playoff') break;
+    const ls = d.league.results.filter(r => !r.player && (r.a === 'thunder' || r.b === 'thunder') && r.winner !== 'thunder').length;
+    lost += ls;
+    C.nextSeason(d); C.finishAuction(d);
+  }
+  assert.ok(lost > 0 || d.history.some(h => h.champion !== 'thunder'), 'in the Super League they can lose');
+});
