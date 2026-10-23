@@ -9,10 +9,10 @@ import { CFG } from './config.js';
 export const FULL = 100, HOLD = 6, COOLED = 55;
 
 // how much an event adds (a hot-headed player gains faster: his `fire`, 0.2 to 0.55)
-const GAIN = { sledge: 22, six: 20, four: 14, beaten: 12, dot: 9, edge: 10 };
+const GAIN = { sledge: 30, six: 27, four: 19, beaten: 16, dot: 12, edge: 13 };   // (a bowler has two overs, so a duel has to be able to fill in about one)
 export const gainOf = (kind, fire = 0.3) => Math.round((GAIN[kind] || 0) * (0.85 + fire));
 
-export const START = 30;
+export const START = 40;
 
 export class Duels {
   constructor() { this.map = new Map(); }
