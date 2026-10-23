@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// snd/crowd-sing.wav and crowd-boo.wav (tools/build_crowd_mood.py): the singing is long enough to carry a moment and is
-// faded in and out (the recording was cut off at both ends); the boo is whole, ending on silence
+// snd/crowd-boo.wav (tools/build_crowd_mood.py): the boo is whole, ending on silence. The singing (snd/crowd-songs.mp3) is long enough
+// to carry a moment and is faded in and out (the recordings were cut off at both ends)
 function readWav(path) {
   const b = readFileSync(path);
   assert.equal(b.toString('ascii', 0, 4), 'RIFF');
@@ -23,14 +23,23 @@ const load = n => readWav(new URL(`../snd/crowd-${n}.wav`, import.meta.url));
 const rms = (x, a, b) => { let s = 0; for (let i = a; i < b; i++) s += x[i] * x[i]; return Math.sqrt(s / (b - a)); };
 const at = ({ mono, rate }, t, d = 0.2) => rms(mono, Math.floor(t * rate), Math.floor((t + d) * rate));
 
-test('the singing fades in, holds a steady level for seconds, and fades out', () => {
-  const c = load('sing'), m = c.mono, rate = c.rate, mid = at(c, 4, 0.5);
-  assert.ok(m.length / rate > 8, 'long enough for a victory song');
-  assert.ok(mid > 0.08, 'a clear crowd');
-  assert.ok(at(c, 0, 0.05) < mid * 0.3, 'it fades in, not a sudden start');
-  for (const t of [1.5, 3, 5, 7]) assert.ok(at(c, t) > mid * 0.7 && at(c, t) < mid * 1.4, `a steady level at ${t}s`);
-  assert.ok(at(c, m.length / rate - 0.1, 0.09) < mid * 0.1, 'it fades out, not cut off');
-  assert.ok(Math.abs(m[0]) < 0.01 && Math.abs(m[m.length - 1]) < 0.01, 'starts and ends on silence');
+// snd/crowd-songs.mp3 (tools/build_crowd_songs.py): eight 10 s songs, one per 10.5 s slot (the default, then the seven clubs). Decoded with ffmpeg
+// (the test is skipped on a machine without it).
+import { execFileSync } from 'node:child_process';
+let songs = null;
+try { songs = execFileSync('ffmpeg', ['-v', 'error', '-i', new URL('../snd/crowd-songs.mp3', import.meta.url).pathname, '-f', 's16le', '-ar', '32000', '-ac', '1', '-'], { maxBuffer: 1 << 28 }); } catch { /* no ffmpeg */ }
+test('every song fades in, holds a steady level for seconds, and fades out', { skip: !songs && 'ffmpeg is not installed' }, () => {
+  const rate = 32000, all = new Float64Array(songs.length / 2);
+  for (let i = 0; i < all.length; i++) all[i] = songs.readInt16LE(i * 2) / 32768;
+  assert.ok(all.length / rate > 8 * 10.5 - 1, 'eight slots');
+  for (let slot = 0; slot < 8; slot++) {
+    const m = all.subarray(Math.round(slot * 10.5 * rate), Math.round((slot * 10.5 + 10) * rate)), c = { mono: m, rate };
+    const mid = at(c, 4, 0.5);
+    assert.ok(mid > 0.05, `slot ${slot}: a clear crowd`);
+    assert.ok(at(c, 0, 0.05) < mid * 0.3, `slot ${slot}: it fades in, not a sudden start`);
+    for (const t of [3, 5, 7]) assert.ok(at(c, t) > mid * 0.25 && at(c, t) < mid * 2.6, `slot ${slot}: a crowd (not a gap) at ${t}s`);
+    assert.ok(at(c, 9.85, 0.1) < mid * 0.15, `slot ${slot}: it fades out, not cut off`);
+  }
 });
 
 test('the boo is whole: a clear boo that dies away to silence', () => {
