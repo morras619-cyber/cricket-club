@@ -15,6 +15,7 @@ test('a counter needs the charge: Brace 20, Steady Hands 25, nothing below that'
 
 test('the AI answers only from its own hidden charge, pays for it, and keeps it back for a Spark', () => {
   const m = new Mind(makeRng(3));
+  m.charge.value = 0;
   assert.equal(m.counter('thunder'), null, 'no charge, no answer');
   m.charge.value = 19; assert.equal(m.counter('thunder'), null);
   let got = null;

@@ -28,8 +28,9 @@ export const STEADY_SQUEEZE = 0.85;
 // ---- the AI's mind ----
 const FIRE_AT = { thunder: 'bat', mirror: 'bat', tornado: 'bowl', maya: 'bowl', shatter: 'bowl' };
 export class Mind {
-  constructor(rng) {
-    this.charge = new Charge(0);   // hidden: never shown
+  constructor(rng, { gain = 1.6, start = 20 } = {}) {
+    this.charge = new Charge(start);   // hidden: never shown (it starts a little warm, and fills faster than yours: it has one star to feed)
+    this.gain = gain;
     this.rng = rng;
     this.counters = 0; this.fired = 0;
   }
@@ -37,16 +38,16 @@ export class Mind {
 
   // what happened on a ball for the AI side: its batter hit well or boundaries, its bowler a dot or a wicket, a wicket it lost
   earn({ batting, runs = 0, wicket = false, grade = null }) {
-    const S = CFG.charge.sources;
+    const S = CFG.charge.sources, add = n => this.charge.add(n * this.gain, 'ai');
     if (batting) {
       if (wicket) { this.charge.wicketLost(); return; }
-      if (grade === 'perfect') this.charge.add(S.perfectBat, 'ai');
-      else if (grade === 'good') this.charge.add(S.goodBat, 'ai');
-      if (runs === 4) this.charge.add(S.four, 'ai');
-      if (runs >= 6) this.charge.add(S.six, 'ai');
+      if (grade === 'perfect') add(S.perfectBat);
+      else if (grade === 'good') add(S.goodBat);
+      if (runs === 4) add(S.four);
+      if (runs >= 6) add(S.six);
     } else {
-      if (wicket) this.charge.add(S.wicket, 'ai');
-      else if (runs === 0) { this.charge.add(S.dot, 'ai'); this.charge.dot(); }
+      if (wicket) add(S.wicket);
+      else if (runs === 0) { add(S.dot); this.charge.dot(); }
     }
   }
 
