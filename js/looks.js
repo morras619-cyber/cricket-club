@@ -73,6 +73,8 @@ function baseLook(p) {
 }
 export const skinHex = l => (typeof l.skin === 'string' ? l.skin : SKIN[l.skin] || SKIN[2]);
 export const hairHex = (l, age = 0) => (age >= 35 ? HAIR[5] : typeof l.hair === 'string' ? l.hair : HAIR[l.hair] ?? HAIR[0]);
+// the skin and hair of a player as colours (hex), whether his look holds colours (a painted player) or tone numbers (a generated one); the fallback fills what is missing
+export const colourLook = (l, fb = {}) => ({ skin: l?.skin != null ? skinHex(l) : fb.skin, hair: l?.hair != null ? hairHex(l) : fb.hair });
 
 // ---------- colour helpers ----------
 export function hsv(r, g, b) {

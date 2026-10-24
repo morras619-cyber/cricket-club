@@ -10,7 +10,23 @@ export class CutIn {
   start(hero, power, now) { this.active = { hero, power, t0: now, seed: Math.floor(now) % 9973 + 1 }; }
   get busy() { return !!this.active; }
 
+  // A cut-in that cannot be drawn must never leave the canvas clipped and shifted for the rest of the match: every save is paired with a
+  // restore even if the drawing throws, and the cut-in is dropped.
   draw(ctx, W, H, now) {
+    if (!this.active) return;
+    let depth = 0;
+    const save = ctx.save, restore = ctx.restore;
+    ctx.save = function () { depth++; return save.call(this); };
+    ctx.restore = function () { depth--; return restore.call(this); };
+    try { this.paint(ctx, W, H, now); }
+    catch (e) { this.active = null; console.error('cut-in', e); }
+    finally {
+      while (depth > 0) { restore.call(ctx); depth--; }
+      delete ctx.save; delete ctx.restore;
+    }
+  }
+
+  paint(ctx, W, H, now) {
     const c = this.active;
     if (!c) return;
     const t = now - c.t0;

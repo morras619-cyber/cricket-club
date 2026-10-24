@@ -11,7 +11,7 @@ import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
-import { lookOf, faceCanvas, masksReady } from './looks.js';
+import { lookOf, faceCanvas, masksReady, colourLook } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
@@ -439,7 +439,7 @@ export class Game {
   asHero(p, team, slot) {
     if (!p) return this.captain;
     const lk = lookOf(p) || {};
-    return { id: p.id, name: p.name, slot, emblem: null, plain: true, face: portraitFace(p, team, 240), quote: p.nick ? `${p.nick} time!` : 'Watch this!', look: { ...teamLook(team), skin: lk.skin || teamLook(team).skin, hair: lk.hair || teamLook(team).hair } };
+    return { id: p.id, name: p.name, slot, emblem: null, plain: true, face: portraitFace(p, team, 240), quote: p.nick ? `${p.nick} time!` : 'Watch this!', look: { ...teamLook(team), ...colourLook(lk, teamLook(team)) } };   // (a generated player's skin and hair are tone numbers: they must become colours, or the cut-in cannot draw him)
   }
   // my wicket-keeper (his face is on the keeper powers)
   keeperPlayer() { return this.fieldingXI([{ keeper: true }], 'player')[0]; }
