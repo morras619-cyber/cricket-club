@@ -5,6 +5,7 @@ import { KIT_SHEETS } from './kitsheets.js';
 import { skinHex, hairHex, hsv, rgb } from './looks.js';
 import { buildOf } from './builds.js';
 import { logoSrc } from './teams.js';
+import { loadHair, hairReady, dressSheet } from './hair.js';
 
 const REF_HEIGHT_M = 1.85;
 // the game's frame names -> the sheet's poses (0-9, left to right, top row first)
@@ -18,6 +19,14 @@ const POSE_FRONT = { celebrate2: 4 };
 const POSE_SPIN = {
   start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 6, frontarm: 6, release: 8,
   follow1: 9, follow2: 10, follow3: 11, finish: 12, field: 14, react: 14, celebrate1: 14, celebrate2: 14,
+};
+
+// the second spinner action (tools/build_spin2_sheets.py; 15 poses, the same order front and back): stand, four short steps, the
+// wind-up (gather, coil, the arm going up), release (the arm straight up), the arm sweeping out and across the body (follow 1-5), the
+// finish, hands on hips
+const POSE_SPIN2 = {
+  start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 5, frontarm: 6, release: 7,
+  follow1: 8, follow2: 9, follow3: 10, follow4: 11, follow5: 12, finish: 13, field: 14, react: 14, celebrate1: 14, celebrate2: 14,
 };
 
 // the spinner from behind (15 poses)
@@ -52,7 +61,8 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'bat-back', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back', 'field', 'spin2-front', 'spin2-back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  loadHair();
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -243,6 +253,26 @@ function printLine(g, text, cap, cy, fill, edge) {
   g.restore();
 }
 
+// A sheet drawn bald: his haircut, beard and cap drawn on the heads of every frame (tools/kit/headfit made the tables: where each
+// head is, one for the haircuts and caps and one for the beards), the same pieces the other sprites wear (js/hair.js). Returns the
+// pixels of what was drawn, so the shirt print can stay under long hair.
+function dressHeads(g, meta, side, look, style, beard, wear) {
+  const W = g.canvas.width, H = g.canvas.height, layer = document.createElement('canvas');
+  layer.width = W; layer.height = H;
+  const lg = layer.getContext('2d', { willReadFrequently: true });
+  const table = list => Object.fromEntries(list.map((h, i) => [i, h]));
+  const o = meta.dress || {};
+  const pieces = { hair: style, beard: null, wear: wear === 'cap' ? 'cap' : null };
+  dressSheet(lg, pieces, table(meta.heads), side, hairHex(look), skinHex(look), { lift: o.lift, hairGrow: o.hairGrow });
+  if (beard && side === 'front' && meta.beardHeads) {
+    dressSheet(lg, { hair: null, beard: beard.replace('beard_', ''), wear: null }, table(meta.beardHeads), side, hairHex(look), skinHex(look), { lift: o.beardLift ?? o.lift });
+  }
+  g.drawImage(layer, 0, 0);
+  const px = lg.getImageData(0, 0, W, H).data;
+  layer.width = 0; layer.height = 0;
+  return px;
+}
+
 const playerCache = new Map();
 function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
@@ -250,7 +280,9 @@ function playerSheet(view, team, look, mirror) {
   const sk = skinHex(look), hr = hairHex(look), style = hairStyleOf(look);
   const facing = view.endsWith('front');
   const beard = facing ? beardOf(look) : null, wear = wearOf(look);
-  const hp = style && meta.hair?.[style] ? hairData(view, style) : null;
+  let hp = style && meta.hair?.[style] ? hairData(view, style) : null;
+  const dressing = meta.heads && hairReady(facing ? 'front' : 'back');   // (a sheet drawn bald: his cut, beard and cap are put on at run time)
+  if (meta.heads && !dressing) return null;
   const bp = beard && meta.hair?.[beard] ? hairData(view, beard) : null;
   const wp = wear && meta.hair?.[wear] ? hairData(view, wear) : null;
   if (hp === undefined || bp === undefined || wp === undefined) return null;
@@ -287,6 +319,7 @@ function playerSheet(view, team, look, mirror) {
     }
   }
   g.putImageData(img, 0, 0);
+  if (dressing) hp = dressHeads(g, meta, facing ? 'front' : 'back', look, style, beard, wear);
   // a left-armer: the whole sheet mirrored (the crest and print are drawn after, so they read right)
   if (mirror) {
     const flipped = document.createElement('canvas');
@@ -439,7 +472,7 @@ export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look)
   const sheet = playerSheet(view, team, look, !!flip);
   if (!sheet) return false;
   const meta = KIT_SHEETS[view];
-  const pose = (view === 'spin-back' ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
+  const pose = (view.startsWith('spin2') ? POSE_SPIN2[frame] : view === 'spin-back' ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
   let [sx, sy, w, h, ax, ay] = meta.frames[pose];
   if (flip) { sx = sheet.width - sx - w; ax = w - ax; }
   // his own build: taller or shorter, broader or slighter, about his feet
