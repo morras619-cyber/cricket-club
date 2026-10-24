@@ -21,7 +21,7 @@ import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { levelOf, levelName, learn, adaptScale } from './adapt.js';
 import { preMatch } from './rivals.js';
-import { ensureChirp, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING } from './chirp.js';
+import { ensureChirp, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, bannerFace, engagement } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
@@ -1401,53 +1401,89 @@ const countUp = (node, to) => {
   node.textContent = '0'; requestAnimationFrame(step);
 };
 const cface = (face, cls = '') => { const d = el('span', `cface ${cls}`); d.setAttribute('style', faceStyle(face)); d.setAttribute('aria-hidden', 'true'); return d; };
-const cicon = (i, n) => { const w = el('span', 'cstat'), ic = el('i', 'cicon'); ic.style.backgroundPosition = `${i / 3 * 100}% 0`; w.append(ic, el('b', '', '')); w.lastChild.dataset.n = n; return w; };
+const ccrest = (club, cls = '') => { const i = document.createElement('img'); i.className = `cface crest ${cls}`; i.src = logoSrc(club); i.alt = ''; return i; };
+const cstat = (icon, n) => { const w = el('span', 'cstat'), ic = el('i', 'cicon'); ic.style.backgroundPosition = `${icon / 3 * 100}% 0`; const b = el('b', '', ''); b.dataset.n = n; w.append(ic, b); return w; };
+// the badge: a blue tick for a club and its players, the shield for the press
+const cbadge = by => { const v = el('i', by.type === 'press' ? 'cshield' : 'ctick'); v.setAttribute('role', 'img'); v.setAttribute('aria-label', 'verified'); return v; };
+function chirpActions(post) { const st = el('div', 'cstats'); st.append(cstat(1, post.likes), cstat(2, post.replies), cstat(3, post.shares)); return st; }
+function chirpReplies(post) {
+  if (!post.comments?.length) return null;
+  const list = el('div', 'creplies');
+  for (const m of post.comments) {
+    const row = el('div', 'creply');
+    const txt = el('div', 'cbody'); const h = el('div', 'chead'); h.append(el('b', 'cname sm', m.name), el('span', 'chandle', m.handle));
+    txt.append(h, el('p', 'ctext sm', m.text));
+    row.append(cface(m.face, 'sm'), txt);
+    list.append(row);
+  }
+  return list;
+}
 function chirpPost(c, post, k) {
   const card = el('article', `cpost ${post.kind}`);
   const by = post.by;
-  const av = by.type === 'star' ? (() => { const i = document.createElement('img'); i.className = 'cface crest'; i.src = logoSrc(by.club); i.alt = ''; return i; })() : cface(by.face);
+  const av = by.type === 'star' || by.type === 'club' ? ccrest(by.club) : cface(by.face);
   const head = el('div', 'chead');
   const name = el('b', 'cname', by.name);
-  if (by.verified) { const v = el('i', 'cicon cverified'); v.style.backgroundPosition = '0 0'; v.setAttribute('role', 'img'); v.setAttribute('aria-label', 'verified'); name.append(v); }
-  head.append(name, el('span', 'chandle', `${by.handle}${by.outlet ? ' · ' + by.outlet : by.type === 'star' ? ' · ' + teamById(by.club).name : ''}`), el('span', 'cago', AGO[Math.min(k, AGO.length - 1)]));
+  if (by.verified) name.append(cbadge(by));
+  const sub = el('div', 'csub');
+  sub.append(el('span', 'chandle', by.handle));
+  if (by.outlet) sub.append(el('span', 'coutlet', by.outlet));
+  else if (by.type === 'star') sub.append(el('span', 'chandle', `· ${teamById(by.club).name}`));
+  const top = el('div', 'ctop'); top.append(name, el('span', 'cago', AGO[Math.min(k, AGO.length - 1)]), el('span', 'cdots', '⋮'));
+  head.append(top, sub);
   const body = el('div', 'cbody');
-  body.append(head, el('p', 'ctext', post.text));
-  const stats = el('div', 'cstats');
-  stats.append(cicon(1, post.likes), cicon(2, post.replies), cicon(3, post.shares));
-  body.append(stats);
-  if (post.comments?.length) {
-    const list = el('div', 'ccomments');
-    for (const m of post.comments) {
-      const row = el('div', 'ccomment');
-      const txt = el('div'); txt.append(el('p', '', m.text), el('small', '', `${m.name} ${m.handle}`));
-      row.append(cface(m.face, 'sm'), txt);
-      list.append(row);
-    }
-    body.append(list);
-  }
+  body.append(head, el('p', 'ctext', post.text), chirpActions(post));
+  const rep = chirpReplies(post); if (rep) body.append(rep);
   card.append(av, body);
+  return card;
+}
+// your club's own post: the next match, with the club's star on it
+function nextMatchPost(c) {
+  if (c.phase !== 'season' || !c.league) return null;
+  const f = nextFixture(c.league);
+  if (!f) return null;
+  const me = teamById(c.club), opp = teamById(f.opp), by = { type: 'club', club: c.club, name: me.name, handle: handleOf(me.name), verified: true };
+  const card = el('article', 'cpost official');
+  const row = el('div', 'crow');
+  const head = el('div', 'chead'), top = el('div', 'ctop'), name = el('b', 'cname', me.name); name.append(cbadge(by));
+  top.append(name, el('span', 'cago', '2h'), el('span', 'cdots', '⋮'));
+  const sub = el('div', 'csub'); sub.append(el('span', 'chandle', by.handle));
+  head.append(top, sub);
+  const hb = el('div', 'cbody'); hb.append(head);
+  row.append(ccrest(c.club), hb);
+  const ban = el('div', 'cbanner');
+  const face = bannerFace(c, c.club);
+  if (face) { const im = document.createElement('img'); im.className = 'cbface'; im.src = face; im.alt = ''; ban.append(im); } else ban.append(ccrest(c.club, 'cbcrest'));
+  const words = el('div', 'cbwords'); words.append(el('b', 'cbnext', 'NEXT MATCH'), el('b', 'cbvs', `VS ${opp.name.toUpperCase()}`));
+  const chips = el('div', 'cbchips');
+  chips.append(el('span', '', `📅 ${f.label.toUpperCase()}`), el('span', '', `📍 ${groundOf(f.home || c.club).name.toUpperCase()}`), el('span', '', `⚡ ${divisionName(divisionOf(c, c.club)).toUpperCase()}`));
+  ban.append(words, chips);
+  const eng = engagement(c, by, `next${c.season}${f.opp}`);
+  card.append(row, ban, chirpActions({ likes: eng.likes, replies: eng.replies, shares: eng.shares }));
   return card;
 }
 function chirpPanel(c) {
   const P = ensureChirp(c), me = teamById(c.club);
-  const box = el('div', 'panel paper chirp');
-  box.append(el('h3', '', 'Chirp'));
-  // your club: followers, and the buzz around it
-  const head = el('div', 'cclub');
-  const logo = document.createElement('img'); logo.src = logoSrc(c.club); logo.alt = ''; logo.className = 'cface crest big';
-  const info = el('div', 'cinfo'); info.append(el('b', '', me.name), el('span', 'chandle', handleOf(me.name)));
-  const nums = el('div', 'cnums');
-  const f = el('b', '', compact(P.fans)); f.dataset.n = P.fans;
-  const buzz = el('div', 'cbuzz'); const bar = el('i'); bar.style.width = `${Math.round(P.buzz * 100)}%`; buzz.append(bar);
-  nums.append(el('span', '', 'Followers'), f, el('span', '', `Buzz · ${buzzWord(P.buzz)}`), buzz);
-  head.append(logo, info, nums);
-  box.append(head);
-  const perk = sponsorBonus(c);
-  const lift = Math.round(crowdOf(c) * CROWD_TIMING * 1000) / 10;
-  box.append(el('p', 'sheetnote cperk', `${perk > 0 ? `Your fans bring ${money(perk)} extra in sponsorship every season. ` : 'Win matches and your followers grow: big clubs earn more from sponsors. '}${lift >= 0.1 ? `At home, your crowd widens your timing by ${lift}%.` : 'A bigger, hotter crowd will widen your timing at home.'}`));
-  if (!P.feed.length) { box.append(el('p', 'sheetnote', 'Quiet for now. Play a match and Chirp will have something to say.')); return box; }
-  P.feed.slice(0, 8).forEach((post, k) => box.append(chirpPost(c, post, k)));
-  // the numbers count up when the feed opens
+  const box = el('div', 'chirp');
+  box.append(el('h3', 'vh', 'Chirp'));   // (the pager names the tab from it)
+  // the app's header: the logo, and where the club stands
+  const bar = el('div', 'chirpbar');
+  const logo = document.createElement('img'); logo.src = 'img/chirp/logo.webp'; logo.alt = 'Chirp'; logo.className = 'chirplogo';
+  const stats = el('div', 'chirpstats');
+  const fol = el('b', '', compact(P.fans)); fol.dataset.n = P.fans;
+  const buzz = el('div', 'cbuzz'); const bz = el('i'); bz.style.width = `${Math.round(P.buzz * 100)}%`; buzz.append(bz);
+  const f1 = el('span', 'cfol'); f1.append(fol, el('small', '', 'FOLLOWERS'));
+  const f2 = el('span', 'cfol'); f2.append(el('b', 'sm', buzzWord(P.buzz)), el('small', '', 'BUZZ'), buzz);
+  stats.append(f1, f2);
+  bar.append(logo, stats);
+  box.append(bar);
+  const perk = sponsorBonus(c), lift = Math.round(crowdOf(c) * CROWD_TIMING * 1000) / 10;
+  box.append(el('p', 'cperk', `${perk > 0 ? `Your fans bring ${money(perk)} extra in sponsorship every season. ` : 'Win matches and your followers grow: big clubs earn more from sponsors. '}${lift >= 0.1 ? `At home, your crowd widens your timing by ${lift}%.` : 'A bigger, hotter crowd will widen your timing at home.'}`));
+  const feed = el('div', 'cfeed');
+  const next = nextMatchPost(c); if (next) feed.append(next);
+  P.feed.slice(0, 8).forEach((post, k) => feed.append(chirpPost(c, post, k + 1)));
+  if (!P.feed.length && !next) feed.append(el('p', 'cperk', 'Quiet for now. Play a match and Chirp will have something to say.'));
+  box.append(feed);
   requestAnimationFrame(() => box.querySelectorAll('[data-n]').forEach(n => countUp(n, +n.dataset.n)));
   return box;
 }

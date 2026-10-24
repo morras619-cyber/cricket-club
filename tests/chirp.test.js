@@ -93,3 +93,31 @@ test('careers saved before Chirp get a feed when they load', () => {
   C.migrateCareer(c);
   assert.equal(c.chirp.fans, K.START_FANS);
 });
+
+test('the feed does not say the same thing twice: a season of results, wins or losses, has no repeated wording close together', () => {
+  for (const won of [true, false]) {
+    const c = career(13);
+    const texts = [];
+    for (let m = 0; m < 14; m++) {
+      const opp = m % 2 ? 'kites' : 'lagoon';
+      const mine = `${60 + m}/3`, theirs = `${won ? 40 + m : 90 + m}/5`;
+      const rng = makeRng(m * 37 + (won ? 1 : 2));
+      const a = K.postMatch(c, { me: c.club, they: opp, mine, theirs, won }), b = K.postFan(c, { won, they: opp, mine, theirs }, rng);
+      for (const post of [b, a]) texts.push(post.text, ...post.comments.map(x => x.text));
+    }
+    const counts = new Map();
+    for (const t of texts) counts.set(t, (counts.get(t) || 0) + 1);
+    // the press recaps differ by the score; the replies and fans' posts must not repeat inside a stretch of 24
+    const body = texts.filter(t => !t.startsWith('FT:'));
+    for (let i = 0; i < body.length; i++) for (let j = i + 1; j < Math.min(body.length, i + 24); j++) assert.notEqual(body[i], body[j], `repeated: ${body[i]}`);
+    assert.ok(Math.max(...[...counts.values()]) <= 2, `a line said more than twice (${won ? 'wins' : 'losses'})`);
+  }
+});
+
+test('lines about the score are only used when there is a score', () => {
+  const c = career();
+  for (let s = 0; s < 40; s++) {
+    const cs = K.commentsFor(c, { kind: 'win', by: { type: 'press', name: 'X', face: 38 } }, makeRng(s), 3);
+    for (const x of cs) assert.ok(!/ to \s|^\s*v |\{|-run gap/.test(x.text) && !/\bv\b {2,}/.test(x.text), x.text);
+  }
+});

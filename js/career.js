@@ -623,7 +623,7 @@ export function afterLeagueMatch(c, summary) {
   const mine = summary.innings.find(i => i.side === 'player'), theirs = summary.innings.find(i => i.side === 'ai'), won = result.winner === c.club, opp = summary.oppTeam.id;
   const gained = afterMatchPopularity(c, { won, derby: !!rivalKind(c, opp), upset: clubRating(c, opp) > clubRating(c, c.club) + 3, bigWin: Math.abs(mine.runs - theirs.runs) >= 25 });
   postMatch(c, { me: c.club, they: opp, mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, won });
-  postFan(c, { won }, makeRng(hashStr(`${c.seed}-fan-${c.season}-${c.league.results?.length || 0}`)));
+  postFan(c, { won, they: opp, mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}` }, makeRng(hashStr(`${c.seed}-fan-${c.season}-${c.league.results?.length || 0}`)));
   notes.push(`📈 ${gained >= 0 ? '+' : '−'}${compact(Math.abs(gained))} followers on Chirp`);
   if (finish(c.league)) notes.push(...endSeason(c));
   return notes;

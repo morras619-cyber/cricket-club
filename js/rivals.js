@@ -80,27 +80,48 @@ export const LINES = {
       'Nice run. The table does not scare us. Neither do you.',
       'Someone has been busy. We are still the ones with the trophies.',
       'Enjoy the view from down there. It is a long way up.',
+    
+      'A win here, a win there. Call us when you win a title.',
+      'Keep it up, {me}. It makes the final more fun.',
+      'We checked your table. We are still not worried.',
+      'Good for you. Now do it away at the Thunderdome.',
     ],
     top: [
       'Top of the table? Hold on to it, {me}. Nobody keeps it from us for long.',
       'Top already? Then you will be hungry. We like hungry. We eat it.',
       'Lovely. A league leader who has never seen a real crowd.',
+    
+      'Top of your table, {me}? We have been there for years. It gets lonely.',
+      'Enjoy the view, {me}. The air up there is thin.',
+      'League leaders. How adorable.',
     ],
     promoted: [
       'Welcome up, {me}. The air is thinner, and we are the reason.',
       'You made it. Now the real match begins.',
       'Promoted? Well done. Now stand where we can see you.',
       'New division, same old story: it ends with us.',
+    
+      'Up you come, {me}. Mind the step: it is a long way back down.',
+      'A promotion party? We had one last Tuesday. For a Tuesday.',
+      'Welcome, {me}. Bring a coat. It gets cold at the top.',
     ],
     relegated: [
       'Down again? The Thunderdome sends its regards, {me}.',
       'We would say sorry, but we are not.',
       'Come back when you have learned to finish.',
+    
+      'Back down you go, {me}. It is quieter there.',
+      'We saw the table. We felt nothing.',
+      'Relegation suits you, {me}. Good colour.',
     ],
     champion: [
       'A trophy in your division? Impressive. Now do it where it counts.',
       'Champions, are you? Of that? Send us a photo.',
       'Fine. You won something. Come and try to win it from us.',
+    
+      'Champions of that league? Lovely. Come test it against us.',
+      'Well played. Now try it with the lights on, {me}.',
+      'A trophy! Put it next to ours. Oh wait, you cannot.',
     ],
     pre: [
       'Tonight the Thunderdome roars. Bring a brave face, {me}.',
@@ -108,6 +129,10 @@ export const LINES = {
       'We have been waiting for you, {me}. Do not disappoint us.',
       'You wanted a shot at the champions. Here it is. Do not waste it.',
       'Lightning does not ask permission. See you out there.',
+    
+      'Bring your best, {me}. Bring your lucky socks too.',
+      'The crowd is loud tonight and every cheer is ours.',
+      'See you at the toss, {me}. Try not to blink.',
     ],
     theyWon: [
       'That is how it is done, {me}. Take notes.',
@@ -115,6 +140,10 @@ export const LINES = {
       'Thunder strikes twice. Ask anyone.',
       'Better luck next time. Or the time after.',
       'The gap is where it was. Mind it.',
+    
+      'Another day, another win for the champions.',
+      'You were close, {me}. In a different postcode.',
+      'Thanks for the practice, {me}.',
     ],
     youWon: [
       'Enjoy it, {me}. It is the only one you will get.',
@@ -122,6 +151,10 @@ export const LINES = {
       'Fine. You earned that one. Do not get used to it.',
       'Do not frame the scorecard. It will not happen twice.',
       'Well played. Rematch. Now.',
+    
+      'Okay, that one stings. Enjoy it, {me}.',
+      'One win does not make a season. Remember that.',
+      'Do not get comfortable. The return fixture is ours.',
     ],
   },
   division: {
@@ -129,6 +162,14 @@ export const LINES = {
       'This division is not big enough for both of us, {me}.',
       'We have marked you as the club to beat. We say so loudly.',
       'Everyone says you are the one to watch. We will see about that.',
+    
+      'Welcome to our patch, {me}. Mind the neighbours.',
+      'Everyone is talking about {me}. Everyone is wrong.',
+      '{they} have been waiting for a rival like you.',
+    
+      'Welcome to our patch, {me}. Mind the neighbours.',
+      'Everyone is talking about {me}. Everyone is wrong.',
+      '{they} have been waiting for a rival like you.',
     ],
     pre: [
       'We have been waiting for this one, {me}. Bring your best.',
@@ -136,6 +177,12 @@ export const LINES = {
       'Our fans have circled this date. Do not disappoint them.',
       'You talk a good game. Let us see you play it.',
       '{they} do not lose this fixture. Remember that.',
+    
+      'The lads have been counting down the days, {me}.',
+      'We have a point to prove. So do you, {me}.',
+      'Your name is on our fixture list in red pen.',
+      'Do not be late, {me}. We hate waiting.',
+      'Bring the whole club, {me}. You will need the support.',
     ],
     theyWon: [
       'Better luck next time, {me}. Or the time after.',
@@ -143,6 +190,11 @@ export const LINES = {
       'We told you. Nobody listens until it is too late.',
       'Good effort. Not good enough.',
       'Was that your best? Truly?',
+    
+      'Not a bad effort, {me}. Not a good one either.',
+      'See? That is what a rivalry looks like.',
+      '{they} take this one. Again.',
+      'We will save you a seat in the return, {me}.',
     ],
     youWon: [
       'All right, you won. Enjoy it for a day.',
@@ -150,6 +202,11 @@ export const LINES = {
       'Lucky bounce, {me}. Do not frame the scorecard.',
       'Fine. Now it is personal.',
       'You beat us. You did not beat us twice.',
+    
+      'Good game, {me}. Do not tell the lads I said that.',
+      'It was close. It will be closer next time.',
+      'Take the points, {me}. Take the credit too. We will take the rematch.',
+      '{they} will be back, and angrier.',
     ],
     streak: [
       'Again? Fine, {me}. We are not laughing anymore.',
@@ -165,10 +222,13 @@ export function line(c, kind, event, clubId, salt = '') {
   const pool = LINES[kind]?.[event];
   if (!pool) return null;
   const rng = makeRng(hash(`${c.seed}|${c.season}|${event}|${clubId}|${salt}`));
-  const last = c.rivals?.said?.[`${kind}.${event}`];
-  const idxs = pool.map((_, i) => i).filter(i => pool.length < 2 || i !== last);
+  const key = `${kind}.${event}`;
+  let heard = c.rivals?.said?.[key];
+  if (!Array.isArray(heard)) heard = heard == null ? [] : [heard];   // (careers from before: the one last line)
+  let idxs = pool.map((_, i) => i).filter(i => !heard.includes(i));
+  if (!idxs.length) idxs = pool.map((_, i) => i).filter(i => i !== heard.at(-1));   // (all heard: start again, but not with the last one)
   const i = idxs[rng.int(0, idxs.length - 1)];
-  return { text: fill(pool[i], c, clubId), index: i };
+  return { text: fill(pool[i], c, clubId), index: i, heard: idxs.length === pool.length - heard.length ? [...heard, i] : [i] };
 }
 
 // the message in the inbox: from a club, spoken by its best player
@@ -176,7 +236,7 @@ export function say(c, kind, event, clubId, salt = '') {
   const l = line(c, kind, event, clubId, salt);
   if (!l) return null;
   if (!c.rivals) c.rivals = freshRivals();
-  c.rivals.said[`${kind}.${event}`] = l.index;
+  c.rivals.said[`${kind}.${event}`] = l.heard;
   const msg = { from: clubId, who: speakerOf(c, clubId), text: l.text, event, season: c.season };
   c.rivals.inbox = [msg, ...c.rivals.inbox].slice(0, INBOX_MAX);
   postFromMessage(c, msg, event === 'youWon' ? 'win' : 'taunt');   // (it is on Chirp too, with the fans replying)
