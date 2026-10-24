@@ -2,7 +2,6 @@ import { CFG } from './config.js';
 import { INK, FONT_DISPLAY, FONT_BODY, halftonePattern } from './fx.js';
 import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
-import { drawLife } from './standlife.js';
 import { makeEffectLevel } from './effectlevel.js';
 import { groundOf } from './grounds.js';
 import { teamById, logoSrc } from './teams.js';
@@ -416,8 +415,6 @@ function renderBuilt(cam, art, v, im) {
   const spots = G.landmark === 'bolts' ? { lightning: true } : {};
   if (v.plumes) spots.plumes = { at: v.plumes.map(([x, y, z = 1]) => ({ x: dx + x * k, y: dy + y * k, z })), s: v.ps * k };
   cam.layout = { roofY: Math.max(0, at(v.roof.r, v.roof.h)), standTop: at(v.roof.r, v.roof.h - 1.5), hy, spots };
-  // where the picture lies on screen, for js/standlife.js (clouds, birds, swaying flags, camera flashes): the sky above the roof line, the stands down to the boards
-  cam.layout.life = { club: art.team, W, k, dx, dy, skyY: Math.max(0, at(v.roof.r, v.roof.h)), stands: [Math.max(0, at(v.roof.r, v.roof.h - 1.5)), by] };
   return c;
 }
 
@@ -840,7 +837,6 @@ export function drawAtmosphere(ctx, cam, t, flare = 0) {
     }
   }
   if (s.plumes) drawPlumes(ctx, s.plumes, t, flare, hi);
-  drawLife(ctx, cam, t, flare);
   if (s.eyes) {
     const glow = 0.6 + 0.4 * Math.sin(t * 0.004);
     ctx.fillStyle = `rgba(255,${60 + 80 * glow},40,1)`;
