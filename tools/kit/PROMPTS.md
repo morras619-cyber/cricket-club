@@ -264,3 +264,24 @@ C3 TEAM: 1 two fielders in a high five (draw ONE man, his right hand raised to m
 7. Hands have five fingers or a believable fist/glove; boots white with blue soles.
 
 Send the sheets as PNG (not JPEG: JPEG blurs the magenta key) at 1984 x 793 or larger.
+
+---------------------------------------------------------------------------------------------------
+## SPINNERS WEAR THE PREMIUM KIT (use this instead of the standard kit lines for B3 and B4)
+
+The game's spinner sheets (`img/kit/spin-front.webp`, `spin-back.webp`) are drawn in three colours, not two.
+Replace the COLOURS line of the master block with:
+
+```
+Shirt and trousers main blue base #0164F3 (shadow #0242CA); a NAVY yoke across the shoulders and navy side
+panels down the shirt and trousers, base #031545 (shadow #020C2A); thin YELLOW piping along the navy edges,
+collar and cuffs, base #F6F416 (shadow #F4C546). Skin base #FCAA6E (shadow #F6A064). White boots #FDFCFC.
+```
+
+Attach `ref-spinner` sheets (`img/kit/spin-front.webp`, `img/kit/spin-back.webp` on magenta) as the style reference.
+
+## Measured on the first generated pace sheets (front + back, 10 poses each)
+
+Outline about 2 px near-black navy, blue #0163F2/#016AF5, yellow #FAF409, skin #FCAC6B, flat magenta
+(237,6,224, std 2): all inside the spec. Figures are about 380 px tall (spec 640): fine, the build rescales
+by measuring, but ask for 640 if the generator allows. Keep the back of the shirt plain: yellow seam lines
+down the back cross the name-and-number print.
