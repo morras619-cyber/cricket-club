@@ -363,6 +363,12 @@ function layStrip(g, cam, art, W, hy, H, dpr) {
   }
   drawCreases(g, cam, 1.52);
 }
+// the first row of real art in each stand picture (measured from where the rows stop being smooth: tools/ground_seams.py)
+const SEAM = {
+  thunder: { bat: 164, bowl: 234 }, cyclones: { bat: 93, bowl: 167 }, titans: { bat: 82, bowl: 157 }, phoenix: { bat: 95, bowl: 159 },
+  storm: { bat: 73, bowl: 113 }, eagles: { bat: 60, bowl: 170 }, vipers: { bat: 91, bowl: 170 }, royals: { bat: 79, bowl: 156 },
+};
+const SEAM_ZOOM = 1.18;
 function renderBuilt(cam, art, v, im) {
   const { W, H, hy, f } = cam;
   const G = groundOf(HOME), night = NIGHT[G.time] ?? 1;
@@ -372,7 +378,12 @@ function renderBuilt(cam, art, v, im) {
   const g = c.getContext('2d');
   g.scale(dpr, dpr);
   g.imageSmoothingQuality = 'high';
-  const k = f / v.f, dw = v.w * k, dh = v.h * k, dx = W / 2 - dw / 2, dy = hy - v.above * k;
+  // the painted stands' top rows are a smooth, mirrored extension of the sky (rows above SEAM are not real art): a tall phone would show a
+  // blurry band there, so the picture is enlarged about the horizon until the window starts at the seam (by at most SEAM_ZOOM)
+  const seam = SEAM[art.team]?.[cam.kind];
+  let k = f / v.f;
+  if (seam && hy > 0) k = Math.min(k * SEAM_ZOOM, Math.max(k, hy / (v.above - seam)));
+  const dw = v.w * k, dh = v.h * k, dx = W / 2 - dw / 2, dy = hy - v.above * k;
   if (dy > 0) {
     const gr = g.createLinearGradient(0, 0, 0, dy + 2);
     gr.addColorStop(0, G.sky[0]); gr.addColorStop(1, v.top);
