@@ -62,7 +62,7 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'bat-back', 'field', 'karim-front', 'karim-back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back', 'field', 'spin2-front', 'spin2-back', 'karim-front', 'karim-back']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   loadHair();
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {

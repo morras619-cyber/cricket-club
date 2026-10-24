@@ -611,7 +611,7 @@ function dressFor(view, v, look) {
 
 // the bowler views drawn from the plain-kit sheets (kitsprite.js)
 // (spinners wear the fast bowler's sheets too: one art style and finish for every bowler)
-const KIT_VIEW = { front: 'front', 'spin-front': 'front', back: 'back', 'spin-back': 'back' };   // (the shared spinner, img/kit/spin2-*, is built but not switched on: see tools/build_spin2_sheets.py)
+const KIT_VIEW = { front: 'front', 'spin-front': 'spin2-front', back: 'back', 'spin-back': 'spin2-back' };
 // (the spinners' own action, tools/build_spin2_sheets.py: short steps, an upright wind-up, a small follow-through; the old fast-bowler
 // stand-in is what a spin view falls back to while it loads)
 // named spinners drawn on their own sheets (img/kit/<key>-front.webp, -back.webp), his hair and face as drawn
@@ -623,7 +623,7 @@ const isSpin2 = view => KIT_VIEW[view]?.startsWith('spin2');
 export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, view = 'front', look = null) {
   // a named bowler: the plain-kit sheets (his own skin, hair, crest, name and number), once loaded
   let kit = KIT_VIEW[view];
-  if (view.startsWith('spin') && STAR_SPINNERS[look?.who]) kit = `${STAR_SPINNERS[look.who]}-${view.slice(5)}`;   // (a star with his own sheets)
+  if (kit?.startsWith('spin2') && STAR_SPINNERS[look?.who]) kit = `${STAR_SPINNERS[look.who]}-${kit.slice(6)}`;   // (a star with his own sheets)
   if (kit && look?.who && drawKitSprite(ctx, px, py, kPerM, frame, team, flip, kit, look)) return true;
   // (the older sheets have three follow-through frames, not five)
   if (frame === 'follow4' || frame === 'follow5') frame = 'follow3';
