@@ -21,7 +21,7 @@ import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { levelOf, levelName, learn, adaptScale } from './adapt.js';
 import { preMatch } from './rivals.js';
-import { ensureChirp, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, bannerFace, engagement } from './chirp.js';
+import { ensureChirp, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
@@ -1452,12 +1452,12 @@ function nextMatchPost(c) {
   const hb = el('div', 'cbody'); hb.append(head);
   row.append(ccrest(c.club), hb);
   const ban = el('div', 'cbanner');
-  const face = bannerFace(c, c.club);
-  if (face) { const im = document.createElement('img'); im.className = 'cbface'; im.src = face; im.alt = ''; ban.append(im); } else ban.append(ccrest(c.club, 'cbcrest'));
+  const main = el('div', 'cbmain');
   const words = el('div', 'cbwords'); words.append(el('b', 'cbnext', 'NEXT MATCH'), el('b', 'cbvs', `VS ${opp.name.toUpperCase()}`));
   const chips = el('div', 'cbchips');
   chips.append(el('span', '', `📅 ${f.label.toUpperCase()}`), el('span', '', `📍 ${groundOf(f.home || c.club).name.toUpperCase()}`), el('span', '', `⚡ ${divisionName(divisionOf(c, c.club)).toUpperCase()}`));
-  ban.append(words, chips);
+  main.append(words, ccrest(c.club, 'cbcrest'));
+  ban.append(main, chips);
   const eng = engagement(c, by, `next${c.season}${f.opp}`);
   card.append(row, ban, chirpActions({ likes: eng.likes, replies: eng.replies, shares: eng.shares }));
   return card;

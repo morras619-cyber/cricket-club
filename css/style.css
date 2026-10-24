@@ -1231,20 +1231,19 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .creplies { margin-top: 12px; border-left: 3px solid #2f6cf0; border-radius: 6px 16px 16px 6px; background: #0a1a52; display: grid; }
 .creply { display: flex; gap: 10px; padding: 10px 10px 10px 10px; }
 .creply + .creply { border-top: 1px solid #ffffff14; }
-.cbanner { position: relative; margin: 8px 0 10px; height: 168px; border-radius: 16px; overflow: hidden; background: linear-gradient(105deg, #070f33 0%, #12307f 55%, #0a1a52 100%); border: 2px solid var(--cline); }
-.cbanner::before { content: ''; position: absolute; inset: 0; background: linear-gradient(104deg, transparent 8%, #ffe21a 8.5% 13%, transparent 13.5%, transparent 58%, #3a7bff55 58.5% 66%, transparent 66.5%); opacity: .55; }
-.cbface { position: absolute; right: -6px; bottom: 0; height: 118%; width: auto; max-width: 52%; object-fit: contain; object-position: bottom right; filter: drop-shadow(-4px 0 10px rgba(0, 0, 30, .55)); }
-.cbcrest { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 112px; height: 112px; box-shadow: 0 0 0 4px #ffcf1a, 0 0 0 6px var(--cb); }
-.cbwords { position: absolute; left: 12px; top: 14px; right: 40%; display: grid; line-height: .95; }
-.cbnext { font-family: var(--display); font-style: italic; font-weight: 400; font-size: 36px; color: #ffe94d; -webkit-text-stroke: 1.5px #0a0f30; paint-order: stroke fill; text-shadow: 3px 3px 0 #0a0f30; }
-.cbvs { font-family: var(--display); font-style: italic; font-weight: 400; font-size: 22px; color: #fff; -webkit-text-stroke: 1.5px #0a0f30; paint-order: stroke fill; text-shadow: 2px 2px 0 #0a0f30; margin-top: 4px; overflow-wrap: anywhere; }
-.cbchips { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.creply .chead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
+.cbanner { position: relative; display: flex; flex-direction: column; margin: 8px 0 10px; border-radius: 16px; overflow: hidden; background: linear-gradient(105deg, #070f33 0%, #12307f 55%, #0a1a52 100%); border: 2px solid var(--cline); }
+.cbanner::before { content: ''; position: absolute; inset: 0; background: linear-gradient(104deg, transparent 8%, #ffe21a 8.5% 13%, transparent 13.5%, transparent 58%, #3a7bff55 58.5% 66%, transparent 66.5%); opacity: .55; pointer-events: none; }
+.cbmain { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px 10px 22px; min-height: 130px; }
+.cbwords { display: grid; line-height: .95; min-width: 0; flex: 1 1 auto; }
+.cbnext { font-family: var(--display); font-style: italic; font-weight: 400; font-size: 34px; white-space: nowrap; color: #ffe94d; -webkit-text-stroke: 1.5px #0a0f30; paint-order: stroke fill; text-shadow: 3px 3px 0 #0a0f30; }
+.cbvs { font-family: var(--display); font-style: italic; font-weight: 400; font-size: 19px; line-height: 1.05; color: #fff; -webkit-text-stroke: 1.5px #0a0f30; paint-order: stroke fill; text-shadow: 2px 2px 0 #0a0f30; margin-top: 6px; overflow-wrap: anywhere; }
+.cbcrest { flex: none; width: 104px; height: 104px; box-shadow: 0 0 0 4px #ffcf1a, 0 0 0 6px var(--cb); }
+.cbchips { position: relative; display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 0 10px 10px; }
 .cbchips span { font-size: 10.5px; font-weight: 900; letter-spacing: .4px; padding: 3px 8px; border-radius: 8px; background: #050c2ccc; color: #dfe8ff; white-space: nowrap; }
+
 .vh { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .cpost.official { flex-direction: column; gap: 6px; }
 .cpost.official .crow { display: flex; gap: 12px; align-items: center; }
-.cpost.official .cbanner { margin: 4px 0 6px; }
+.cpost.official .cbanner { margin: 4px -12px 6px; border-radius: 0; border-left: 0; border-right: 0; }
 .cpost.official .cstats { padding-left: 4px; }
-.cbwords { right: 42%; top: 12px; }
-.cbnext { font-size: 34px; white-space: nowrap; }
-.cbvs { font-size: 19px; line-height: 1.05; }

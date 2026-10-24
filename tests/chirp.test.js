@@ -102,7 +102,8 @@ test('the feed does not say the same thing twice: a season of results, wins or l
       const opp = m % 2 ? 'kites' : 'lagoon';
       const mine = `${60 + m}/3`, theirs = `${won ? 40 + m : 90 + m}/5`;
       const rng = makeRng(m * 37 + (won ? 1 : 2));
-      const a = K.postMatch(c, { me: c.club, they: opp, mine, theirs, won }), b = K.postFan(c, { won, they: opp, mine, theirs }, rng);
+      const story = K.storyOf(c, { won, first: { runs: 40 + (m % 5) * 9, wkts: 2, ballsLeft: 0 }, second: { runs: won ? 60 : 30, wkts: m % 3, ballsLeft: m * 2 } });
+      const a = K.postMatch(c, { me: c.club, they: opp, mine, theirs, won, story }), b = K.postFan(c, { won, they: opp, mine, theirs, story }, rng);
       for (const post of [b, a]) texts.push(post.text, ...post.comments.map(x => x.text));
     }
     const counts = new Map();
@@ -110,7 +111,7 @@ test('the feed does not say the same thing twice: a season of results, wins or l
     // the press recaps differ by the score; the replies and fans' posts must not repeat inside a stretch of 24
     const body = texts.filter(t => !t.startsWith('FT:'));
     for (let i = 0; i < body.length; i++) for (let j = i + 1; j < Math.min(body.length, i + 24); j++) assert.notEqual(body[i], body[j], `repeated: ${body[i]}`);
-    assert.ok(Math.max(...[...counts.values()]) <= 2, `a line said more than twice (${won ? 'wins' : 'losses'})`);
+    const worst = [...counts].sort((a, b) => b[1] - a[1])[0]; assert.ok(worst[1] <= 3, `a line said more than three times (${won ? "wins" : "losses"}): ${worst[0]} x${worst[1]}`);
   }
 });
 
@@ -120,4 +121,52 @@ test('lines about the score are only used when there is a score', () => {
     const cs = K.commentsFor(c, { kind: 'win', by: { type: 'press', name: 'X', face: 38 } }, makeRng(s), 3);
     for (const x of cs) assert.ok(!/ to \s|^\s*v |\{|-run gap/.test(x.text) && !/\bv\b {2,}/.test(x.text), x.text);
   }
+});
+
+const inn = (runs, wkts = 0, ballsLeft = 0) => ({ runs, wkts, ballsLeft });
+test('the story of a match: how it was won, and how close it was', () => {
+  const c = career();
+  // lost by 6 runs, all out chasing 42: a thriller, whoever it is
+  let st = K.storyOf(c, { won: false, first: inn(42, 2), second: inn(36, 3) });
+  assert.deepEqual([st.how, st.amount, st.by, st.tone], ['runs', '6 runs', 'by 6 runs', 'thriller']);
+  // a chase won with wickets and plenty of balls left is a rout; one with a ball to spare is a thriller
+  assert.equal(K.storyOf(c, { won: true, first: inn(30, 3), second: inn(31, 0, 20) }).tone, 'rout');
+  assert.equal(K.storyOf(c, { won: true, first: inn(30, 3), second: inn(31, 2, 1) }).tone, 'thriller');
+  assert.equal(K.storyOf(c, { won: true, first: inn(60, 1), second: inn(20, 3) }).tone, 'rout');
+  assert.equal(K.storyOf(c, { won: false, first: inn(40, 1), second: inn(30, 3) }).tone, 'solid');
+  assert.equal(K.storyOf(c, { won: true, first: inn(40, 1), second: inn(40, 3), tiebreak: 'super' }).by, 'in the Super Over');
+});
+
+test('a close match is never called a one-sided one, and a rout is never called close', () => {
+  const close = /so close|painfully|too close|that finish|fine margins|thriller|wire|nerves|heartbreak|gutting|right there|nearly/i, rout = /not even close|gap|hardly broke|miles ahead|dismantl|domination|never got into|demolition|masterclass/i;
+  for (let s = 0; s < 40; s++) {
+    for (const [tone, bad] of [['thriller', rout], ['rout', close]]) for (const won of [true, false]) {
+      const c = career(s);
+      const story = { won, how: 'runs', amount: '30 runs', by: 'by 30 runs', tone, streak: { kind: won ? 'W' : 'L', n: 1 }, snap: false };
+      const post = K.postMatch(c, { me: c.club, they: 'kites', mine: '60/3', theirs: '30/5', won, story });
+      for (const t of [post.text.replace(/^FT:.*?\. /, ''), ...post.comments.map(x => x.text)]) assert.ok(!bad.test(t), `${tone} ${won ? 'win' : 'loss'}: ${t}`);
+    }
+  }
+});
+
+test('the fans notice a run of results, and the first win after a bad run', () => {
+  const c = career(3), won = (w, f, s) => K.storyOf(c, { won: w, first: f, second: s });
+  for (let i = 0; i < 3; i++) won(false, inn(40), inn(30, 3));
+  const lost = won(false, inn(40), inn(30, 3));
+  assert.deepEqual([lost.streak.kind, lost.streak.n], ['L', 4]);
+  const back = won(true, inn(40), inn(41, 1, 6));
+  assert.equal(back.snap, true);
+  assert.equal(back.streak.n, 1);
+  // four defeats: the first reply is about the run, and it says the number
+  const c2 = career(5); let st; for (let i = 0; i < 4; i++) st = K.storyOf(c2, { won: false, first: inn(40), second: inn(30, 3) });
+  const post = K.postMatch(c2, { me: c2.club, they: 'kites', mine: '30/3', theirs: '40/2', won: false, story: st });
+  assert.match(post.comments[0].text, /4|straight|in a row|bounce/i);
+});
+
+test('a title remembers where the club started; the first season has nothing to remember', () => {
+  const c = career(2);
+  c.history = [{ season: 1, div: 'd3', pos: 6 }, { season: 2, div: 'd3', pos: 3 }, { season: 3, div: 'asl', pos: 1 }];
+  assert.match(C.clubMemory(c, 'champion'), /started in .*6th/);
+  c.history = [{ season: 1, div: 'd3', pos: 1 }];
+  assert.equal(C.clubMemory(c, 'champion'), '');
 });

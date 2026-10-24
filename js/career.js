@@ -14,7 +14,7 @@ import { newLeague, simLeague, advance, playerResult, table, finish, nextFixture
 import { NATIONS, pickNation } from './nations.js';
 import { randomLook } from './looks.js';
 import { ensureRivals, nemesisOf, say, afterMatch, messageNote, rivalKind } from './rivals.js';
-import { ensureChirp, afterMatchPopularity, seasonPopularity, postMatch, postFan, postMilestone, sponsorBonus, compact } from './chirp.js';
+import { ensureChirp, afterMatchPopularity, seasonPopularity, postMatch, postFan, postMilestone, storyOf, sponsorBonus, compact } from './chirp.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -622,8 +622,9 @@ export function afterLeagueMatch(c, summary) {
   // Chirp: the press and a fan post about it, and your club's followers and buzz move
   const mine = summary.innings.find(i => i.side === 'player'), theirs = summary.innings.find(i => i.side === 'ai'), won = result.winner === c.club, opp = summary.oppTeam.id;
   const gained = afterMatchPopularity(c, { won, derby: !!rivalKind(c, opp), upset: clubRating(c, opp) > clubRating(c, c.club) + 3, bigWin: Math.abs(mine.runs - theirs.runs) >= 25 });
-  postMatch(c, { me: c.club, they: opp, mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, won });
-  postFan(c, { won, they: opp, mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}` }, makeRng(hashStr(`${c.seed}-fan-${c.season}-${c.league.results?.length || 0}`)));
+  const story = storyOf(c, { won, first: summary.innings[0], second: summary.innings[1], tiebreak: summary.result.tiebreak });
+  postMatch(c, { me: c.club, they: opp, mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, won, story });
+  postFan(c, { won, they: opp, mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, story }, makeRng(hashStr(`${c.seed}-fan-${c.season}-${c.league.results?.length || 0}`)));
   notes.push(`📈 ${gained >= 0 ? '+' : '−'}${compact(Math.abs(gained))} followers on Chirp`);
   if (finish(c.league)) notes.push(...endSeason(c));
   return notes;
@@ -689,6 +690,16 @@ export function endSeason(c) {
 }
 
 // the season's movements between the divisions, and what they mean for you
+// what the fans remember when a big moment comes: the club's own seasons, from c.history (the last entry is the season just played)
+export function clubMemory(c, ev) {
+  const past = c.history.slice(0, -1), first = past[0], nth = n => `${n}${['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th'}`;
+  if (!first) return '';
+  if (ev === 'relegated' && past.at(-1)?.promoted) return ' They went up only a year ago.';
+  if (ev === 'champion' && first.div !== c.history.at(-1).div) return ` Remember when they started in ${divisionName(first.div)}, finishing ${nth(first.pos)}? Look at them now.`;
+  if (ev === 'champion' && first.pos > 4) return ` Their first season ended ${nth(first.pos)}. Look at them now.`;
+  if (ev === 'promoted' && past.length >= 2 && past.every(p => p.div === first.div)) return ` ${past.length + 1} seasons in the same division, and finally they are going up.`;
+  return '';
+}
 function applyMoves(c, notes) {
   const M = c.moves, D = c.divisions;
   const move = (id, from, to) => { D[from] = D[from].filter(x => x !== id); D[to] = [...D[to], id]; };
@@ -703,7 +714,7 @@ function applyMoves(c, notes) {
   if (ev) {
     seasonPopularity(c, ev);
     const club = teamById(c.club).name;
-    postMilestone(c, ev === 'promoted' ? `PROMOTED! ${club} are heading up to ${divisionName(h.promoted)} next season. 🎉` : ev === 'relegated' ? `${club} are relegated to ${divisionName(h.relegated)}. They will need a big rebuild. 💔` : `CHAMPIONS! ${club} win the title in ${divisionName(h.div)}! 🏆`);
+    postMilestone(c, (ev === 'promoted' ? `PROMOTED! ${club} are heading up to ${divisionName(h.promoted)} next season. 🎉` : ev === 'relegated' ? `${club} are relegated to ${divisionName(h.relegated)}. They will need a big rebuild. 💔` : `CHAMPIONS! ${club} win the title in ${divisionName(h.div)}! 🏆`) + clubMemory(c, ev));
   }
   c.moveNews = [
     `⬆️ ${teamById(M.d2up).name} are promoted to the Asian Super League`, `⬇️ ${teamById(M.aslDown).name} lose the play-off and go down to Division 2`,
