@@ -130,9 +130,7 @@ function flatAtlas(view, hex) {
 }
 
 // Draw a player's pieces on every head of a sheet. view: 'front' (face to the camera) or 'back'.
-// opts (optional, for sheets drawn bald): lift (how far the pieces stand above the skull, in skulls), hairDown and
-// hairGrow (the haircuts' shift down and size), beardDown and beardGrow: each one's own default when left out
-export function dressSheet(g, pieces, heads, view, hairHex, skinHex, opts = {}) {
+export function dressSheet(g, pieces, heads, view, hairHex, skinHex) {
   if (!pieces || !hairReady(view)) return false;
   const hairAtlas = tintedAtlas(view, hairHex), wearAtlas = atlases[view];
   const list = [];
@@ -151,11 +149,7 @@ export function dressSheet(g, pieces, heads, view, hairHex, skinHex, opts = {}) 
   if (pieces.wear) list.push(['wear', pieces.wear, pieces.wearColour ? tintedAtlas(view, pieces.wearColour, 215) : wearAtlas]);
   g.save();
   g.imageSmoothingQuality = 'high';
-  const lift = opts.lift ?? (view === 'back' ? 0.05 : 0.12); // the drawn spikes stand above the skull
-  for (const e of list) {
-    if (e[0] === 'beard') { e[3] = opts.beardDown ?? e[3]; e[4] = opts.beardGrow ?? e[4]; }
-    else if (e[0] === 'hair' && e[1] !== 'bald') { e[3] = opts.hairDown ?? e[3]; e[4] = opts.hairGrow ?? e[4]; }
-  }
+  const lift = view === 'back' ? 0.05 : 0.12; // the drawn spikes stand above the skull
   for (const [x0, y0, sk, ang] of Object.values(heads)) {
     const x = x0 - Math.sin(ang) * sk * lift, y = y0 + Math.cos(ang) * sk * lift;
     for (const [kind, name, src, down = 0, grow = 1] of list) {
