@@ -23,6 +23,7 @@ import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { adaptScale, NO_DIALS, dialsFor } from './adapt.js';
+import { CROWD_TIMING } from './chirp.js';
 import { DISCO_MS, DISCO_LEAD_MS, discoColors, drawDisco } from './disco.js';
 import { quality } from './quality.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
@@ -260,6 +261,8 @@ export class Game {
     this.home = opts.home || homeFromSeed(this.seed, this.myTeam.id, this.oppTeam.id);
     crowdSong(this.home);   // (the home crowd sings its own club's song)
     this.ground = groundOf(this.home);
+    // a big, buzzing club's home crowd lifts its batters a little (js/chirp.js): wider timing windows, at home, in a career
+    this.crowdLift = opts.crowd && this.home === this.myTeam.id ? CROWD_TIMING * opts.crowd : 0;
     this.pitch = pitchOf(this.home);
     preloadEffects('electric');
     setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; });
@@ -795,7 +798,7 @@ export class Game {
   // good bowler (bowlSkill) squeezes everyone's timing
   windowsFor(fx, extra = 0, tornado = false, skill = 75, bowlSkill = 75) {
     const w = { ...CFG.timing };
-    const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1);
+    const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1) * (1 + (this.crowdLift || 0));
     const braced = fx.counter === 'brace';   // (the bowler answered this power with Brace: half of it)
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? (braced ? 20 : 40) : 0);
     if (fx.focus) { const h = braced ? BRACE.focusWindow : 1; w.perfect += 55 * h; w.good += 45 * h; }

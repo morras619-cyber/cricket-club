@@ -1193,3 +1193,36 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .newsmsg img { flex: none; width: 44px; height: 44px; object-fit: contain; }
 .newsmsg p { margin: 0; font-weight: 800; font-style: italic; font-size: 14px; line-height: 1.35; }
 .newsmsg small { opacity: .65; font-weight: 700; }
+/* Chirp */
+.chirp h3 { margin: 0 0 8px; }
+.cface { flex: none; width: 44px; height: 44px; border-radius: 50%; display: block; background: #efe3d0 url(../img/chirp/avatars.webp) 0 0 / 800% 700% no-repeat; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1a1442; }
+.cface.sm { width: 30px; height: 30px; box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px #1a1442; }
+.cface.crest { background: #fff; object-fit: contain; padding: 3px; box-sizing: border-box; }
+.cface.big { width: 56px; height: 56px; }
+.cicon { display: inline-block; width: 18px; height: 18px; vertical-align: -3px; background: url(../img/chirp/icons.webp) 0 0 / 400% 100% no-repeat; }
+.cclub { display: flex; gap: 12px; align-items: center; padding: 6px 0 10px; border-bottom: 3px solid #1a1442; }
+.cinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cinfo b { font-family: var(--display); font-size: 20px; line-height: 1.05; }
+.chandle { font-size: 12.5px; font-weight: 700; opacity: .6; }
+.cnums { text-align: right; display: grid; gap: 1px; justify-items: end; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+.cnums b { font-family: var(--display); font-size: 26px; line-height: 1; letter-spacing: .5px; color: #e8343b; }
+.cbuzz { width: 92px; height: 8px; border-radius: 6px; background: #1a144233; overflow: hidden; }
+.cbuzz i { display: block; height: 100%; background: linear-gradient(90deg, #3ec6ff, #ffd23f, #ff5a36); }
+.cperk { margin: 6px 0 4px; text-align: center; }
+.cpost { display: flex; gap: 10px; padding: 10px 0; border-top: 2px solid rgba(26, 20, 66, .14); }
+.cpost:first-of-type { border-top: 0; }
+.cbody { flex: 1; min-width: 0; }
+.chead { display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; line-height: 1.2; }
+.cname { font-weight: 900; font-size: 15px; }
+.cverified { width: 16px; height: 16px; margin-left: 3px; vertical-align: -2px; }
+.cago { margin-left: auto; font-size: 12px; font-weight: 800; opacity: .5; }
+.ctext { margin: 3px 0 6px; font-weight: 700; font-size: 15px; line-height: 1.4; }
+.cstats { display: flex; gap: 18px; font-weight: 900; font-size: 13px; }
+.cstat { display: inline-flex; gap: 5px; align-items: center; }
+.ccomments { margin-top: 8px; padding: 6px 8px; border-radius: 12px; background: rgba(26, 20, 66, .07); display: grid; gap: 7px; }
+.ccomment { display: flex; gap: 8px; align-items: flex-start; }
+.ccomment p { margin: 0; font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+.ccomment small { font-size: 11.5px; font-weight: 700; opacity: .55; }
+.page.scrolls { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.cclub { padding-right: 6px; }
+.cnums b { font-size: 24px; }

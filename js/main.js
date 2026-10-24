@@ -21,6 +21,7 @@ import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { levelOf, levelName, learn, adaptScale } from './adapt.js';
 import { preMatch } from './rivals.js';
+import { ensureChirp, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
@@ -90,6 +91,7 @@ const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance
 const fitWatch = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => fitPage(e.target))) : null;
 function fitPage(pg) {
   if (pg.parentElement && getComputedStyle(pg.parentElement).flexGrow === '0') return;
+  if (pg.querySelector('.chirp')) { pg.classList.add('scrolls'); return; }   // (the feed is long: it scrolls instead of shrinking)
   let box = pg.querySelector(':scope > .fitbox');
   if (!box) {
     box = el('div', 'fitbox');
@@ -783,7 +785,7 @@ async function startMatch(opts) {
   try {
     summary = await game.runMatch({
       mode, story: !!opts.story, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
-      records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill),
+      records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill), crowd: mode === 'career' && profile.career?.chirp ? crowdOf(profile.career) : 0,
     });
   } finally {
     game.matchActive = false;
@@ -1385,24 +1387,68 @@ function careerSeason(c, body) {
     body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
       () => startMatch({ mode: 'career' }), preMatch(c, o.id)));
   }
-  body.append(newsroomPanel(c));
+  body.append(chirpPanel(c));
   if (c.custom) body.append(stadiumPanel(c));
   body.append(scoutsPanel(c));
   body.append(...leaguePanels(c.league));
 }
 
-// ---------- the Newsroom: what your rivals have been saying (js/rivals.js) ----------
-function newsroomPanel(c) {
-  const box = el('div', 'panel paper newsroom');
-  box.append(el('h3', '', '📣 Newsroom'));
-  const inbox = c.rivals?.inbox || [];
-  if (!inbox.length) { box.append(el('p', 'sheetnote', 'Quiet for now. Win a few matches and your rivals will have something to say.')); return box; }
-  for (const m of inbox.slice(0, 3)) {
-    const row = el('div', 'newsmsg');
-    const logo = document.createElement('img'); logo.src = logoSrc(m.from); logo.alt = ''; row.append(logo);
-    const txt = el('div'); txt.append(el('p', '', `“${m.text}”`), el('small', '', `${m.who} · ${teamById(m.from).name} · season ${m.season}`)); row.append(txt);
-    box.append(row);
+// ---------- Chirp: the feed of your club's world (js/chirp.js): rivals, press and fans post, the fans reply ----------
+const AGO = ['2m', '19m', '1h', '3h', '6h', '9h', '1d', '1d', '2d', '3d', '4d', '5d'];
+const countUp = (node, to) => {
+  const t0 = performance.now(), dur = 900;
+  const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - (1 - k) ** 3; node.textContent = compact(Math.round(to * e)); if (k < 1) requestAnimationFrame(step); };
+  node.textContent = '0'; requestAnimationFrame(step);
+};
+const cface = (face, cls = '') => { const d = el('span', `cface ${cls}`); d.setAttribute('style', faceStyle(face)); d.setAttribute('aria-hidden', 'true'); return d; };
+const cicon = (i, n) => { const w = el('span', 'cstat'), ic = el('i', 'cicon'); ic.style.backgroundPosition = `${i / 3 * 100}% 0`; w.append(ic, el('b', '', '')); w.lastChild.dataset.n = n; return w; };
+function chirpPost(c, post, k) {
+  const card = el('article', `cpost ${post.kind}`);
+  const by = post.by;
+  const av = by.type === 'star' ? (() => { const i = document.createElement('img'); i.className = 'cface crest'; i.src = logoSrc(by.club); i.alt = ''; return i; })() : cface(by.face);
+  const head = el('div', 'chead');
+  const name = el('b', 'cname', by.name);
+  if (by.verified) { const v = el('i', 'cicon cverified'); v.style.backgroundPosition = '0 0'; v.setAttribute('role', 'img'); v.setAttribute('aria-label', 'verified'); name.append(v); }
+  head.append(name, el('span', 'chandle', `${by.handle}${by.outlet ? ' · ' + by.outlet : by.type === 'star' ? ' · ' + teamById(by.club).name : ''}`), el('span', 'cago', AGO[Math.min(k, AGO.length - 1)]));
+  const body = el('div', 'cbody');
+  body.append(head, el('p', 'ctext', post.text));
+  const stats = el('div', 'cstats');
+  stats.append(cicon(1, post.likes), cicon(2, post.replies), cicon(3, post.shares));
+  body.append(stats);
+  if (post.comments?.length) {
+    const list = el('div', 'ccomments');
+    for (const m of post.comments) {
+      const row = el('div', 'ccomment');
+      const txt = el('div'); txt.append(el('p', '', m.text), el('small', '', `${m.name} ${m.handle}`));
+      row.append(cface(m.face, 'sm'), txt);
+      list.append(row);
+    }
+    body.append(list);
   }
+  card.append(av, body);
+  return card;
+}
+function chirpPanel(c) {
+  const P = ensureChirp(c), me = teamById(c.club);
+  const box = el('div', 'panel paper chirp');
+  box.append(el('h3', '', 'Chirp'));
+  // your club: followers, and the buzz around it
+  const head = el('div', 'cclub');
+  const logo = document.createElement('img'); logo.src = logoSrc(c.club); logo.alt = ''; logo.className = 'cface crest big';
+  const info = el('div', 'cinfo'); info.append(el('b', '', me.name), el('span', 'chandle', handleOf(me.name)));
+  const nums = el('div', 'cnums');
+  const f = el('b', '', compact(P.fans)); f.dataset.n = P.fans;
+  const buzz = el('div', 'cbuzz'); const bar = el('i'); bar.style.width = `${Math.round(P.buzz * 100)}%`; buzz.append(bar);
+  nums.append(el('span', '', 'Followers'), f, el('span', '', `Buzz · ${buzzWord(P.buzz)}`), buzz);
+  head.append(logo, info, nums);
+  box.append(head);
+  const perk = sponsorBonus(c);
+  const lift = Math.round(crowdOf(c) * CROWD_TIMING * 1000) / 10;
+  box.append(el('p', 'sheetnote cperk', `${perk > 0 ? `Your fans bring ${money(perk)} extra in sponsorship every season. ` : 'Win matches and your followers grow: big clubs earn more from sponsors. '}${lift >= 0.1 ? `At home, your crowd widens your timing by ${lift}%.` : 'A bigger, hotter crowd will widen your timing at home.'}`));
+  if (!P.feed.length) { box.append(el('p', 'sheetnote', 'Quiet for now. Play a match and Chirp will have something to say.')); return box; }
+  P.feed.slice(0, 8).forEach((post, k) => box.append(chirpPost(c, post, k)));
+  // the numbers count up when the feed opens
+  requestAnimationFrame(() => box.querySelectorAll('[data-n]').forEach(n => countUp(n, +n.dataset.n)));
   return box;
 }
 

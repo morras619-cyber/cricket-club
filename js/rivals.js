@@ -5,6 +5,7 @@ import { makeRng } from './rng.js';
 import { teamById } from './teams.js';
 import { ovr } from './squads.js';
 import { heroById } from './heroes.js';
+import { postFromMessage } from './chirp.js';
 
 export const NEMESIS = 'thunder';
 const FALLBACK = 'cyclones';          // (the nemesis when you ARE Thunder)
@@ -178,6 +179,7 @@ export function say(c, kind, event, clubId, salt = '') {
   c.rivals.said[`${kind}.${event}`] = l.index;
   const msg = { from: clubId, who: speakerOf(c, clubId), text: l.text, event, season: c.season };
   c.rivals.inbox = [msg, ...c.rivals.inbox].slice(0, INBOX_MAX);
+  postFromMessage(c, msg, event === 'youWon' ? 'win' : 'taunt');   // (it is on Chirp too, with the fans replying)
   return msg;
 }
 export const messageNote = m => `📣 ${m.who} (${teamById(m.from).name}): "${m.text}"`;
