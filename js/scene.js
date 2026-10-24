@@ -381,8 +381,9 @@ function renderBuilt(cam, art, v, im) {
   // the painted stands' top rows are a smooth, mirrored extension of the sky (rows above SEAM are not real art): a tall phone would show a
   // blurry band there, so the picture is enlarged about the horizon until the window starts at the seam (by at most SEAM_ZOOM)
   const seam = SEAM[art.team]?.[cam.kind];
-  let k = f / v.f;
-  if (seam && hy > 0) k = Math.min(k * SEAM_ZOOM, Math.max(k, hy / (v.above - seam)));
+  const k0 = f / v.f;
+  let k = k0;
+  if (seam && hy > 0) k = Math.min(k0 * SEAM_ZOOM, Math.max(k0, hy / (v.above - seam)));
   const dw = v.w * k, dh = v.h * k, dx = W / 2 - dw / 2, dy = hy - v.above * k;
   if (dy > 0) {
     const gr = g.createLinearGradient(0, 0, 0, dy + 2);
@@ -390,8 +391,11 @@ function renderBuilt(cam, art, v, im) {
     g.fillStyle = gr; g.fillRect(0, 0, W, dy + 2);
     if (night >= 0.6) for (let i = 0; i < 40; i++) { const r = ((i * 7919) % 997) / 997, q = ((i * 104729) % 991) / 991; g.fillStyle = `rgba(255,255,255,${0.25 + 0.5 * q})`; g.fillRect(r * W, q * dy, 1.3, 1.3); }
   }
-  if (dy + dh < H) { g.fillStyle = v.bottom; g.fillRect(0, dy + dh - 1, W, H - dy - dh + 1); }
-  g.drawImage(im, dx, dy, dw, dh);
+  // (below the horizon the picture's own pitch must stay exactly where the camera puts the real one: only the stand above it is enlarged)
+  const gh = (v.h - v.above) * k0, gw = v.w * k0;
+  if (hy + gh < H) { g.fillStyle = v.bottom; g.fillRect(0, hy + gh - 1, W, H - hy - gh + 1); }
+  g.drawImage(im, 0, 0, v.w, v.above, dx, dy, dw, hy - dy);
+  g.drawImage(im, 0, v.above, v.w, v.h - v.above, W / 2 - gw / 2, hy, gw, gh);
   // a ground with a strip of its own: it is laid over the rendered one, row by row, in this camera's perspective
   const sa = stripFor(art);
   if (sa) layStrip(g, cam, sa, W, hy, H, dpr);   // (it is laid over the rendered pitch: the creases are drawn again on it)
