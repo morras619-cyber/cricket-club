@@ -1131,7 +1131,8 @@ export class OutfieldView {
     }
     ctx.save();
     // (with the rendered stadium the grass stops just past the rope: its boards stand beyond)
-    const gr = top ? R + 1.9 : R + 4;
+    // (the rendered stadium's own grass ends about 64.3 m out: the rope sits on its edge and the game's grass ends under the rope, so no strip of the picture's grass shows outside it)
+    const ropeR = top ? R + 2.1 : R + 1.5, gr = top ? ropeR : R + 4;
     ctx.beginPath(); ctx.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2);
     if (art) {
       // the painted grass right up to the stands, its stripes along the pitch as in the match
@@ -1154,9 +1155,9 @@ export class OutfieldView {
         ctx.strokeStyle = style; ctx.lineWidth = w;
         const lift = w < rw ? rw * 0.18 : 0;
         ctx.beginPath();
-        if (!bump) ctx.ellipse(c.x, c.y - lift, (R + 1.5) * k, (R + 1.5) * k * 0.78, 0, 0, Math.PI * 2);
+        if (!bump) ctx.ellipse(c.x, c.y - lift, ropeR * k, ropeR * k * 0.78, 0, 0, Math.PI * 2);
         else for (let i = 0; i <= 360; i++) {
-          const a = (i / 360) * Math.PI * 2, r = (R + 1.5 + bump(a)) * k;
+          const a = (i / 360) * Math.PI * 2, r = (ropeR + bump(a)) * k;
           const x = c.x + Math.cos(a) * r, y = c.y - lift - Math.sin(a) * r * 0.78;
           if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
         }
