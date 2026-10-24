@@ -3,6 +3,7 @@ import { portraitFace } from './futcard.js';
 import { faceEl } from './looks.js';
 import { musicWanted } from './audio.js';
 import { drawEffect } from './fx.js';
+import { logoSrc } from './teams.js';
 
 const $ = id => document.getElementById(id);
 
@@ -87,7 +88,7 @@ export class UI {
 
   // team v team, shown with the next banner (cleared after it)
   matchup(a, b) {
-    $('vsA').src = `img/logo-${a}.webp`; $('vsB').src = `img/logo-${b}.webp`;
+    $('vsA').src = logoSrc(a); $('vsB').src = logoSrc(b);
     $('bannerVs').hidden = false;
   }
   // face: an optional portrait canvas, or a player card, shown above the text (a new batter, the bowler of the over)
