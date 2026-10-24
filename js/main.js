@@ -1419,7 +1419,7 @@ function chirpReplies(post) {
   return list;
 }
 function chirpPost(c, post, k) {
-  const card = el('article', `cpost ${post.kind}`);
+  const card = el('article', `cpost k-${post.kind}`);
   const by = post.by;
   const av = by.type === 'star' || by.type === 'club' ? ccrest(by.club) : cface(by.face);
   const head = el('div', 'chead');
