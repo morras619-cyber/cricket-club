@@ -33,6 +33,7 @@ import { TAUNTS, pick } from './story.js';
 import { Duels, FULL, HOLD, gainOf, hotSpec, Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './heat.js';
 import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
+import { handHint } from './handhint.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
 import { drawKitFielder } from './kitsprite.js';
 
@@ -502,7 +503,7 @@ export class Game {
     await this.sleepReal(this.bot ? 60 : 2600);
   }
 
-  quit() { this.cancelAll(); this.ui.hud(false); this.clearBowlUI(); this.view = 'idle'; this.paused = false; }
+  quit() { handHint(document.getElementById('app')).hide(); this.cancelAll(); this.ui.hud(false); this.clearBowlUI(); this.view = 'idle'; this.paused = false; }
   clearBowlUI() { document.querySelectorAll('.overpick').forEach(e => e.remove()); this.ui.fieldButton(false); this.ui.shotButton(false); this.ui.fieldEditor(false); this.ui.editing(false); this.ui.banter(false); }
 
   async introBanner(head, sub) {
@@ -848,6 +849,7 @@ export class Game {
     // before the delivery a tap on the field map enlarges it
     this.onInput = (type, g) => { if (type === 'down' && this.inMap(g)) this.mapBig = !this.mapBig; };
     if (opt.waitPower) await opt.waitPower();
+    if (opt.hand && !this.bot) handHint(document.getElementById('app')).show(opt.hand);   // (the tutorial: a hand shows what to do, until the player touches the screen or the ball is played)
     if (opt.noBall) {
       inn.extra(1, true); inn.nbPlay = true;
       this.ui.banner('NO BALL!', 'He overstepped: +1 run, free hit', 1700);
@@ -939,6 +941,7 @@ export class Game {
     });
     this.onInput = null;
     this.ui.hint(null);
+    if (opt.hand && !this.bot) handHint(document.getElementById('app')).hide();
     this.fx.speed = 0;
 
     // ----- resolve -----
@@ -2965,7 +2968,7 @@ export class Game {
       this.hud(inn);
     };
     // ball 1: assisted
-    await fair(straight, () => ({ slow: 0.5, extra: 120, assist: assistHit, hint: 'HOLD · SWIPE UP · LIFT ON THE RING' }));
+    await fair(straight, () => ({ slow: 0.5, extra: 120, assist: assistHit, hint: 'HOLD · SWIPE UP · LIFT ON THE RING', hand: { kind: 'swipe', from: [0.8, 0.68], to: [0.8, 0.44] } }));
     if (inn.runs > 0) await say(bowlerP, 'lucky');
     // ball 2: their star bowler powers up. Block it, or (if you dare) go for it
     // (their own star if he bowls; else Mystic Babar Bhai and his Maya Ball)
@@ -2975,7 +2978,7 @@ export class Game {
       const special = { ...straight, power: star.power.kind };
       applyPower(special, star.power.kind);
       await fair(special, () => ({
-        extra: 60, hint: 'TAP TO DEFEND · OR GO FOR IT!',
+        extra: 60, hint: 'TAP TO DEFEND · OR GO FOR IT!', hand: { kind: 'tap', at: [0.8, 0.56] },
         waitPower: async () => { await say(bowlerP, 'power', { side: 'right' }); await this.coach?.('tutBlock'); },
         ok: keep => inn.wkts === keep.wkts, // survive it and it's done, whatever it scored
       }), 3, 'He never saw that no-ball. Again!');

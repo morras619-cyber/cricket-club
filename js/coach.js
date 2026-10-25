@@ -53,13 +53,12 @@ export const DEV = {
     "Let's start with a final over. You need 14 off the last 4 balls. Don't worry, I'll be right here.",
   ],
   tutBat: [
-    "Batting is all in the timing. Hold your finger down, swipe up, and lift off when the ring lights up.",
-    "Middle it and the ball flies. Mistime it and it doesn't. Watch the ring, not the bowler!",
+    "Batting is all in the timing, beta. Watch the hand, then do the same.",
+    "Watch the ring, not the bowler!",
   ],
   tutBlock: [
-    "Uh-oh, beta. Their star bowler has fired his power. This ball is special and it's coming at you hard.",
-    "The safe play is to tap anywhere to defend it. Block it, survive, and we'll score off the next one.",
-    "But if you're feeling really brave... go for it! Time it perfectly and it flies. Your call!",
+    "Uh-oh, beta! Their star bowler fired his power. That ball is special.",
+    "Tap anywhere to defend it. Or, if you're brave, go for it!",
   ],
   tutKeeper: [
     "Edge! Now you're the wicket-keeper. The ball is flying to you behind the stumps.",
