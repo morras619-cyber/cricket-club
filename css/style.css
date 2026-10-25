@@ -1298,3 +1298,33 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 #career .auction .auc-bid:disabled { opacity: .72; filter: grayscale(.3); }
 #career .auction .ghostchip { align-self: center; background: transparent; color: #cfd8ff; border: 1.5px solid rgba(207, 216, 255, .45); box-shadow: none; font-size: 12px; padding: 4px 12px; }
 @media (max-height: 700px) { .auction .auc-note, .auction .auc-facts div:first-child { display: none; } #career .auction .auc-btns .bigbtn { min-height: 48px; } }
+
+/* auction phase 2: the report on the lot, the next bid, the last sale, the squad-needs and sold pages */
+.auction .auc-price em { font-style: normal; font-size: 10.5px; font-weight: 800; color: #b8c6ff; margin-top: 2px; }
+.auction .auc-last { align-self: center; margin: -4px 0 -2px; font-size: 11px; font-weight: 800; color: #b8c6ff; text-align: center; line-height: 1.1; }
+.auction .auc-last.mine { color: var(--bolt); }
+.auction .auc-report { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.auction .auc-report > div { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px; padding: 4px 3px 5px; border-radius: 10px; border: 1.5px solid rgba(255, 255, 255, .18); background: rgba(5, 8, 28, .72); min-width: 0; }
+.auction .auc-report small { font-size: 8.5px; font-weight: 800; letter-spacing: .5px; color: #9fb0f0; white-space: nowrap; }
+.auction .auc-report b { font-family: var(--display); font-weight: 400; font-size: 17px; letter-spacing: .6px; line-height: 1.05; }
+.auction .auc-report span { font-size: 9.5px; font-weight: 700; color: #cfd8ff; line-height: 1.1; }
+.auction .auc-report .tone-good { border-color: rgba(93, 255, 155, .55); } .auction .auc-report .tone-good b { color: #5dff9b; }
+.auction .auc-report .tone-ok b { color: #fff; }
+.auction .auc-report .tone-warn { border-color: rgba(255, 207, 74, .6); } .auction .auc-report .tone-warn b { color: #ffcf4a; }
+.auction .auc-report .tone-bad { border-color: rgba(255, 107, 107, .65); } .auction .auc-report .tone-bad b { color: #ff7a7a; }
+#career .auc-page { background: linear-gradient(180deg, rgba(14, 24, 74, .94), rgba(6, 10, 34, .97)); border: 2px solid rgba(255, 210, 63, .8); border-radius: 18px; box-shadow: 0 0 0 2px #070b24, inset 0 0 36px rgba(30, 90, 255, .25); color: #fff; padding: 12px; }
+#career .auc-page h3 { color: var(--bolt); font-size: 22px; letter-spacing: 1.2px; margin: 0 0 8px; }
+.auc-table { display: flex; flex-direction: column; gap: 4px; }
+.auc-table > div { display: grid; grid-template-columns: 1fr 52px 84px; gap: 6px; align-items: baseline; padding: 6px 8px; border-radius: 8px; background: rgba(5, 8, 28, .6); font-size: 14px; }
+.auc-table .hd { background: none; padding-bottom: 0; font-size: 10.5px; color: #9fb0f0; letter-spacing: .7px; }
+.auc-table .hd b, .auc-table .rw b { text-align: right; font-weight: 900; }
+.auc-table .rw span { font-weight: 700; color: #dfe6ff; }
+.auc-table .rw b.up { color: #5dff9b; }
+.auc-need { margin: 10px 0 0; font-weight: 800; font-size: 13.5px; color: #dfe6ff; text-align: center; }
+.auc-sale { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; margin-top: 4px; border-radius: 10px; background: rgba(5, 8, 28, .6); border: 1.5px solid rgba(255, 255, 255, .12); }
+.auc-sale b { display: block; font-size: 14px; line-height: 1.1; }
+.auc-sale small { font-size: 11.5px; font-weight: 700; color: #b8c6ff; }
+.auc-sale strong { font-family: var(--display); font-weight: 400; font-size: 22px; letter-spacing: .8px; color: var(--bolt); }
+.auc-sale.mine { border-color: rgba(255, 210, 63, .85); background: rgba(255, 210, 63, .12); }
+@media (max-height: 700px) { #career.is-auction .title { font-size: 21px; } .auction .auc-facts div:not(:last-child), .auction .auc-note { display: none; } .auction .auc-last { display: none; } .auction .auc-report span { display: none; } }
+@media (max-height: 650px) { .auction .auc-power span { display: none; } .auction .auc-power { padding: 4px 10px; } }

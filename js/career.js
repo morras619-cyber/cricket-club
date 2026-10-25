@@ -358,6 +358,8 @@ export function upgradeStadium(c) {
 
 // ---------- the auction ----------
 const inc = price => (price < 1 ? 0.1 : price < 3 ? 0.25 : 0.5);
+export const RESERVE_PER_PLACE = 0.3; // $M a club keeps back for each place it still has to fill (aiMaxes; the auction report's squad risk)
+export const openingPrice = p => Math.max(0.1, round2(value(p) * 0.5));
 const squadSize = (c, teamId) => clubPlayers(c, teamId).length;
 function aiMaxes(c, p) {
   const rng = makeRng(hashStr(`${c.seed}-${c.season}-${p.id}`));
@@ -366,7 +368,7 @@ function aiMaxes(c, p) {
     if (t.id === c.club) continue;
     const n = squadSize(c, t.id);
     if (n >= MAX_SQUAD) { out[t.id] = 0; continue; }
-    const reserve = Math.max(0, MIN_SQUAD - n - 1) * 0.3;
+    const reserve = Math.max(0, MIN_SQUAD - n - 1) * RESERVE_PER_PLACE;
     const free = c.budgets[t.id] - reserve;
     const need = n < MIN_SQUAD ? 1.25 : n < 12 ? 1 : 0.7;
     const homecoming = p.home === t.id ? 1.25 : 1; // a hero's old club wants him back
@@ -385,10 +387,44 @@ function openLot(c) {
   while (A.idx < A.lots.length && c.players[A.lots[A.idx]].team) A.idx++;
   if (A.idx >= Math.min(A.lots.length, LOTS)) { A.lot = null; return; }
   const p = c.players[A.lots[A.idx]];
-  A.lot = { pid: p.id, price: Math.max(0.1, round2(value(p) * 0.5)), leader: null, maxes: aiMaxes(c, p) };
+  A.lot = { pid: p.id, price: openingPrice(p), leader: null, maxes: aiMaxes(c, p) };
 }
 export const currentLot = c => c.auction?.lot || null;
 export const nextBid = lot => (lot.leader ? round2(lot.price + inc(lot.price)) : lot.price);
+
+// ---------- the auction report: what a lot would do for your squad (the auction screen) ----------
+// Only existing measures: the squad rating is squads.js teamRating (best four batters, best three
+// bowlers); the money a place still to fill needs is the AI clubs' own reserve.
+const topAvg = (xs, n) => { const t = [...xs].sort((a, b) => b - a).slice(0, n); return t.length ? Math.round(t.reduce((a, b) => a + b, 0) / t.length) : 0; };
+// Your squad as it stands; with `extra` (a player), as it would be with him signed.
+export function squadNeeds(c, extra = null) {
+  const pool = [...clubPlayers(c, c.club), ...(extra ? [extra] : [])];
+  const bowlers = pool.filter(p => p.bowl);
+  return {
+    size: pool.length, needed: Math.max(0, MIN_SQUAD - pool.length), places: Math.max(0, MAX_SQUAD - pool.length),
+    rating: teamRating(pool.map(enginePlayer)), bat: topAvg(pool.map(p => p.bat), 4), bowl: topAvg(bowlers.map(p => p.bowlSkill), 3),
+    pace: bowlers.filter(p => !bowlType(p.bowl).spin).length, spin: bowlers.filter(p => bowlType(p.bowl).spin).length,
+    allr: pool.filter(p => p.role === 'all').length,
+  };
+}
+// The decision in four verdicts, each { label, tone: 'good' | 'ok' | 'warn' | 'bad', detail }, for the next bid on this lot.
+export function assessLot(c, lot) {
+  const p = c.players[lot.pid], bid = nextBid(lot), now = squadNeeds(c), after = squadNeeds(c, p);
+  const gain = after.rating - now.rating;
+  const fit = gain >= 3 ? ['Excellent', 'good'] : gain >= 1 ? ['Good', 'good'] : ['Depth', 'ok'];
+  const ratio = bid / Math.max(0.1, value(p));
+  const price = ratio < 0.8 ? ['Bargain', 'good'] : ratio <= 1.1 ? ['Fair', 'ok'] : ['Expensive', 'warn'];
+  const left = round2(c.money - bid), needAfter = Math.max(0, MIN_SQUAD - (now.size + 1)), reserve = round2(needAfter * RESERVE_PER_PLACE);
+  const cash = left < 0 ? [`-${money(-left)}`, 'bad'] : [money(left), left < reserve ? 'warn' : 'ok'];
+  const risk = now.size >= MAX_SQUAD ? ['Full', 'bad'] : left < 0 ? ['Too dear', 'bad'] : left < reserve ? ['High', 'bad'] : needAfter > 0 && left < 2 * reserve ? ['Medium', 'warn'] : ['Low', 'good'];
+  return {
+    fit: { label: fit[0], tone: fit[1], detail: gain > 0 ? `Rating ${now.rating} → ${after.rating}` : `Rating stays ${now.rating}` },
+    price: { label: price[0], tone: price[1], detail: `${Math.round(ratio * 100)}% of his worth` },
+    cash: { label: cash[0], tone: cash[1], detail: left < 0 ? `Short by ${money(-left)}` : c.money > 0 ? `Uses ${Math.round(bid / c.money * 100)}% of your cash` : 'No cash' },
+    risk: { label: risk[0], tone: risk[1], detail: now.size >= MAX_SQUAD ? 'Squad is full' : left < 0 ? 'Not enough money' : needAfter > 0 ? `Then ${needAfter} more to sign` : 'Squad complete' },
+    now, after, bid, left,
+  };
+}
 function sign(c, p, teamId, price) {
   p.team = teamId;
   const rng = makeRng(hashStr(`${p.id}-${c.season}-c`));

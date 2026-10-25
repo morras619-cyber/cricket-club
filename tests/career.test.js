@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as C from '../js/career.js';
 import { TEAMS, CLUBS, teamById, logoSrc, setMyClub } from '../js/teams.js';
 import { nextFixture } from '../js/tournament.js';
-import { ovr } from '../js/squads.js';
+import { ovr, teamRating } from '../js/squads.js';
 import { makeRng } from '../js/rng.js';
 
 const fakeInn = (side, i) => ({ side, runs: i.runs, wkts: i.wkts, balls: i.balls, log: [], battingCard: () => [], bowlingCard: () => [] });
@@ -45,6 +45,58 @@ test('the auction: you can be outbid, you can win, and every club ends with a fu
   C.finishAuction(c);
   for (const t of CLUBS) assert.ok(C.clubPlayers(c, t.id).length >= C.MIN_SQUAD && C.clubPlayers(c, t.id).length <= C.MAX_SQUAD, t.id);
   assert.equal(c.phase, 'season');
+});
+
+test('the auction report uses the game\'s own numbers: opening price, squad rating, the AI reserve', () => {
+  const c = C.newCareer(8);
+  C.chooseClub(c, 'kites');
+  const lot = C.currentLot(c), p = c.players[lot.pid];
+  assert.equal(lot.price, C.openingPrice(p), 'a fresh lot opens at the opening price');
+  const now = C.squadNeeds(c), mine = C.clubPlayers(c, c.club);
+  assert.equal(now.size, mine.length);
+  assert.equal(now.rating, C.clubRating(c, c.club), 'the squad rating is the existing one');
+  const after = C.squadNeeds(c, p);
+  assert.equal(after.size, now.size + 1);
+  assert.equal(after.rating, teamRating([...C.clubPool(c, c.club), C.enginePlayer(p)]));
+  assert.equal(now.needed, Math.max(0, C.MIN_SQUAD - now.size));
+  assert.equal(now.places, C.MAX_SQUAD - now.size);
+  assert.equal(now.pace + now.spin, mine.filter(x => x.bowl).length);
+  // reading the report changes nothing
+  const snap = JSON.stringify(c);
+  C.assessLot(c, lot); C.squadNeeds(c, p);
+  assert.equal(JSON.stringify(c), snap);
+});
+
+test('the auction report: the four verdicts follow the next bid and your money', () => {
+  const c = C.newCareer(8);
+  C.chooseClub(c, 'kites');
+  const lot = C.currentLot(c), p = c.players[lot.pid], worth = C.value(p);
+  // price against his worth: 50% (the opening price) is a bargain; double is expensive
+  lot.price = Math.round(worth * 50) / 100; lot.leader = null; c.money = 20;
+  let a = C.assessLot(c, lot);
+  assert.equal(a.bid, C.nextBid(lot));
+  assert.equal(a.price.label, 'Bargain');
+  assert.equal(a.left, Math.round((20 - a.bid) * 100) / 100, 'cash after is money minus the next bid');
+  lot.price = Math.round(worth * 1.5 * 100) / 100;
+  assert.equal(C.assessLot(c, lot).price.label, 'Expensive');
+  // can't afford it: cash goes negative, the risk says so, and you are not charged by looking
+  lot.price = 5; c.money = 1;
+  a = C.assessLot(c, lot);
+  assert.ok(a.left < 0 && a.cash.tone === 'bad' && a.cash.label.startsWith('-$'));
+  assert.equal(a.risk.label, 'Too dear');
+  assert.equal(c.money, 1);
+  // a short squad that would spend nearly everything keeps too little for the places still to fill
+  const mine = C.clubPlayers(c, c.club);
+  for (const x of mine.slice(0, 3)) x.team = 'jaguars'; // 7 left: three more places needed after this one
+  lot.price = 2; c.money = 2.5;
+  a = C.assessLot(c, lot);
+  assert.ok(a.left >= 0 && a.left < 2 * C.RESERVE_PER_PLACE, 'less than the reserve for the places still to fill');
+  assert.ok(['High', 'Medium'].includes(a.risk.label));
+  c.money = 20; lot.price = 0.5;
+  assert.equal(C.assessLot(c, lot).risk.label, 'Low');
+  // a full squad: blocked
+  for (const x of Object.values(c.players).filter(x => !x.team).slice(0, 14)) { x.team = c.club; }
+  assert.equal(C.assessLot(c, lot).risk.label, 'Full');
 });
 
 test('a season pays prize money by position and goes into the records', () => {

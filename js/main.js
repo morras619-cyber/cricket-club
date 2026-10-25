@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS } from './grounds.js';
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -1342,13 +1342,16 @@ function careerAuction(c, body) {
     stage.append(head);
     const shown = Math.min(A.lots.length, 16);
     stage.append(el('div', 'auc-lot', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
+    const last = A.results.at(-1);
+    if (last) stage.append(el('div', 'auc-last' + (last.team === c.club ? ' mine' : ''), last.team ? `Last: ${c.players[last.pid].name} → ${last.team === c.club ? 'YOU' : teamById(last.team).name} · ${money(last.price)}` : `Last: ${c.players[last.pid].name} went unsold`));
     // the player, and what he costs
     const main = el('div', 'auc-main');
     const cardBox = el('div', 'auc-card');
-    cardBox.append(futCard(p, { size: Math.max(120, Math.min(210, window.innerWidth * 0.5, window.innerHeight * 0.3)) }));
+    cardBox.append(futCard(p, { size: Math.max(120, Math.min(210, window.innerWidth * 0.5, window.innerHeight * (window.innerHeight < 700 ? 0.24 : 0.3))) }));
     const side = el('div', 'auc-side');
     const price = el('div', 'auc-price');
     price.append(el('small', '', lot.leader ? 'CURRENT BID' : 'OPENING PRICE'), el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'No bids yet'));
+    if (lot.leader) price.append(el('em', '', `Opened ${money(openingPrice(p))} · next ${money(nextBid(lot))}`));
     const facts = el('div', 'auc-facts');
     for (const [k, v] of [['Age', p.age ?? '—'], ['Batting', p.bat], ['Bowling', p.bowlSkill || '—'], ['Worth', money(value(p))]]) {
       const row = el('div', ''); row.append(el('span', '', k), el('b', '', String(v))); facts.append(row);
@@ -1361,6 +1364,14 @@ function careerAuction(c, body) {
       pw.append(el('b', '', heroById(p.heroId).power.name), el('span', '', heroById(p.heroId).power.desc));
       stage.append(pw);
     }
+    // the decision in four verdicts for the next bid (career.js assessLot)
+    const rep = assessLot(c, lot), report = el('div', 'auc-report');
+    for (const [k, title] of [['fit', 'SQUAD FIT'], ['price', 'PRICE'], ['cash', 'CASH AFTER'], ['risk', 'SQUAD RISK']]) {
+      const t = el('div', `tone-${rep[k].tone}`);
+      t.append(el('small', '', title), el('b', '', rep[k].label), el('span', '', rep[k].detail));
+      report.append(t);
+    }
+    stage.append(report);
     const row = el('div', 'menu row auc-btns');
     const pass = el('button', 'bigbtn auc-pass');
     pass.append(el('b', '', 'Pass'), el('small', '', 'Save your budget'));
@@ -1388,11 +1399,33 @@ function careerAuction(c, body) {
     stage.append(skip);
     body.append(stage);
   }
+  if (lot) {
+    // your squad now, and with this lot signed (a page of its own: the tab beside "Now")
+    const now = squadNeeds(c), after = squadNeeds(c, c.players[lot.pid]);
+    const pg = el('div', 'panel statcard auc-page');
+    pg.append(el('h3', '', 'Squad needs'));
+    const tbl = el('div', 'auc-table');
+    const head = el('div', 'hd'); head.append(el('span', ''), el('b', '', 'NOW'), el('b', '', `WITH ${c.players[lot.pid].name.split(' ').pop().toUpperCase()}`));
+    tbl.append(head);
+    for (const [k, label] of [['rating', 'Squad rating'], ['bat', 'Batting (best 4)'], ['bowl', 'Bowling (best 3)'], ['pace', 'Pace bowlers'], ['spin', 'Spin bowlers'], ['allr', 'All-rounders'], ['size', `Players (${MIN_SQUAD}-${MAX_SQUAD})`]]) {
+      const r = el('div', 'rw'); const up = after[k] > now[k];
+      r.append(el('span', '', label), el('b', '', String(now[k])), el('b', up ? 'up' : '', String(after[k])));
+      tbl.append(r);
+    }
+    pg.append(tbl, el('p', 'auc-need', now.needed ? `You need ${now.needed} more player${now.needed > 1 ? 's' : ''} to reach ${MIN_SQUAD}. ${now.places} places are free.` : `Squad complete. ${now.places} place${now.places === 1 ? ' is' : 's are'} free.`));
+    body.append(pg);
+  }
   const res = c.auction.results.slice(-8).reverse();
   if (res.length) {
-    const rb = el('div', 'panel paper statcard');
+    const rb = el('div', lot ? 'panel statcard auc-page' : 'panel paper statcard');
     rb.append(el('h3', '', 'Sold'));
-    for (const r of res) rb.append(el('div', 'kotie' + (r.team === c.club ? ' mine' : ''), `${c.players[r.pid].name} → ${r.team ? `${teamById(r.team).name} · ${money(r.price)}` : 'unsold'}`));
+    for (const r of res) {
+      if (!lot) { rb.append(el('div', 'kotie' + (r.team === c.club ? ' mine' : ''), `${c.players[r.pid].name} → ${r.team ? `${teamById(r.team).name} · ${money(r.price)}` : 'unsold'}`)); continue; }
+      const row = el('div', 'auc-sale' + (r.team === c.club ? ' mine' : ''));
+      const who = el('div', ''); who.append(el('b', '', c.players[r.pid].name), el('small', '', r.team ? (r.team === c.club ? 'You signed him' : teamById(r.team).name) : 'Unsold'));
+      row.append(who, el('strong', '', r.team ? money(r.price) : '—'));
+      rb.append(row);
+    }
     body.append(rb);
   }
 }
