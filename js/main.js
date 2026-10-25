@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS } from './grounds.js';
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -1356,7 +1356,21 @@ function careerAuction(c, body) {
     for (const [k, v] of [['Age', p.age ?? '—'], ['Batting', p.bat], ['Bowling', p.bowlSkill || '—'], ['Worth', money(value(p))]]) {
       const row = el('div', ''); row.append(el('span', '', k), el('b', '', String(v))); facts.append(row);
     }
-    side.append(price, facts, el('p', 'auc-note', ageNote(p)));
+    // the rival clubs: the leader, those who have dropped out (their limits stay hidden until they do), and how many are still in
+    const rivals = el('div', 'auc-rivals'), all = rivalsOf(c, lot);
+    const crestOf = (r, label) => {
+      const rv = el('div', `rv rv-${r.state}`), nm = teamById(r.team).name, img = el('img');
+      img.src = logoSrc(r.team); img.alt = '';
+      rv.title = rv.ariaLabel = r.state === 'lead' ? `${nm}: leading` : `${nm}: out at ${money(r.at)}`;
+      rv.append(img, el('span', '', label));
+      return rv;
+    };
+    const lead = all.find(r => r.state === 'lead'), outs = all.filter(r => r.state === 'out').sort((x, y) => y.at - x.at).slice(0, 4);
+    if (lead) rivals.append(crestOf(lead, 'LEAD'));
+    for (const r of outs) rivals.append(crestOf(r, 'OUT'));
+    const stillIn = all.filter(r => r.state === 'in').length;
+    rivals.append(el('p', 'rv-count', stillIn ? `${stillIn} club${stillIn > 1 ? 's' : ''} still in` : lead && lead.team === c.club ? 'No club can raise' : 'No one else in'));
+    side.append(price, rivals, facts, el('p', 'auc-note', ageNote(p)));
     main.append(cardBox, side);
     stage.append(main);
     if (p.heroId) {
@@ -1382,14 +1396,15 @@ function careerAuction(c, body) {
     bidBtn.addEventListener('click', () => {
       const r = bid(c);
       if (r === 'won') { ui.toast(`${p.name} signed for ${money(c.auction.results.at(-1).price)}!`); sfx.full(); }
-      else if (r === 'outbid') { ui.toast(`${teamById(c.auction.lot.leader).name} bid ${money(c.auction.lot.price)}`); sfx.click(); }
+      else if (r === 'outbid') { const L = c.auction.lot; ui.toast(`${teamById(L.leader).name} bid ${money(L.price)}`); sfx.click(); }
       else if (r === 'broke') ui.toast('Not enough money');
       else if (r === 'full') ui.toast(`Your squad is full (${MAX_SQUAD})`);
       saveProfile(profile); renderCareer();
     });
     pass.addEventListener('click', () => {
       const w = passLot(c);
-      ui.toast(w ? `${p.name} → ${teamById(w).name} for ${money(c.auction.results.at(-1).price)}` : `${p.name} goes unsold`);
+      const sale = c.auction.results.at(-1), ru = sale.out?.[0];
+      ui.toast(w ? `${p.name} → ${teamById(w).name} for ${money(sale.price)}${ru ? ` (${teamById(ru[0]).name} out at ${money(ru[1])})` : ''}` : `${p.name} goes unsold`);
       saveProfile(profile); renderCareer();
     });
     row.append(pass, bidBtn);
@@ -1423,6 +1438,7 @@ function careerAuction(c, body) {
       if (!lot) { rb.append(el('div', 'kotie' + (r.team === c.club ? ' mine' : ''), `${c.players[r.pid].name} → ${r.team ? `${teamById(r.team).name} · ${money(r.price)}` : 'unsold'}`)); continue; }
       const row = el('div', 'auc-sale' + (r.team === c.club ? ' mine' : ''));
       const who = el('div', ''); who.append(el('b', '', c.players[r.pid].name), el('small', '', r.team ? (r.team === c.club ? 'You signed him' : teamById(r.team).name) : 'Unsold'));
+      if (r.out?.length) who.append(el('small', 'auc-beat', `${r.team === c.club ? 'Beat' : 'Outbid'}: ${teamById(r.out[0][0]).name} ${money(r.out[0][1])}`));
       row.append(who, el('strong', '', r.team ? money(r.price) : '—'));
       rb.append(row);
     }

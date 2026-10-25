@@ -99,6 +99,71 @@ test('the auction report: the four verdicts follow the next bid and your money',
   assert.equal(C.assessLot(c, lot).risk.label, 'Full');
 });
 
+test('the rival contest: any club that can raise does, in a fixed order, and you win exactly when none can', () => {
+  const play = () => {
+    const c = C.newCareer(8);
+    C.chooseClub(c, 'kites');
+    const seen = [];
+    let guard = 0;
+    while (C.currentLot(c) && guard++ < 200) {
+      const lot = C.currentLot(c), p = c.players[lot.pid];
+      let r;
+      do {
+        if (c.money < C.nextBid(lot)) { r = null; break; }
+        const price = C.nextBid(lot), raise = Math.round((price + (price < 1 ? 0.1 : price < 3 ? 0.25 : 0.5)) * 100) / 100;
+        const could = Object.values(lot.maxes).some(m => m >= raise);
+        r = C.bid(c);
+        assert.equal(r === 'won', !could, 'you win exactly when no club can raise');
+        if (r === 'outbid') {
+          assert.notEqual(lot.leader, c.club);
+          assert.ok(lot.maxes[lot.leader] >= lot.price, 'the raiser\'s limit allows his bid');
+          assert.ok(c.budgets[lot.leader] >= lot.price - 1e-9, 'and so does his budget');
+          assert.ok(!(lot.leader in (lot.out || {})), 'a club that is out does not come back');
+          seen.push(`${lot.pid}:${lot.leader}:${lot.price}`);
+        }
+      } while (r === 'outbid');
+      if (r !== 'won') C.pass(c);
+    }
+    return { seen, c };
+  };
+  const a = play(), b = play();
+  assert.ok(a.seen.length > 5);
+  assert.deepEqual(a.seen, b.seen, 'the same career bids the same way');
+  assert.ok(new Set(a.seen.map(x => x.split(':')[1])).size > 1, 'more than one club raises across the auction');
+  assert.ok(a.c.money >= 0);
+});
+
+test('the rival contest: dropouts are recorded when their turn comes, a full squad never bids, old lots still work', () => {
+  const c = C.newCareer(8);
+  C.chooseClub(c, 'kites');
+  const lot = C.currentLot(c);
+  const rivals = Object.keys(lot.maxes);
+  const full = rivals[0];
+  lot.maxes[full] = 0; // (a club with a full squad)
+  c.money = 50;
+  let guard = 0;
+  while (C.bid(c) === 'outbid' && guard++ < 100) assert.notEqual(lot.leader, full);
+  assert.ok(!(full in (lot.out || {})), 'a full squad is not counted as bidding');
+  for (const [t, at] of Object.entries(lot.out || {})) assert.ok(lot.maxes[t] < at + 0.51, `${t} dropped out near its limit`);
+  // a lot saved before the contest existed (no out, no last) still bids
+  const c2 = C.newCareer(8); C.chooseClub(c2, 'kites'); c2.money = 50;
+  const l2 = C.currentLot(c2); delete l2.out; delete l2.last;
+  assert.ok(['won', 'outbid'].includes(C.bid(c2)));
+});
+
+test('passing: the sale keeps who was outbid, and the price is still a step over the runner-up\'s limit', () => {
+  const c = C.newCareer(8);
+  C.chooseClub(c, 'kites');
+  const lot = C.currentLot(c), p = c.players[lot.pid];
+  const ms = Object.entries(lot.maxes).sort((x, y) => y[1] - x[1]);
+  const w = C.pass(c), sale = c.auction.results.at(-1);
+  assert.equal(w, ms[0][0], 'the club with the highest limit wins');
+  const inc = x => (x < 1 ? 0.1 : x < 3 ? 0.25 : 0.5);
+  assert.equal(sale.price, Math.max(C.openingPrice(p), Math.min(ms[0][1], Math.round((ms[1][1] + inc(ms[1][1])) * 100) / 100)));
+  assert.ok(sale.out.length >= 1 && sale.out[0][0] === ms[1][0], 'the runner-up is listed first');
+  for (const [t, at] of sale.out) assert.ok(t !== w && at <= sale.price);
+});
+
 test('a season pays prize money by position and goes into the records', () => {
   const c = C.newCareer(9);
   C.chooseClub(c, 'jaguars'); C.finishAuction(c);

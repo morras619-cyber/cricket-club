@@ -425,12 +425,37 @@ export function assessLot(c, lot) {
     now, after, bid, left,
   };
 }
-function sign(c, p, teamId, price) {
+function sign(c, p, teamId, price, out = null) {
   p.team = teamId;
   const rng = makeRng(hashStr(`${p.id}-${c.season}-c`));
   p.contract = p.age >= PEAK_AGE ? 1 : rng.int(1, 3);
   if (teamId === c.club) c.money = round2(c.money - price); else c.budgets[teamId] = round2(c.budgets[teamId] - price);
-  c.auction?.results.push({ pid: p.id, team: teamId, price });
+  c.auction?.results.push(out?.length ? { pid: p.id, team: teamId, price, out } : { pid: p.id, team: teamId, price });
+}
+// The rival clubs bid in a fixed order for each lot (seeded: the same career and lot always go the same way).
+const bidOrder = (c, lot) => {
+  const rng = makeRng(hashStr(`${c.seed}-${c.season}-${lot.pid}-order`));
+  return Object.keys(lot.maxes).sort().map(t => [rng.next(), t]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+};
+// A rival raises to `raise`: the next club in the order, after the last one who bid, whose limit allows it. A club whose limit is
+// below it is out for this lot at the price it could not match (a club whose squad is full never bids). Null if none can: your bid stands.
+function rivalRaise(c, lot, raise) {
+  const order = bidOrder(c, lot), at = order.indexOf(lot.last);
+  lot.out = lot.out || {};
+  for (let k = 1; k <= order.length; k++) {
+    const t = order[(at + k + order.length) % order.length];
+    if (lot.out[t] != null || !(lot.maxes[t] > 0)) continue;
+    if (lot.maxes[t] >= raise) return t;
+    lot.out[t] = lot.price;
+  }
+  return null;
+}
+// The rival clubs for the screen, in their bidding order: leading, out (with the price they could not match), full (a full squad does not
+// bid), or still in (they have not had to answer yet: their limits stay hidden until they drop out).
+export function rivalsOf(c, lot) {
+  return bidOrder(c, lot).map(team => (lot.leader === team ? { team, state: 'lead' }
+    : lot.out?.[team] != null ? { team, state: 'out', at: lot.out[team] }
+    : !(lot.maxes[team] > 0) ? { team, state: 'full' } : { team, state: 'in' }));
 }
 // You bid. Returns 'won' | 'outbid' | 'broke' | 'full'.
 export function bid(c) {
@@ -439,15 +464,15 @@ export function bid(c) {
   const price = nextBid(lot);
   if (c.money < price) return 'broke';
   lot.price = price; lot.leader = c.club;
-  // the keenest AI club raises if it still can
-  const [best, max] = Object.entries(lot.maxes).sort((x, y) => y[1] - x[1])[0] || [];
-  const raise = round2(price + inc(price));
-  if (best && max >= raise) { lot.price = raise; lot.leader = best; return 'outbid'; }
-  sign(c, p, c.club, price);
+  // a rival raises if any club still can (the same limits as ever: you win exactly when none can)
+  const raise = round2(price + inc(price)), rival = rivalRaise(c, lot, raise);
+  if (rival) { lot.price = raise; lot.leader = rival; lot.last = rival; return 'outbid'; }
+  sign(c, p, c.club, price, Object.entries(lot.out || {}).sort((x, y) => y[1] - x[1]));
   c.auction.idx++; openLot(c);
   return 'won';
 }
-// You let this one go: the AI clubs settle it between themselves.
+// You let this one go: the AI clubs settle it between themselves (the keenest wins, at a step over the next keenest's limit).
+// The sale keeps who was outbid and where, for the sold list.
 export function pass(c) {
   const lot = c.auction.lot, p = c.players[lot.pid];
   const order = Object.entries(lot.maxes).sort((x, y) => y[1] - x[1]);
@@ -457,8 +482,10 @@ export function pass(c) {
     winner = top[0];
     price = Math.max(lot.price, Math.min(top[1], round2((top2?.[1] || 0) + inc(top2?.[1] || 0))));
   }
-  if (winner) sign(c, p, winner, round2(price));
-  else c.auction.results.push({ pid: p.id, team: null, price: 0 });
+  if (winner) {
+    const out = order.slice(1).filter(([, m]) => m >= openingPrice(p)).map(([team, m]) => [team, Math.min(m, round2(price))]);
+    sign(c, p, winner, round2(price), out);
+  } else c.auction.results.push({ pid: p.id, team: null, price: 0 });
   c.auction.idx++; openLot(c);
   return winner;
 }

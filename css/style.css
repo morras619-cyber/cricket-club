@@ -1328,3 +1328,16 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .auc-sale.mine { border-color: rgba(255, 210, 63, .85); background: rgba(255, 210, 63, .12); }
 @media (max-height: 700px) { #career.is-auction .title { font-size: 21px; } .auction .auc-facts div:not(:last-child), .auction .auc-note { display: none; } .auction .auc-last { display: none; } .auction .auc-report span { display: none; } }
 @media (max-height: 650px) { .auction .auc-power span { display: none; } .auction .auc-power { padding: 4px 10px; } }
+
+/* auction phase 3a: the rival clubs on the lot, and who was outbid in the sold list */
+.auction .auc-rivals { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 6px; border-radius: 12px; border: 1.5px solid rgba(255, 255, 255, .16); background: rgba(5, 8, 28, .6); }
+.auction .auc-rivals .rv { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.auction .auc-rivals img { width: 28px; height: 28px; object-fit: contain; border-radius: 50%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6)); }
+.auction .auc-rivals span { font-size: 8px; font-weight: 800; letter-spacing: .4px; line-height: 1; min-height: 8px; color: #b8c6ff; }
+.auction .auc-rivals .rv-count { flex: 1 1 100%; margin: 0; text-align: center; font-size: 11px; font-weight: 800; color: #b8c6ff; }
+.auction .auc-rivals .rv-lead img { box-shadow: 0 0 0 2px var(--bolt), 0 0 10px rgba(255, 210, 63, .8); background: rgba(255, 210, 63, .2); }
+.auction .auc-rivals .rv-lead span { color: var(--bolt); }
+.auction .auc-rivals .rv-out img { filter: grayscale(1) brightness(.7); opacity: .4; }
+.auction .auc-rivals .rv-out span { color: #ff8a8a; }
+.auc-sale small.auc-beat { display: block; color: #9fb0f0; font-size: 11px; }
+@media (max-height: 700px) { .auction .auc-rivals img { width: 22px; height: 22px; } }
