@@ -1248,3 +1248,53 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .cpost.official .crow { display: flex; gap: 12px; align-items: center; }
 .cpost.official .cbanner { margin: 4px -12px 6px; border-radius: 0; border-left: 0; border-right: 0; }
 .cpost.official .cstats { padding-left: 4px; }
+
+/* ---------- the auction stage: a lot on the block (career, js/main.js careerAuction) ---------- */
+#career.is-auction .lede, #career.is-auction .lg-logo { display: none; }
+#career.is-auction .title { font-size: 26px; }
+#career .lotcard.auction {
+  padding: 10px; gap: 8px; align-items: stretch; text-align: left; color: #fff;
+  background: linear-gradient(180deg, rgba(14, 24, 74, .94), rgba(6, 10, 34, .97));
+  border: 2px solid rgba(255, 210, 63, .8); border-radius: 18px;
+  box-shadow: 0 0 0 2px #070b24, 0 0 22px rgba(255, 190, 40, .32), inset 0 0 36px rgba(30, 90, 255, .28);
+}
+.auction .auc-club { display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "crest who budget" "crest squad budget"; column-gap: 10px; row-gap: 2px; align-items: center; }
+.auction .auc-crest { grid-area: crest; width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .6)); }
+.auction .auc-who { grid-area: who; min-width: 0; display: flex; flex-direction: column; line-height: 1.05; }
+.auction .auc-who b { font-family: var(--display); font-size: 21px; letter-spacing: .6px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.auction .auc-who small { font-size: 12px; font-weight: 700; color: #b8c6ff; }
+.auction .auc-squad { grid-area: squad; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.auction .auc-squad small { font-size: 10.5px; font-weight: 800; letter-spacing: .6px; color: #c9d4ff; white-space: nowrap; }
+.auction .auc-pips { display: flex; gap: 2px; }
+.auction .auc-pips i { width: 5px; height: 10px; border-radius: 3px 3px 1.5px 1.5px; background: rgba(160, 175, 230, .3); }
+.auction .auc-pips i.on { background: var(--bolt); box-shadow: 0 0 5px rgba(255, 210, 63, .7); }
+.auction .auc-budget { grid-area: budget; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 8px; border-radius: 10px; border: 2px solid #2ecc71; background: rgba(8, 60, 36, .75); box-shadow: 0 0 10px rgba(46, 204, 113, .35); }
+.auction .auc-budget small { font-size: 9.5px; font-weight: 800; letter-spacing: .8px; color: #b6f3cf; white-space: nowrap; }
+.auction .auc-budget b { font-family: var(--display); font-size: 24px; letter-spacing: .8px; line-height: 1; color: #fff; }
+.auction .auc-lot { align-self: center; font-family: var(--display); font-size: 17px; letter-spacing: 1.6px; line-height: 1; padding: 4px 18px 3px; color: var(--bolt); border: 2px solid rgba(255, 210, 63, .85); border-radius: 8px; background: rgba(8, 12, 40, .85); transform: skewX(-8deg); }
+.auction .auc-main { display: flex; gap: 10px; align-items: stretch; }
+.auction .auc-card { flex: none; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: radial-gradient(circle at 50% 40%, rgba(255, 190, 40, .28), transparent 70%); }
+#career .auction .fut { margin: 0; }
+.auction .auc-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.auction .auc-price { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 6px 7px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, .22); background: rgba(5, 8, 28, .85); line-height: 1.05; }
+.auction .auc-price small { font-size: 10.5px; font-weight: 800; letter-spacing: 1px; color: #dfe6ff; }
+.auction .auc-price b { font-family: var(--display); font-size: clamp(28px, 9.2vw, 40px); letter-spacing: .5px; color: var(--bolt); text-shadow: 0 2px 0 #7a4a00, 0 0 14px rgba(255, 190, 40, .55); }
+.auction .auc-price span { font-size: 12px; font-weight: 800; color: #fff; }
+.auction .auc-facts { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border-radius: 12px; border: 1.5px solid rgba(255, 255, 255, .16); background: rgba(5, 8, 28, .6); }
+.auction .auc-facts div { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12.5px; }
+.auction .auc-facts span { font-weight: 800; letter-spacing: .5px; text-transform: uppercase; font-size: 10.5px; color: #9fb0f0; }
+.auction .auc-facts b { font-weight: 900; color: #fff; }
+.auction .auc-note { margin: 0; text-align: center; font-size: 11.5px; font-weight: 700; font-style: italic; color: #c9d4ff; }
+.auction .auc-power { display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 10px; border: 1.5px solid rgba(255, 210, 63, .55); border-left-width: 5px; background: rgba(255, 210, 63, .1); }
+.auction .auc-power b { font-family: var(--display); font-size: 17px; letter-spacing: 1px; color: var(--bolt); line-height: 1.05; }
+.auction .auc-power span { font-size: 12px; font-weight: 700; color: #fff; line-height: 1.15; }
+#career .auction .auc-btns { gap: 10px; }
+#career .auction .auc-btns .bigbtn { min-height: 56px; padding: 6px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 20px; }
+.auction .auc-btns .bigbtn b { font-family: var(--display); font-weight: 400; font-size: 25px; letter-spacing: 1.2px; line-height: 1; }
+.auction .auc-btns .bigbtn small { font-family: var(--body); font-size: 11.5px; font-weight: 800; letter-spacing: 0; line-height: 1; }
+#career .auction .auc-pass { background: linear-gradient(#2f66f0, #12318f); color: #fff; border-color: #070b24; box-shadow: inset 0 0 0 2px #36c8ff, 0 4px 0 #070b24, 0 8px 14px rgba(0, 0, 40, .5); }
+#career .auction .auc-pass small { color: #cfe3ff; }
+#career .auction .auc-bid small { color: #5a3a00; }
+#career .auction .auc-bid:disabled { opacity: .72; filter: grayscale(.3); }
+#career .auction .ghostchip { align-self: center; background: transparent; color: #cfd8ff; border: 1.5px solid rgba(207, 216, 255, .45); box-shadow: none; font-size: 12px; padding: 4px 12px; }
+@media (max-height: 700px) { .auction .auc-note, .auction .auc-facts div:first-child { display: none; } #career .auction .auc-btns .bigbtn { min-height: 48px; } }

@@ -1114,7 +1114,9 @@ function renderCareer(notes = careerNotes) {
   const c = career();
   careerNotes = [];
   ui.show('career');
-  $('careerTitle').textContent = `Season ${c.season}`;
+  const bidding = c.phase === 'auction' && careerView !== 'squad' && !!currentLot(c); // the lot on the block: the auction stage's look (css .is-auction)
+  $('career').classList.toggle('is-auction', bidding);
+  $('careerTitle').textContent = bidding ? `Season ${c.season} auction` : `Season ${c.season}`;
   const club = c.club ? teamById(c.club) : null;
   $('careerLede').textContent = club
     ? `${club.name} · ${divisionName(divisionOf(c, c.club))} · ${money(c.money)} to spend · rating ${clubRating(c, c.club)}`
@@ -1314,8 +1316,7 @@ function careerAuction(c, body) {
     // short of players with the money running out: once a season
     if (!shown && lot && mine.length < MIN_SQUAD - 2 && c.money < 0.8) coachOnce(`auctionLow-${c.season}`, DEV.auctionLow);
   });
-  const status = el('div', 'panel paper notecard', `${teamById(c.club).name} · squad ${mine.length}/${MAX_SQUAD} · ${money(c.money)} to spend`);
-  body.append(status);
+  if (!lot) body.append(el('div', 'panel paper notecard', `${teamById(c.club).name} · squad ${mine.length}/${MAX_SQUAD} · ${money(c.money)} to spend`));
   if (!lot) {
     const done = el('div', 'panel paper fixture');
     done.append(el('h3', '', 'The auction is over'), el('p', '', 'Every club needs at least 10 players: any gaps are filled with free agents and academy graduates.'));
@@ -1324,19 +1325,48 @@ function careerAuction(c, body) {
     done.append(go);
     body.append(done);
   } else {
-    const p = c.players[lot.pid], A = c.auction;
-    const card = el('div', 'panel paper lotcard');
+    const p = c.players[lot.pid], A = c.auction, me = teamById(c.club);
+    const stage = el('div', 'lotcard auction');
+    // your franchise: crest, division and rating, squad places, money left
+    const head = el('div', 'auc-club');
+    const crest = el('img', 'auc-crest'); crest.src = logoSrc(c.club); crest.alt = '';
+    const who = el('div', 'auc-who');
+    who.append(el('b', '', me.name), el('small', '', `${divisionName(divisionOf(c, c.club))} · Rating ${clubRating(c, c.club)}`));
+    const squad = el('div', 'auc-squad');
+    const pips = el('div', 'auc-pips'); pips.setAttribute('aria-label', `${mine.length} of ${MAX_SQUAD} players`);
+    for (let i = 0; i < MAX_SQUAD; i++) pips.append(el('i', i < mine.length ? 'on' : ''));
+    squad.append(el('small', '', `SQUAD ${mine.length}/${MAX_SQUAD}`), pips);
+    const budget = el('div', 'auc-budget');
+    budget.append(el('small', '', 'BUDGET LEFT'), el('b', '', money(c.money)));
+    head.append(crest, who, squad, budget);
+    stage.append(head);
     const shown = Math.min(A.lots.length, 16);
-    card.append(el('div', 'eyebrow', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
-    card.append(futCard(p, { size: Math.min(250, window.innerWidth * 0.62, window.innerHeight * 0.15) }));
-    card.append(el('p', 'lotmeta', `${ageNote(p)} · bat ${p.bat}${p.bowlSkill ? ` · bowl ${p.bowlSkill}` : ''} · worth ${money(value(p))}`));
-    if (p.heroId) card.append(el('div', 'herostat', `${heroById(p.heroId).power.name}: ${heroById(p.heroId).power.desc}`));
-    const price = el('div', 'lotprice');
-    price.append(el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'Opening price'));
-    card.append(price);
-    const row = el('div', 'menu row');
-    const pass = el('button', 'bigbtn', 'Pass');
-    const bidBtn = el('button', 'bigbtn primary', `Bid ${money(nextBid(lot))}`);
+    stage.append(el('div', 'auc-lot', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
+    // the player, and what he costs
+    const main = el('div', 'auc-main');
+    const cardBox = el('div', 'auc-card');
+    cardBox.append(futCard(p, { size: Math.max(120, Math.min(210, window.innerWidth * 0.5, window.innerHeight * 0.3)) }));
+    const side = el('div', 'auc-side');
+    const price = el('div', 'auc-price');
+    price.append(el('small', '', lot.leader ? 'CURRENT BID' : 'OPENING PRICE'), el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'No bids yet'));
+    const facts = el('div', 'auc-facts');
+    for (const [k, v] of [['Age', p.age ?? '—'], ['Batting', p.bat], ['Bowling', p.bowlSkill || '—'], ['Worth', money(value(p))]]) {
+      const row = el('div', ''); row.append(el('span', '', k), el('b', '', String(v))); facts.append(row);
+    }
+    side.append(price, facts, el('p', 'auc-note', ageNote(p)));
+    main.append(cardBox, side);
+    stage.append(main);
+    if (p.heroId) {
+      const pw = el('div', 'auc-power');
+      pw.append(el('b', '', heroById(p.heroId).power.name), el('span', '', heroById(p.heroId).power.desc));
+      stage.append(pw);
+    }
+    const row = el('div', 'menu row auc-btns');
+    const pass = el('button', 'bigbtn auc-pass');
+    pass.append(el('b', '', 'Pass'), el('small', '', 'Save your budget'));
+    const bidBtn = el('button', 'bigbtn primary auc-bid');
+    const why = mine.length >= MAX_SQUAD ? 'Squad full' : c.money < nextBid(lot) ? 'Not enough money' : 'Make your move';
+    bidBtn.append(el('b', '', `Bid ${money(nextBid(lot))}`), el('small', '', why));
     bidBtn.disabled = c.money < nextBid(lot) || mine.length >= MAX_SQUAD;
     bidBtn.addEventListener('click', () => {
       const r = bid(c);
@@ -1352,11 +1382,11 @@ function careerAuction(c, body) {
       saveProfile(profile); renderCareer();
     });
     row.append(pass, bidBtn);
-    card.append(row);
+    stage.append(row);
     const skip = el('button', 'chipbtn ghostchip', 'Skip the rest of the auction');
     skip.addEventListener('click', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
-    card.append(skip);
-    body.append(card);
+    stage.append(skip);
+    body.append(stage);
   }
   const res = c.auction.results.slice(-8).reverse();
   if (res.length) {
