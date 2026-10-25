@@ -1116,6 +1116,7 @@ function renderCareer(notes = careerNotes) {
   ui.show('career');
   const bidding = c.phase === 'auction' && careerView !== 'squad' && !!currentLot(c); // the lot on the block: the auction stage's look (css .is-auction)
   $('career').classList.toggle('is-auction', bidding);
+  $('career').classList.toggle('in-auction', c.phase === 'auction' && careerView !== 'squad'); // the auction's own backdrop (css), also on its closing card
   $('careerTitle').textContent = bidding ? `Season ${c.season} auction` : `Season ${c.season}`;
   const club = c.club ? teamById(c.club) : null;
   $('careerLede').textContent = club

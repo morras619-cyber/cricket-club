@@ -1341,3 +1341,6 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .auction .auc-rivals .rv-out span { color: #ff8a8a; }
 .auc-sale small.auc-beat { display: block; color: #9fb0f0; font-size: 11px; }
 @media (max-height: 700px) { .auction .auc-rivals img { width: 22px; height: 22px; } }
+
+/* the auction's own backdrop: the dark arena with the crowd (the auction screens only) */
+#career.in-auction { background: #070b2c url(../img/auction-bg.webp) center top / cover no-repeat; }
