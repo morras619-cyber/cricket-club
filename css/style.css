@@ -364,7 +364,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .hb-level b { font-family: var(--display); font-size: 12px; letter-spacing: .5px; line-height: 1; flex: none; }
 .hb-xp { flex: 1; height: 6px; border-radius: 4px; background: #050a1e; overflow: hidden; }
 .hb-xp i { display: block; height: 100%; width: 0; background: url(../img/menu/xp-fill.webp) 0 0 / 100% 100%; border-radius: 4px; }
-.hub-top .hb-pill { display: flex; align-items: center; gap: 2px; align-self: flex-start; height: 40px; padding: 0 2px; border: 7px solid transparent; border-image: url(../img/menu/frame-pill.webp) 30 fill / 7px stretch; margin-top: 2px; }
+.hub-top .hb-pill { display: flex; align-items: center; gap: 2px; align-self: flex-start; height: 40px; padding: 0 5px 0 2px; border: 7px solid transparent; border-image: url(../img/menu/frame-pill.webp) 30 fill / 7px stretch; margin-top: 2px; }
 .hb-pill img { width: 21px; height: 21px; object-fit: contain; margin: -6px 0 -6px -5px; }
 .hb-pill img.plus { width: 16px; height: 16px; margin: -6px -4px -6px 0; }
 .hb-pill span { font-family: var(--display); font-size: 15px; letter-spacing: .3px; min-width: 14px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -402,9 +402,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .hp-dot { position: absolute; top: 2px; right: 6px; width: 14px; height: 14px; border-radius: 50%; background: #e5262d; border: 1.5px solid #000; }
 .hubrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .hubbtn { position: relative; padding: 0; border: 0; background: none; font: inherit; }
-.hubbtn img { display: block; width: 100%; height: auto; }
+.hubbtn { border-radius: 14px; box-shadow: 0 0 0 2px #ffd23f, 0 0 10px rgba(255, 210, 63, .35); }
+/* the cream cards turned navy (the picture inverted: cream -> navy, ink -> white), as the rest of the new look */
+.hubbtn img { display: block; width: 100%; height: auto; border-radius: 14px; filter: invert(1) brightness(1.15) contrast(.95); }
 .hubbtn:active { transform: translate(1px, 2px); }
-.hubbtn span { position: absolute; left: 0; right: 0; bottom: 7%; text-align: center; font-family: var(--display); font-size: clamp(11px, 3.3vw, 14px); letter-spacing: .5px; color: #111; }
+.hubbtn span { position: absolute; left: 0; right: 0; bottom: 7%; text-align: center; font-family: var(--display); font-size: clamp(11px, 3.3vw, 14px); letter-spacing: .5px; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .6); }
 /* settings: one row of toggles */
 .setrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .setcard { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px 10px; border-radius: 14px; border: 2px solid #2f6fe4; background: linear-gradient(160deg, #13204a, #0a1130); color: #fffbe8; font: inherit; box-shadow: 0 0 10px rgba(47, 111, 228, .35); }
