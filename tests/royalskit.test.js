@@ -27,7 +27,10 @@ test('the Pink Royals back view: 10 poses inside his sheet, the mask the same si
     const [fx, fy, fw, fh] = m.frames[i];
     assert.ok(x > fx && x < fx + fw && y > fy && y < fy + fh * 0.6 && w > 40 && w < 100, `pose ${i}: the print sits on the back`);
   });
-  assert.ok(m.skin > 0.2 && m.skin < 0.95 && !m.tones && !m.hair.part, 'plain (no recolour), a skin reference, no hair layers');
+  assert.ok(m.skin > 0.2 && m.skin < 0.95 && !m.tones, 'plain (no recolour), with a skin reference');
+  // his hairstyles are the Thunder ones carried over: the same styles, a layer file for each, the size of the sheet
+  assert.deepEqual(Object.keys(m.hair).sort(), Object.keys(KIT_SHEETS.back.hair).sort());
+  for (const st of Object.keys(m.hair)) assert.deepEqual(webpSize(read(`img/kit/royals-back-hair-${st}.webp`)), [W, H], `${st} hair layer`);
 });
 
 test('Royals bowlers from behind draw from their own kit view; every other club still from the Thunder sheet', () => {
