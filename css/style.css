@@ -1364,3 +1364,24 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .matcherr { position: absolute; z-index: 60; left: 50%; top: 50%; width: min(92%, 420px); max-height: 80%; overflow: auto; transform: translate(-50%, -50%); padding: 16px; text-align: center; touch-action: auto; user-select: text; -webkit-user-select: text; }
 .matcherr h3 { margin: 0 0 6px; font-family: var(--display); font-size: 26px; }
 .matcherr pre { text-align: left; white-space: pre-wrap; word-break: break-word; font-size: 12px; background: #fff; border: 2px solid var(--ink); border-radius: 10px; padding: 8px; margin: 8px 0 12px; max-height: 40vh; overflow: auto; }
+
+/* the result screen in the dark-glass and gold look (with the match HUD, the auction and the home screen) */
+#result .card { background: linear-gradient(180deg, rgba(14, 24, 74, .94), rgba(6, 10, 34, .96)); border: 2px solid rgba(255, 210, 63, .75); box-shadow: 0 0 0 2px #070b24, 0 6px 14px rgba(0, 0, 0, .4), inset 0 0 22px rgba(30, 90, 255, .2); color: #fff; }
+#result .card .eyebrow { color: #ffe27a; }
+#result .card .score { color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); }
+#result .card .sub { color: #c9d4ff; }
+#result .matchstats, #result .page > .panel.paper { background: linear-gradient(180deg, rgba(14, 24, 74, .94), rgba(6, 10, 34, .97)); color: #fff; border: 2px solid rgba(255, 210, 63, .8); border-radius: 16px; box-shadow: 0 0 0 2px #070b24, 0 0 18px rgba(255, 190, 40, .25), inset 0 0 30px rgba(30, 90, 255, .22); }
+#result .matchstats .row b { color: #fff; }
+#result .matchstats .row span { color: #dfe6ff; }
+#result .matchstats .row.notes { color: #ffe27a; }
+#result .matchstats .badge { background: linear-gradient(#ff5a5f, #d2262d); border-color: #fff3; color: #fff; }
+#result .dots i { background: rgba(255, 255, 255, .25); border-color: rgba(255, 255, 255, .5); }
+#result .dots i.on { background: var(--bolt); border-color: var(--bolt); }
+.reward-chips { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+.reward-chips .rc { display: flex; flex-direction: column; align-items: center; padding: 6px 4px 5px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, .22); background: rgba(5, 8, 28, .7); line-height: 1; }
+.reward-chips .rc b { font-family: var(--display); font-weight: 400; font-size: 26px; letter-spacing: .6px; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); }
+.reward-chips .rc small { margin-top: 3px; font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #b8c6ff; }
+.reward-chips .rc-xp b { color: #7fd8ff; } .reward-chips .rc-xp { border-color: rgba(127, 216, 255, .6); }
+.reward-chips .rc-coin b { color: var(--bolt); } .reward-chips .rc-coin { border-color: rgba(255, 210, 63, .65); }
+.reward-chips .rc-gem b { color: #ff9bf0; } .reward-chips .rc-gem { border-color: rgba(255, 155, 240, .6); }
+.reward-chips .rc-lvl b { color: #5dff9b; } .reward-chips .rc-lvl { border-color: rgba(93, 255, 155, .55); }

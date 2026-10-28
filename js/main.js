@@ -2057,7 +2057,13 @@ function showResult(summary) {
   }, 'image/jpeg', 0.86);
   // the result in tabs over swipeable pages: nothing scrolls down
   const hl = el('div', 'panel paper matchstats'), sc = el('div', 'panel paper matchstats');
-  hl.append(el('div', 'row notes', rewardLine));
+  // what the match gave you, as chips (the same figures as the line above)
+  const chips = el('div', 'reward-chips');
+  for (const [cls, big, small] of [['xp', `+${rewards.xp}`, 'XP'], ['coin', `+${rewards.coins}`, 'COINS'], ...(rewards.gems ? [['gem', `+${rewards.gems}`, 'GEMS']] : []), ['lvl', `${level(profile.xp).lv}`, 'LEVEL']]) {
+    const c = el('div', `rc rc-${cls}`); c.append(el('b', '', big), el('small', '', small)); chips.append(c);
+  }
+  hl.append(chips);
+  if (rewards.pass) hl.append(el('div', 'row notes', `Season Pass tier ${rewards.pass}!`));
   const hlRows = [];
   for (const row of [...ms.children]) {
     const tag = row.querySelector?.('.badge')?.textContent;
