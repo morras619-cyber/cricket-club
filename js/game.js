@@ -126,9 +126,8 @@ export class Game {
       this.realTime += dt;
       const scale = this.realTime < this.hitStopUntil ? 0 : this.timeScale;
       this.gameTime += (dt * scale) / 1000;
-      this.tick();
-      this.fx.update(dt);
-      this.of.update(dt);
+      // (one failing update must not end the loop: the game would stop for good)
+      try { this.tick(); this.fx.update(dt); this.of.update(dt); } catch (e) { this.loopError = e; console.error('frame update', e); }
     }
     try { this.render(); } catch (e) { console.error(e); }
     requestAnimationFrame(t => this.frame(t));

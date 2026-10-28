@@ -726,6 +726,17 @@ async function startStory() {
 }
 
 // ---------- match ----------
+// The match stopped on an error (a bug): what it was, to read out, and the way back to the menu.
+function showMatchError(e, loopErr) {
+  const box = $('matchError') || el('div', 'panel paper matcherr'), msg = el('pre', '', '');
+  box.id = 'matchError'; box.innerHTML = '';
+  const first = x => x ? `${x.name || 'Error'}: ${x.message || x}\n${String(x.stack || '').split('\n').slice(1, 4).map(s => s.trim().slice(0, 90)).join('\n')}` : '';
+  msg.textContent = [first(e), loopErr && loopErr !== e ? `Frame: ${first(loopErr)}` : ''].filter(Boolean).join('\n');
+  const back = el('button', 'bigbtn primary', 'Back to menu');
+  back.addEventListener('click', () => { box.remove(); try { game.quit?.(); } catch {} renderHome(); });
+  box.append(el('h3', '', 'The match hit a problem'), el('p', '', 'Sorry! Please send this message so it can be fixed:'), msg, back);
+  document.getElementById('app').append(box);
+}
 // opts.mode: 'quick' | 'challenge' | 'tutorial' | 'league' | 'cup' | 'daily'
 async function startMatch(opts) {
   unlockAudio();
@@ -787,6 +798,11 @@ async function startMatch(opts) {
       mode, story: !!opts.story, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
       records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill), crowd: mode === 'career' && profile.career?.chirp ? crowdOf(profile.career) : 0,
     });
+  } catch (e) {
+    // a match that fails must say so (it would otherwise leave a dead screen): the error is shown, with a way back
+    console.error('match', e);
+    showMatchError(e, game.loopError);
+    return;
   } finally {
     game.matchActive = false;
     stopAmbience(); crowdStop(); game.crowdLive = false;
