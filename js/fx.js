@@ -103,6 +103,14 @@ export class FX {
     }
   }
 
+  // paper falling across the whole screen from above, in the given colours (a six; a four gets fewer)
+  confetti(W, n = 40, colors = ['#ffd23f', '#fff4da', '#e8343b']) {
+    for (let i = 0; i < n; i++) {
+      this.parts.push({ x: Math.random() * W, y: -10 - Math.random() * 120, vx: (Math.random() - 0.5) * 2.6, vy: 1.2 + Math.random() * 2.2, life: 110 + Math.random() * 60, max: 170,
+        r: 3 + Math.random() * 3, color: colors[i % colors.length], rect: true, rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.4, grav: 0.03 });
+    }
+  }
+
   update(dtMs) {
     const k = dtMs / 16.67;
     for (const w of this.words) w.t += dtMs;
@@ -117,7 +125,7 @@ export class FX {
     this.words = this.words.filter(w => w.t < w.dur);
     this.bubbles = this.bubbles.filter(b => b.t < b.dur);
     this.bursts = this.bursts.filter(b => b.t < b.dur);
-    for (const p of this.parts) { p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.25 * k; p.life -= k; }
+    for (const p of this.parts) { p.x += p.vx * k; p.y += p.vy * k; p.vy += (p.grav ?? 0.25) * k; p.life -= k; if (p.rect) p.rot += p.vr * k; }
     this.parts = this.parts.filter(p => p.life > 0);
     this.flashA = Math.max(0, this.flashA - 0.006 * dtMs);
     this.shakeA = Math.max(0, this.shakeA - 0.04 * dtMs);
@@ -152,6 +160,7 @@ export class FX {
     for (const p of this.parts) {
       ctx.globalAlpha = Math.min(1, p.life / 20);
       ctx.fillStyle = p.color;
+      if (p.rect) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, Math.abs(Math.cos(p.rot * 1.7)) * 0.8 + 0.2); ctx.fillRect(-p.r, -p.r * 0.6, p.r * 2, p.r * 1.2); ctx.restore(); continue; }
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;

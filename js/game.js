@@ -1715,6 +1715,7 @@ export class Game {
           const T = o.side === 'ai' ? this.myTeam : this.oppTeam;
           this.fx.ripple(p.x, p.y, { colors: [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], r: grade === 'perfect' ? 150 : 110 });
           this.fx.sparks(p.x, p.y, grade === 'perfect' ? 30 : 18, [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], 6);
+          if (!this.bot) this.fx.confetti(this.W, grade === 'perfect' ? 56 : 36, [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da', '#ffd23f']);
           this.fx.shake(grade === 'perfect' ? 18 : 9);
           sfx.crowd(grade === 'perfect' ? 1.8 : 1.2);
           // how far it went
@@ -1722,7 +1723,7 @@ export class Game {
           this.fx.word(`${m} METRES`, p.x, p.y + 30, { size: 40, color: '#fff4da', stroke: '#e8343b', rot: 0, dur: 1400 });
           this.board(`${m}m SIX!`);
         }
-        else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
+        else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); if (!this.bot) this.fx.confetti(this.W, 14, ['#3ec6ff', '#fff4da', '#ffd23f']); }
         else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); this.fieldingGroan(o.side === 'ai' ? this.oppTeam : this.myTeam); }
         else if (o.runOut !== undefined) { /* the throw says RUN OUT! or SAFE! */ }
         else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * (D ? 0.62 : 0.3), { size: 44, color: '#fff4da', stroke: INK });

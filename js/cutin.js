@@ -42,7 +42,7 @@ export class CutIn {
     ctx.fillStyle = `rgba(6,4,20,${0.62 * Math.min(1, t / 120) * (1 - outP)})`;
     ctx.fillRect(0, 0, W, H);
     ctx.translate(slide, 0);
-    const y0 = H * 0.25, y1 = H * 0.76, sk = W * 0.18;
+    const up = H < 720 ? 0.05 : 0, y0 = H * (0.23 - up), y1 = H * (0.73 - up), sk = W * 0.18;   // (a short phone: the panel rides higher, so its caption clears the power bar)
     const band = () => { ctx.beginPath(); ctx.moveTo(-20, y0 + sk); ctx.lineTo(W + 20, y0); ctx.lineTo(W + 20, y1 - sk); ctx.lineTo(-20, y1); ctx.closePath(); };
 
     ctx.save(); band(); ctx.clip();
@@ -89,16 +89,19 @@ export class CutIn {
     const words = power.name.toUpperCase().split(' ');
     const last = words.pop();
     const rot = -Math.atan2(sk, W);
-    if (words.length) comicText(ctx, words.join(' '), W * 0.42, y1 - sk * 0.95, Math.min(52, W * 0.13), look.trim, '#e8343b', rot, W * 0.8);
-    comicText(ctx, last + '!', W * 0.64, y1 - sk * 0.95 + Math.min(62, W * 0.16), Math.min(80, W * 0.2), '#fffbe8', look.suit, rot, W * 0.7);
+    // what it does: a cream box clear below the power's name (drawn first, so the name overlaps it rather than being cut off)
+    const lastSize = Math.min(80, W * 0.2, H * 0.09), firstSize = Math.min(52, W * 0.13, H * 0.062);
+    const lastY = y1 - sk * 0.95 + lastSize * 0.78;
     ctx.font = `700 13px ${FONT_BODY}`;
     const lines = wrap(ctx, power.desc, Math.min(300, W - 60));
-    const bh = lines.length * 17 + 14, by = y1 + 16;
+    const bh = lines.length * 17 + 14, by = Math.max(y1 + 8, lastY + lastSize * 0.5 + 14);
     ctx.fillStyle = '#fff4da'; ctx.strokeStyle = INK; ctx.lineWidth = 3;
     const bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 22;
     ctx.fillRect(16, by, bw, bh); ctx.strokeRect(16, by, bw, bh);
     ctx.fillStyle = INK; ctx.textBaseline = 'top';
     lines.forEach((l, i) => ctx.fillText(l, 27, by + 8 + i * 17));
+    if (words.length) comicText(ctx, words.join(' '), W * 0.42, y1 - sk * 0.95, firstSize, look.trim, '#e8343b', rot, W * 0.8);
+    comicText(ctx, last + '!', W * 0.64, lastY, lastSize, '#fffbe8', look.suit, rot, W * 0.7);
     ctx.restore();
   }
 }
