@@ -63,4 +63,18 @@ export const PORTRAIT_STYLES = Object.fromEntries(Object.entries({
   'tristan-coetzee': 'messy stubble',
   'varun-iyer': 'part goatee',
   'wiaan-coetzee': 'messy full',
+  // the black-background sheets (tools/build_portraits_black.py)
+  'aarav-menon': 'curly goatee',
+  'ahsan-gondal': 'curly goatee headband #c0282c',
+  'blake-ruawai': 'curly goatee',
+  'cooper-thornton': 'messy full',
+  'fazal-shinwari': 'long full',
+  'flynn-brennan': 'messy -',
+  'jermaine-thorpe': 'dreads -',
+  'kai-whitaker': 'messy - shades',
+  'nikau-kerr': 'ponytail stubble',
+  'riley-thornton': 'messy -',
+  'shamar-greaves': 'buzz goatee',
+  'shane-phillip': 'buzz -',
+  'tevin-baptiste': 'curly goatee',
 }).map(([k, v]) => [k, S(v)]));

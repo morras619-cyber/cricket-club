@@ -17,16 +17,18 @@ import { PORTRAIT_FACES } from './portrait-faces.js';
 const HAS_PORTRAIT = new Set(PORTRAIT_KEYS);
 const keyOf = p => (p.heroId ? heroById(p.heroId).name : p.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const srcs = new Map(), kits = new Map();
-// the last batch of portraits is one picture (img/cards/portraits-more.webp); each is cut out of it onto a canvas that stands in
+// the last batches of portraits are a few pictures (PORTRAIT_FILES); each is cut out of its picture onto a canvas that stands in
 // for its own image (the same size and 'load' as an image has)
-let atlasImg = null;
+const PORTRAIT_FILES = ['img/cards/portraits-more.webp', 'img/cards/portraits-more2.webp'];
+const atlasImgs = [];
 function atlasPortrait(key) {
-  const [x, y, w, h] = PORTRAIT_ATLAS[key];
+  const [x, y, w, h, n = 0] = PORTRAIT_ATLAS[key];
   const c = document.createElement('canvas');
   c.width = w; c.height = h; c.naturalWidth = w; c.naturalHeight = h; c.complete = false;
-  const paint = () => { c.getContext('2d').drawImage(atlasImg, x, y, w, h, 0, 0, w, h); c.complete = true; c.dispatchEvent(new Event('load')); };
-  if (!atlasImg) { atlasImg = new Image(); atlasImg.src = 'img/cards/portraits-more.webp'; }
-  if (atlasImg.complete && atlasImg.naturalWidth) paint(); else atlasImg.addEventListener('load', paint, { once: true });
+  if (!atlasImgs[n]) { atlasImgs[n] = new Image(); atlasImgs[n].src = PORTRAIT_FILES[n]; }
+  const img = atlasImgs[n];
+  const paint = () => { c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h); c.complete = true; c.dispatchEvent(new Event('load')); };
+  if (img.complete && img.naturalWidth) paint(); else img.addEventListener('load', paint, { once: true });
   return c;
 }
 function portraitSrc(key) {

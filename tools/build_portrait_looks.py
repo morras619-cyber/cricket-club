@@ -21,6 +21,8 @@ HAIR_FIX = {
     'rohit-grewal': '#141010', 'faizan-paracha': '#141010', 'rhys-mckenzie': '#9a7a48',
     # (a flat cap, a headband and a bat)
     'bilal-noorzai': '#1c1410', 'jermaine-granger': '#141010', 'captain-comet': '#2a1a14', 'iron-wall-ian': '#2a1a14',
+    # the black-background sheets: a red headband over dark hair, and golden curls the outline darkens
+    'ahsan-gondal': '#2a1612', 'blake-ruawai': '#b5873f',
 }
 
 
