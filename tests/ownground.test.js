@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { existsSync, statSync } from 'node:fs';
 import { GROUND_ART } from '../js/groundart.js';
 
-// tools/build_own1_paint.py: the level-1 ground of your own club, from one painted stand, for the three match cameras
-test('the level-1 ground has its three views, each with its pictures and a horizon inside it', () => {
-  const m = GROUND_ART.own1.views;
+// tools/build_own_paint.py: the grounds of your own club at its three levels, each from one painted stand, for the three match cameras
+for (const level of [1, 2, 3]) test(`the level-${level} ground has its three views, each with its pictures and a horizon inside it`, () => {
+  const m = GROUND_ART[`own${level}`].views;
   for (const v of ['bat', 'bowl', 'keeper']) {
     for (const x of ['', '-tint', '-uv']) {
-      const f = new URL(`../img/ground/own1/view-${v}${x}.webp`, import.meta.url);
+      const f = new URL(`../img/ground/own${level}/view-${v}${x}.webp`, import.meta.url);
       assert.ok(existsSync(f) && statSync(f).size > 100, `view-${v}${x}.webp`);
     }
     const a = m[v];

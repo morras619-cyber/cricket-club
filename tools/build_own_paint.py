@@ -1,33 +1,35 @@
 #!/usr/bin/env python3
-"""Your own club's level-1 ground, from the painted stand (tools/ground/own1-stand.png), for the three match cameras.
+"""Your own club's ground at a level (1, 2 or 3), from its painted stand (tools/ground/own<level>-stand.png), for the three match cameras.
 
-usage: python3 tools/build_own1_paint.py
+usage: python3 tools/build_own_paint.py [level ...]      (all three levels when none is named)
 
-SOURCE: one picture (1448 x 1086): a small night stand with its floodlights, trees and side stands, painted in one royal blue (seats, roof band, boards) and one golden
+SOURCE: one picture per level: a night stand with its floodlights, trees and side stands, painted in one royal blue (seats, roof band, boards) and one golden
 yellow (steps, rails, trim); below the stand's foot (row FOOT) flat magenta, which the game replaces.
-OUT, per camera (bat, bowl, keeper) in img/ground/own1/ (the files js/ownground.js paints in the club's colours):
+OUT, per camera (bat, bowl, keeper) in img/ground/own<level>/ (the files js/ownground.js paints in the club's colours):
   view-<v>.webp       the ground: the stand with its blue and yellow turned into a grey ramp (so the club's colour multiplied on gives the
                       club's colour at the painted brightness), the sky carried up and the mown grass laid below the stand in this camera's perspective
   view-<v>-tint.webp  R the main colour's weight, G the trim's
   view-<v>-uv.webp    black (no crest pictures on this stand)
-and the cameras' entries for own1 in js/groundart.js (the picture's focal length, its horizon row ...).
+and the cameras' entries for own<level> in js/groundart.js (the picture's focal length, its horizon row ...).
 Needs numpy and Pillow.
 """
 import json
 import numpy as np
 from PIL import Image
 
-SRC = 'tools/ground/own1-stand.png'
-OUT = 'img/ground/own1/'
-FOOT = 550                         # the first magenta row: the foot of the stand's boards
-BOARD_PX = 24                      # the boards, in picture pixels (rows 527-549)
-STAND_PX, STAND_M = 660, 23.0      # the main stand's width in the picture, and what it is in metres (a small club ground)
-ROOF_ROW = 421                     # the top of the roof's blue band
 GREY = 0.7                         # ownground.js: the grey a club-coloured surface is rendered in
 CY, BOARD_R = 10.0, 63.8
 TOP_PAD = 420                      # more sky above the picture (a tall phone shows more of it)
-# the cameras (scene.js Cam3D): height, depth of the far boards, the picture's focal length (so the boards come out 0.95 m high), the
-# rows of grass wanted below the stand (the tallest phone, at that camera's scale), and which way it looks
+# the levels: the picture's first magenta row (the foot of the stand's boards), the boards' height in picture pixels, the main stand's width
+# in the picture and in metres (a small club ground, a bigger one, the big finished one), the top of the roof's blue band, and how the lit
+# windows (golden, like the trim) are kept out of the trim colour: 'rows' (the trim starts at a row) or 'blobs' (the wide lit glass bands)
+LEVELS = {
+    1: dict(foot=550, board_px=24, stand_px=660, stand_m=23.0, roof_row=421, glass=('rows', 488)),
+    2: dict(foot=582, board_px=25, stand_px=788, stand_m=32.0, roof_row=330, glass=('blobs',)),
+    3: dict(foot=582, board_px=25, stand_px=842, stand_m=42.0, roof_row=241, glass=('blobs',)),
+}
+# the cameras (scene.js Cam3D): height, which way it looks, the focal length of the phone-sized screen it is built for (the picture's own
+# focal length is worked out from the stand's width), and where the horizon sits on the screen
 CAMS = {
     'bat':    dict(cy=4.2, cz=-9.5, dir=1,  fcam=1053, hyk=0.30),
     'bowl':   dict(cy=2.6, cz=34,   dir=-1, fcam=1560, hyk=0.36),
@@ -46,19 +48,36 @@ def ramp(x, a, b):
     return np.clip((x - a) / (b - a), 0, 1)
 
 
-def weights(rgb):
+def weights(rgb, L):
     """how much of each pixel is the main colour (blue) and the trim (yellow): soft, so the edges blend"""
+    from scipy import ndimage as ndi
     hue, sat, v = hsv(rgb)
     H, W = hue.shape; rows = np.arange(H)[:, None] * np.ones((1, W))
-    blue = ramp(hue, 198, 212) * (1 - ramp(hue, 244, 256)) * ramp(sat, 0.35, 0.6) * ramp(v, 0.12, 0.3) * ramp(rows, ROOF_ROW - 4, ROOF_ROW + 2)
-    yel = ramp(hue, 36, 44) * (1 - ramp(hue, 60, 68)) * ramp(sat, 0.55, 0.8) * ramp(v, 0.5, 0.7) * ramp(rows, 488, 494)   # (not the lit windows under the roof)
+    roof = L['roof_row']
+    blue = ramp(hue, 198, 212) * (1 - ramp(hue, 240, 247)) * ramp(sat, 0.35, 0.6) * ramp(v, 0.12, 0.3) * ramp(rows, roof - 4, roof + 2)
+    yel = ramp(hue, 34, 44) * (1 - ramp(hue, 60, 68)) * ramp(sat, 0.55, 0.8) * ramp(v, 0.5, 0.7)
+    if L['glass'][0] == 'rows':
+        yel = yel * ramp(rows, L['glass'][1], L['glass'][1] + 6)       # (not the lit windows under the roof)
+    else:
+        # the lit glass bands: wide, flat strips of golden light, whole panes joined across their mullions; the trim is thin lines, steps and posts
+        m = yel > 0.5
+        lab, n = ndi.label(ndi.binary_closing(m, structure=np.ones((3, 17))), structure=np.ones((3, 3)))
+        glass = np.zeros_like(m)
+        for i, bx in enumerate(ndi.find_objects(lab), 1):
+            h, w = bx[0].stop - bx[0].start, bx[1].stop - bx[1].start
+            if w >= 50 and h >= 9 and w / h >= 2.2 and bx[0].start < L['foot'] - 40:
+                glass |= lab == i
+        yel = yel * ~ndi.binary_dilation(glass, iterations=2)
+        yel = ndi.gaussian_filter(yel, 0.6)
     return blue, yel
 
 
-def main():
+def build(level):
+    L = LEVELS[level]; FOOT, BOARD_PX, STAND_PX, STAND_M, ROOF_ROW = L['foot'], L['board_px'], L['stand_px'], L['stand_m'], L['roof_row']
+    SRC = f'tools/ground/own{level}-stand.png'; OUT = f'img/ground/own{level}/'
     src = np.array(Image.open(SRC).convert('RGB')).astype(np.float32)[:FOOT]
     W = src.shape[1]
-    blue, yel = weights(src)
+    blue, yel = weights(src, L)
     hue, sat, v = hsv(src)
     vb = float(np.median(v[blue > 0.9])); vy = float(np.median(v[yel > 0.9]))
     print('painted blue value', round(vb, 3), 'yellow', round(vy, 3), 'weights', int((blue > 0.5).sum()), int((yel > 0.5).sum()))
@@ -68,7 +87,7 @@ def main():
     ramp_g = np.where(blue > yel, gb, gy)[..., None] * np.ones(3)
     base = src * (1 - w) + ramp_g * w
     # the sky carried up: the top row's colours darkened a little and starred
-    rng = np.random.default_rng(7)
+    rng = np.random.default_rng(7 + level)
     top_row = src[:6].mean(0)
     pad = np.zeros((TOP_PAD, W, 3), np.float32)
     for y in range(TOP_PAD):
@@ -115,8 +134,14 @@ def main():
         print(name, meta_views[name])
     s = open('js/groundart.js').read()
     head, body = s.split('export const GROUND_ART = ', 1)
-    K = json.loads(body.rsplit(';', 1)[0]); K['own1']['views'] = meta_views
+    K = json.loads(body.rsplit(';', 1)[0]); K[f'own{level}']['views'] = meta_views
     open('js/groundart.js', 'w').write(head + 'export const GROUND_ART = ' + json.dumps(K, indent=1) + ';\n')
+
+
+def main():
+    import sys
+    for lv in ([int(x) for x in sys.argv[1:]] or sorted(LEVELS)):
+        print('level', lv); build(lv)
 
 
 if __name__ == '__main__':
