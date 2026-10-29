@@ -26,8 +26,8 @@ TOP_PAD = 420                      # more sky above the picture (a tall phone sh
 # and where the big video screens are (a box round each dark panel): the club's crest and name are laid on them (ownground.js picture 4)
 LEVELS = {
     1: dict(foot=550, board_px=24, stand_px=660, stand_m=23.0, roof_row=421, glass=('rows', 488)),
-    2: dict(foot=582, board_px=25, stand_px=788, stand_m=32.0, roof_row=330, glass=('blobs',), screens=[(1360, 250, 1570, 410)]),
-    3: dict(foot=582, board_px=25, stand_px=842, stand_m=42.0, roof_row=241, glass=('blobs',), screens=[(170, 225, 325, 360), (1350, 225, 1510, 360)]),
+    2: dict(foot=582, board_px=25, stand_px=788, stand_m=25.0, roof_row=330, glass=('blobs',), screens=[(1360, 250, 1570, 410)]),
+    3: dict(foot=582, board_px=25, stand_px=842, stand_m=26.0, roof_row=241, glass=('blobs',), screens=[(170, 225, 325, 360), (1350, 225, 1510, 360)]),
 }
 # the cameras (scene.js Cam3D): height, which way it looks, the focal length of the phone-sized screen it is built for (the picture's own
 # focal length is worked out from the stand's width), and where the horizon sits on the screen
