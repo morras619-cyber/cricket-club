@@ -45,11 +45,14 @@ function place(b, art, beat) {
   bub.style.top = `${top}px`;
   const [tx, ty] = (msg ? PHONE : MOUTH).map((v, k) => v * (k ? H : W));
   const xa = msg ? left + bw * 0.8 : left + bw * 0.24, xb = msg ? left + bw * 0.62 : left + bw * 0.1, r = 18;
+  // (his tail stops short of his face: it points at the mouth without touching it)
+  let tipX = tx, tipY = ty;
+  if (!msg) { const mx = (xa + xb) / 2, dx = tx - mx, dy = ty - bottom, len = Math.hypot(dx, dy) || 1, gap = Math.min(W * 0.075, len * 0.6); tipX = tx - dx / len * gap; tipY = ty - dy / len * gap; }
   tail.setAttribute('viewBox', `0 0 ${W} ${H}`); tail.setAttribute('width', W); tail.setAttribute('height', H);
   tail.querySelector('path').setAttribute('d',
     `M${left + r},${top} H${left + bw - r} Q${left + bw},${top} ${left + bw},${top + r} V${bottom - r} Q${left + bw},${bottom} ${left + bw - r},${bottom}`
-    + ` H${xa} L${tx},${ty} L${xb},${bottom} H${left + r} Q${left},${bottom} ${left},${bottom - r} V${top + r} Q${left},${top} ${left + r},${top} Z`);
-  sp.style.transformOrigin = `${tx}px ${ty}px`;
+    + ` H${xa} L${tipX},${tipY} L${xb},${bottom} H${left + r} Q${left},${bottom} ${left},${bottom - r} V${top + r} Q${left},${top} ${left + r},${top} Z`);
+  sp.style.transformOrigin = `${tipX}px ${tipY}px`;
 }
 
 // the panels one after another; resolves when the last bubble has been tapped (or skipped)
