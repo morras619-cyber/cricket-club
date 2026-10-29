@@ -21,7 +21,7 @@ import { encodeChallenge, decodeChallenge } from './codec.js';
 import { renderShareCard } from './sharecard.js';
 import { levelOf, levelName, learn, adaptScale } from './adapt.js';
 import { preMatch } from './rivals.js';
-import { ensureChirp, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
+import { ensureChirp, faceOfPress, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
@@ -31,7 +31,7 @@ import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 import { storyIntro, taunt } from './story.js';
-import { playComic } from './comic.js';
+import { playComic, titleCard } from './comic.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
 import { TossAnim, loadToss } from './toss.js';
@@ -749,7 +749,10 @@ async function startMatch(opts) {
   const mode = opts.mode;
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
   let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = {}, pools = null, rival = null, home = null;
-  if (mode === 'tutorial' && opts.story) {
+  if (mode === 'tutorial' && opts.opening) {
+    // the story's final: Thunder Strikers (Kabir's side) at home against the Volt Vipers
+    team = 'thunder'; opp = 'vipers'; home = 'thunder'; levels = {}; sq = starSquad('thunder'); rival = starSquad('vipers');
+  } else if (mode === 'tutorial' && opts.story) {
     // the story: you, the Green Cyclones, away at the Thunderdome against the unbeaten Thunder Strikers
     team = 'cyclones'; opp = 'thunder'; home = 'thunder'; levels = {};
     sq = { bat: heroById('meher'), bowl: heroById('zara'), field: heroById('rani') };
@@ -798,7 +801,7 @@ async function startMatch(opts) {
   let summary;
   try {
     summary = await game.runMatch({
-      mode, story: !!opts.story, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+      mode, story: !!opts.story, opening: !!opts.opening, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
       records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill), crowd: mode === 'career' && profile.career?.chirp ? crowdOf(profile.career) : 0,
     });
   } catch (e) {
@@ -810,6 +813,7 @@ async function startMatch(opts) {
     game.matchActive = false;
     stopAmbience(); crowdStop(); game.crowdLive = false;
   }
+  if (opts.opening) { game.quit(); return summary; }   // (the story's final: no result screen, the story goes on)
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
@@ -1115,6 +1119,36 @@ function warAfterMatch(summary) {
 $('btnWar').addEventListener('click', () => { unlockAudio(); warWatch(); renderWar(); });
 $('warBack').addEventListener('click', renderHome);
 
+// ---------- the story's opening scene (js/comic.js): the night before, the black card, Chirp, then the final ----------
+function openingChirp() {
+  return new Promise(done => {
+    const box = el('div', 'cm-chirp'), feed = el('div', 'chirp');
+    const bar = el('div', 'chirpbar'), logo = document.createElement('img'); logo.src = 'img/chirp/logo.webp'; logo.alt = 'Chirp'; logo.className = 'chirplogo';
+    const stats = el('div', 'chirpstats'), fol = el('b', '', ''); fol.dataset.n = 4200000;
+    const f1 = el('span', 'cfol'); f1.append(fol, el('small', '', 'FOLLOWERS'));
+    stats.append(f1); bar.append(logo, stats);
+    const by = { type: 'club', club: 'thunder', name: 'Thunder Strikers', handle: handleOf('Thunder Strikers'), verified: true };
+    const post = {
+      kind: 'win', by, likes: 1284000, replies: 48200, shares: 310000,
+      text: 'THE FINAL. Tonight. Thirty thousand at the Thunderdome and one trophy left to win. Let\'s make history. ⚡🏆 #ThunderUp',
+      comments: [{ name: 'Mina Cho', handle: '@MinaCho · Cricket Daily', face: faceOfPress(7), text: "Kabir Anand's first final, and he walks out at number 3. Is this his day... or will he choke? 👀" }],
+    };
+    const feedBox = el('div', 'cfeed'); feedBox.append(chirpPost(null, post, 0));
+    feed.append(bar, feedBox);
+    const go = el('button', 'cm-go', 'Go on');
+    box.append(feed, go); $('app').append(box);
+    requestAnimationFrame(() => { box.classList.add('up'); box.querySelectorAll('[data-n]').forEach(n => countUp(n, +n.dataset.n)); });
+    go.onclick = () => { box.classList.remove('up'); setTimeout(() => { box.remove(); done(); }, 400); };
+  });
+}
+async function careerOpening() {
+  ui.show(null);
+  await playComic();
+  await titleCard('16 HOURS LATER...');
+  await openingChirp();
+  await startMatch({ mode: 'tutorial', opening: true });
+}
+
 // ---------- career: the Super League ----------
 let careerView = 'hub'; // 'hub' | 'squad'
 let careerNotes = [];
@@ -1160,7 +1194,7 @@ $('btnLeague').addEventListener('click', async () => {
   // the story opens a new career, once (not for a career already under way)
   if (fresh && !profile.coachSeen?.careerOpening && !window.__SIXCHARGE_BOT) {
     profile.coachSeen = { ...profile.coachSeen, careerOpening: 1 }; saveProfile(profile);
-    ui.show(null); await playComic();
+    await careerOpening();
   }
   // a new career starts by choosing the region it's played in
   if (fresh) renderRegion(); else renderCareer();
@@ -2116,7 +2150,7 @@ document.addEventListener('visibilitychange', () => {
   setupClubTabs();
   watchBlock('#pickteam .pt');
   game.resize(); // redraw the cached stadium now the comic font is ready
-  if (new URLSearchParams(location.search).get('comic') === 'opening') { ui.show(null); playComic().then(renderHome); }   // (a way to see the story opening while it is being made)
+  if (new URLSearchParams(location.search).get('comic') === 'opening') { ui.show(null); careerOpening().then(renderHome); }   // (a way to see the story opening while it is being made)
   else if (challenge || window.__SIXCHARGE_BOT) renderHome();
   else renderTitle(); // (the title screen first for everyone; Play goes on to the tutorial or the hub)
   // the logo splash: up for a moment, then it fades away

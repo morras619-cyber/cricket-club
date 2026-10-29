@@ -91,3 +91,16 @@ export function playComic(panels = OPENING) {
     requestAnimationFrame(() => { b.classList.add('up'); panel(); });
   });
 }
+
+// a black card with a few words (the story's "16 hours later"); a tap moves on, or it goes by itself
+export function titleCard(text, ms = 2800) {
+  return new Promise(done => {
+    const c = mk('div', 'cm-card'); c.append(mk('p', '', text));
+    $('app').append(c);
+    let over = false;
+    const end = () => { if (over) return; over = true; c.classList.remove('up'); setTimeout(() => { c.remove(); done(); }, 400); };
+    requestAnimationFrame(() => c.classList.add('up'));
+    c.onclick = end;
+    setTimeout(end, ms);
+  });
+}

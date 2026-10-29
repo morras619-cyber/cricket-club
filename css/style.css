@@ -1437,3 +1437,12 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .cm-dots { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; pointer-events: none; }
 .cm-dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, .3); border: 1.5px solid var(--ink); }
 .cm-dots i.on { background: #ffd23f; }
+
+.cm-card { position: absolute; inset: 0; z-index: 33; display: grid; place-items: center; background: #000; opacity: 0; transition: opacity .4s; }
+.cm-card.up { opacity: 1; }
+.cm-card p { margin: 0; padding: 0 24px; text-align: center; font-family: var(--display); font-size: clamp(30px, 9vw, 54px); letter-spacing: 3px; color: #f4f7ff; text-shadow: 3px 3px 0 #1f45a8; animation: storyin .9s .3s cubic-bezier(.2, 1.1, .4, 1) both; }
+/* the story's Chirp moment: one post on a dark screen, with the comment under it */
+.cm-chirp { position: absolute; inset: 0; z-index: 32; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: calc(16px + env(safe-area-inset-top, 0px)) 14px calc(86px + env(safe-area-inset-bottom, 0px)); background: #050b24; opacity: 0; transition: opacity .4s; overflow: auto; }
+.cm-chirp.up { opacity: 1; }
+.cm-chirp .chirp { width: 100%; max-width: 520px; margin: 0 auto; }
+.cm-chirp .cm-go { position: absolute; left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-family: var(--display); font-size: 22px; letter-spacing: 1px; padding: 9px 30px; border-radius: 12px; border: 3px solid var(--ink); background: #ffd23f; color: var(--ink); box-shadow: 0 4px 0 rgba(0, 0, 0, .4); }

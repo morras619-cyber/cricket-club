@@ -303,7 +303,7 @@ export class Game {
     this.adapt = opts.level != null ? dialsFor(opts.level, adaptScale(mode)) : NO_DIALS;
     this.mindOn = this.heatOn; this.mind = this.mindOn ? new Mind(makeRng((this.seed ^ 0x5bd1e995) >>> 0), { gain: this.adapt.mind }) : null; this.myCounter = null; this.aiCounterNow = null;
     try {
-      if (mode === 'tutorial') return await this.runTutorial(!!opts.story);
+      if (mode === 'tutorial') return opts.opening ? await this.runOpening() : await this.runTutorial(!!opts.story);
       await this.pitchReport();
       const script = aiBowlingScript(this.seed, this.aiPlan, this.mindOn ? null : this.rival.bowl?.power.kind);   // (with a mind the AI chooses its own moment for the power)
       if (mode === 'daily') {
@@ -2969,6 +2969,53 @@ export class Game {
   }
 
   // ---------- Issue #1: the tutorial over ----------
+  // the story's first match (js/comic.js, then main.js careerOpening): the final, Thunder Strikers batting first on 34 for 1 after three overs.
+  // Kabir walks in with a bad knee: he is in pain, you can play whatever shot you like, and the first ball bowls him (a golden duck, 34 for 2).
+  async runOpening() {
+    const inn = new Innings('player');
+    this.innings.push(inn);
+    this.phase = 'bat';
+    this.charge.value = 40; this.ui.charge(40);
+    // the order: an opener already out, their captain at the other end, Kabir next in (a man of the side, in his own look)
+    const order = this.mySide.order, isRaja = p => p.id === 'raja' || p.hero?.id === 'raja';
+    const raja = order.find(isRaja) || order[1], others = order.filter(p => p !== raja);
+    const base = others.find((p, i) => i >= 1 && !p.hero) || others[1], opener = others.find(p => p !== base);
+    const kabir = { ...base, id: 'kabir-anand', name: 'Kabir Anand', short: 'Kabir', nick: null, number: 9, app: { skin: 2, hair: 1, style: 'curly', beard: 'none', cut: 'curly' } };
+    order.splice(0, order.length, opener, raja, kabir, ...others.filter(p => p !== opener && p !== base));
+    // 34 for 1 after 3 overs (18 balls)
+    inn.balls = 18; inn.runs = 34; inn.wkts = 1;
+    inn.log = ['1', '0', '4', '0', '1', '6', '0', '1', '0', '4', 'W', '0', '2', '4', '0', '4', '6', '1'];
+    inn.bowler = { balls: 18, runs: 34, wkts: 1, dots: 7 };
+    inn.stints.push({ id: opener.id, name: opener.name, nation: opener.nation || null, runs: 14, balls: 11, fours: 2, sixes: 0, out: true, how: 'caught' });
+    inn.setBatter(kabir); inn.setPartner(raja);
+    Object.assign(inn.other, { runs: 20, balls: 15, fours: 2, sixes: 1 });
+    inn.setBowler(this.bowlerOf(inn));
+    this.hud(inn);
+    this.ui.shotButton(true, this.shotLoft, () => { this.shotLoft = !this.shotLoft; sfx.click(); return this.shotLoft; });
+    this.ui.banner('THE FINAL', `${this.myTeam.name} 34/1 · ${kabir.name} walks in`, 2600);
+    await this.sleepReal(this.bot ? 100 : 2600);
+    const spec = { x: 0.02, length: 'full', kmh: 134, swing: 0.02, move: 0, type: 'Full ball' };
+    await this.batBall(inn, inn.balls + 1, spec, {
+      hint: 'PLAY YOUR SHOT', extra: 40,
+      // before the bowler runs in: he winces
+      waitPower: async () => {
+        if (this.bot) return;
+        this.say('batter', kabir, this.myTeam, 'Ughh...', { dur: 1700 });
+        await this.sleepReal(1900);
+        this.say('batter', kabir, this.myTeam, 'My knee... not now. Not now!', { dur: 2000 });
+        await this.sleepReal(2200);
+      },
+      // however he plays, he is beaten
+      assist: () => ({ outcome: 'bowled', grade: 'miss' }),
+    });
+    this.hud(inn);
+    await this.sleepReal(this.bot ? 100 : 1400);
+    this.ui.banner('GOLDEN DUCK', `${kabir.name} b ${this.bowlerOf(inn).name} · 0 (1) · ${this.myTeam.name} ${inn.runs}/${inn.wkts}`, 2800);
+    await this.sleepReal(this.bot ? 100 : 3000);
+    this.ui.shotButton(false);
+    return { mode: 'tutorial', opening: true, innings: this.innings, result: { outcome: 'loss', text: '' }, moments: [], team: this.team, rival: this.rival, seed: this.seed, stats: this.stats };
+  }
+
   // story: the first-time version (js/story.js): the same moves, at the Thunderdome against the Thunder Strikers, who taunt you
   async runTutorial(story = false) {
     const NEED = story ? 12 : 14;   // (the story's batter has no six to fire: four, a block, four, and his power's four)

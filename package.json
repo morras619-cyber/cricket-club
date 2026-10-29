@@ -7,6 +7,7 @@
   "scripts": {
     "start": "npx --yes http-server -c-1 -p 8080 .",
     "test": "node --test tests/*.test.js",
-    "smoke": "node tests/smoke.mjs"
+    "smoke": "node tests/smoke.mjs",
+    "opening": "node tests/opening.mjs"
   }
 }
