@@ -488,11 +488,11 @@ export function bowlFrame(spr, gameTime, realTime, view = 'front') {
   switch (spr.anim) {
     case 'run':
       if (view.startsWith('spin') && KIT_VIEW[view] === view.slice(5)) {
-        // the fast bowler's frames at about half his stride rate: a few walking-pace strides
-        if (view === 'spin-back') return spr.p < 0.72 ? RUN_CYCLE[Math.floor(spr.p * 7) % 4] : spr.p < 0.82 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
-        return spr.p < 0.78 ? RUN_CYCLE[Math.floor(spr.p * 7) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
+        // the fast bowler's frames at about a third of his stride rate: a few easy, walking-pace strides
+        if (view === 'spin-back') return spr.p < 0.72 ? RUN_CYCLE[Math.floor(spr.p * 5) % 4] : spr.p < 0.82 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
+        return spr.p < 0.78 ? RUN_CYCLE[Math.floor(spr.p * 5) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
       }
-      if (view.startsWith('spin')) return spr.p < 0.7 ? SPIN_CYCLE[Math.floor(spr.p * 8) % 2] : spr.p < 0.85 ? 'gather' : 'coil';
+      if (view.startsWith('spin')) return spr.p < 0.7 ? SPIN_CYCLE[Math.floor(spr.p * 4) % 2] : spr.p < 0.85 ? 'gather' : 'coil';
       if (view === 'back') return spr.p < 0.74 ? RUN_CYCLE[Math.floor(spr.p * 14) % 4] : spr.p < 0.83 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
       return spr.p < 0.8 ? RUN_CYCLE[Math.floor(spr.p * 14) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
     case 'deliver': {

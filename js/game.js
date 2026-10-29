@@ -18,7 +18,7 @@ import { cardFor } from './cards.js';
 import { portraitFace } from './futcard.js';
 import { paceTired, tiredness } from './stamina.js';
 import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
-import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
+import { resolveLineup, overPlan, bowlType, runUp, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
@@ -49,8 +49,10 @@ const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))
 // the game's pace while you field a catch / a run-out pick-up (the timing bar crosses at this pace; the
 // green stays as many ms of real time whatever it is)
 const CATCH_SLOW = 1.1, PICK_SLOW = 1.1;
-// a spinner's approach, as a share of the time it used to take
-const SPIN_RUNUP = 0.75;
+// run-ups: a fast bowler starts a long way back and comes in quickly; a spinner takes a short, slower, easy run. A type's own length is
+// the longest run-up times its `runup` (squads.js: express 1 down to a spinner's 0.35); runUp (squads.js) is the batting view (the bowler at the far end),
+// BOWL_RUNUP_M the bowling view (my bowler, drawn from behind). The batting view's numbers are squads.js runUp.
+const BOWL_RUNUP_M = 6.5, SPIN_BOWL_RUN_MS = 900, BOWL_RUN_MS = 700;
 // and its ball through the air, quicker than its km/h alone would make it (the speed shown stays)
 const SPIN_FLIGHT = 1.3;
 const SHOT_WORDS = ['THWACK!', 'DHOOM!', 'KRAK!', 'BLAM!', 'SMASH!'];
@@ -831,6 +833,7 @@ export class Game {
     this.heatShow(inn);
     S.batter.look = teamLook(this.myTeam); S.batter.team = this.myTeam.id; S.batter.emblem = null;
     S.bowler.look = teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
+    S.bowler.z = 20.6 + runUp(btype).m;   // (he waits where his run-up starts)
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler); // their own skin and hair on the drawn sprites
     const partner = this.nonStrikerOf(inn);
     S.nonStriker = partner ? { team: this.myTeam, people: lookOf(partner) } : null;
@@ -878,10 +881,10 @@ export class Game {
     let prog = 0, last = this.gameTime;
     await this.until(() => {
       const dt = this.gameTime - last; last = this.gameTime;
-      if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / (850 * (0.55 + 0.45 * btype.runup) * (btype.spin ? SPIN_RUNUP : 1));
+      if (this.realTime >= this.powerFxUntil) prog += (dt * 1000) / runUp(btype).ms;
       if (this.armed.readbowler && S.read === undefined) { S.read = this.readInfo(spec, btype, inn); S.readPre = !S.read.none; }   // (Read the Bowler: the landing spot shows before he lets go)
       const p = Math.min(1, prog);
-      S.bowler.z = 20.6 + 6.9 * btype.runup * (1 - p); S.bowler.pose = POSES.run(p * 13); S.bowler.spr = { anim: 'run', p };
+      S.bowler.z = 20.6 + runUp(btype).m * (1 - p); S.bowler.pose = POSES.run(p * 13); S.bowler.spr = { anim: 'run', p };
       return p >= 1;
     });
     this.onInput = null;
@@ -1846,7 +1849,7 @@ export class Game {
     this.heatShow(inn);
     S.bowler.look = teamLook(this.myTeam); S.bowler.emblem = null;
     // right-arm over, a little wide of the stumps so the ball leaves his hand; left-armers from the other side
-    S.bowler.z = 26; S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
+    S.bowler.runup = btype.runup; S.bowler.z = this.bowlRunZ(S); S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler);
     S.keeper.look = teamLook(this.myTeam, 1);
     S.keeper.people = this.keeperPeople();
@@ -1932,9 +1935,9 @@ export class Game {
     let noBall = null;
     if (rg === 'bad') { noBall = 'step'; rg = 'loose'; }
     // finish the run-up
-    const left = Math.max(0, 700 - (this.realTime - S.runStart));
-    const z0 = S.bowler.z;
-    await this.animate(left, p => { S.bowler.z = lerp(z0, 20.7, p); S.bowler.pose = POSES.run(p * 8 + 6); S.bowler.spr = { anim: 'run', p: (26 - S.bowler.z) / 5.3 }; }, true);
+    const left = Math.max(0, (btype.spin ? SPIN_BOWL_RUN_MS : BOWL_RUN_MS) - (this.realTime - S.runStart));
+    const z0 = S.bowler.z, zStart = this.bowlRunZ(S);
+    await this.animate(left, p => { S.bowler.z = lerp(z0, 20.7, p); S.bowler.pose = POSES.run(p * 8 + 6); S.bowler.spr = { anim: 'run', p: (zStart - S.bowler.z) / (zStart - 20.7) }; }, true);
     S.aim = null; S.trail = []; this.bowlTrail = null;
 
     const words = { perfect: '#ffd23f', good: '#fff4da', loose: '#ff8a8a', bad: '#e8343b' };
@@ -2167,6 +2170,9 @@ export class Game {
     return r;
   }
 
+  // where my bowler starts his run-up (the bowling view): a long way back for a fast bowler, near the crease for a spinner
+  bowlRunZ(S) { return 20.7 + BOWL_RUNUP_M * (S.bowler.runup ?? 0.8); }
+
   // Waits for the delivery swipe. Touch down starts the run-up; lift to bowl.
   async captureBowlGesture(S, kind) {
     const scale = this.H / 844;
@@ -2192,7 +2198,7 @@ export class Game {
         if (!r) {
           this.fx.word('SWIPE FURTHER UP THE PITCH', this.W / 2, this.H * 0.5, { size: 26, color: '#fff4da', stroke: INK, rot: 0, dur: 1000 });
           pts = null; S.aim = null; S.runStart = null; this.bowlTrail = null; this.bowlCrowd('abort');
-          S.bowler.z = 26; S.bowler.pose = POSES.stand(); S.bowler.spr = null;
+          S.bowler.z = this.bowlRunZ(S); S.bowler.pose = POSES.stand(); S.bowler.spr = null;
           return;
         }
         done = r;
@@ -2203,8 +2209,8 @@ export class Game {
       if (this.fieldEditRequested) return true;
       if (pts && S.runStart != null && !done) {
         const e = this.realTime - S.runStart;
-        const p = Math.min(1, e / 1100);
-        S.bowler.z = lerp(26, 21.4, p); S.bowler.pose = POSES.run(p * 10); S.bowler.spr = { anim: 'run', p: (26 - S.bowler.z) / 5.3 };
+        const zStart = this.bowlRunZ(S), p = Math.min(1, e / (S.bowler.spin ? 1500 : 1100));   // (a spinner's walk-in is slower)
+        S.bowler.z = lerp(zStart, zStart - 0.87 * (zStart - 20.7), p); S.bowler.pose = POSES.run(p * 10); S.bowler.spr = { anim: 'run', p: (zStart - S.bowler.z) / (zStart - 20.7) };
         if (e > 2600) {
           done = this.aimAt(gestureToDelivery(pts, kind, scale), pts[pts.length - 1]) || { x: 0.2, length: 'good', bounce: 5.5, h: 0.8, kmh: 120, swing: 0, move: 0, loop: 0.6, type: 'Seam up', grade: 'loose', lateWorld: 0, mag: 0, slower: false, speedP: 0.3 };
           done.hesitated = true;
