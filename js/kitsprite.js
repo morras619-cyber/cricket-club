@@ -55,7 +55,7 @@ const loaded = img => img && img.complete && img.naturalWidth > 0;
 // ?painted=0 in the address (or sixcharge.painted = 0) shows the old stance instead of the painted one, to compare
 export const painted = { off: (() => { try { return /[?&]painted=0/.test(location.search) || localStorage.getItem('sixcharge.painted') === '0'; } catch { return false; } })() };
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'bat-back', 'bat-ready', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back', 'bat-paint', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -473,13 +473,14 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
   const sheet = playerSheet('bat-back', team, look, false);
   if (!sheet) return false;
   const [bh, bw] = buildOf(look), meta = KIT_SHEETS['bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
-  // the stance he waits in is painted (img/kit/bat-ready.*, tools/build_bat_ready.py) once its sheet is in; every other pose is the old sheet's
-  const rd = KIT_SHEETS['bat-ready'] && !painted.off ? playerSheet('bat-ready', team, look, false) : null, rm = KIT_SHEETS['bat-ready'];
+  // the poses that are painted (img/kit/bat-paint.*, tools/build_bat_paint.py) come from that sheet once it is in; any other pose is the old sheet's
+  const pm = KIT_SHEETS['bat-paint'], ps = pm && !painted.off ? playerSheet('bat-paint', team, look, false) : null;
   const one = (name, alpha) => {
     ctx.globalAlpha = alpha;
-    if (name === 'ready' && rd) {
-      const [sx, sy, w, h, ax, ay] = rm.frames[0], kr = kPerM * BAT_HEIGHT_M / rm.refPx * bh, kxr = kr * bw;
-      ctx.drawImage(rd, sx, sy, w, h, px - ax * kxr, py - ay * kr, w * kxr, h * kr);
+    const pi = ps && pm.names[name];
+    if (pi != null) {
+      const [sx, sy, w, h, ax, ay] = pm.frames[pi], kr = kPerM * BAT_HEIGHT_M / pm.refPx * bh, kxr = kr * bw;
+      ctx.drawImage(ps, sx, sy, w, h, px - ax * kxr, py - ay * kr, w * kxr, h * kr);
       return;
     }
     const [sx, sy, w, h, ax, ay] = meta.frames[POSE_BAT[name] ?? 0];
