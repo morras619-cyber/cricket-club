@@ -4,7 +4,7 @@ import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
 import { makeEffectLevel } from './effectlevel.js';
 import { groundOf } from './grounds.js';
-import { teamById, logoSrc } from './teams.js';
+import { stadiumTest, teamById, logoSrc } from './teams.js';
 import { paintGround } from './ownground.js';
 import { GROUND_ART } from './groundart.js';
 
@@ -70,7 +70,8 @@ export function setGround(teamId, onChange) {
 // code-painted ground stands in.
 const ART = {};
 // (your own club's ground: its level's grey build, painted in your colours and crest)
-const artKey = team => { const t = teamById(team); return t.custom ? `${team}|own${t.stadium}|${t.suit}|${t.trim}|${logoSrc(team).length}` : team; };
+const levelOf = t => stadiumTest.level || t.stadium;
+const artKey = team => { const t = teamById(team); return t.custom ? `${team}|own${levelOf(t)}|${t.suit}|${t.trim}|${logoSrc(team).length}` : team; };
 // the pitch, grass and stumps a ground may share with another (meta.share) rather than carry its own copies
 const SHARED = new Set(['pitch', 'grass', 'stumps', 'stumps-broken']);
 // creases, kept on the pitch: white, with a fine ink edge only where they're big enough to
@@ -160,7 +161,7 @@ function stripOnly(team) {
 const stripFor = art => (art?.pitchFresh ? art : stripOnly(HOME));
 const pw = p => p.naturalWidth || p.width, ph = p => p.naturalHeight || p.height;
 function loadArt(team) {
-  const T = teamById(team), key = artKey(team), dir = T.custom ? `own${T.stadium}` : team;
+  const T = teamById(team), key = artKey(team), dir = T.custom ? `own${levelOf(T)}` : team;
   const meta = GROUND_ART[dir];
   if (!meta || ART[key]) return;
   const a = (ART[key] = { meta, ready: false, team });

@@ -1,7 +1,7 @@
 import { UI } from './ui.js';
 import { Game } from './game.js';
 import { HEROES, heroById, heroesFor, BAT_TYPES, POWERS, batTypeOf, bowlPowerOf } from './heroes.js';
-import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero, logoSrc, setMyClub, setLogo } from './teams.js';
+import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero, logoSrc, setMyClub, setLogo, stadiumTest } from './teams.js';
 import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
@@ -314,10 +314,16 @@ function renderSettings() {
   state('setHaptics', sound.haptics ? 'On' : 'Off', sound.haptics);
   state('setField', { key: 'Key moments', all: 'Every chance', off: 'Auto' }[game.settings.fielding], game.settings.fielding !== 'off');
   state('setUnits', units.speed === 'mph' ? 'mph' : 'km/h', true);
+  $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
 $('settingsBack').addEventListener('click', () => renderHome());
 $('setStory').addEventListener('click', () => { unlockAudio(); careerOpening().then(renderSettings); });   // (the career's opening story again; it plays by itself only the first time)
+$('setStadiumTest').addEventListener('click', () => {   // (testing only: shows your own club's ground at level 1, 2 or 3 in your next match; the saved game is not touched)
+  stadiumTest.level = (stadiumTest.level + 1) % 4;
+  try { localStorage.setItem('sixcharge.stadiumTest', String(stadiumTest.level)); } catch { /* private window: it lasts until you reload */ }
+  renderSettings();
+});
 $('playerName').addEventListener('input', e => { profile.name = e.target.value.trim().slice(0, 14); saveProfile(profile); });
 $('setSound').addEventListener('click', () => { sound.on = !sound.on; profile.settings.sound = sound.on; saveProfile(profile); unlockAudio(); renderSettings(); });
 $('setHaptics').addEventListener('click', () => { sound.haptics = !sound.haptics; profile.settings.haptics = sound.haptics; saveProfile(profile); renderSettings(); });
