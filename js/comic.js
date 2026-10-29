@@ -13,7 +13,8 @@ export const OPENING = [
   { img: 'img/story/open-1.webp', beats: [{ say: 'Thirty thousand seats. One night away.' }, { say: "Twenty years I've dreamed about this." }] },
   { img: 'img/story/open-2.webp', beats: [{ say: "Every net session. Every ground that said I wasn't good enough." }, { say: 'Tomorrow, they find out.' }] },
   { img: 'img/story/open-3.webp', beats: [{ sfx: 'BZZT!', say: "That'll be Raja." }] },
-  { img: 'img/story/open-4.webp', beats: [{ msg: { who: 'Raja', text: 'Sleep. Tomorrow we make history.' } }, { say: "Don't be scared. Not tonight." }] },
+  { img: 'img/story/open-4.webp', beats: [{ msg: { who: 'Raja', text: 'Sleep. Tomorrow we make history.' } }] },
+  { img: 'img/story/open-1.webp', beats: [{ say: "Don't be scared. Not tonight." }] },   // (the phone is dark again)
 ];
 
 let box = null;
