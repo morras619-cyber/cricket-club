@@ -9,7 +9,7 @@ OUT, per camera (bat, bowl, keeper) in img/ground/own<level>/ (the files js/owng
   view-<v>.webp       the ground: the stand with its blue and yellow turned into a grey ramp (so the club's colour multiplied on gives the
                       club's colour at the painted brightness), the sky carried up and the mown grass laid below the stand in this camera's perspective
   view-<v>-tint.webp  R the main colour's weight, G the trim's
-  view-<v>-uv.webp    black (no crest pictures on this stand)
+  view-<v>-uv.webp    where the club's plate (crest and name) goes: on the big video screens, black elsewhere
 and the cameras' entries for own<level> in js/groundart.js (the picture's focal length, its horizon row ...).
 Needs numpy and Pillow.
 """
@@ -22,11 +22,12 @@ CY, BOARD_R = 10.0, 63.8
 TOP_PAD = 420                      # more sky above the picture (a tall phone shows more of it)
 # the levels: the picture's first magenta row (the foot of the stand's boards), the boards' height in picture pixels, the main stand's width
 # in the picture and in metres (a small club ground, a bigger one, the big finished one), the top of the roof's blue band, and how the lit
-# windows (golden, like the trim) are kept out of the trim colour: 'rows' (the trim starts at a row) or 'blobs' (the wide lit glass bands)
+# windows (golden, like the trim) are kept out of the trim colour: 'rows' (the trim starts at a row) or 'blobs' (the wide lit glass bands);
+# and where the big video screens are (a box round each dark panel): the club's crest and name are laid on them (ownground.js picture 4)
 LEVELS = {
     1: dict(foot=550, board_px=24, stand_px=660, stand_m=23.0, roof_row=421, glass=('rows', 488)),
-    2: dict(foot=582, board_px=25, stand_px=788, stand_m=32.0, roof_row=330, glass=('blobs',)),
-    3: dict(foot=582, board_px=25, stand_px=842, stand_m=42.0, roof_row=241, glass=('blobs',)),
+    2: dict(foot=582, board_px=25, stand_px=788, stand_m=32.0, roof_row=330, glass=('blobs',), screens=[(1360, 250, 1570, 410)]),
+    3: dict(foot=582, board_px=25, stand_px=842, stand_m=42.0, roof_row=241, glass=('blobs',), screens=[(170, 225, 325, 360), (1350, 225, 1510, 360)]),
 }
 # the cameras (scene.js Cam3D): height, which way it looks, the focal length of the phone-sized screen it is built for (the picture's own
 # focal length is worked out from the stand's width), and where the horizon sits on the screen
@@ -72,6 +73,44 @@ def weights(rgb, L):
     return blue, yel
 
 
+def screens_uv(rgb, boxes):
+    """the uv picture (ownground.js: B 160 = picture 4, the club's plate; R, G where in it) for each dark video screen: the panel is found in
+    its box, its four corners give the perspective, and the 2:1 plate is laid across the panel's width, centred, the rest of the glass left dark"""
+    import cv2
+    from scipy import ndimage as ndi
+    H, W = rgb.shape[:2]
+    uv = np.zeros((H, W, 3), np.uint8)
+    val = rgb.max(-1) / 255
+    for (x0, y0, x1, y1) in boxes:
+        m = val[y0:y1, x0:x1] < 0.22
+        lab, n = ndi.label(m)
+        i = int(np.argmax(ndi.sum(m, lab, range(1, n + 1)))) + 1
+        ys, xs = np.nonzero(lab == i)
+        pts = np.stack([xs + x0, ys + y0], 1).astype(np.float32)
+        hull = cv2.convexHull(pts)
+        quad = cv2.approxPolyDP(hull, 0.02 * cv2.arcLength(hull, True), True).reshape(-1, 2)
+        if len(quad) != 4:
+            quad = cv2.boxPoints(cv2.minAreaRect(hull)).astype(np.float32)
+        quad = quad.astype(np.float32)
+        s_, d_ = quad.sum(1), quad[:, 0] - quad[:, 1]          # corners: top-left, top-right, bottom-right, bottom-left
+        tl, br, tr, bl = quad[np.argmin(s_)], quad[np.argmax(s_)], quad[np.argmax(d_)], quad[np.argmin(d_)]
+        quad = np.array([tl, tr, br, bl], np.float32)
+        c = quad.mean(0); quad = c + (quad - c) * 0.9           # a little inside the frame
+        wq = (np.linalg.norm(tr - tl) + np.linalg.norm(br - bl)) / 2 * 0.9; hq = (np.linalg.norm(bl - tl) + np.linalg.norm(br - tr)) / 2 * 0.9
+        band = min(1.0, (wq / 2) / hq)                          # the plate's height as a part of the panel's
+        M = cv2.getPerspectiveTransform(quad, np.array([[0, 0], [1, 0], [1, 1], [0, 1]], np.float32))
+        gx, gy = np.meshgrid(np.arange(int(quad[:, 0].min()) - 1, int(quad[:, 0].max()) + 2), np.arange(int(quad[:, 1].min()) - 1, int(quad[:, 1].max()) + 2))
+        p = M @ np.stack([gx.ravel() + 0.5, gy.ravel() + 0.5, np.ones(gx.size)])
+        u, v = (p[0] / p[2]).reshape(gx.shape), (p[1] / p[2]).reshape(gx.shape)
+        lo = 0.5 - band / 2
+        ok = (u >= 0) & (u <= 1) & (v >= lo) & (v <= lo + band)
+        vv = (v - lo) / band
+        uv[gy[ok], gx[ok], 0] = np.clip(u[ok] * 255, 0, 255).astype(np.uint8)
+        uv[gy[ok], gx[ok], 1] = np.clip((1 - vv[ok]) * 255, 0, 255).astype(np.uint8)
+        uv[gy[ok], gx[ok], 2] = 160
+    return uv
+
+
 def build(level):
     L = LEVELS[level]; FOOT, BOARD_PX, STAND_PX, STAND_M, ROOF_ROW = L['foot'], L['board_px'], L['stand_px'], L['stand_m'], L['roof_row']
     SRC = f'tools/ground/own{level}-stand.png'; OUT = f'img/ground/own{level}/'
@@ -97,6 +136,8 @@ def build(level):
     pad[star] = np.clip(pad[star] + rng.uniform(120, 230, (star.sum(), 1)), 0, 255)
     rgb_all = np.concatenate([pad, base], 0)
     tint_all = np.concatenate([np.zeros((TOP_PAD, W, 3), np.float32), np.stack([blue * 255, yel * 255, np.zeros_like(blue)], -1)], 0)
+    uv_pic = screens_uv(src.astype(np.uint8), L['screens']) if L.get('screens') else np.zeros(src.shape, np.uint8)
+    uv_all = np.concatenate([np.zeros((TOP_PAD, W, 3), np.uint8), uv_pic], 0)
     foot = FOOT + TOP_PAD
     meta_views = {}
     for name, c in CAMS.items():
@@ -123,7 +164,8 @@ def build(level):
         base_img = Image.fromarray(np.clip(img, 0, 255).astype(np.uint8), 'RGB')
         base_img.save(OUT + f'view-{name}.webp', 'WEBP', quality=88, method=6)
         Image.fromarray(np.clip(tint, 0, 255).astype(np.uint8), 'RGB').save(OUT + f'view-{name}-tint.webp', 'WEBP', lossless=True, method=6)
-        Image.fromarray(np.zeros((H, W, 3), np.uint8), 'RGB').save(OUT + f'view-{name}-uv.webp', 'WEBP', lossless=True)
+        uv = np.zeros((H, W, 3), np.uint8); uv[:foot] = uv_all
+        Image.fromarray(uv, 'RGB').save(OUT + f'view-{name}-uv.webp', 'WEBP', lossless=True, exact=True)
         # the roof (r from the camera's own height and the roof row)
         roof_row = TOP_PAD + ROOF_ROW; r = BOARD_R + 2; Dr = D + 2
         roof_h = c['cy'] - (roof_row - above) * Dr / fpic
