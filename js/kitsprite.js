@@ -20,10 +20,11 @@ const POSE_SPIN = {
   follow1: 9, follow2: 10, follow3: 11, finish: 12, field: 14, react: 14, celebrate1: 14, celebrate2: 14,
 };
 
-// the spinner from behind (15 poses)
+// the spinner from behind (12 poses, tools/build_spin_back.py): three run-up strides, the gather, the coil with the arm up, the
+// release, the arm swinging through, two bends of the follow-through, a recovery stride, and two standing poses (the pace bowler's)
 const POSE_SPIN_BACK = {
-  start: 0, run1: 1, run2: 2, run3: 3, gather: 4, coil: 6, frontarm: 7, release: 8,
-  follow1: 10, follow2: 11, follow3: 12, finish: 13, field: 14, react: 9, celebrate1: 14, celebrate2: 14,
+  start: 10, run1: 0, run2: 1, run3: 2, gather: 3, coil: 4, frontarm: 4, release: 5,
+  follow1: 6, follow2: 7, follow3: 8, finish: 10, field: 11, react: 9, celebrate1: 5, celebrate2: 5,
 };
 // the batter from behind (26 poses, tools/kit/compose_batter.py: ready, leave x2, backlift, drive x3,
 // pull x2, defend x3, cut x4, bowled, celebration, reverse sweep x3, straight drive x2, on-drive x2, cover drive x1), named as batsprite.js names them
@@ -52,7 +53,7 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'bat-back', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'spin-back', 'bat-back', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
