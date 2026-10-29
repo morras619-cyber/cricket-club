@@ -180,58 +180,10 @@ def build(level):
     open('js/groundart.js', 'w').write(head + 'export const GROUND_ART = ' + json.dumps(K, indent=1) + ';\n')
 
 
-BG = (28, 24, 57)                  # the top view's night (scene.js drawGround clears to #1b1838; the old pictures were laid on this)
-RANGE_M = 64.1                     # the rope's radius (scene.js drawGround: R + 2.1): the picture's grass edge is that far from the pitch centre
-
-
-def build_top(level):
-    """the view from above (the ball in play): the stadium picture squashed or stretched up and down until its field is the game's 100 : 78
-    oval, the magenta outside laid on the game's night colour, the blue and yellow turned into grey ramps with their tint, and the entry
-    for own<level> 'top' in js/groundart.js (pixels a metre across the field, and where the pitch centre is)"""
-    from scipy import ndimage as ndi
-    OUT = f'img/ground/own{level}/'
-    im = Image.open(f'tools/ground/own{level}-top.png').convert('RGB'); a = np.array(im).astype(np.float32)
-    H, W = a.shape[:2]
-    hue, sat, v = hsv(a)
-    grass = (hue > 70) & (hue < 110) & (sat > 0.5) & (v > 0.43) & (v < 0.79)
-    lab, n = ndi.label(ndi.binary_opening(grass, iterations=3))
-    m = lab == lab[H // 2, W // 2]; ys, xs = np.nonzero(m)
-    fw, fh = xs.max() - xs.min(), ys.max() - ys.min(); cx, cy = (xs.min() + xs.max()) / 2, (ys.min() + ys.max()) / 2
-    f = 0.78 / (fh / fw)                       # the stretch that makes the field 100 : 78
-    H2 = int(round(H * f))
-    a = np.array(Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).resize((W, H2), Image.LANCZOS)).astype(np.float32)
-    cy *= f
-    # the magenta outside laid on the night colour (the edge's magenta fringe taken out of the pixels that are part magenta)
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    alpha = np.clip(1 - ((np.minimum(r, b) - g) - 60) / 100, 0, 1)[..., None]
-    mag = np.array([250, 0, 250], np.float32)
-    clean = np.where((alpha > 0) & (alpha < 1), np.clip((a - (1 - alpha) * mag) / np.maximum(alpha, 0.25), 0, 255), a)
-    rgb = clean * alpha + np.array(BG, np.float32) * (1 - alpha)
-    hue, sat, v = hsv(rgb)
-    blue = ramp(hue, 198, 212) * (1 - ramp(hue, 240, 247)) * ramp(sat, 0.35, 0.6) * ramp(v, 0.12, 0.3) * alpha[..., 0]
-    yel = ramp(hue, 34, 44) * (1 - ramp(hue, 60, 68)) * ramp(sat, 0.7, 0.9) * ramp(v, 0.5, 0.7) * alpha[..., 0]
-    vb = float(np.median(v[blue > 0.9])); vy = float(np.median(v[yel > 0.9]))
-    w = np.clip(blue + yel, 0, 1)[..., None]
-    gb = np.clip(GREY * 255 * v / vb, 0, 255); gy = np.clip(GREY * 255 * v / vy, 0, 255)
-    base = rgb * (1 - w) + (np.where(blue > yel, gb, gy)[..., None] * np.ones(3)) * w
-    Image.fromarray(np.clip(base, 0, 255).astype(np.uint8), 'RGB').save(OUT + 'view-top.webp', 'WEBP', quality=88, method=6)
-    Image.fromarray(np.clip(np.stack([blue * 255, yel * 255, np.zeros_like(blue)], -1), 0, 255).astype(np.uint8), 'RGB').save(OUT + 'view-top-tint.webp', 'WEBP', lossless=True, method=6)
-    Image.fromarray(np.zeros((H2, W, 3), np.uint8), 'RGB').save(OUT + 'view-top-uv.webp', 'WEBP', lossless=True)
-    px = fw / (2 * RANGE_M)
-    meta = {'px': round(float(px), 3), 'w': W, 'h': H2, 'c': [round(float(cx), 1), round(float(cy), 1)]}
-    print('top', level, 'field', fw, fh, 'stretch', round(float(f), 3), meta, 'blue px', int((blue > 0.5).sum()), 'yellow px', int((yel > 0.5).sum()))
-    src = open('js/groundart.js').read()
-    head, body = src.split('export const GROUND_ART = ', 1)
-    K = json.loads(body.rsplit(';', 1)[0]); K[f'own{level}']['top'] = meta
-    open('js/groundart.js', 'w').write(head + 'export const GROUND_ART = ' + json.dumps(K, indent=1) + ';\n')
-
-
 def main():
     import sys
-    import os
     for lv in ([int(x) for x in sys.argv[1:]] or sorted(LEVELS)):
         print('level', lv); build(lv)
-        if os.path.exists(f'tools/ground/own{lv}-top.png'): build_top(lv)
 
 
 if __name__ == '__main__':
