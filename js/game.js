@@ -16,6 +16,7 @@ import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
 import { portraitFace } from './futcard.js';
+import { paceTired, tiredness } from './stamina.js';
 import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
@@ -376,6 +377,7 @@ export class Game {
     const out = { ...spec };
     if (type?.spin) { out.move = (out.move || 0) * f.turn; out.flight = SPIN_FLIGHT; }
     else { out.swing = (out.swing || 0) * f.swing; out.move = (out.move || 0) * f.seam; out.kmh = (out.kmh || 0) * f.kmh; }
+    if (inn?.curBowler) out.kmh = (out.kmh || 0) * paceTired(inn.energyOf(inn.curBowler));   // (a tired bowler is slower)
     // the ball's height at the batter and its pace off the pitch (unevenly, on a cracked pitch), the same for every ball of a seed
     const r = makeRng((this.seed * 131 + ((inn?.balls || 0) + 1) * 977 + this.innings.length * 7919 + (this.rebowls || 0) * 1299709) >>> 0);
     const u = f.uneven ? r.normal() * f.uneven : 0;
@@ -713,7 +715,14 @@ export class Game {
     const bat = this.batterOf(inn), bowl = this.bowlerOf(inn);
     if (inn.side === 'player') heroLine = `${short(bat)} ${inn.cur.runs}* (${inn.cur.balls}) · v ${short(bowl)}`;
     else { const b = inn.figs[bowl.id] || { wkts: 0, runs: 0, balls: 0 }; heroLine = `${short(bowl)} ${b.wkts}/${b.runs} · ${Math.floor(b.balls / 6)}.${b.balls % 6} ov · v ${short(bat)}`; }
-    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${bat.name.toUpperCase()}` : `YOU BOWL · ${bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine, logo: this.myTeam ? logoSrc(this.myTeam.id) : null });
+    this.ui.score(inn, { label: inn.side === 'player' ? `YOU BAT · ${bat.name.toUpperCase()}` : `YOU BOWL · ${bowl.name.toUpperCase()}`, need, phase: phaseFor(ball).name, heroLine, logo: this.myTeam ? logoSrc(this.myTeam.id) : null, stam: { bat: inn.energyOf(bat.id), bowl: inn.energyOf(bowl.id) } });
+    // the first time someone is spent, say so once
+    inn.warned = inn.warned || new Set();
+    for (const [who, role] of [[bat, 'bat'], [bowl, 'bowl']]) {
+      if (!who || inn.warned.has(who.id) || tiredness(inn.energyOf(who.id)) < 0.5) continue;
+      inn.warned.add(who.id);
+      this.showTag(`${short(who).toUpperCase()} IS TIRING`, '#ffd23f', 1800);
+    }
   }
 
   phaseBanner(ballNo) {
@@ -952,7 +961,7 @@ export class Game {
     if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
     if (bowler.ability === 'mystery') skill -= 12;
     const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;   // (his bowler is a little better or worse, as you play)
-    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length });
+    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
@@ -1031,7 +1040,7 @@ export class Game {
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs');
       this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
-      inn.ball({ runs: 0 });
+      inn.ball({ runs: 0, missed: res.outcome === 'beaten' });
       if (res.outcome === 'beaten') this.charge.missed(); else this.charge.dot();   // (a swing and a miss costs charge; a leave, like a block, keeps it level)
     } else if (res.outcome === 'edge') {
       const caught = !fx.lucky && rng.chance(keeperEdgeP(res.offset));   // (Lucky Break: it drops)
@@ -1996,7 +2005,7 @@ export class Game {
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const pf = this.feel();
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * (pf.ai / pf.bat) ** 1.5 * aiHome };   // (raised: the pitch has to be felt)
-    const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length });
+    const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
     let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
@@ -2060,7 +2069,7 @@ export class Game {
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs'); // (a miss gets the groan; a ball left alone only lets the build-up fade)
       this.fx.word(res.outcome === 'leave' ? 'LEFT ALONE' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
-      inn.ball({ runs: 0 });
+      inn.ball({ runs: 0, missed: res.outcome === 'beaten' });
       this.charge.award('dot', 'DOT'); this.charge.dot();
     } else if (res.outcome === 'stumping-chance') {
       const chance = { kind: 'stumping', p: 0.6 };

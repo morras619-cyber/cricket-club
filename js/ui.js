@@ -4,6 +4,7 @@ import { faceEl } from './looks.js';
 import { musicWanted } from './audio.js';
 import { drawEffect } from './fx.js';
 import { logoSrc } from './teams.js';
+import { tiredness } from './stamina.js';
 
 const $ = id => document.getElementById(id);
 
@@ -50,7 +51,7 @@ export class UI {
     box.classList.toggle('hot', !!info.hot);
   }
 
-  score(inn, { label, need, phase, heroLine = '', logo }) {
+  score(inn, { label, need, phase, heroLine = '', logo, stam = null }) {
     const lg = $('hudLogo');
     if (logo && !lg.src.endsWith(logo)) lg.src = logo;
     lg.hidden = !logo;
@@ -68,6 +69,15 @@ export class UI {
     if (crr != null) parts.push(`CRR <b>${crr.toFixed(2)}</b>`);
     if (rrr != null) parts.push(`RRR <b class="${crr != null && rrr > crr ? 'hot' : ''}">${rrr.toFixed(2)}</b>`);
     $('hudRates').innerHTML = parts.join(' · ');
+    if (stam) {
+      for (const [id, e, name] of [['stamBat', stam.bat, 'batter'], ['stamBowl', stam.bowl, 'bowler']]) {
+        const el = $(id), v = Math.round(e), t = tiredness(e);
+        el.firstElementChild.textContent = t >= 0.5 ? 'TIRED' : id === 'stamBat' ? 'BAT' : 'BOWL';
+        el.classList.toggle('tired', t >= 0.5); el.classList.toggle('low', t > 0 && t < 0.5);
+        el.firstElementChild.nextElementSibling.firstElementChild.style.width = `${v}%`;
+        el.title = `${name} stamina ${v}`;
+      }
+    }
     setFit($('hudNeed'), need);
     setFit($('hudPhase'), phase.toUpperCase());
     // this over, with empty slots for the balls still to come

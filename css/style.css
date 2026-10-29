@@ -1385,3 +1385,15 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .reward-chips .rc-coin b { color: var(--bolt); } .reward-chips .rc-coin { border-color: rgba(255, 210, 63, .65); }
 .reward-chips .rc-gem b { color: #ff9bf0; } .reward-chips .rc-gem { border-color: rgba(255, 155, 240, .6); }
 .reward-chips .rc-lvl b { color: #5dff9b; } .reward-chips .rc-lvl { border-color: rgba(93, 255, 155, .55); }
+
+/* ---------- stamina: two thin bars on the scorecard, the batter's and the bowler's ---------- */
+.sc-stam { display: flex; gap: 8px; padding: 2px 9px 3px; }
+.stam { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; font-family: var(--ui); font-weight: 800; font-size: 10.5px; letter-spacing: .7px; color: #9fb3ff; }
+.stam span { flex: none; min-width: 28px; }
+.stam-bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(0, 0, 0, .45); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); overflow: hidden; }
+.stam-bar i { display: block; height: 100%; width: 100%; border-radius: 3px; background: linear-gradient(#7dffa3, #2fc46b); transition: width .35s ease; }
+.stam.low .stam-bar i { background: linear-gradient(#ffe27a, #f0a81c); }
+.stam.low span { color: #ffe27a; }
+.stam.tired .stam-bar i { background: linear-gradient(#ff8a8a, #e8343b); }
+.stam.tired span { color: #ff8a8a; animation: stamPulse 1s ease-in-out infinite; }
+@keyframes stamPulse { 50% { opacity: .45; } }

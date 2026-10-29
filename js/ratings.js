@@ -2,6 +2,7 @@
 // Every number a player has should be felt: a 94 hits it 100 m when he middles it, a 64 can
 // clear the short side of the ground at best.
 import { batTypeOf } from './heroes.js';
+import { staminaEffect } from './stamina.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -38,6 +39,7 @@ const weaknessOf = r => 1 - 0.6 * clamp(((r ?? 75) - 50) / 45, 0, 1);
 const exploit = (f, s, w) => (f > 1 ? 1 - 0.18 * s * clamp((f - 1) / 0.3, 0, 1) : 1 + 0.18 * w * clamp((1 - f) / 0.3, 0, 1));
 
 // batter: { bat (rating), role... } as a player; bowler: a player; ctx: { feel (pitchFeel), ballNo, length }
+// (ctx may also carry batEnergy and bowlEnergy, 0 to 100)
 // -> { win: his timing windows (1 = no change, below 1 favours the bowler), power: how hard he hits it, edgeP: an extra chance of an edge }
 export function matchup(batter, bowler, ctx = {}) {
   const out = { win: 1, power: 1, edgeP: 0 };
@@ -83,5 +85,8 @@ export function matchup(batter, bowler, ctx = {}) {
   if (f.bounce < 1) out.win *= 1 - 0.3 * (1 - f.bounce);
   if (f.bounce > 1 && (ctx.length === 'good' || ctx.length === 'full')) out.edgeP += 0.5 * (f.bounce - 1);   // (not on the short ball: that one is hard enough to play)
   if (f.skid < 1) out.win *= 1 - 0.5 * (1 - f.skid);
+  // stamina (stamina.js): a tired batter hits shorter and times it worse, and a tired bowler is easier to hit
+  const st = staminaEffect(ctx.batEnergy, ctx.bowlEnergy);
+  out.power *= st.power; out.win *= st.win; out.edgeP += st.edgeP;
   return out;
 }
