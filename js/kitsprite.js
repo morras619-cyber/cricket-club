@@ -52,8 +52,7 @@ function image(src) {
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
 export function loadKitSprites(...teamIds) {
-  // (the Pink Royals' own back view, drawn in their kit: only loaded when they are playing)
-  for (const view of ['front', 'back', 'bat-back', 'field', ...(teamIds.includes('royals') ? ['royals-back'] : [])]) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -317,8 +316,7 @@ function playerSheet(view, team, look, mirror) {
     // dark trim, black on orange, becomes a deep shade of the shirt rather than stark black)
     const tr = hexRgb(team.trim), su = hexRgb(team.suit), dark = lum(...tr) < 0.2 * 255, mixK = dark ? 0.42 : 0.12;
     const fill = `rgb(${tr.map((v, k) => Math.round(v + (su[k] * (dark ? 0.45 : 1) - v) * mixK)).join(',')})`, close = Math.abs(lum(...hexRgb(team.trim)) - lum(...hexRgb(team.suit))) <= 0.35 * 255;
-    // (the Royals' white print lies over the white crown of their kit: always outlined)
-    const edge = close || view === 'royals-back' ? `rgb(${hexRgb(team.suit).map(x => Math.round(x * 0.35)).join(',')})` : null;
+    const edge = close ? `rgb(${hexRgb(team.suit).map(x => Math.round(x * 0.35)).join(',')})` : null;
     const hb = BLOCK.name + BLOCK.gap + BLOCK.num;
     for (const [x, y, w, sx, sy, ang, ndx, ndy, udx, udy] of meta.place) {
       for (const [text, cap, cy, dx, dy] of [[name, BLOCK.name, -hb / 2 + BLOCK.name / 2, ndx, ndy], [String(num), BLOCK.num, hb / 2 - BLOCK.num / 2, udx, udy]]) {

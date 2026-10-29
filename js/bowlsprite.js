@@ -615,8 +615,7 @@ const KIT_VIEW = { front: 'front', 'spin-front': 'front', back: 'back', 'spin-ba
 // look: the player's skin and hair (looks.js), repainted onto the drawn sheet
 export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, view = 'front', look = null) {
   // a named bowler: the plain-kit sheets (his own skin, hair, crest, name and number), once loaded
-  // (the Pink Royals have their own back view, drawn in their kit)
-  const kit = KIT_VIEW[view] === 'back' && team?.id === 'royals' ? 'royals-back' : KIT_VIEW[view];
+  const kit = KIT_VIEW[view];
   if (kit && look?.who && drawKitSprite(ctx, px, py, kPerM, frame, team, flip, kit, look)) return true;
   // a club's own spinner sheet when it has loaded (the Thunder one, repainted, until then)
   if (view === 'spin-back' && team && VIEWS['spin-back-' + sheetOf(team.id)]?.ready) view = 'spin-back-' + sheetOf(team.id);
