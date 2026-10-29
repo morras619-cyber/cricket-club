@@ -108,11 +108,11 @@ export const DEV = {
     "YOU DID IT! You beat the Thunder Strikers, in their own house! Do you know how long people have waited to see that?",
     "But it was one match. They'll be back, stronger and angrier. And they will never forget your face.",
     "Build a squad, climb through the divisions and reach the Super League. That's where you meet them again. And that's where you beat them for good.",
-    "Tap Play, then Super League. Your career starts now, beta.",
+    "Tap Play, then Career Mode. Your career starts now, beta.",
   ],
   tutDone: [
     "What did I tell you? A natural!",
-    "Quick Game is for a single match. When you're ready for a whole career, come and find me in the Super League.",
+    "Quick Game is for a single match. When you're ready for a whole career, come and find me in Career Mode.",
   ],
   quickTeam: [
     "Pick your side, beta. Swipe through the clubs and check their ratings underneath.",
