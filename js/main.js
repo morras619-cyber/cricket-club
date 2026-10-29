@@ -1154,10 +1154,16 @@ function renderCareer(notes = careerNotes) {
   autoPages(body, 'Now');
   saveProfile(profile);
 }
-$('btnLeague').addEventListener('click', () => {
+$('btnLeague').addEventListener('click', async () => {
   unlockAudio(); careerView = 'hub';
+  const fresh = career().phase === 'pick' && !career().region;
+  // the story opens a new career, once (not for a career already under way)
+  if (fresh && !profile.coachSeen?.careerOpening && !window.__SIXCHARGE_BOT) {
+    profile.coachSeen = { ...profile.coachSeen, careerOpening: 1 }; saveProfile(profile);
+    ui.show(null); await playComic();
+  }
   // a new career starts by choosing the region it's played in
-  if (career().phase === 'pick' && !career().region) renderRegion(); else renderCareer();
+  if (fresh) renderRegion(); else renderCareer();
 });
 $('careerHome').addEventListener('click', () => { if (careerView === 'squad') { careerView = 'hub'; renderCareer(); } else renderHome(); });
 $('careerSquad').addEventListener('click', () => { careerView = careerView === 'squad' ? 'hub' : 'squad'; renderCareer(); });
