@@ -7,7 +7,10 @@ test('the story opening: four panels, each with its picture and something to rea
   assert.equal(OPENING.length, 4);
   for (const p of OPENING) {
     assert.ok(existsSync(new URL(`../${p.img}`, import.meta.url)), p.img);
-    assert.ok(p.cap || p.say || p.msg || p.sfx, `${p.img} has no text`);
-    for (const k of ['say', 'msg']) if (p[k]) assert.ok(p[k].who && p[k].text, `${p.img} ${k}`);
+    assert.ok(p.beats.length, `${p.img} has no beats`);
+    for (const b of p.beats) {
+      assert.ok(b.say || b.msg || b.sfx, `${p.img} has an empty beat`);
+      if (b.msg) assert.ok(b.msg.who && b.msg.text, `${p.img} message`);
+    }
   }
 });
