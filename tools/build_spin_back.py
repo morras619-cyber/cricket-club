@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """The off-spinner from behind in the plain kit: img/kit/spin-back.webp (+ -mask.png) and its entry in
-js/kitsheets.js, built from tools/kit/src/spinner-back.png (10 poses on a transparent background, two rows of five: three run-up
+js/kitsheets.js, built from tools/kit/src/spinner-back.png (10 poses on magenta, two rows of five: three run-up
 strides, the gather, the coil with the arm up, the release, the arm swinging through, two bends of the follow-through
 and a recovery stride).
 
-The sheet has no standing pose, so two are taken from the pace bowler as the match really draws him (the premium kit with
-the navy yoke: tools/kit/render_pace_poses.mjs writes tools/kit/src/pace/start.png and field.png, bald and without a name),
-scaled to the spinner's size and put in a third row: they are the spinner's start, finish, fielding and reacting poses. The poses are then cut and repainted like the pace bowler's (tools/build_kit_sheets.py: the
+The sheet has no standing pose, so two are taken from the pace bowler's own sheet (img/kit/back.webp: his stance and
+his last, standing, pose), scaled to the spinner's size and put in a third row: they are the spinner's start, finish,
+fielding and reacting poses. The poses are then cut and repainted like the pace bowler's (tools/build_kit_sheets.py: the
 same masks, R skin, G shirt, B kit 255 suit / 128 trim), with no hair and no name and number print yet. The white ball the
 generator drew in the hand is taken out first: the game draws its own.
 
@@ -24,8 +24,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from build_kit_sheets import build, write_sheets  # noqa: E402
 
 SRC = 'tools/kit/src/spinner-back.png'
-PACE = ['start', 'field']   # the pace bowler's stance and his last, standing, pose (tools/kit/src/pace/<name>.png)
-MAGENTA = (250, 0, 250)     # (what the cutting expects behind a pose: the sheets are flattened onto it)
+PACE = [0, 9]          # the pace sheet's stance and his last pose (both standing)
 STAND_H = 455          # the standing pose's height in the spinner's sheet
 EXTRA_Y = 1040         # the third row
 ROWH = 520             # (build_kit_sheets orders the poses by this row height)
@@ -61,16 +60,15 @@ def pose_boxes(a):
     return boxes
 
 
-def pace_pose(name):
-    """one pose of the pace bowler as the match draws him, on magenta, scaled to the spinner's standing height"""
-    im = Image.open(f'tools/kit/src/pace/{name}.png').convert('RGBA')
-    al = np.array(im.getchannel('A'))
-    al[al < 110] = 0   # (the soft ground shadow the game puts under him goes)
-    im.putalpha(Image.fromarray(al))
-    im = im.crop(im.getbbox())
+def pace_pose(i, meta):
+    """one pose of the pace bowler's sheet on magenta, scaled to the spinner's standing height"""
+    x, y, w, h = meta['frames'][i][:4]
+    im = Image.open('img/kit/back.webp').convert('RGBA').crop((x, y, x + w, y + h))
+    bb = im.getchannel('A').point(lambda v: 255 if v > 128 else 0).getbbox()
+    im = im.crop(bb)
     s = STAND_H / im.height
     im = im.resize((round(im.width * s), STAND_H), Image.LANCZOS)
-    bg = Image.new('RGB', im.size, MAGENTA)
+    bg = Image.new('RGB', im.size, (255, 0, 255))
     bg.paste(im, (0, 0), im)
     return bg
 
@@ -78,17 +76,14 @@ def pace_pose(name):
 def main():
     src = open('js/kitsheets.js').read()
     sheets = json.loads(src[src.index('= ') + 2:src.rindex(';')])
-    sheet = Image.open(SRC).convert('RGBA')
-    flat = Image.new('RGB', sheet.size, MAGENTA)
-    flat.paste(sheet, (0, 0), sheet)
-    a = np.array(flat)
+    a = np.array(Image.open(SRC).convert('RGB'))
     clean, n = without_ball(a, pose_boxes(a))
     print('ball pixels removed:', n)
-    canvas = Image.new('RGB', (a.shape[1], EXTRA_Y + STAND_H + 80), MAGENTA)
+    canvas = Image.new('RGB', (a.shape[1], EXTRA_Y + STAND_H + 80), (255, 0, 255))
     canvas.paste(Image.fromarray(clean), (0, 0))
     x = 60
     for i in PACE:
-        p = pace_pose(i)
+        p = pace_pose(i, sheets['back'])
         canvas.paste(p, (x, EXTRA_Y + 20))
         x += p.width + 120
     tmp = os.path.join(tempfile.mkdtemp(), 'spin-back.png')
