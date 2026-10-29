@@ -1,5 +1,5 @@
 import { CFG, phaseFor } from './config.js';
-import { finishLight, NIGHT } from './light.js';
+import { finishLight, groundLight, NIGHT } from './light.js';
 import { makeRng } from './rng.js';
 import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
@@ -3321,6 +3321,7 @@ export class Game {
   render3D(kind) {
     const ctx = this.ctx, S = this.S, cam = this.cams[kind];
     drawBackground(ctx, cam);
+    groundLight(ctx, this.W, this.H, cam.hy, NIGHT[this.ground?.time] ?? 1);   // (the light on the ground, under the figures)
     drawAtmosphere(ctx, cam, this.realTime, Math.max(0, ((this.flareUntil || 0) - this.realTime) / 1600));
     drawBoard(ctx, cam, this.realTime, this.realTime < this.boardUntil ? this.boardMsg : null);
     const items = [];

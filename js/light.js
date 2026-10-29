@@ -25,18 +25,22 @@ export function softShadow(ctx, x, y, rx, ry, a = 0.28) {
   blob(x, y, rx * 0.9, ry / rx * 1.1, a * 3.4);                                  // (the dark core under the feet)
 }
 
+// The pool of warm light on the middle of the ground. It is laid on the ground (right after the background is drawn), under the figures: laid over
+// them it washed the players out (the batter's blue lost a tenth of its colour and its depth).
+export function groundLight(ctx, W, H, hy, night = 0) {
+  if (!light.on || !quality.high) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'soft-light';
+  const g = ctx.createRadialGradient(W / 2, H * 0.7, 0, W / 2, H * 0.7, Math.max(W * 0.95, H * 0.62));
+  g.addColorStop(0, `rgba(255,238,185,${0.42 + 0.14 * night})`); g.addColorStop(0.55, 'rgba(255,238,185,0.12)'); g.addColorStop(1, 'rgba(255,236,190,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, hy, W, H - hy);
+  ctx.restore();
+}
+
 // The finishing pass over a match view (after the figures, before the buttons): W x H is the picture, hy its horizon, night 0..1
 export function finishLight(ctx, W, H, hy, night = 0) {
   if (!light.on) return;
   ctx.save();
-  // a pool of warm light on the middle of the ground
-  if (quality.high) {
-    ctx.globalCompositeOperation = 'soft-light';
-    const g = ctx.createRadialGradient(W / 2, H * 0.7, 0, W / 2, H * 0.7, Math.max(W * 0.95, H * 0.62));
-    g.addColorStop(0, `rgba(255,238,185,${0.42 + 0.14 * night})`); g.addColorStop(0.55, 'rgba(255,238,185,0.12)'); g.addColorStop(1, 'rgba(255,236,190,0)');
-    ctx.fillStyle = g; ctx.fillRect(0, hy, W, H - hy);
-    ctx.globalCompositeOperation = 'source-over';
-  }
   // a vignette: the corners fall away
   const v = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.28, W / 2, H * 0.55, H * 0.78);
   v.addColorStop(0, 'rgba(4,6,20,0)'); v.addColorStop(1, `rgba(4,6,20,${0.4 + 0.14 * night})`);
