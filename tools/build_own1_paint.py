@@ -95,8 +95,7 @@ def main():
         g = np.where(band[..., None] == 1, a, b) * np.ones((1, W, 1))
         fog = np.exp(-(ys - foot) / 60.0)[:, None, None]                 # darker and bluer into the distance, by the stand
         g = g * (1 - 0.35 * fog) + np.array([14, 28, 48]) * 0.35 * fog
-        xs = np.linspace(-1, 1, W)[None, :, None]
-        g = g * (1 - 0.18 * xs ** 2)                                     # the sides a little darker
+        # (no darker sides: the picture is mirrored side by side on a wide screen, and a dark edge would show as a line at every join)
         g += rng.normal(0, 2.2, g.shape)
         img[foot:] = g
         tint = np.zeros((H, W, 3), np.float32); tint[:foot] = tint_all

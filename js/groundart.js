@@ -234,7 +234,7 @@ export const GROUND_ART = {
     "h": 2895,
     "above": 853.5,
     "top": "#070328",
-    "bottom": "#216921",
+    "bottom": "#236f23",
     "tile": true,
     "board": {
      "r": 63.8,
@@ -251,7 +251,7 @@ export const GROUND_ART = {
     "h": 2245,
     "above": 907.4,
     "top": "#070328",
-    "bottom": "#216921",
+    "bottom": "#246f23",
     "tile": true,
     "board": {
      "r": 63.8,
@@ -268,7 +268,7 @@ export const GROUND_ART = {
     "h": 3895,
     "above": 840.1,
     "top": "#070328",
-    "bottom": "#216921",
+    "bottom": "#246f23",
     "tile": true,
     "board": {
      "r": 63.8,
