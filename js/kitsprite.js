@@ -140,10 +140,10 @@ const PREMIUM = {
 };
 const TARGET_HSV = c => hsv(c[0], c[1], c[2]);
 function premiumOf(team) {
-  if (PREMIUM[team.id]) return PREMIUM[team.id].map(hexRgb);
+  if (PREMIUM[team.id]) { const [c, d, t] = PREMIUM[team.id].map(hexRgb); return [c, c.map((x, k) => x * 0.45 + d[k] * 0.55), t]; }   // (the side panels: a deeper shade of the shirt, not a different colour)
   const c = hexRgb(team.suit), [h, sa, v] = hsv(...c);
   // (the yoke and side panels: the same colour, deeper: not the shirt scaled towards black, which left a lime shirt with olive patches and a red one with brown)
-  return [c, rgb(h, Math.min(1, sa * 1.08), v * 0.6), hexRgb(team.trim)];
+  return [c, rgb(h, Math.min(1, sa * 1.08), v * 0.74), hexRgb(team.trim)];
 }
 // A colour at every step of its shading, 0 to 2.5 times the brightness it was drawn at (in hundredths): shadows are the colour darkened with a little more
 // of its colour (not just scaled towards black, which turns yellow to olive and red to brown), lights run on towards white.
@@ -190,6 +190,13 @@ function smoothTone(tn, m, W, H, frames) {
   for (const [fx, fy, fw, fh] of frames || []) for (let y = fy; y < fy + Math.round(fh * 0.15); y++) helmet.fill(1, y * W + fx, y * W + fx + fw);
   return smoothField(val, cnt, W, H, 3, i => (helmet[i] ? [18, 50] : [10, 30]));
 }
+// the weights of the club's three colours (panel, trim), without the speckle: a straps's yellow is one yellow, not yellow with white and green flecks in it
+function smoothWeights(tn, m, W, H) {
+  const n = W * H, cnt = new Float32Array(n), out = [];
+  for (let i = 0; i < n; i++) if (m[i * 4 + 2] === 255 && tn[i * 4 + 2]) cnt[i] = 1;
+  for (const ch of [0, 1]) { const val = new Float32Array(n); for (let i = 0; i < n; i++) if (cnt[i]) val[i] = tn[i * 4 + ch]; out.push(smoothField(val, cnt, W, H, 2, () => [45, 120])); }
+  return out;
+}
 // his skin's brightness the same way, a smaller blur: the muscle's real shadows stay, the mottled painted patches go
 function smoothSkin(src, mask, W, H) {
   const n = W * H, val = new Float32Array(n), cnt = new Float32Array(n);
@@ -202,6 +209,8 @@ const smoothed = new Map();
 const smoothTones = (view, tn, m, W, H) => { if (!smoothed.has(view)) smoothed.set(view, smoothTone(tn, m, W, H, KIT_SHEETS[view].frames)); return smoothed.get(view); };
 const helmets = new Map();   // (the top of each frame of a batter sheet: his helmet is one colour, not the yoke's second one)
 const helmetOf = (view, W, H) => { if (!helmets.has(view)) { const hm = new Uint8Array(W * H); for (const [fx, fy, fw, fh] of KIT_SHEETS[view].frames) for (let y = fy; y < fy + Math.round(fh * 0.15); y++) hm.fill(1, y * W + fx, y * W + fx + fw); helmets.set(view, hm); } return helmets.get(view); };
+const smoothedW = new Map();
+const weightsOf = (view, tn, m, W, H) => { if (!smoothedW.has(view)) smoothedW.set(view, smoothWeights(tn, m, W, H)); return smoothedW.get(view); };
 const smoothedSkin = new Map();
 const skinTones = (view, src, mask, W, H) => { if (!smoothedSkin.has(view)) smoothedSkin.set(view, smoothSkin(src, mask, W, H)); return smoothedSkin.get(view); };
 
@@ -220,13 +229,15 @@ function teamSheet(view, team) {
   if (data.tone) {
     // each colour shaded by the cloth's brightness against that colour's drawn brightness, then
     // mixed by the soft weights (so panel edges and piping blend, no patches)
-    const tgt0 = !!meta.hsv, tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0], luts = pal.map(shades), sm = tgt0 ? null : smoothTones(view, tn, m, c.width, c.height), hm = view === 'bat-back' ? helmetOf(view, c.width, c.height) : null;
+    const tgt0 = !!meta.hsv, tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0], luts = pal.map(shades), sm = tgt0 ? null : smoothTones(view, tn, m, c.width, c.height), hm = view === 'bat-back' ? helmetOf(view, c.width, c.height) : null, sw = tgt0 ? null : weightsOf(view, tn, m, c.width, c.height);
     // (a painted sheet: the hue becomes the club's, the colour's depth and light stay as painted;
     // the club's colours are worked out once, not per pixel)
     const tgt = meta.hsv && pal.map((t, k) => { const [th, ts, tv] = TARGET_HSV(t), [, rs, rv] = meta.hsv[k]; return [th, ts / Math.max(rs, 0.05), tv / Math.max(rv, 0.05)]; });
     for (let i = 0; i < p.length; i += 4) {
       if (m[i + 2] !== 255 || !p[i + 3] || !tn[i + 2]) continue;
-      w[1] = tn[i] / 255; w[2] = tn[i + 1] / 255; w[0] = Math.max(0, 1 - w[1] - w[2]);
+      // (white pads, gloves and boots keep their white: a pixel with next to no colour in it is not kit)
+      if (!tgt0 && Math.max(p[i], p[i + 1], p[i + 2]) - Math.min(p[i], p[i + 1], p[i + 2]) < 34 && lum(p[i], p[i + 1], p[i + 2]) > 120) continue;
+      w[1] = (sw ? sw[0][i >> 2] : tn[i]) / 255; w[2] = (sw ? sw[1][i >> 2] : tn[i + 1]) / 255; w[0] = Math.max(0, 1 - w[1] - w[2]);
       if (hm && hm[i >> 2]) { w[0] += w[1]; w[1] = 0; }   // (his helmet: all in the main colour, no patch of the yoke's)
       const L = sm ? sm[i >> 2] : tn[i + 2];
       let r = 0, gg = 0, b = 0;
@@ -354,7 +365,8 @@ function playerSheet(view, team, look, mirror) {
   const layers = [[hp, style], [bp, beard], [wp, null]].filter(([d]) => d).map(([d, s2]) => [d, s2 ? meta.hair[s2] * 255 : 0]);
   for (let i = 0; i < p.length; i += 4) {
     if (m[i] > 127 && p[i + 3]) {
-      const r = (sl ? sl[i >> 2] : lum(p[i], p[i + 1], p[i + 2])) / sref;
+      let r = (sl ? sl[i >> 2] : lum(p[i], p[i + 1], p[i + 2])) / sref;
+      if (sl) r = Math.max(0.1, 1 + (r - 1) * 1.45);   // (his arm: more of the muscle's light and shade, now that the mottling is gone)
       for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
     }
     if (layers.length) for (const [d, href] of layers) {
