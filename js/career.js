@@ -304,7 +304,7 @@ function refreshRivals(c) {
 }
 
 // ---------- choosing a club ----------
-export function chooseClub(c, teamId) {
+export function chooseClub(c, teamId, { hold = false } = {}) {
   const t = teamById(teamId);
   // (a new career picks from Division 3; after that you stay with your club and climb)
   if (c.club ? teamId !== c.club : !isUnlocked(c, t)) return false;
@@ -313,17 +313,26 @@ export function chooseClub(c, teamId) {
   ensureChirp(c).startDiv = c.chirp.startDiv || divisionOf(c, teamId);   // (where the club started: the fans remember it)
   refreshRivals(c);
   // your scouts' finds come first, at their set price; then the auction
-  if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c);
+  if (hold) c.phase = 'trials'; else if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c);
   return true;
 }
 
 // Your own club: it takes the place of the weakest Division 3 club (its budget and ground), and
 // that club's regulars become a squad of young unknowns: rough now, with room to grow.
 // spec: { name, short, suit, trim, emblem, ground, crest (an image URL) }
-export function createClub(c, spec) {
+export function createClub(c, spec, { trials = false } = {}) {
   if (c.club) return false;
   const base = [...c.divisions.d3].sort((a, b) => clubRating(c, a) - clubRating(c, b))[0];
   const rng = makeRng(hashStr(`mine-${c.seed}`));
+  if (trials) {
+    // the story's way: the club starts with nobody. The regulars of the club it replaces go back on the market, and the squad is chosen in the nets (trialists, below)
+    for (const p of clubPlayers(c, base)) { p.team = null; p.contract = 0; }
+    c.custom = { ...spec, base, gone: teamById(base).name, stadium: 1 };
+    setMyClub(c.custom);
+    if (!chooseClub(c, base, { hold: true })) return false;
+    makeTrialists(c);
+    return true;
+  }
   for (const p of clubPlayers(c, base)) {
     const main = Math.max(...primary(p).map(k => p[k]));
     p.age = rng.int(18, 21);
@@ -334,6 +343,61 @@ export function createClub(c, spec) {
   setMyClub(c.custom);
   return chooseClub(c, base);
 }
+
+// ---------- the net trials: a new club's first squad (the story) ----------
+// Dev has found a keeper; the rest of the squad is picked in the nets from six batters and six bowlers (none of them any good yet: they are
+// young, and each has a type). The founder, Kabir, is already in it and can't be sold. You pick 4 batters and 5 bowlers: 4 + 5 + the keeper + Kabir = 11.
+export const TRIAL_BATS = [
+  { label: 'Aggressive opener', trait: 'Quick starter' }, { label: 'Power batter', trait: 'Swings from the first ball' }, { label: 'Anchor', trait: 'Hard to dislodge' },
+  { label: 'Finisher', trait: 'Calm when it counts' }, { label: 'Touch batter', trait: 'Sweet timing' }, { label: 'Tactical batter', trait: 'Finds the gaps' },
+];
+export const TRIAL_BOWLS = ['express', 'swing', 'seam', 'leftpace', 'offspin', 'legspin'];
+export const TRIAL_PICKS = { bat: 4, bowl: 5 };
+const KABIR = { id: 'kabir-anand', name: 'Kabir Anand', short: 'Kabir', nick: 'The Founder', nation: 'IN', role: 'bat', label: 'Tactical batter', trait: 'Plays through the pain', bat: 66, bowl: null, bowlSkill: 0, number: 9, hero: false };
+function trialPlayer(c, rng, base, extra) {
+  const nation = pickNation(rng), used = new Set(Object.values(c.players).map(p => p.name));
+  let name;
+  do { name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+  const id = `tr-${++c.youthNo}`;
+  const w = rng.int(0, WEAK.length - 1);
+  return newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), hero: false, ...base,
+    ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
+  { age: rng.int(18, 24), pot: rng.int(62, 84), team: null, contract: 0, trial: true, app: randomLook(nation, rng), ...extra });
+}
+function makeTrialists(c) {
+  const rng = makeRng(hashStr(`trial-${c.seed}`));
+  const T = { bats: [], bowls: [], keeper: null, results: null };
+  for (const b of TRIAL_BATS) {
+    const bat = rng.int(46, 60), p = trialPlayer(c, rng, { role: 'bat', label: b.label, trait: b.trait, bat, bowl: null, bowlSkill: 0 }, {});
+    c.players[p.id] = p; T.bats.push(p.id);
+  }
+  for (const type of TRIAL_BOWLS) {
+    const p = trialPlayer(c, rng, { role: 'bowl', label: `${bowlType(type).name}`, trait: 'A net bowler with something to prove', bat: rng.int(12, 28), bowl: type, bowlSkill: rng.int(46, 62) }, {});
+    c.players[p.id] = p; T.bowls.push(p.id);
+  }
+  const k = trialPlayer(c, rng, { role: 'wk', label: 'Keeper-batter', trait: 'Safe hands, quick feet', bat: rng.int(48, 58), bowl: null, bowlSkill: 0 }, { trial: false, age: rng.int(22, 27) });
+  k.team = c.club; k.contract = 3; c.players[k.id] = k; T.keeper = k.id;
+  // the founder: in the squad from the start, on a contract that never ends, and never sold
+  const kab = newPlayer({ ...KABIR, ai: { ...WEAK[0], honesty: 0.7, fire: 0.3, rattle: 0.4 } }, { age: 24, pot: 82, team: c.club, contract: 99, founder: true, app: { skin: 2, hair: 1, style: 'curly', beard: 'none', cut: 'curly' } });
+  c.players[kab.id] = kab;
+  c.trial = T;
+}
+// the picks: 4 batters and 5 bowlers from the trialists. They join; the others stay on the market (the auction sells them). The club has no money for its first auction.
+export function signTrialists(c, batIds, bowlIds) {
+  const T = c.trial;
+  if (!T || batIds.length !== TRIAL_PICKS.bat || bowlIds.length !== TRIAL_PICKS.bowl) return false;
+  if (!batIds.every(id => T.bats.includes(id)) || !bowlIds.every(id => T.bowls.includes(id)) || new Set([...batIds, ...bowlIds]).size !== batIds.length + bowlIds.length) return false;
+  for (const id of [...T.bats, ...T.bowls]) c.players[id].trial = false;
+  for (const id of [...batIds, ...bowlIds]) { const p = c.players[id]; p.team = c.club; p.contract = 3; }
+  c.money = 0;
+  c.lineup = null;
+  c.trialDone = { bats: batIds, bowls: bowlIds };
+  delete c.trial;
+  startAuction(c);
+  return true;
+}
+// the auction's pool must not include the trialists still being judged
+const inTrial = p => !!p.trial;
 
 // Your club's ground, in three levels: bigger crowds pay more at every home match. The Arena
 // is for clubs out of Division 3.
@@ -381,7 +445,7 @@ function aiMaxes(c, p) {
   return out;
 }
 export function startAuction(c) {
-  const pool = Object.values(c.players).filter(p => !p.team && !p.retired).sort((a, b) => value(b) - value(a));
+  const pool = Object.values(c.players).filter(p => !p.team && !p.retired && !inTrial(p)).sort((a, b) => value(b) - value(a));
   c.auction = { lots: pool.map(p => p.id), idx: 0, lot: null, results: [] };
   c.phase = 'auction';
   openLot(c);
@@ -468,7 +532,7 @@ function chirpContracts(c) {
 // you let a player go
 export function releasePlayer(c, id) {
   const p = c.players[id];
-  if (!p || p.team !== c.club) return false;
+  if (!p || p.team !== c.club || p.founder) return false;   // (the founder is never let go)
   chirpLeft(c, p, 'released');
   p.team = null; p.contract = 0;
   return true;

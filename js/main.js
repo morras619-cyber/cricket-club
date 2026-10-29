@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS } from './grounds.js';
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -750,7 +750,13 @@ async function startMatch(opts) {
   const mode = opts.mode;
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
   let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = {}, pools = null, rival = null, home = null;
-  if (mode === 'tutorial' && opts.opening) {
+  if (mode === 'tutorial' && opts.trial) {
+    // the nets: your own club's colours, the candidates as the pool, another Division 3 club as the net bowlers and batters
+    const c = profile.career, T = opts.trial, oppId = c.divisions.d3.find(id => id !== c.club);
+    team = c.club; opp = oppId; home = c.club; levels = {};
+    pools = { mine: [...T.bats, ...T.bowls].map(id => enginePlayer(c.players[id])), opp: clubPool(c, oppId) };
+    sq = clubHeroes(pools.mine); rival = clubHeroes(pools.opp);
+  } else if (mode === 'tutorial' && opts.opening) {
     // the story's final: Thunder Strikers (Kabir's side) at home against the Volt Vipers
     team = 'thunder'; opp = 'vipers'; home = 'thunder'; levels = {}; sq = starSquad('thunder'); rival = starSquad('vipers');
   } else if (mode === 'tutorial' && opts.story) {
@@ -802,7 +808,7 @@ async function startMatch(opts) {
   let summary;
   try {
     summary = await game.runMatch({
-      mode, story: !!opts.story, opening: !!opts.opening, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+      mode, story: !!opts.story, opening: !!opts.opening, trial: opts.trial ? { bats: opts.trial.bats.map(id => profile.career.players[id]).map(enginePlayer), bowls: opts.trial.bowls.map(id => profile.career.players[id]).map(enginePlayer) } : null, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
       records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill), crowd: mode === 'career' && profile.career?.chirp ? crowdOf(profile.career) : 0,
     });
   } catch (e) {
@@ -814,7 +820,7 @@ async function startMatch(opts) {
     game.matchActive = false;
     stopAmbience(); crowdStop(); game.crowdLive = false;
   }
-  if (opts.opening) { game.quit(); return summary; }   // (the story's final: no result screen, the story goes on)
+  if (opts.opening || opts.trial) { game.quit(); return summary; }   // (the story's final: no result screen, the story goes on)
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   showResult(summary);
@@ -1177,7 +1183,8 @@ function renderCareer(notes = careerNotes) {
   $('career').classList.toggle('in-auction', c.phase === 'auction' && careerView !== 'squad'); // the auction's own backdrop (css), also on its closing card
   $('careerTitle').textContent = bidding ? `Season ${c.season} auction` : `Season ${c.season}`;
   const club = c.club ? teamById(c.club) : null;
-  $('careerLede').textContent = club
+  $('careerLede').textContent = club && c.phase === 'trials' ? `${club.name} · ${divisionName(divisionOf(c, c.club))} · picking the first squad`
+    : club
     ? `${club.name} · ${divisionName(divisionOf(c, c.club))} · ${money(c.money)} to spend · rating ${clubRating(c, c.club)}`
     : `Super League career · ${money(c.money)} to spend`;
   $('careerSquad').hidden = !club || c.phase === 'pick';
@@ -1189,7 +1196,7 @@ function renderCareer(notes = careerNotes) {
   if (c.news?.length && (c.phase === 'scouts' || c.phase === 'auction') && !c.auction?.results?.length) {
     const n = el('div', 'panel paper statcard'); n.append(el('h3', '', 'Off-season news')); for (const x of c.news) n.append(el('div', 'kotie', x)); body.append(n);
   }
-  ({ pick: careerPick, scouts: careerScouts, auction: careerAuction, season: careerSeason, playoff: careerPlayoff, done: careerDone })[c.phase](c, body);
+  ({ pick: careerPick, trials: careerTrials, scouts: careerScouts, auction: careerAuction, season: careerSeason, playoff: careerPlayoff, done: careerDone })[c.phase](c, body);
   autoPages(body, 'Now');
   saveProfile(profile);
 }
@@ -1364,14 +1371,74 @@ $('mkGo').addEventListener('click', () => {
   if (name.length < 3) { ui.toast('Give your club a name first'); $('mkNameIn').focus(); return; }
   if (!mk.crest) return;
   const c = mk.c;
-  if (createClub(c, { name, short: mkShort(), suit: mk.suit, trim: mk.trim, emblem: mk.emblem, ground: mkGroundName(), crest: mk.crest })) {
+  if (createClub(c, { name, short: mkShort(), suit: mk.suit, trim: mk.trim, emblem: mk.emblem, ground: mkGroundName(), crest: mk.crest }, { trials: true })) {
     setLogo(mk.pid, null); mk = null;
     sfx.dhol(); saveProfile(profile);
     careerNotes = [`🏟️ ${name} are born! They take the place of ${c.custom.gone} in Division 3.`];
     renderCareer();
-    coachOnce('madeClub', DEV.madeClub);
   }
 });
+
+// ---------- the nets: the new club's first squad (career.js net trials) ----------
+let trialSel = null;
+const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const statLine = (r, bat) => (bat ? `${r.runs} off ${r.balls} · ${pl(r.fours, 'four')} · ${pl(r.sixes, 'six').replace('sixs', 'sixes')} · out ${r.outs ? pl(r.outs, 'time') : 'never'}` : `${r.outs} for ${r.runs} · ${pl(r.dots, 'dot')} · ${pl(r.fours + r.sixes, 'boundary').replace('boundarys', 'boundaries')}`);
+async function runTrials(c) {
+  const T = c.trial;
+  const sum = await startMatch({ mode: 'tutorial', trial: { bats: T.bats, bowls: T.bowls } });
+  if (sum?.trial) { T.results = sum.trial; saveProfile(profile); }
+  renderCareer();
+}
+function careerTrials(c, body) {
+  const T = c.trial;
+  if (!T) return;
+  const note = el('div', 'panel paper statcard');
+  if (!T.results) {
+    note.append(el('h3', '', '🏏 The nets'), el('p', 'tnote', `${c.custom.name} have a ground, a name and a crest, and two players: you and a keeper Dev found. The rest of the squad is picked in the nets: face six balls from each of six batters, and bowl six with each of six bowlers. Then you choose.`));
+    const go = el('button', 'bigbtn primary', 'Go to the nets');
+    go.addEventListener('click', () => { sfx.click(); runTrials(c); });
+    note.append(go); body.append(note);
+    coachOnce('trials', DEV.trials);
+    return;
+  }
+  if (!trialSel || trialSel.c !== c) trialSel = { c, bats: new Set(), bowls: new Set() };
+  note.append(el('h3', '', '✅ Pick your squad'), el('p', 'tnote', `Choose ${TRIAL_PICKS.bat} batters and ${TRIAL_PICKS.bowl} bowlers. With the keeper and you, that makes eleven.`));
+  const sign = el('button', 'bigbtn primary', '');
+  note.append(sign); body.append(note);
+  const refresh = () => {
+    const nb = trialSel.bats.size, nw = trialSel.bowls.size, ok = nb === TRIAL_PICKS.bat && nw === TRIAL_PICKS.bowl;
+    sign.textContent = ok ? 'Sign the squad' : `Batters ${nb}/${TRIAL_PICKS.bat} · Bowlers ${nw}/${TRIAL_PICKS.bowl}`;
+    sign.disabled = !ok;
+    for (const b of body.querySelectorAll('.tcard')) b.classList.toggle('on', (b.dataset.k === 'bat' ? trialSel.bats : trialSel.bowls).has(b.dataset.id));
+  };
+  const section = (title, ids, kind, max) => {
+    const box = el('div', 'panel paper statcard'); box.append(el('h3', '', title));
+    for (const id of ids) {
+      const p = c.players[id], r = T.results[kind === 'bat' ? 'bats' : 'bowls'][id];
+      const card = el('button', 'tcard'); card.dataset.id = id; card.dataset.k = kind;
+      const bt = kind === 'bat' ? p.label : bowlType(p.bowl).name;
+      const rate = kind === 'bat' ? `Bat ${p.bat}` : `Bowl ${p.bowlSkill}`;
+      card.append(el('b', '', p.name), el('span', 'tt', `${bt} · ${p.age} · ${rate} · ${'★'.repeat(potentialStars(p))}${'☆'.repeat(5 - potentialStars(p))}`), el('span', 'tr', r ? `Nets: ${statLine(r, kind === 'bat')}` : 'Not tried'));
+      card.addEventListener('click', () => {
+        const set = kind === 'bat' ? trialSel.bats : trialSel.bowls;
+        if (set.has(id)) set.delete(id); else if (set.size < max) set.add(id); else ui.toast(`You can only sign ${max} ${kind === 'bat' ? 'batters' : 'bowlers'}: put one back first`);
+        sfx.click(); refresh();
+      });
+      box.append(card);
+    }
+    return box;
+  };
+  body.append(section('Batters', T.bats, 'bat', TRIAL_PICKS.bat), section('Bowlers', T.bowls, 'bowl', TRIAL_PICKS.bowl));
+  sign.addEventListener('click', () => {
+    if (!signTrialists(c, [...trialSel.bats], [...trialSel.bowls])) return;
+    trialSel = null; sfx.dhol(); saveProfile(profile);
+    careerNotes = [`✍️ ${c.custom.name}'s first eleven is signed.`];
+    renderCareer();
+    coachOnce('trialsDone', DEV.trialsDone);
+  });
+  refresh();
+  coachOnce('trialsPick', DEV.trialsPick);
+}
 
 // the pre-season auction
 function careerAuction(c, body) {

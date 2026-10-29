@@ -303,6 +303,7 @@ export class Game {
     this.adapt = opts.level != null ? dialsFor(opts.level, adaptScale(mode)) : NO_DIALS;
     this.mindOn = this.heatOn; this.mind = this.mindOn ? new Mind(makeRng((this.seed ^ 0x5bd1e995) >>> 0), { gain: this.adapt.mind }) : null; this.myCounter = null; this.aiCounterNow = null;
     try {
+      if (mode === 'tutorial' && opts.trial) return await this.runTrial(opts.trial);
       if (mode === 'tutorial') return opts.opening ? await this.runOpening() : await this.runTutorial(!!opts.story);
       await this.pitchReport();
       const script = aiBowlingScript(this.seed, this.aiPlan, this.mindOn ? null : this.rival.bowl?.power.kind);   // (with a mind the AI chooses its own moment for the power)
@@ -2969,6 +2970,70 @@ export class Game {
   }
 
   // ---------- Issue #1: the tutorial over ----------
+  // the net trials (career.js TRIAL_*): every candidate faces six balls (a batter, with a net bowler) or bowls six (a bowler, at a net batter), played for
+  // real as him: his rating and type decide the timing windows and how the ball does. A wicket costs nothing (it is only the nets). Returns what each did.
+  async runTrial({ bats = [], bowls = [] }) {
+    const out = { bats: {}, bowls: {} };
+    const net = this.oppSide.attack[0], netBat = this.oppSide.order[0], netMate = this.oppSide.order[1] || netBat;
+    this.fieldState.setting = 'off';   // (the nets: no fielding mini-games)
+    this.charge.value = 40; this.ui.charge(40);
+    const tally = (inn, from) => {
+      const d = inn.detail.slice(from), s = { balls: d.length, runs: 0, outs: 0, fours: 0, sixes: 0, dots: 0 };
+      for (const x of d) { s.runs += x.r; if (x.k) s.outs++; if (x.r === 4) s.fours++; if (x.r === 6) s.sixes++; if (x.r === 0 && !x.k) s.dots++; }
+      return s;
+    };
+    const script = aiBowlingScript(this.seed, this.aiPlan, null);
+    this.mySide.order.splice(0, this.mySide.order.length, ...bats);
+    this.phase = 'bat';
+    this.ui.shotButton(true, this.shotLoft, () => { this.shotLoft = !this.shotLoft; sfx.click(); return this.shotLoft; });
+    for (const [bi, cand] of bats.entries()) {
+      const inn = new Innings('player', null, { balls: 6, wkts: 99 });
+      this.innings.push(inn);
+      inn.setBatter(cand); inn.setBowler(net);
+      this.hud(inn);
+      this.ui.banner(`NET TRIAL ${bi + 1}/${bats.length}`, `${cand.name} · ${cand.label}`, 2200);
+      await this.sleepReal(this.bot ? 100 : 2300);
+      for (let k = 0; k < 6; k++) {
+        const spec = script[(bi * 6 + k) % script.length];
+        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? 'HOLD · SWIPE · LIFT ON THE RING · TAP TO DEFEND' : undefined, extra: 25 });
+        if (!inn.cur.id) inn.setBatter(cand);   // (bowled in the nets: back to the crease)
+        this.hud(inn);
+        await this.sleepReal(this.bot ? 60 : 450);
+      }
+      out.bats[cand.id] = tally(inn, 0);
+      const r = out.bats[cand.id];
+      this.ui.banner(`${cand.short || cand.name}: ${r.runs} off 6`, `${r.fours} fours · ${r.sixes} sixes · out ${r.outs} time${r.outs === 1 ? '' : 's'}`, 2200);
+      await this.sleepReal(this.bot ? 100 : 2300);
+    }
+    this.ui.shotButton(false);
+    this.mySide.attack.splice(0, this.mySide.attack.length, ...bowls);
+    this.phase = 'bowl';
+    this.bowlHistory = []; this.aiPowerBalls = new Set(); this.freeHit = false; this.lastBowlerId = null;
+    for (const [bi, cand] of bowls.entries()) {
+      const inn = new Innings('ai', null, { balls: 6, wkts: 99 });
+      this.innings.push(inn);
+      inn.setBowler(cand); inn.setBatter(netBat); inn.setPartner(netMate);
+      this.hud(inn);
+      this.ui.banner(`NET TRIAL ${bi + 1}/${bowls.length}`, `${cand.name} · ${cand.label}`, 2200);
+      await this.sleepReal(this.bot ? 100 : 2300);
+      while (inn.balls < 6) {
+        const wk = inn.wkts;
+        const r = await this.bowlBall(inn, inn.balls + 1, { hint: inn.balls === 0 ? 'SWIPE FROM YOUR BOWLER UP THE PITCH' : undefined });
+        if (!inn.cur.id) inn.setBatter(netBat);
+        if (inn.wkts > wk) inn.setPartner(netMate);
+        this.hud(inn);
+        if (r?.rebowl) continue;
+        await this.sleepReal(this.bot ? 60 : 350);
+      }
+      out.bowls[cand.id] = tally(inn, 0);
+      const r = out.bowls[cand.id];
+      this.ui.banner(`${cand.short || cand.name}: ${r.outs} for ${r.runs}`, `${r.dots} dots · ${r.fours} fours · ${r.sixes} sixes`, 2200);
+      await this.sleepReal(this.bot ? 100 : 2300);
+    }
+    this.ui.fieldButton(false);
+    return { mode: 'tutorial', trial: out, innings: this.innings, result: { outcome: 'win', text: '' }, moments: [], team: this.team, rival: this.rival, seed: this.seed, stats: this.stats };
+  }
+
   // the story's first match (js/comic.js, then main.js careerOpening): the final, Thunder Strikers batting first on 34 for 1 after three overs.
   // Kabir walks in with a bad knee: he is in pain, you can play whatever shot you like, and the first ball bowls him (a golden duck, 34 for 2).
   async runOpening() {

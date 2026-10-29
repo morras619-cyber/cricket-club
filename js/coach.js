@@ -130,7 +130,21 @@ export const DEV = {
   makeClub: [
     "Your own club? Now that's the spirit, beta! Give it a name the crowd can sing.",
     "Pick two colours that look good together: a bold main colour and a bright trim. Then choose a crest.",
-    "You'll start in Division 3 with a squad of young unknowns. Raw, but they'll grow with you.",
+    "You'll start in Division 3. We have a ground, a name and not one player yet. We'll fix that in the nets.",
+  ],
+  trials: [
+    "Good news, beta. I found you a wicketkeeper who'll play for nothing. He's yours, and so are you: you're on the team sheet too.",
+    "The rest we pick in the nets. Six batters, six bowlers. None of them is any good yet, so don't expect miracles.",
+    "Face six balls from each batter, and bowl six with each bowler. Watch how they play, then choose four batters and five bowlers.",
+    "Think about what a side needs: openers, power hitters, someone who stays in. Fast bowlers, swing, spin. A good eleven needs a bit of everything.",
+  ],
+  trialsPick: [
+    "That's all of them. Now the hard part: you can only sign four batters and five bowlers.",
+    "Look at what they did in the nets, but look at their age and potential too. A raw boy can grow into a star.",
+  ],
+  trialsDone: [
+    "Eleven players. A name. A ground with weeds. That's a club, beta!",
+    "We have no money for this year's auction, so we just watch. See how the big clubs buy: you'll learn who pays what.",
   ],
   madeClub: [
     "Welcome to the league! Every big club started like this: a few kids, a small ground and a dream.",
