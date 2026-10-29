@@ -25,6 +25,7 @@ import { ensureChirp, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crow
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
+import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
@@ -251,7 +252,8 @@ $('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!pr
 // ---------- home: the hub ----------
 function renderHome() {
   ui.show('home');
-  warWatch(); warBanner();
+  $('btnWar').hidden = !FEATURES.war; $('btnPass').hidden = !FEATURES.pass;
+  if (FEATURES.war) { warWatch(); warBanner(); }
   const { lv, progress } = level(profile.xp);
   $('lvl').textContent = `Lv ${lv}`;
   $('xpFill').style.width = `${Math.round(progress * 100)}%`;
@@ -1987,7 +1989,7 @@ function showResult(summary) {
   }
   const extra = [];
   if (got.length) extra.push(...got.map(a => `🏅 ${a.name} +${a.coins}`));
-  if (rewards.pass) extra.push(`Season Pass tier ${rewards.pass}!`);
+  if (rewards.pass && FEATURES.pass) extra.push(`Season Pass tier ${rewards.pass}!`);
   const rewardLine = `+${rewards.xp} XP · +${rewards.coins} coins${rewards.gems ? ` · +${rewards.gems} 💎` : ''} · Level ${level(profile.xp).lv}`;
   $('resRewards').textContent = [rewardLine, ...extra].join(' · ');
   // this match's scorecard
@@ -2063,7 +2065,7 @@ function showResult(summary) {
     const c = el('div', `rc rc-${cls}`); c.append(el('b', '', big), el('small', '', small)); chips.append(c);
   }
   hl.append(chips);
-  if (rewards.pass) hl.append(el('div', 'row notes', `Season Pass tier ${rewards.pass}!`));
+  if (rewards.pass && FEATURES.pass) hl.append(el('div', 'row notes', `Season Pass tier ${rewards.pass}!`));
   const hlRows = [];
   for (const row of [...ms.children]) {
     const tag = row.querySelector?.('.badge')?.textContent;

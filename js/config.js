@@ -59,6 +59,9 @@ export const CFG = {
   ],
 };
 
+// Features switched off for now (the code and the saved data stay, so they can come back): the Weekend War and the Season Pass.
+export const FEATURES = { war: false, pass: false };
+
 export function phaseFor(ballNo) {
   return CFG.phases.find(p => ballNo >= p.from && ballNo <= p.to) || CFG.phases[2];
 }
