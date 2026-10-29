@@ -900,7 +900,7 @@ export function drawAtmosphere(ctx, cam, t, flare = 0) {
 const BOARD_TEXT = '★ SIXCHARGE ★   SUPERHERO CRICKET   ★ 6 ★ 4 ★ 6 ★   POWER UP!   ';
 export function drawBoard(ctx, cam, t, message) {
   const b = cam.board;
-  if (!b) return;
+  if (!b || NETS) return;   // (no scrolling LED boards at the nets)
   const { W } = cam;
   if (b.painted) return drawPaintedBoard(ctx, cam, t, message);
   const gr = ctx.createLinearGradient(0, 0, W, 0);

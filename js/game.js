@@ -24,6 +24,7 @@ import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './units.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { netBall } from './nets.js';
 import { adaptScale, NO_DIALS, dialsFor } from './adapt.js';
 import { CROWD_TIMING } from './chirp.js';
 import { DISCO_MS, DISCO_LEAD_MS, discoColors, drawDisco } from './disco.js';
@@ -271,7 +272,8 @@ export class Game {
     this.crowdLift = opts.crowd && this.home === this.myTeam.id ? CROWD_TIMING * opts.crowd : 0;
     this.pitch = pitchOf(this.home);
     preloadEffects('electric');
-    setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; }, { nets: !!opts.trial });
+    this.nets = !!opts.trial;   // the net trials: a practice net (scene.js setGround), no non-striker, the ball stopped by the nets
+    setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; }, { nets: this.nets });
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
     // hero levels: stronger heroes and cheaper signature powers
     this.levels = opts.levels || {};
@@ -837,7 +839,7 @@ export class Game {
     S.bowler.look = teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.bowler.z = 20.6 + runUp(btype).m;   // (he waits where his run-up starts)
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler); // their own skin and hair on the drawn sprites
-    const partner = this.nonStrikerOf(inn);
+    const partner = this.nets ? null : this.nonStrikerOf(inn);   // (the nets: one batter)
     S.nonStriker = partner ? { team: this.myTeam, people: lookOf(partner) } : null;
     if (btype.left) S.bowler.x = -0.6;
     const rng = this.ballRng(ballNo);
@@ -1576,7 +1578,19 @@ export class Game {
     if (this.O) { this.O.batters[0].y = pos(0); this.O.batters[1].y = pos(1); this.O.running = t < total && runs > 0; }
   }
 
+  // A shot in the nets: the ball hits the net and drops (js/game.js netBall), so there is no field to watch. The runs it was worth are still said
+  // (the trial counts them), and a catch still counts as out.
+  async netPlay(sim, o) {
+    const runs = o.caught ? 0 : sim.runs;
+    await this.sleepReal(this.bot ? 0 : 700);
+    if (!o.caught) {
+      const word = sim.kind === 'six' ? 'SIX!' : sim.kind === 'four' && !o.saved ? 'FOUR!' : runs > 0 ? `${runs} RUN${runs === 1 ? '' : 'S'}` : null;
+      if (word) this.fx.word(word, this.W / 2, this.H * 0.3, { size: sim.kind === 'six' || sim.kind === 'four' ? 64 : 44, color: '#fff4da', stroke: INK });
+    }
+    await this.sleepReal(this.bot ? 0 : 700);
+  }
   async showAutoPlay(sim, fielders, o = {}) {
+    if (this.nets) return this.netPlay(sim, o);   // (the nets: the ball stays in the cage)
     const fs = this.setupOutfield(fielders, o.side || 'ai');
     const path = sim.path;
     let actor = null, target = null, tArrive = 0;
@@ -3275,6 +3289,7 @@ export class Game {
     }
     if (S.flight) {
       const t = this.gameTime - S.flight.t0, f = S.flight;
+      if (this.nets) return netBall(f, t);   // (a ball hit in the nets hits the net and drops)
       const y = f.p0.y + f.vy * t - 4.9 * t * t;
       return { x: f.p0.x + f.vx * t, y: Math.max(0.03, y), z: f.p0.z + f.vz * t };
     }
