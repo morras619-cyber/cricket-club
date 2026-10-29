@@ -31,6 +31,7 @@ import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 import { storyIntro, taunt } from './story.js';
+import { playComic } from './comic.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
 import { TossAnim, loadToss } from './toss.js';
@@ -2109,7 +2110,8 @@ document.addEventListener('visibilitychange', () => {
   setupClubTabs();
   watchBlock('#pickteam .pt');
   game.resize(); // redraw the cached stadium now the comic font is ready
-  if (challenge || window.__SIXCHARGE_BOT) renderHome();
+  if (new URLSearchParams(location.search).get('comic') === 'opening') { ui.show(null); playComic().then(renderHome); }   // (a way to see the story opening while it is being made)
+  else if (challenge || window.__SIXCHARGE_BOT) renderHome();
   else renderTitle(); // (the title screen first for everyone; Play goes on to the tutorial or the hub)
   // the logo splash: up for a moment, then it fades away
   const splash = $('splash');
