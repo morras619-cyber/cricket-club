@@ -16,7 +16,7 @@ export function loadHair() {
 export const hairReady = view => atlases[view]?.complete && atlases[view].naturalWidth;
 
 // the looks' style names onto the drawn pieces ('short' alternates between two cuts)
-const CUTS = { crop: 'buzz', swept: 'messy', spiky: 'spiky', curly: 'curly', long: 'long', afro: 'curly', dreads: 'dreads', bald: 'bald' };
+const CUTS = { crop: 'buzz', swept: 'messy', spiky: 'spiky', curly: 'curly', long: 'long', afro: 'afro', dreads: 'dreads', bald: 'bald' };
 const CHINS = { stubble: 'stubble', moustache: 'moustache', beard: 'full', goatee: 'goatee' };
 const WEARS = { patka: 'turban' };
 function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }

@@ -93,8 +93,8 @@ function hairData(view, style) {
 const CHIN = { full: 'beard_full', beard: 'beard_full', stubble: 'beard_stubble', moustache: 'beard_moustache', goatee: 'beard_goatee', long: 'beard_long' };
 export const beardOf = look => CHIN[look.chin] || (look.chin === undefined ? CHIN[look.beard] : null) || null;
 export const wearOf = look => (look.wear === 'cap' ? 'cap' : null);
-const CUT = { part: 'part', messy: 'messy', buzz: 'buzz', curly: 'curly', spiky: 'spiky', long: 'long', ponytail: 'ponytail', dreads: 'dreads', bun: 'bun' };
-const STYLE = { crop: 'buzz', swept: 'messy', spiky: 'spiky', curly: 'curly', long: 'long', afro: 'curly', dreads: 'dreads', patka: 'buzz' };
+const CUT = { part: 'part', messy: 'messy', buzz: 'buzz', curly: 'curly', spiky: 'spiky', long: 'long', ponytail: 'ponytail', dreads: 'dreads', bun: 'bun', sweep: 'sweep', shag: 'shag', wavy: 'wavy', ringlets: 'ringlets', quiff: 'quiff', fuzz: 'fuzz', fringe: 'fringe', slick: 'slick', afro: 'afro', swoop: 'swoop' };
+const STYLE = { crop: 'buzz', swept: 'messy', spiky: 'spiky', curly: 'curly', long: 'long', afro: 'afro', dreads: 'dreads', patka: 'buzz' };
 export function hairStyleOf(look) {
   if (look.wear === 'cap') return null; // the cap's drawing has his short sides under it
   if (look.cut === 'bald' || (!look.cut && look.style === 'bald')) return null;
