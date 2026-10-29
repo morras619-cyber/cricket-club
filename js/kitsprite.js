@@ -32,6 +32,8 @@ const POSE_BAT = Object.fromEntries(['ready', 'leave1', 'leave2', 'backlift', 'd
   'pull1', 'pull2', 'def1', 'def2', 'def3', 'cut1', 'cut2', 'cut3', 'cut4',
   'bowled', 'celebrate', 'rsweep1', 'rsweep2', 'rsweep3', 'straight1', 'straight2', 'ondrive1', 'ondrive2', 'cover1'].map((n, i) => [n, i]));
 const PAINT_STAND_IN = { bowled: 'def1' };
+// poses only the painted sheet has: the old sheet's nearest
+const OLD_STAND_IN = { cover0: 'drive2', cover2: 'drive2', cover3: 'drive3', cutflat: 'cut2', loft1: 'drive3', straight3: 'straight2' };
 const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
 // the fielders (22 poses, tools/kit/compose_fielder.py): crouched ready from the front, side and back;
 // running away, across (facing right), toward the camera, turning; reaching up; the dive (to the right);
@@ -53,10 +55,11 @@ function image(src) {
 }
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
-// ?painted=0 in the address (or sixcharge.painted = 0) shows the old stance instead of the painted one, to compare
-export const painted = { off: (() => { try { return /[?&]painted=0/.test(location.search) || localStorage.getItem('sixcharge.painted') === '0'; } catch { return false; } })() };
+// The painted batter (img/kit/bat-paint.*) is shelved: the old batter sheet is the one in play. ?painted=1 in the address
+// (or sixcharge.painted = 1) brings the painted one back, to compare.
+export const painted = { off: (() => { try { return !(/[?&]painted=1/.test(location.search) || localStorage.getItem('sixcharge.painted') === '1'); } catch { return true; } })() };
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'bat-back', 'bat-paint', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back', 'bat-paint', 'field']) if (!views[view] && KIT_SHEETS[view] && !(view === 'bat-paint' && painted.off)) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -481,7 +484,7 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
   const one = (name, alpha) => {
     ctx.globalAlpha = alpha;
     // (getting bowled has no painted pose yet: the defensive one stands in)
-    const fi = usePaint ? pm.names[pm.names[name] != null ? name : PAINT_STAND_IN[name] ?? 'def1'] : POSE_BAT[name] ?? 0;
+    const fi = usePaint ? pm.names[pm.names[name] != null ? name : PAINT_STAND_IN[name] ?? 'def1'] : POSE_BAT[name] ?? POSE_BAT[OLD_STAND_IN[name]] ?? 0;
     const [sx, sy, w, h, ax, ay] = meta.frames[fi];
     ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   };
