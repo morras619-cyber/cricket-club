@@ -21,32 +21,34 @@ function build() {
   if (box) return box;
   box = mk('div', 'comic'); box.id = 'comic'; box.hidden = true;
   box.innerHTML = '<div class="cm-art"><div class="cm-pic"></div><div class="cm-shade"></div><div class="cm-sfx"></div>'
-    + '<svg class="cm-tail" aria-hidden="true"><path/></svg><div class="cm-bub"><b></b><p></p></div></div>'
+    + '<div class="cm-speech"><svg class="cm-tail" aria-hidden="true"><path/></svg><div class="cm-bub"><b></b><p></p></div></div></div>'
     + '<div class="cm-btns"><button class="cm-skip">Skip</button><span class="cm-dots"></span><button class="cm-next">Next</button></div>';
   $('app').append(box);
   return box;
 }
 
-// the bubble up, with its tail to the point (fractions of the picture): the speech sits above-right of the head, a message above the phone
+// the bubble up, with its tail to the point (fractions of the picture): the speech sits above-right of the head, a message above the phone.
+// The bubble and its tail are one outline (one path), so no line crosses where the tail joins.
 function place(b, art, beat) {
-  const bub = b.querySelector('.cm-bub'), tail = b.querySelector('.cm-tail'), sfx = b.querySelector('.cm-sfx');
+  const sp = b.querySelector('.cm-speech'), bub = b.querySelector('.cm-bub'), tail = b.querySelector('.cm-tail'), sfx = b.querySelector('.cm-sfx');
   const W = art.clientWidth, H = art.clientHeight, msg = !!beat.msg;
   sfx.hidden = !beat.sfx; sfx.textContent = beat.sfx || '';
-  bub.hidden = tail.style.display = !beat.say && !msg ? 'none' : '';
-  if (!beat.say && !msg) return;
-  bub.classList.toggle('msg', msg);
+  sp.hidden = !beat.say && !msg;
+  if (sp.hidden) return;
+  sp.classList.toggle('msg', msg);
   bub.querySelector('b').textContent = msg ? beat.msg.who : ''; bub.querySelector('b').hidden = !msg;
   bub.querySelector('p').textContent = msg ? beat.msg.text : beat.say;
-  const bw = W * (msg ? 0.62 : 0.52); bub.style.width = `${bw}px`;
-  bub.style.left = `${msg ? W - bw - W * 0.03 : W * 0.46}px`;
-  bub.style.top = '0px';
-  const bh = bub.offsetHeight, bottom = H * (msg ? 0.8 : 0.155), left = parseFloat(bub.style.left);
-  bub.style.top = `${Math.max(H * 0.015, bottom - bh)}px`;
-  const base = Math.max(H * 0.015, bottom - bh) + bh, [tx, ty] = (msg ? PHONE : MOUTH);
-  const x0 = msg ? left + bw * 0.62 : left + bw * 0.1, x1 = msg ? left + bw * 0.8 : left + bw * 0.24;
+  const bw = W * (msg ? 0.62 : 0.52), left = msg ? W - bw - W * 0.03 : W * 0.46;
+  bub.style.width = `${bw}px`; bub.style.left = `${left}px`; bub.style.top = '0px';
+  const bh = bub.offsetHeight, top = Math.max(H * 0.015, H * (msg ? 0.8 : 0.155) - bh), bottom = top + bh;
+  bub.style.top = `${top}px`;
+  const [tx, ty] = (msg ? PHONE : MOUTH).map((v, k) => v * (k ? H : W));
+  const xa = msg ? left + bw * 0.8 : left + bw * 0.24, xb = msg ? left + bw * 0.62 : left + bw * 0.1, r = 18;
   tail.setAttribute('viewBox', `0 0 ${W} ${H}`); tail.setAttribute('width', W); tail.setAttribute('height', H);
-  tail.querySelector('path').setAttribute('d', `M${x0},${base - 2} L${tx * W},${ty * H} L${x1},${base - 2}`);
-  tail.querySelector('path').setAttribute('class', msg ? 'msg' : '');
+  tail.querySelector('path').setAttribute('d',
+    `M${left + r},${top} H${left + bw - r} Q${left + bw},${top} ${left + bw},${top + r} V${bottom - r} Q${left + bw},${bottom} ${left + bw - r},${bottom}`
+    + ` H${xa} L${tx},${ty} L${xb},${bottom} H${left + r} Q${left},${bottom} ${left},${bottom - r} V${top + r} Q${left},${top} ${left + r},${top} Z`);
+  sp.style.transformOrigin = `${tx}px ${ty}px`;
 }
 
 // the panels one after another; resolves when the last bubble has been tapped (or skipped)
@@ -59,7 +61,7 @@ export function playComic(panels = OPENING) {
     const beat = () => {
       const p = panels[i], bt = p.beats[j];
       place(b, art, bt);
-      for (const e of [q('.cm-bub'), q('.cm-sfx'), q('.cm-tail')]) { e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); }
+      for (const e of [q('.cm-speech'), q('.cm-sfx')]) { e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); }
       const last = i === panels.length - 1 && j === p.beats.length - 1;
       q('.cm-next').textContent = last ? 'Go on' : 'Next';
       q('.cm-skip').hidden = last;
