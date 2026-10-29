@@ -31,7 +31,7 @@ import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 import { storyIntro, taunt } from './story.js';
-import { playComic, titleCard, NIGHT } from './comic.js';
+import { playComic, titleCard, NIGHT, EXIT } from './comic.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
 import { TossAnim, loadToss } from './toss.js';
@@ -1151,6 +1151,7 @@ async function careerOpening() {
   ui.show(null);
   await titleCard('4 HOURS LATER...');
   await playComic(NIGHT);
+  await playComic(EXIT);
 }
 
 // ---------- career: the Super League ----------

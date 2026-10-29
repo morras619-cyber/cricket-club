@@ -46,7 +46,7 @@ await page.waitForTimeout(500);
 let coach = false;
 for (let i = 0; i < 8; i++) { await page.click('.cm-next'); await page.waitForTimeout(300); if (/cut from the team, effective immediately/.test(await page.textContent('#comic'))) coach = true; }
 check(coach, 'the night scene ends with the coach\'s message: cut from the team, effective immediately');
-await page.click('.cm-next');
+for (let i = 0; i < 40 && await page.evaluate(() => document.getElementById('region').hidden); i++) { await page.click('.cm-next').catch(() => {}); await page.waitForTimeout(250); }
 await page.waitForFunction(() => !document.getElementById('region').hidden, null, { timeout: 15000 });
 check(true, 'the story moves on to the region choice');
 check(errors.length === 0, `no page errors${errors.length ? ': ' + errors[0] : ''}`);

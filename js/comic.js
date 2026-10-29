@@ -40,6 +40,22 @@ export const NIGHT = [
   ] },
 ];
 
+// the next morning: the bag packed, the tunnel out of the Thunderdome, the bus stop, Uncle Dev, and the old ground (the man in the suit is the owner; his name is not said)
+const say = (text, at, mouth) => ({ say: text, at: { left: at[0], width: at[1], bottom: at[2] }, mouth });
+const fanBeat = h => fan(h, 'Walk away from cricket, Kabir. For everyone\'s sake.');
+export const EXIT = [
+  { img: 'img/story/exit-1.webp', beats: [say('"Not good enough."', [0.04, 0.46, 0.12], [0.58, 0.19]), say('Twenty years. One night.', [0.04, 0.46, 0.12], [0.58, 0.19])] },
+  { img: 'img/story/exit-2.webp', beats: [say('Your pass, please.', [0.2, 0.42, 0.13], [0.1, 0.2]), say('...Here.', [0.46, 0.4, 0.13], [0.46, 0.24])] },
+  { img: 'img/story/exit-3.webp', beats: [say('Nothing personal, Anand. The club needs someone to blame.', [0.5, 0.46, 0.2], [0.66, 0.3]), say('I gave you everything.', [0.04, 0.46, 0.2], [0.42, 0.27]), say("And it wasn't enough.", [0.5, 0.46, 0.2], [0.66, 0.3])] },
+  { img: 'img/story/exit-4.webp', beats: [say('Twenty years of dreams...', [0.5, 0.46, 0.17], [0.44, 0.29]), say('...and not one of you says a word.', [0.5, 0.46, 0.17], [0.44, 0.29])] },
+  { img: 'img/story/exit-5.webp', beats: [say('Fine. Keep your trophy.', [0.4, 0.5, 0.2], [0.33, 0.29])] },
+  { img: 'img/story/exit-6.webp', beats: [fanBeat('imran_ultra'), say("Maybe they're right.", [0.45, 0.5, 0.22], [0.4, 0.33])] },
+  { img: 'img/story/exit-7.webp', beats: [say('They chased you out, beta.', [0.3, 0.5, 0.15], [0.76, 0.22])] },
+  { img: 'img/story/exit-8.webp', beats: [say("Come on. Let's chase them back.", [0.3, 0.5, 0.17], [0.76, 0.27])] },
+  { img: 'img/story/exit-9.webp', beats: [say('With what, Dev? A bag and a bat?', [0.04, 0.5, 0.24], [0.25, 0.35]), say('And a ground. Wait until you see it.', [0.5, 0.46, 0.17], [0.66, 0.25])] },
+  { img: 'img/story/exit-10.webp', beats: [say('Not much to look at, is it?', [0.5, 0.46, 0.3], [0.66, 0.39]), say('Then I will build my own club. And one day I will beat them.', [0.04, 0.55, 0.3], [0.38, 0.4])] },
+];
+
 let box = null;
 function build() {
   if (box) return box;
@@ -73,14 +89,16 @@ function place(b, art, beat, p = {}) {
   sp.classList.toggle('msg', msg);
   bub.querySelector('b').textContent = msg ? beat.msg.who : ''; bub.querySelector('b').hidden = !msg;
   bub.querySelector('p').textContent = msg ? beat.msg.text : beat.say;
-  const at = p.sayAt || { left: 0.46, width: 0.52, bottom: 0.155 };
+  const at = beat.at || p.sayAt || { left: 0.46, width: 0.52, bottom: 0.155 };
   const bw = W * (msg ? 0.62 : at.width), left = msg ? W - bw - W * 0.03 : W * at.left;
   bub.style.width = `${bw}px`; bub.style.left = `${left}px`; bub.style.top = '0px';
   const bh = bub.offsetHeight, below = msg && p.msgBelow;
   const top = below ? H * 0.585 : Math.max(H * 0.015, H * (msg ? 0.8 : at.bottom) - bh), bottom = top + bh;
   bub.style.top = `${top}px`;
-  const [tx, ty] = (msg ? (p.phone || PHONE) : (p.mouth || MOUTH)).map((v, k) => v * (k ? H : W));
-  const xa = msg ? left + bw * 0.8 : left + bw * 0.24, xb = msg ? left + bw * 0.62 : left + bw * 0.1, r = 18;
+  const [tx, ty] = (msg ? (p.phone || PHONE) : (beat.mouth || p.mouth || MOUTH)).map((v, k) => v * (k ? H : W));
+  let xa = msg ? left + bw * 0.8 : left + bw * 0.24, xb = msg ? left + bw * 0.62 : left + bw * 0.1;
+  const r = 18;
+  if (beat.at && !msg) { const cx = Math.min(left + bw * 0.86, Math.max(left + bw * 0.14, tx)); xa = cx + bw * 0.07; xb = cx - bw * 0.07; }   // (a bubble placed by hand: its tail grows from the part of it nearest the mouth)
   // (his tail stops short of his face: it points at the mouth without touching it)
   let tipX = tx, tipY = ty;
   if (!msg) { const mx = (xa + xb) / 2, dx = tx - mx, dy = ty - bottom, len = Math.hypot(dx, dy) || 1, gap = Math.min(W * 0.075, len * 0.6); tipX = tx - dx / len * gap; tipY = ty - dy / len * gap; }
