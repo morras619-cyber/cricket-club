@@ -36,7 +36,7 @@ export const OLD_FRAME = { cut4: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rswee
 
 // frame, ms on screen. The swing starts when the finger lifts, which is the moment of contact,
 // so the downswing is brief and the contact frame lands almost at once.
-const SEQ = {
+export const SEQ = {
   drive: [['drive1', 25], ['drive2', 35], ['drive3', Infinity]],
   ondrive: [['ondrive1', 160], ['ondrive2', Infinity]], // through the ball, round to the leg side
   straight: [['straight1', 160], ['straight3', Infinity]], // bat through the line, a high finish with the bat held up

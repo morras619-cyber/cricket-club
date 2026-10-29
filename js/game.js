@@ -3001,7 +3001,7 @@ export class Game {
     this.phase = 'bat';
     this.ui.shotButton(true, this.shotLoft, () => { this.shotLoft = !this.shotLoft; sfx.click(); return this.shotLoft; });
     for (const [bi, cand] of bats.entries()) {
-      const inn = new Innings('player', null, { balls: N, wkts: 99 });
+      const inn = new Innings('player', null, { balls: N, wkts: 99, solo: true });
       this.innings.push(inn);
       inn.setBatter(cand); inn.setBowler(net);
       this.hud(inn);
@@ -3024,7 +3024,7 @@ export class Game {
     this.phase = 'bowl';
     this.bowlHistory = []; this.aiPowerBalls = new Set(); this.freeHit = false; this.lastBowlerId = null;
     for (const [bi, cand] of bowls.entries()) {
-      const inn = new Innings('ai', null, { balls: N, wkts: 99 });
+      const inn = new Innings('ai', null, { balls: N, wkts: 99, solo: true });
       this.innings.push(inn);
       inn.setBowler(cand); inn.setBatter(netBat); inn.setPartner(netMate);
       this.hud(inn);

@@ -15,6 +15,7 @@ export class Innings {
     this.maxBalls = opt.balls || CFG.balls;
     this.maxWkts = opt.wkts || CFG.wickets;
     this.sixes = !!opt.sixes;
+    this.solo = !!opt.solo;   // the nets: one batter, who stays on strike and carries on after he is out (nothing is lost in the nets)
     this.kind = opt.kind || 'main';
     this.runs = 0; this.wkts = 0; this.balls = 0;
     this.log = []; // per legal ball: '0' '1' '4' '6' 'W' ...
@@ -53,7 +54,7 @@ export class Innings {
   setPartner(p) { if (p) this.people[p.id] = p; if (p && !this.other.id && this.other.balls === 0) Object.assign(this.other, { id: p.id, name: p.name, nation: p.nation || null }); }
   // ids of everyone who has batted or is in
   battedIds() { return [...this.stints.map(s => s.id), this.cur.id, this.other.id].filter(Boolean); }
-  swapStrike() { [this.cur, this.other] = [this.other, this.cur]; }
+  swapStrike() { if (!this.solo) [this.cur, this.other] = [this.other, this.cur]; }
   // The bowler of the current over.
   setBowler(p) {
     if (!p) return;
@@ -120,7 +121,7 @@ export class Innings {
     }
     this.tireBall({ runs, missed });
     this.detail.push({ b: c.id || null, w: this.curBowler, r: runs, k: !!wicket, ro: !!runOut });
-    if (wicket) { this.stints.push({ ...c, out: true, how: runOut ? 'run out' : f ? `b ${f.short}` : 'out' }); this.cur = freshStint(); }
+    if (wicket && !this.solo) { this.stints.push({ ...c, out: true, how: runOut ? 'run out' : f ? `b ${f.short}` : 'out' }); this.cur = freshStint(); }
     // they crossed: 1, 3 or 5 runs puts the other man on strike (a wicket brings the new man in on strike)
     else if (runs % 2 === 1) this.swapStrike();
     // end of the over: the bowling switches ends, so the other batter faces
