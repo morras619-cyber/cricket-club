@@ -69,7 +69,7 @@ function pictures(club, crest) {
 
 // one view painted: the grey ground, the colours, the crest pictures
 function paint(base, tint, uv, w, h, club, pics) {
-  const B = pixels(base, w, h), T = pixels(tint, w, h), U = pixels(uv, w, h);
+  const B = pixels(base, w, h), T = pixels(tint, w, h), U = uv ? pixels(uv, w, h) : new Uint8ClampedArray(w * h * 4);   // (the nets have no crest pictures: no uv picture)
   const su = rgbOf(club.suit).map(v => v / (255 * GREY)), tr = rgbOf(club.trim).map(v => v / (255 * GREY));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d'), img = g.createImageData(w, h), o = img.data;
@@ -101,7 +101,7 @@ export async function paintGround(level, club, crestSrc, views = ['bat', 'bowl',
   const crest = await load(crestSrc).catch(() => null);
   const pics = pictures(club, crest), out = {};
   for (const v of views) {
-    const [base, tint, uv] = await Promise.all(['', '-tint', '-uv'].map(x => load(`${dirOf(v)}view-${v}${x}.webp`)));
+    const [base, tint, uv] = await Promise.all(['', '-tint', '-uv'].map(x => (art === 'nets' && v !== 'top' && x === '-uv' ? null : load(`${dirOf(v)}view-${v}${x}.webp`))));
     out[v] = paint(base, tint, uv, base.naturalWidth, base.naturalHeight, club, pics);
     await frame();
   }

@@ -22,7 +22,7 @@ for (const level of [1, 2, 3]) test(`the level-${level} ground has its three vie
 test('the cricket nets have their three views, each with its pictures and a horizon inside it', () => {
   const m = GROUND_ART.nets1.views;
   for (const v of ['bat', 'bowl', 'keeper']) {
-    for (const x of ['', '-tint', '-uv']) {
+    for (const x of ['', '-tint']) {
       const f = new URL(`../img/ground/nets1/view-${v}${x}.webp`, import.meta.url);
       assert.ok(existsSync(f) && statSync(f).size > 100, `nets1 view-${v}${x}.webp`);
     }

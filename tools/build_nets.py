@@ -7,7 +7,7 @@ usage: python3 tools/build_nets.py
 The painted scene has no nets in it. Here they are drawn, 3D to the picture, so they line up with the pitch, the batter and the ball: the cage runs
 from 12 m behind the batter's stumps to 40 m beyond them (the bowler's run-up is inside), 3.8 m wide and 5 m tall. Posts and the roof frame are the
 trim colour (golden yellow, recoloured to the club's second colour), the kickboards along the foot of the side nets the main colour (blue).
-Same outputs as tools/build_own_paint.py: view-<cam>.webp, -tint.webp, -uv.webp, and the entry 'nets1' in js/groundart.js.
+Outputs: view-<cam>.webp and -tint.webp (no -uv: the nets carry no crest pictures), and the entry 'nets1' in js/groundart.js.
 Needs numpy, scipy and Pillow.
 """
 import json
@@ -157,7 +157,6 @@ def main():
         tint[..., 1] = np.maximum(tint[..., 1] * (1 - cover), post * 255)
         Image.fromarray(np.clip(img, 0, 255).astype(np.uint8), 'RGB').save(OUT + f'view-{name}.webp', 'WEBP', quality=88, method=6)
         Image.fromarray(np.clip(tint, 0, 255).astype(np.uint8), 'RGB').save(OUT + f'view-{name}-tint.webp', 'WEBP', lossless=True, method=6)
-        Image.fromarray(np.zeros((H, W, 3), np.uint8), 'RGB').save(OUT + f'view-{name}-uv.webp', 'WEBP', lossless=True)
         roof_row = TOP_PAD + ROOF_ROW; Dr = D + 2
         roof_h = c['cy'] - (roof_row - above) * Dr / fpic
         meta_views[name] = {'f': round(fpic), 'w': W, 'h': H, 'above': round(float(above), 1), 'top': '#%02x%02x%02x' % tuple(int(x) for x in img[0].mean(0)),
