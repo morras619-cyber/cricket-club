@@ -59,7 +59,7 @@ const loaded = img => img && img.complete && img.naturalWidth > 0;
 // (or sixcharge.painted = 1) brings the painted one back, to compare.
 export const painted = { off: (() => { try { return !(/[?&]painted=1/.test(location.search) || localStorage.getItem('sixcharge.painted') === '1'); } catch { return true; } })() };
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'bat-back', 'bat-paint', 'field']) if (!views[view] && KIT_SHEETS[view] && !(view === 'bat-paint' && painted.off)) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back', 'bat-enh', 'bat-paint', 'field']) if (!views[view] && KIT_SHEETS[view] && !(view === 'bat-paint' && painted.off)) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -522,9 +522,16 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
   const pm = KIT_SHEETS['bat-paint'], usePaint = pm && !painted.off;
   const sheet = playerSheet(usePaint ? 'bat-paint' : 'bat-back', team, look, false);
   if (!sheet) return false;
+  // the poses that have been redrawn in the richer style (img/kit/bat-enh.*, tools/build_bat_enh.py) come from that small sheet once it is made; the others are the old sheet's
+  const em = !usePaint && KIT_SHEETS['bat-enh'], es = em ? playerSheet('bat-enh', team, look, false) : null;
   const [bh, bw] = buildOf(look), meta = KIT_SHEETS[usePaint ? 'bat-paint' : 'bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
   const one = (name, alpha) => {
     ctx.globalAlpha = alpha;
+    if (es && em.names[name] != null) {
+      const [sx, sy, w, h, ax, ay] = em.frames[em.names[name]], ke = kPerM * BAT_HEIGHT_M / em.refPx * bh;
+      ctx.drawImage(es, sx, sy, w, h, px - ax * ke * bw, py - ay * ke, w * ke * bw, h * ke);
+      return;
+    }
     // (getting bowled has no painted pose yet: the defensive one stands in)
     const fi = usePaint ? pm.names[pm.names[name] != null ? name : PAINT_STAND_IN[name] ?? 'def1'] : POSE_BAT[name] ?? POSE_BAT[OLD_STAND_IN[name]] ?? 0;
     const [sx, sy, w, h, ax, ay] = meta.frames[fi];
