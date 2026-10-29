@@ -31,7 +31,7 @@ import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 import { storyIntro, taunt } from './story.js';
-import { playComic, titleCard, NIGHT, EXIT } from './comic.js';
+import { playComic, preloadComic, titleCard, NIGHT, EXIT } from './comic.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
 import { TossAnim, loadToss } from './toss.js';
@@ -1150,6 +1150,7 @@ function openingChirp() {
 }
 async function careerOpening() {
   ui.show(null);
+  setTimeout(() => preloadComic(NIGHT, EXIT), 4000);   // (the rest of the story comes while the first panels are read and the match is played)
   await playComic();
   await titleCard('16 HOURS LATER...');
   await openingChirp();

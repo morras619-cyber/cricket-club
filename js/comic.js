@@ -110,13 +110,27 @@ function place(b, art, beat, p = {}) {
   sp.style.transformOrigin = `${tipX}px ${tipY}px`;
 }
 
+// The pictures are fetched and decoded ahead of the taps, so a panel shows the moment it is tapped to.
+const pics = new Map();   // src -> { img, ok: decoded, wait: promise }
+function picture(src) {
+  if (!pics.has(src)) {
+    const img = new Image(), e = { img, ok: false };
+    img.src = src;
+    e.wait = (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej; })).catch(() => {}).then(() => { e.ok = true; });
+    pics.set(src, e);
+  }
+  return pics.get(src);
+}
+export function preloadComic(...lists) { for (const l of lists) for (const p of l) picture(p.img); }
+
 // the panels one after another; resolves when the last bubble has been tapped (or skipped)
 export function playComic(panels = OPENING) {
   return new Promise(done => {
     const b = build(), q = s => b.querySelector(s), art = q('.cm-art');
     const dots = q('.cm-dots'); dots.innerHTML = '';
     for (let k = 0; k < panels.length; k++) dots.append(mk('i'));
-    let i = 0, j = 0;
+    let i = 0, j = 0, busy = false;
+    preloadComic(panels);
     const beat = () => {
       const p = panels[i], bt = p.beats[j];
       place(b, art, bt, p);
@@ -127,6 +141,8 @@ export function playComic(panels = OPENING) {
     };
     const panel = () => {
       const p = panels[i], pic = q('.cm-pic');
+      // (the next one is already coming while this one is read)
+      if (panels[i + 1]) picture(panels[i + 1].img);
       pic.style.backgroundImage = `url(${p.img})`;
       q('.cm-fans').innerHTML = '';
       pic.classList.remove('go'); void pic.offsetWidth; pic.classList.add('go');   // (restarts the slow push-in)
@@ -135,16 +151,20 @@ export function playComic(panels = OPENING) {
     };
     const close = () => { b.classList.remove('up'); setTimeout(() => { b.hidden = true; done(); }, 250); };
     const next = () => {
+      if (busy) return;
       if (++j < panels[i].beats.length) return beat();
       j = 0;
       if (++i >= panels.length) return close();
-      panel();
+      const pic = picture(panels[i].img);
+      if (pic.ok) return panel();
+      // (a slow connection: wait for the picture rather than show a blank panel)
+      busy = true; pic.wait.then(() => { busy = false; panel(); });
     };
     q('.cm-next').onclick = e => { e.stopPropagation(); next(); };
     q('.cm-skip').onclick = e => { e.stopPropagation(); close(); };
     b.onclick = next;
     b.hidden = false;
-    requestAnimationFrame(() => { b.classList.add('up'); panel(); });
+    picture(panels[0].img).wait.then(() => requestAnimationFrame(() => { b.classList.add('up'); panel(); }));
   });
 }
 
