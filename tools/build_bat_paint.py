@@ -121,6 +121,35 @@ def classify(rgb, al, rect=None):
     return dict(zone=(c0, top), collar=collar and collar['bx'], belt=belt and belt['bx'], kit=kit, blue=blue, yellow=yellow, skin=skin, shirt=shirt, wy=wy, lum=lum, hue=hue, sat=sat, mx=mx, info=info)
 
 
+def hsv_to_rgb(h, s, v):
+    h = (h % 360) / 60; c = v * s; x = c * (1 - np.abs(h % 2 - 1)); m = v - c; i = np.floor(h).astype(int) % 6
+    r = np.choose(i, [c, x, 0 * c, 0 * c, x, c]); g = np.choose(i, [x, c, c, x, 0 * c, 0 * c]); b = np.choose(i, [0 * c, 0 * c, x, c, c, x])
+    return np.stack([r + m, g + m, b + m], -1) * 255
+
+
+def circ_mean(h):
+    a = np.deg2rad(h); return float(np.rad2deg(np.arctan2(np.sin(a).mean(), np.cos(a).mean())) % 360)
+
+
+def stats(rgb, c):
+    out = {}
+    for k in ('blue', 'yellow'):
+        m = c[k]
+        if m.sum() > 200: out[k] = (circ_mean(c['hue'][m]), float(np.median(c['sat'][m])), float(np.median(c['mx'][m])) / 255)
+    return out
+
+
+def level(rgb, al, c, ref):
+    # the painted blue and yellow of this pose brought to the colour depth of the whole set (the sheets were painted one after another and drift a little)
+    st = stats(rgb, c); out = rgb.copy()
+    for k in ('blue', 'yellow'):
+        if k not in st: continue
+        h0, s0, v0 = st[k]; hr, sr, vr = ref[k]; m = c[k]
+        hue, sat, mx = c['hue'][m], c['sat'][m], c['mx'][m] / 255
+        out[m] = hsv_to_rgb(hue + (hr - h0), np.clip(sat * sr / max(s0, 0.05), 0, 1), np.clip(mx * vr / max(v0, 0.05), 0, 1))
+    return out
+
+
 def main():
     pieces = {}   # (src, k) -> (rgb, alpha)
     for src in sorted({s for s, _ in FRAMES.values()}):
@@ -141,6 +170,16 @@ def main():
     meta_frames, place, names, lums = {}, {}, {}, {'blue': [], 'yellow': [], 'skin': []}
     hsv_s = {'blue': [], 'yellow': []}
     info = {}
+    # first the colour depth of every pose, then each pose brought to the median of them all
+    pre = {}
+    for p in uniq: pre[p] = stats(pieces[p][0], classify(*pieces[p]))
+    ref = {k: (circ_mean(np.array([v[k][0] for v in pre.values() if k in v])), float(np.median([v[k][1] for v in pre.values() if k in v])), float(np.median([v[k][2] for v in pre.values() if k in v]))) for k in ('blue', 'yellow')}
+    spread = lambda k, i: round(float(np.std([v[k][i] for v in pre.values() if k in v])), 3)
+    print('colour spread before (blue hue, sat, value):', spread('blue', 0), spread('blue', 1), spread('blue', 2))
+    for p in uniq:
+        rgb0, al0 = pieces[p]; pieces[p] = (level(rgb0, al0, classify(rgb0, al0), ref), al0)
+    post = {p: stats(pieces[p][0], classify(*pieces[p])) for p in uniq}
+    print('colour spread after:', round(float(np.std([v['blue'][0] for v in post.values()])), 3), round(float(np.std([v['blue'][1] for v in post.values()])), 3), round(float(np.std([v['blue'][2] for v in post.values()])), 3))
     for p in uniq:
         rgb, al = pieces[p]; h, w = al.shape; px, py = pos[p]
         c = classify(rgb, al, next((SHIRT_AT[n] for n, q in frames.items() if q == p and n in SHIRT_AT), None)); info[p] = c['info']

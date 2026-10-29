@@ -949,8 +949,7 @@ export class Game {
     await this.until(() => {
       const tb = this.gameTime - S.ballT0;
       if (fx.meteor && tb > d.tContact - 0.45) { this.timeScale = 0.35; this.fx.speed = 1; }
-      // no shot offered: shoulder arms as the ball arrives
-      if (!fx.meteor && !swing && !S.batter.shot && S.batter.angle > -2 && tb > d.tContact - 0.12) S.batter.shot = { anim: 'leave', t0: this.realTime, from: 'ready' };
+      // (no shot offered: he stays as he is, there is no pose of its own for leaving the ball)
       if (S.maya && this.bot && !S.maya.picked && tb > (d.bounceT ?? 0.3)) S.maya.picked = rng.chance(0.6) ? S.maya.real : -S.maya.real;
       return fx.meteor ? tap || tb > d.tContact + 0.25 : swing || tb > deadline;
     });

@@ -44,7 +44,7 @@ const SEQ = {
   pull: [['pull1', 150], ['pull2', Infinity]], // swung across to leg, through
   cut: [['cut1', 25], ['cut2', 30], ['cut3', 100], ['cut4', Infinity]],
   rsweep: [['rsweep1', 60], ['rsweep2', 130], ['rsweep3', Infinity]], // down on one knee, swept fine on the off side
-  block: [['def1', 60], ['def2', 220], ['def3', Infinity]],
+  block: [['def1', Infinity]],   // (one pose: the bat grounded in front of him, no extra move)
   leave: [['leave1', 170], ['leave2', Infinity]],
   bowled: [['bowled', Infinity]], // beaten: looking back at the stumps
 };
