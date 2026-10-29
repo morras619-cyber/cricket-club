@@ -2970,10 +2970,10 @@ export class Game {
   }
 
   // ---------- Issue #1: the tutorial over ----------
-  // the net trials (career.js TRIAL_*): every candidate faces six balls (a batter, with a net bowler) or bowls six (a bowler, at a net batter), played for
+  // the net trials (career.js TRIAL_*): every candidate faces CFG.trialBalls balls (a batter, with a net bowler) or bowls as many (a bowler, at a net batter), played for
   // real as him: his rating and type decide the timing windows and how the ball does. A wicket costs nothing (it is only the nets). Returns what each did.
   async runTrial({ bats = [], bowls = [] }) {
-    const out = { bats: {}, bowls: {} };
+    const out = { bats: {}, bowls: {} }, N = CFG.trialBalls;
     const net = this.oppSide.attack[0], netBat = this.oppSide.order[0], netMate = this.oppSide.order[1] || netBat;
     this.fieldState.setting = 'off';   // (the nets: no fielding mini-games)
     this.charge.value = 40; this.ui.charge(40);
@@ -2987,14 +2987,14 @@ export class Game {
     this.phase = 'bat';
     this.ui.shotButton(true, this.shotLoft, () => { this.shotLoft = !this.shotLoft; sfx.click(); return this.shotLoft; });
     for (const [bi, cand] of bats.entries()) {
-      const inn = new Innings('player', null, { balls: 6, wkts: 99 });
+      const inn = new Innings('player', null, { balls: N, wkts: 99 });
       this.innings.push(inn);
       inn.setBatter(cand); inn.setBowler(net);
       this.hud(inn);
       this.ui.banner(`NET TRIAL ${bi + 1}/${bats.length}`, `${cand.name} · ${cand.label}`, 2200);
       await this.sleepReal(this.bot ? 100 : 2300);
-      for (let k = 0; k < 6; k++) {
-        const spec = script[(bi * 6 + k) % script.length];
+      for (let k = 0; k < N; k++) {
+        const spec = script[(bi * N + k) % script.length];
         await this.batBall(inn, k + 1, spec, { hint: k === 0 ? 'HOLD · SWIPE · LIFT ON THE RING · TAP TO DEFEND' : undefined, extra: 25 });
         if (!inn.cur.id) inn.setBatter(cand);   // (bowled in the nets: back to the crease)
         this.hud(inn);
@@ -3002,7 +3002,7 @@ export class Game {
       }
       out.bats[cand.id] = tally(inn, 0);
       const r = out.bats[cand.id];
-      this.ui.banner(`${cand.short || cand.name}: ${r.runs} off 6`, `${r.fours} fours · ${r.sixes} sixes · out ${r.outs} time${r.outs === 1 ? '' : 's'}`, 2200);
+      this.ui.banner(`${cand.short || cand.name}: ${r.runs} off ${N}`, `${r.fours} fours · ${r.sixes} sixes · out ${r.outs} time${r.outs === 1 ? '' : 's'}`, 2200);
       await this.sleepReal(this.bot ? 100 : 2300);
     }
     this.ui.shotButton(false);
@@ -3010,13 +3010,13 @@ export class Game {
     this.phase = 'bowl';
     this.bowlHistory = []; this.aiPowerBalls = new Set(); this.freeHit = false; this.lastBowlerId = null;
     for (const [bi, cand] of bowls.entries()) {
-      const inn = new Innings('ai', null, { balls: 6, wkts: 99 });
+      const inn = new Innings('ai', null, { balls: N, wkts: 99 });
       this.innings.push(inn);
       inn.setBowler(cand); inn.setBatter(netBat); inn.setPartner(netMate);
       this.hud(inn);
       this.ui.banner(`NET TRIAL ${bi + 1}/${bowls.length}`, `${cand.name} · ${cand.label}`, 2200);
       await this.sleepReal(this.bot ? 100 : 2300);
-      while (inn.balls < 6) {
+      while (inn.balls < N) {
         const wk = inn.wkts;
         const r = await this.bowlBall(inn, inn.balls + 1, { hint: inn.balls === 0 ? 'SWIPE FROM YOUR BOWLER UP THE PITCH' : undefined });
         if (!inn.cur.id) inn.setBatter(netBat);

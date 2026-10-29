@@ -135,7 +135,7 @@ export const DEV = {
   trials: [
     "Good news, beta. I found you a wicketkeeper who'll play for nothing. He's yours, and so are you: you're on the team sheet too.",
     "The rest we pick in the nets. Six batters, six bowlers. None of them is any good yet, so don't expect miracles.",
-    "Face six balls from each batter, and bowl six with each bowler. Watch how they play, then choose four batters and five bowlers.",
+    "Face four balls from each batter, and bowl four with each bowler. Watch how they play, then choose four batters and five bowlers.",
     "Think about what a side needs: openers, power hitters, someone who stays in. Fast bowlers, swing, spin. A good eleven needs a bit of everything.",
   ],
   trialsPick: [

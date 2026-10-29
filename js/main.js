@@ -1394,7 +1394,7 @@ function careerTrials(c, body) {
   if (!T) return;
   const note = el('div', 'panel paper statcard');
   if (!T.results) {
-    note.append(el('h3', '', '🏏 The nets'), el('p', 'tnote', `${c.custom.name} have a ground, a name and a crest, and two players: you and a keeper Dev found. The rest of the squad is picked in the nets: face six balls from each of six batters, and bowl six with each of six bowlers. Then you choose.`));
+    note.append(el('h3', '', '🏏 The nets'), el('p', 'tnote', `${c.custom.name} have a ground, a name and a crest, and two players: you and a keeper Dev found. The rest of the squad is picked in the nets: face four balls from each of six batters, and bowl four with each of six bowlers. Then you choose.`));
     const go = el('button', 'bigbtn primary', 'Go to the nets');
     go.addEventListener('click', () => { sfx.click(); runTrials(c); });
     note.append(go); body.append(note);
