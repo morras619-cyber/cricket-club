@@ -16,4 +16,8 @@ for (const level of [1, 2, 3]) test(`the level-${level} ground has its three vie
     assert.ok(a.tile, `${v}: mirrored copies on a wide screen`);
     assert.match(a.top, /^#[0-9a-f]{6}$/); assert.match(a.bottom, /^#[0-9a-f]{6}$/);
   }
+  // the view from above: its centre is inside the picture and the field (128 m across) is wider than it is tall as the game draws it
+  const t = GROUND_ART[`own${level}`].top;
+  assert.ok(t.px > 0 && t.c[0] > 0 && t.c[0] < t.w && t.c[1] > 0 && t.c[1] < t.h, 'top view size and centre');
+  assert.ok(128 * t.px < t.w && 128 * 0.78 * t.px < t.h, 'the whole field fits in the top view');
 });
