@@ -32,7 +32,7 @@ const FRAMES = {
 };
 
 // the frames the kit sheet has and the old per-team sheets (and the batter seen from the front) don't
-export const OLD_FRAME = { cut4: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3', cover1: 'drive2', straight1: 'drive2', straight2: 'drive3', ondrive1: 'drive2', ondrive2: 'drive3', cover0: 'drive2', cover2: 'drive2', cover3: 'drive3', cutflat: 'cut2' };
+export const OLD_FRAME = { cut4: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3', cover1: 'drive2', straight1: 'drive2', straight2: 'drive3', ondrive1: 'drive2', ondrive2: 'drive3', cover0: 'drive2', cover2: 'drive2', cover3: 'drive3', cutflat: 'cut2', loft1: 'drive3' };
 
 // frame, ms on screen. The swing starts when the finger lifts, which is the moment of contact,
 // so the downswing is brief and the contact frame lands almost at once.
@@ -40,6 +40,7 @@ const SEQ = {
   drive: [['drive1', 25], ['drive2', 35], ['drive3', Infinity]],
   ondrive: [['ondrive1', 160], ['ondrive2', Infinity]], // through the ball, round to the leg side
   straight: [['straight1', 160], ['straight2', Infinity]], // bat through the line, high finish
+  loft: [['cover0', 30], ['cover2', 40], ['loft1', Infinity]], // a lifted drive: through the ball, eyes up, a high finish
   cover: [['cover0', 30], ['cover2', 40], ['cover3', Infinity]], // down, through the ball, high finish: off side
   pull: [['pull1', 150], ['pull2', Infinity]], // swung across to leg, through
   cut: [['cut1', 25], ['cutflat', 30], ['cut3', 100], ['cut4', Infinity]],
@@ -60,6 +61,7 @@ export function shotAnim(shot) {
   if (shot.kind === 'block') return 'block';
   if (shot.kind === 'leave') return 'leave';
   const a = shot.angle;
+  if (shot.loft && a >= -15 * DEG && a <= 55 * DEG) return 'loft';
   if (a > 110 * DEG) return 'rsweep';
   if (a > 55 * DEG) return 'cut';
   if (a > 15 * DEG) return 'cover';

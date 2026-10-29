@@ -22,7 +22,7 @@ G = 0.85                                  # the whole set's size (1.0 = the stan
 READY_SCALE = 840 / 1575 * G              # the stance (its source figure is 1575 px tall)
 SCALE = {'464df84f': 1.10 * G, 'f628f0f7': 1.10 * G}   # sheets drawn on the wide canvas; every other sheet is on the 1536 x 1024 canvas
 DEFAULT_SCALE = 0.94 * G
-SCALE.update({'c0v1drv1': 0.81 * G, 'c0v2cut1': 0.81 * G})   # (the 2576 x 1438 sheets)
+SCALE.update({'c0v1drv1': 0.81 * G, 'c0v2cut1': 0.81 * G, 'c0v3loft': 0.81 * G})   # (the 2576 x 1438 sheets)
 DIL = {'f628f0f7': 2}                     # (its figures kneel close together: a small gap between them)
 FRAMES = {
     'backlift': ('464df84f', 1), 'leave1': ('2965e2d6', 0), 'leave2': ('2965e2d6', 1),
@@ -31,7 +31,7 @@ FRAMES = {
     'pull1': ('2236f518', 0), 'pull2': ('b506964d', 0), 'def1': ('df0bc565', 0), 'def2': ('df0bc565', 1), 'def3': ('c3007d6e', 1),
     'cut1': ('b506964d', 1), 'cut2': ('54ab15c9', 0), 'cut3': ('464df84f', 2), 'cut4': ('f1c2ccd0', 1),
     'rsweep1': ('f628f0f7', 0), 'rsweep2': ('f628f0f7', 1), 'rsweep3': ('f628f0f7', 2), 'celebrate': ('efc0e85c', 0),
-    'cover0': ('c0v1drv1', 0), 'cover2': ('c0v1drv1', 1), 'cover3': ('c0v1drv1', 2), 'cutflat': ('c0v2cut1', 1),
+    'cover0': ('c0v1drv1', 0), 'cover2': ('c0v1drv1', 1), 'cover3': ('c0v1drv1', 2), 'cutflat': ('c0v2cut1', 1), 'loft1': ('c0v3loft', 2),
 }
 READY = 'tools/kit/bat-ready-source.png'
 # where the shirt back is, for the poses the colours alone get wrong: (left, right, top, bottom) as fractions of the frame

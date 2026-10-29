@@ -253,4 +253,7 @@ test('each swipe direction plays its own shot', async () => {
   assert.equal(d(35), 'cover'); assert.equal(d(80), 'cut'); assert.equal(d(140), 'rsweep');
   assert.equal(d(-35), 'ondrive'); assert.equal(d(-80), 'pull'); assert.equal(d(-150), 'pull');
   assert.equal(shotAnim({ kind: 'block', angle: 0 }), 'block');
+  // a lifted drive straight or to the off side has its own finish; a lifted cut or pull is still a cut or pull
+  const l = deg => shotAnim({ kind: 'drive', angle: deg * Math.PI / 180, loft: true });
+  assert.equal(l(0), 'loft'); assert.equal(l(35), 'loft'); assert.equal(l(80), 'cut'); assert.equal(l(-80), 'pull');
 });
