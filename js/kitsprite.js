@@ -162,9 +162,8 @@ function shades(t) {
 // The cloth's brightness (the tone picture's blue channel) with the painted blotches taken out: a masked box blur (radius R, kit pixels only, so the
 // outlines do not bleed in), then each pixel keeps only the part of its difference from the blur that is a real fold or stitch (more than a little).
 // Returns the smoothed brightness for every pixel (the first pass is done once per sheet and club).
-function smoothTone(tn, m, W, H, R = 3) {
-  const n = W * H, val = new Float32Array(n), cnt = new Float32Array(n);
-  for (let i = 0; i < n; i++) if (m[i * 4 + 2] === 255 && tn[i * 4 + 2]) { val[i] = tn[i * 4 + 2]; cnt[i] = 1; }
+function smoothField(val, cnt, W, H, R, edge) {
+  const n = W * H;
   const blur = (a, b) => {   // (a running sum along rows, then columns)
     const t = new Float32Array(n), u = new Float32Array(n);
     for (const [src, dst] of [[a, t], [b, u]]) {
@@ -179,15 +178,32 @@ function smoothTone(tn, m, W, H, R = 3) {
   const [sv, sc] = blur(val, cnt), out = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     if (!cnt[i]) continue;
-    const b = sv[i] / sc[i], d = val[i] - b, a = Math.abs(d), k = a <= 10 ? 0 : a >= 30 ? 1 : (a - 10) / 20;
+    const [lo, hi] = edge(i), b = sv[i] / sc[i], d = val[i] - b, a = Math.abs(d), k = a <= lo ? 0 : a >= hi ? 1 : (a - lo) / (hi - lo);
     out[i] = b + d * k * k * (3 - 2 * k);
   }
   return out;
 }
+// the cloth's brightness: blotches out, folds and stitching kept; the helmet (the top of each frame) is smoothed harder, to one even gloss with a clean highlight
+function smoothTone(tn, m, W, H, frames) {
+  const n = W * H, val = new Float32Array(n), cnt = new Float32Array(n), helmet = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (m[i * 4 + 2] === 255 && tn[i * 4 + 2]) { val[i] = tn[i * 4 + 2]; cnt[i] = 1; }
+  for (const [fx, fy, fw, fh] of frames || []) for (let y = fy; y < fy + Math.round(fh * 0.15); y++) helmet.fill(1, y * W + fx, y * W + fx + fw);
+  return smoothField(val, cnt, W, H, 3, i => (helmet[i] ? [18, 50] : [10, 30]));
+}
+// his skin's brightness the same way, a smaller blur: the muscle's real shadows stay, the mottled painted patches go
+function smoothSkin(src, mask, W, H) {
+  const n = W * H, val = new Float32Array(n), cnt = new Float32Array(n);
+  for (let i = 0; i < n; i++) if (mask[i * 4] > 127 && src[i * 4 + 3]) { val[i] = lum(src[i * 4], src[i * 4 + 1], src[i * 4 + 2]); cnt[i] = 1; }
+  return smoothField(val, cnt, W, H, 2, () => [12, 34]);
+}
 
 // (the smoothed brightness is the same for every club: made once for each sheet)
 const smoothed = new Map();
-const smoothTones = (view, tn, m, W, H) => { if (!smoothed.has(view)) smoothed.set(view, smoothTone(tn, m, W, H)); return smoothed.get(view); };
+const smoothTones = (view, tn, m, W, H) => { if (!smoothed.has(view)) smoothed.set(view, smoothTone(tn, m, W, H, KIT_SHEETS[view].frames)); return smoothed.get(view); };
+const helmets = new Map();   // (the top of each frame of a batter sheet: his helmet is one colour, not the yoke's second one)
+const helmetOf = (view, W, H) => { if (!helmets.has(view)) { const hm = new Uint8Array(W * H); for (const [fx, fy, fw, fh] of KIT_SHEETS[view].frames) for (let y = fy; y < fy + Math.round(fh * 0.15); y++) hm.fill(1, y * W + fx, y * W + fx + fw); helmets.set(view, hm); } return helmets.get(view); };
+const smoothedSkin = new Map();
+const skinTones = (view, src, mask, W, H) => { if (!smoothedSkin.has(view)) smoothedSkin.set(view, smoothSkin(src, mask, W, H)); return smoothedSkin.get(view); };
 
 // ---------- the club's kit ----------
 const teamCache = new Map();
@@ -204,13 +220,14 @@ function teamSheet(view, team) {
   if (data.tone) {
     // each colour shaded by the cloth's brightness against that colour's drawn brightness, then
     // mixed by the soft weights (so panel edges and piping blend, no patches)
-    const tgt0 = !!meta.hsv, tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0], luts = pal.map(shades), sm = tgt0 ? null : smoothTones(view, tn, m, c.width, c.height);
+    const tgt0 = !!meta.hsv, tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0], luts = pal.map(shades), sm = tgt0 ? null : smoothTones(view, tn, m, c.width, c.height), hm = view === 'bat-back' ? helmetOf(view, c.width, c.height) : null;
     // (a painted sheet: the hue becomes the club's, the colour's depth and light stay as painted;
     // the club's colours are worked out once, not per pixel)
     const tgt = meta.hsv && pal.map((t, k) => { const [th, ts, tv] = TARGET_HSV(t), [, rs, rv] = meta.hsv[k]; return [th, ts / Math.max(rs, 0.05), tv / Math.max(rv, 0.05)]; });
     for (let i = 0; i < p.length; i += 4) {
       if (m[i + 2] !== 255 || !p[i + 3] || !tn[i + 2]) continue;
       w[1] = tn[i] / 255; w[2] = tn[i + 1] / 255; w[0] = Math.max(0, 1 - w[1] - w[2]);
+      if (hm && hm[i >> 2]) { w[0] += w[1]; w[1] = 0; }   // (his helmet: all in the main colour, no patch of the yoke's)
       const L = sm ? sm[i >> 2] : tn[i + 2];
       let r = 0, gg = 0, b = 0;
       if (tgt) {
@@ -332,11 +349,12 @@ function playerSheet(view, team, look, mirror) {
   // skin, then his hair (none if he's bald)
   let img = g.getImageData(0, 0, W, H), p = img.data;
   const m = data.mask, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255;
+  const sl = view === 'bat-back' ? skinTones(view, p, m, W, H) : null;   // (the batter's skin without the painted mottling)
   // hair and beard in his hair colour (shading kept); the cap as drawn
   const layers = [[hp, style], [bp, beard], [wp, null]].filter(([d]) => d).map(([d, s2]) => [d, s2 ? meta.hair[s2] * 255 : 0]);
   for (let i = 0; i < p.length; i += 4) {
     if (m[i] > 127 && p[i + 3]) {
-      const r = lum(p[i], p[i + 1], p[i + 2]) / sref;
+      const r = (sl ? sl[i >> 2] : lum(p[i], p[i + 1], p[i + 2])) / sref;
       for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
     }
     if (layers.length) for (const [d, href] of layers) {
