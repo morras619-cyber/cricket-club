@@ -418,6 +418,7 @@ const SPIN_DELIVERY = [['release', 90], ['follow1', 200], ['follow2', 240], ['fo
 
 import { peopleSheet, peopleFrame, loadPeopleMask, hairHex, skinHex } from './looks.js';
 import { loadKitSprites, drawKitSprite } from './kitsprite.js';
+import { PACE_STEPS } from './squads.js';
 import { loadHair, hairReady, piecesOf, piecesKey, headsOf, dressSheet } from './hair.js';
 import { KIT_LOGOS } from './kitlogos.js';
 import { sheetOf, logoSrc } from './teams.js';
@@ -493,8 +494,8 @@ export function bowlFrame(spr, gameTime, realTime, view = 'front') {
         return spr.p < 0.78 ? RUN_CYCLE[Math.floor(spr.p * 5) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
       }
       if (view.startsWith('spin')) return spr.p < 0.7 ? SPIN_CYCLE[Math.floor(spr.p * 4) % 2] : spr.p < 0.85 ? 'gather' : 'coil';
-      if (view === 'back') return spr.p < 0.74 ? RUN_CYCLE[Math.floor(spr.p * 14) % 4] : spr.p < 0.83 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
-      return spr.p < 0.8 ? RUN_CYCLE[Math.floor(spr.p * 14) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
+      if (view === 'back') return spr.p < 0.74 ? RUN_CYCLE[Math.floor(spr.p * PACE_STEPS) % 4] : spr.p < 0.83 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
+      return spr.p < 0.8 ? RUN_CYCLE[Math.floor(spr.p * PACE_STEPS) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
     case 'deliver': {
       let t = (gameTime - spr.t0) * 1000;
       for (const [f, ms] of view.startsWith('spin') ? SPIN_DELIVERY : DELIVERY) { if (t < ms) return f; t -= ms; }

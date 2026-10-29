@@ -25,9 +25,10 @@ export const BOWL_TYPES = {
 export const bowlType = id => BOWL_TYPES[id] || BOWL_TYPES.swing;
 
 // A bowler's run-up as the batting view shows it (the bowler at the far end): how far back he starts and how long he takes. A fast bowler
-// starts a long way back and comes in quickly; a spinner takes a short run, more slowly. `runup` (above) is the share of the longest run.
-export const RUNUP_M = 8.5, SPIN_RUNUP = 1.5;
-export const runUp = type => ({ m: RUNUP_M * type.runup, ms: 850 * (0.55 + 0.45 * type.runup) * (type.spin ? SPIN_RUNUP : 1) });
+// starts a long way back and runs in at a steady pace; a spinner takes a short run, more slowly. `runup` (above) is the share of the longest run.
+// PACE_RUNUP and SPIN_RUNUP: how many times as long the run takes as the basic 0.85 s. PACE_STEPS: the running frames in a pace bowler's run.
+export const RUNUP_M = 9.5, PACE_RUNUP = 1.3, SPIN_RUNUP = 1.5, PACE_STEPS = 16;
+export const runUp = type => ({ m: RUNUP_M * type.runup, ms: 850 * (0.55 + 0.45 * type.runup) * (type.spin ? SPIN_RUNUP : PACE_RUNUP) });
 
 // Physics for a named delivery of a bowler type. k (0..1) picks a speed within the range.
 export function deliveryParams(typeId, name, k = 0.6, rng = null) {
