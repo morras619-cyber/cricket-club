@@ -3,6 +3,7 @@ import { FX_ATLAS } from './fxatlas.js';
 
 export const INK = '#141018';
 export const FONT_DISPLAY = '"Bangers", "Impact", "Arial Black", sans-serif';
+export const FONT_UI = '"Barlow Condensed", "Arial Narrow", "Trebuchet MS", sans-serif';
 export const FONT_BODY = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
 
 // Hand-drawn 8-frame impact burst (img/burst.webp, tools/build_burst.py): [x, y, w, h, centreX, centreY]
@@ -79,9 +80,11 @@ export class FX {
   word(text, x, y, { size = 64, color = '#ffd23f', stroke = '#e8343b', dur = 1100, rot = (Math.random() - 0.5) * 0.25 } = {}) {
     this.words.push({ text, x, y, size, color, stroke, dur, rot, t: 0 });
   }
-  bubble(text, x, y, { dur = 1600, side = 1 } = {}) {
+  // (x, y): the speaker's mouth, where the tail points. name/color: who is speaking and his team's colour; safeTop: the bubble stays
+  // below this (the scorecard)
+  bubble(text, x, y, { dur = 1600, side = 1, name = null, color = null, safeTop = 8 } = {}) {
     // one speaker at a time: a new line replaces whatever was being said
-    this.bubbles = [{ text, x, y, dur, side, t: 0 }];
+    this.bubbles = [{ text, x, y, dur, side, name, color, safeTop, t: 0 }];
   }
   // the hand-drawn impact burst at (x, y), `size` px across at full blast; hue turns the gold
   blast(x, y, { size = 260, hue = 0, dur = 420 } = {}) { this.blasts.push({ x, y, size, hue, dur, t: 0 }); }
@@ -158,7 +161,7 @@ export class FX {
     if (this.speed > 0) drawSpeedLines(ctx, W, H, this.speed);
     // every bubble and word keeps clear of the ones already on screen (placed once, then it stays)
     const taken = [];
-    for (const b of this.bubbles) taken.push(drawBubble(ctx, b, W, taken));
+    for (const b of this.bubbles) taken.push(drawBubble(ctx, b, W, taken, H));
     for (const w of this.words) taken.push(drawWord(ctx, w, W, H, taken));
     if (this.flashA > 0) {
       ctx.globalAlpha = Math.min(1, this.flashA);
@@ -210,37 +213,62 @@ function drawWord(ctx, w, W, H, taken = []) {
   return { x: x - hx, y: y - hy, w: hx * 2, h: hy * 2 };
 }
 
-export function drawBubble(ctx, b, W, taken = []) {
+// Where a bubble of size w x h sits for a speaker whose mouth is at (tx, ty): above his head with the tail pointing down at him, or
+// below it when there is no room above (the scorecard); kept on the screen and below safeTop. Returns { x, y, below }.
+export function bubbleLayout({ tx, ty, w, h, W, H = 9999, safeTop = 8, gap = 24 }) {
+  const x = Math.max(8, Math.min(W - w - 8, tx - w / 2 + (tx < W / 2 ? w * 0.18 : -w * 0.18)));   // (a little off-centre, towards the middle of the screen)
+  let y = ty - h - gap, below = false;
+  if (y < safeTop) { y = ty + gap + 6; below = true; }
+  y = Math.max(safeTop, Math.min(H - h - 8, y));
+  return { x, y, below };
+}
+
+export function drawBubble(ctx, b, W, taken = [], H = 9999) {
   const p = b.t / b.dur;
   const a = p < 0.08 ? p / 0.08 : p > 0.85 ? (1 - p) / 0.15 : 1;
+  // pops out of the speaker's mouth: a little overshoot
+  const pop = p < 0.12 ? 0.55 + 0.6 * (p / 0.12) : p < 0.2 ? 1.05 - 0.05 * ((p - 0.12) / 0.08) : 1;
   ctx.save();
   ctx.globalAlpha = a;
-  ctx.font = `600 15px ${FONT_BODY}`;
-  const maxW = Math.min(230, W * 0.6);
+  const font = size => `italic 800 ${size}px ${FONT_UI}`;
+  ctx.font = font(19);
+  const maxW = Math.min(230, W * 0.62);
   const lines = wrap(ctx, b.text, maxW);
-  const lh = 18, pad = 10;
-  const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + pad * 2;
-  const h = lines.length * lh + pad * 1.4;
-  let x = b.x - (b.side > 0 ? 18 : w - 18), y = b.y - h - 16;
-  x = Math.max(8, Math.min(W - w - 8, x));
-  y = Math.max(8, y);
-  if (b.ly == null) { b.ly = settle({ x, y, w, h }, taken, 9999).y; b.moved = b.ly !== y; } // its spot, kept clear of the others
-  y = Math.max(8, b.ly);
-  ctx.fillStyle = '#fff4da'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 12);
-  // the pointer to whoever's talking (not when the bubble had to move: it would cross the others)
-  if (!b.moved) {
-    ctx.moveTo(Math.min(Math.max(b.x - 8, x + 10), x + w - 24), y + h);
-    ctx.lineTo(b.x, b.y);
-    ctx.lineTo(Math.min(Math.max(b.x + 8, x + 22), x + w - 10), y + h);
+  const lh = 21, padX = 12, padY = 8;
+  const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + padX * 2;
+  const h = lines.length * lh + padY * 2 - 2;
+  const lay = bubbleLayout({ tx: b.x, ty: b.y, w, h, W, H, safeTop: b.safeTop ?? 8 });
+  let { x, y, below } = lay;
+  if (b.ly == null) { const r = settle({ x, y, w, h }, taken, H); b.ly = r.y; b.moved = r.y !== y; }   // its spot, kept clear of the others
+  y = b.ly;
+  ctx.translate(b.x, b.y); ctx.scale(pop, pop); ctx.translate(-b.x, -b.y);   // (grows from the speaker's mouth)
+  ctx.lineJoin = 'round';
+  // the tail: from the near edge of the bubble to his mouth (not when the bubble had to move: it would cross the others)
+  const edgeY = below ? y : y + h;
+  const bx = Math.min(Math.max(b.x, x + 20), x + w - 20);
+  const tail = () => {
+    ctx.moveTo(bx - 9, edgeY); ctx.quadraticCurveTo(bx - 2, (edgeY + b.y) / 2, b.x, b.y); ctx.quadraticCurveTo(bx + 5, (edgeY + b.y) / 2, bx + 9, edgeY);
+  };
+  ctx.shadowColor = 'rgba(0,0,0,.38)'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 3;
+  ctx.fillStyle = '#fff8e6'; ctx.strokeStyle = INK; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 13);
+  if (!b.moved) tail();
+  ctx.fill(); ctx.shadowColor = 'transparent'; ctx.stroke();
+  // (the bubble's own outline would run across the tail's root: cover it)
+  if (!b.moved) { ctx.fillStyle = '#fff8e6'; ctx.fillRect(bx - 8, below ? y - 1 : y + h - 3, 16, 5); }
+  ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.font = font(19);
+  lines.forEach((l, i) => ctx.fillText(l, x + padX, y + padY + 15 + i * lh));
+  // who is speaking, on a tab in his team's colour
+  if (b.name) {
+    ctx.font = font(12.5);
+    const nw = ctx.measureText(b.name.toUpperCase()).width + 14, nh = 17, nx = x + 10, ny = y - nh + 3;
+    ctx.fillStyle = b.color || '#e8262b'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.roundRect(nx, ny, nw, nh, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.fillText(b.name.toUpperCase(), nx + 7, ny + 13);
   }
-  ctx.fill(); ctx.stroke();
-  if (!b.moved) { ctx.fillStyle = '#fff4da'; ctx.fillRect(Math.min(Math.max(b.x - 6, x + 12), x + w - 22), y + h - 3, 14, 4); }
-  ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  lines.forEach((l, i) => ctx.fillText(l, x + pad, y + pad * 0.7 + i * lh));
   ctx.restore();
-  return { x, y, w, h };
+  return { x, y: y - (b.name ? 14 : 0), w, h: h + (b.name ? 14 : 0) };
 }
 
 function wrap(ctx, text, maxW) {

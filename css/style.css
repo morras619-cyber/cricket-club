@@ -1397,3 +1397,10 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .stam.tired .stam-bar i { background: linear-gradient(#ff8a8a, #e8343b); }
 .stam.tired span { color: #ff8a8a; animation: stamPulse 1s ease-in-out infinite; }
 @keyframes stamPulse { 50% { opacity: .45; } }
+
+/* ---------- a line from someone we can't see on the pitch: his face, small and low, taps pass through ---------- */
+.taunt.quiet { top: 29%; left: 12px; right: 12px; pointer-events: none; }
+.taunt.quiet .taunt-pic { width: 54px; height: 54px; border-radius: 50%; border-width: 3px; }
+.taunt.quiet .taunt-bubble { max-width: 70%; padding: 4px 11px 6px; border-radius: 13px; }
+.taunt.quiet .taunt-name { font-size: 13px; }
+.taunt.quiet .taunt-text { font-size: 17px; }

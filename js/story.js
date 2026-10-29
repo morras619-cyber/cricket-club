@@ -79,7 +79,7 @@ function faceOf(p, team) {
   return hero ? portrait(hero, 64, 'celebrate') : faceEl(p, team, 64, 'taunt-face', true);
 }
 // a line from one of them, on a bubble with his face; it goes after a moment, or on a tap. Resolves when it has gone.
-export function taunt(p, team, line, { ms = 2800, side = 'left' } = {}) {
+export function taunt(p, team, line, { ms = 2800, side = 'left', quiet = false } = {}) {
   if (!p) return Promise.resolve();
   const box = buildTaunt();
   clearTimeout(tauntTimer);
@@ -90,6 +90,7 @@ export function taunt(p, team, line, { ms = 2800, side = 'left' } = {}) {
     box.querySelector('.taunt-name').textContent = p.name.toUpperCase();
     box.querySelector('.taunt-text').textContent = line;
     box.classList.toggle('right', side === 'right');
+    box.classList.toggle('quiet', quiet);   // (in a match: smaller, lower, and taps go through it)
     box.classList.remove('up'); void box.offsetWidth;
     box.hidden = false;
     requestAnimationFrame(() => box.classList.add('up'));
@@ -101,7 +102,7 @@ export function taunt(p, team, line, { ms = 2800, side = 'left' } = {}) {
     };
     tauntDone = finish;
     tauntTimer = setTimeout(finish, ms);
-    box.onpointerdown = e => { e.stopPropagation(); finish(); };
+    box.onpointerdown = quiet ? null : e => { e.stopPropagation(); finish(); };
   });
 }
 

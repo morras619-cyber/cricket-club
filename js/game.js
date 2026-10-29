@@ -609,7 +609,7 @@ export class Game {
       if (ev.crossed) {
         sfx[ev.crossed === 100 ? 'full' : 'dhol']();
         buzz(ev.crossed === 100 ? 120 : [30, 40, 30]);
-        if (ev.crossed === 100) this.fx.bubble(`${this.heroFor('bat').quote}`, this.W * 0.3, this.H * 0.55, { dur: 1400 });
+        if (ev.crossed === 100) this.sayMine(`${this.heroFor('bat').quote}`, { dur: 1400 });
       }
     } else if (ev.type === 'loss') {
       if (ev.label === 'OVERHEAT') sfx.sizzle();
@@ -684,7 +684,7 @@ export class Game {
       this.fx.flash(color, 0.45);
       this.fx.burst(this.W / 2, this.H * 0.42, { color, r: Math.max(this.W, this.H) * 0.6 });
       this.fx.word(def.word, this.W / 2, this.H * 0.42, { size: def.ultimate ? 76 : 60, color, stroke: INK, dur: 1300 });
-      this.fx.bubble(hero.quote, this.W * 0.5, this.H * 0.56, { dur: 1300 });
+      this.sayMine(hero.quote, { dur: 1300 });
       this.ui.banner(def.name.toUpperCase(), def.desc, 1300);
     }
     this.powerFxUntil = this.realTime + (this.bot ? 0 : 1400);
@@ -1191,7 +1191,7 @@ export class Game {
     if (head) { this.ui.banner(head, sub, 1600); await this.sleepReal(this.bot ? 50 : 500); }
     const c = await this.banterChoice();
     if (c === 'smack') {
-      this.fx.bubble(line1, at.x, at.y, { dur: 1800 });
+      this.sayMine(line1, { dur: 1800 });
       this.duelStart(inn);
       await this.sleepReal(this.bot ? 50 : 900);
     } else this.charge.add(3, 'COMPOSURE');
@@ -1206,22 +1206,20 @@ export class Game {
     this.mind?.earn({ batting: false, runs, wicket: wicketFell });
     const hotNow = this.pairHot();
     if (inn.done()) return;
-    const p = this.cams.bat.project(this.S.bowler.x, 1.9, this.S.bowler.z);
-    const bowl = p ? { x: p.x, y: p.y } : { x: this.W / 2, y: this.H * 0.4 };
-    const me = { x: this.W * 0.3, y: this.H * 0.55 };
+    const me = null;   // (duelChoice speaks for my own player: where he is, is worked out in say)
     if (this.playerRevenge) {
       this.playerRevenge = false;
       if (runs >= 4) {
         this.charge.add(10, 'REVENGE');
         this.fx.word('REVENGE!', this.W / 2, this.H * 0.28, { size: 60, color: '#ffd23f', stroke: '#e8343b' });
-        this.fx.bubble(line('batterRevenge', this.batterOf(inn).hero?.id, rng), me.x, me.y, { dur: 1800 });
+        this.say('batter', this.batterOf(inn), this.myTeam, line('batterRevenge', this.batterOf(inn).hero?.id, rng), { dur: 1800 });
         await this.sleepReal(this.bot ? 50 : 900);
         return;
       }
     }
     // a hot duel: he has more to say
     if (hotNow && !wicketFell && rng.chance(0.75)) {
-      this.fx.bubble(line('heatBowler', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1700 });
+      this.say('bowler', this.bowlerOf(inn), this.oppTeam, line('heatBowler', this.bowlerOf(inn).hero?.id, rng), { dur: 1700 });
       await this.sleepReal(this.bot ? 50 : 800);
       return;
     }
@@ -1236,11 +1234,11 @@ export class Game {
     }
     if (runs >= 4 && rng.chance(0.25)) {
       this.lastBatBanter = balls;
-      this.fx.bubble(line(rng.chance(0.5) ? 'bowlerCompliment' : 'bowlerAfterBoundary', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1700 });
+      this.say('bowler', this.bowlerOf(inn), this.oppTeam, line(rng.chance(0.5) ? 'bowlerCompliment' : 'bowlerAfterBoundary', this.bowlerOf(inn).hero?.id, rng), { dur: 1700 });
       await this.sleepReal(this.bot ? 50 : 700);
     } else if ((beaten || wicketFell) && rng.chance(0.3)) {
       this.lastBatBanter = balls;
-      this.fx.bubble(line('bowlerSledge', this.bowlerOf(inn).hero?.id, rng), bowl.x, bowl.y, { dur: 1800 });
+      this.say('bowler', this.bowlerOf(inn), this.oppTeam, line('bowlerSledge', this.bowlerOf(inn).hero?.id, rng), { dur: 1800 });
       if (!wicketFell || inn.wkts < CFG.wickets) {
         this.playerRevenge = true;
         if (this.oppTeam.id !== this.home) this.boo(0.2); // the home crowd boos the visiting sledger
@@ -1330,7 +1328,7 @@ export class Game {
       this.hitStop(40); this.fx.word('NICE!', this.W / 2, this.H * 0.3, { size: 46, color: '#3ec6ff', stroke: INK });
       this.fx.sparks(at.x, at.y, 10); this.fx.shake(6); sfx.bat('good'); buzz(25);
     } else {
-      sfx.thin(); this.fx.shake(2); buzz(10); this.fx.bubble('Oops!', at.x, at.y - 10, { dur: 900 });
+      sfx.thin(); this.fx.shake(2); buzz(10); this.sayMine('Oops!', { dur: 900 });
       this.timingBar(err, grade);
     }
   }
@@ -1795,6 +1793,44 @@ export class Game {
     return p ? { x: p.x, y: p.y } : { x: this.W / 2, y: this.H * 0.4 };
   }
   bowlerSpot() { return { x: this.W * 0.72, y: this.H * 0.56 }; }
+
+  // ---------- who is talking ----------
+  // where a speaker's mouth is on the screen now, or null when we can't see him (the bowler behind us in the bowling view, a fielder away
+  // from the camera)
+  headSpot(role) {
+    const S = this.S, cam = this.cams[this.view];
+    if (!S || !cam) return null;
+    let p = null;
+    if (role === 'batter') p = cam.project(S.batter.x + (this.view === 'bat' ? BAT_BACK_DX : 0), 1.72, S.batter.z);
+    else if (role === 'bowler' && this.view === 'bat') p = cam.project(S.bowler.x, 1.68, S.bowler.z);
+    else if (role === 'keeper') p = cam.project(S.keeper.x, 1.3, S.keeper.z);
+    return p && p.x > 14 && p.x < this.W - 14 && p.y > 14 && p.y < this.H - 14 ? { x: p.x, y: p.y } : null;
+  }
+  // the bottom of the scorecard: a bubble stays below it
+  hudBottom() {
+    const el = document.querySelector('.hud-top'), c = this.cv.getBoundingClientRect();
+    return el && c.height ? Math.max(8, (el.getBoundingClientRect().bottom - c.top) * (this.H / c.height) + 6) : 8;
+  }
+  // a line from a player: on a bubble at his mouth if he is on the screen, else his face (as in the story) on the side he plays on.
+  // role: 'batter' | 'bowler' | 'keeper'
+  say(role, player, team, text, { dur = 1700 } = {}) {
+    if (!text) return;
+    const head = this.headSpot(role);
+    if (head || !player || !this.taunt || this.bot) {
+      const at = head || { x: this.W / 2, y: this.H * 0.4 };
+      this.fx.bubble(text, at.x, at.y, { dur, name: player ? (player.short || player.name.split(' ').slice(-1)[0]) : null, color: team?.suit || null, safeTop: this.hudBottom() });
+      return;
+    }
+    this.fx.bubbles = [];
+    this.taunt(player, team, text, { ms: dur + 300, side: team?.id === this.myTeam?.id ? 'left' : 'right', quiet: true });
+  }
+  // my own player's line: the man batting, or the one bowling
+  sayMine(text, opt) {
+    const inn = this.innings[this.innings.length - 1];
+    if (!inn) return;
+    if (inn.side === 'player') this.say('batter', this.batterOf(inn), this.myTeam, text, opt);
+    else this.say('bowler', this.bowlerOf(inn), this.myTeam, text, opt);
+  }
 
   async bowlBall(inn, ballNo, opt = {}) {
     const S = this.S = this.freshScene();
@@ -2337,20 +2373,20 @@ export class Game {
       if (wicketFell || runs === 0) {
         this.charge.add(10, 'REVENGE');
         this.fx.word('REVENGE!', this.W / 2, this.H * 0.3, { size: 60, color: '#ffd23f', stroke: '#e8343b' });
-        this.fx.bubble(line('revenge', me.id, rng), bowl().x, bowl().y, { dur: 1800 });
+        this.say('bowler', this.bowlerOf(inn), this.myTeam, line('revenge', me.id, rng), { dur: 1800 });
         this.revenge = false;
         await this.sleepReal(this.bot ? 50 : 900);
       } else if (runs >= 4) this.revenge = false;
     }
     // a hot duel: the batter has more to say
     if (hotNow && !wicketFell && rng.chance(0.7)) {
-      this.fx.bubble(line('heatBatter', them.id, rng), bat().x, bat().y, { dur: 1800 });
+      this.say('batter', this.batterOf(inn), this.oppTeam, line('heatBatter', them.id, rng), { dur: 1800 });
       await this.sleepReal(this.bot ? 50 : 850);
       return;
     }
     if (runs >= 4 && inn.balls - this.lastBanterBall >= 4 && rng.chance(0.3)) {
       this.lastBanterBall = inn.balls;
-      this.fx.bubble(line('batterSledge', them.id, rng), bat().x, bat().y, { dur: 2000 });
+      this.say('batter', this.batterOf(inn), this.oppTeam, line('batterSledge', them.id, rng), { dur: 2000 });
       this.revenge = true;
       this.ui.banner('THEY\'RE TALKING', 'Dot ball or wicket next = +10 REVENGE', 1800);
       await this.sleepReal(this.bot ? 50 : 1300);
@@ -2362,11 +2398,11 @@ export class Game {
     if (wicketFell && duelWas) {
       this.lastBanterBall = inn.balls;
       this.fx.word('DUEL WON!', this.W / 2, this.H * 0.3, { size: 60, color: '#ffd23f', stroke: '#e8343b', dur: 1400 });
-      this.fx.bubble(line('sendoff', me.id, rng), bowl().x, bowl().y, { dur: 1800 });
+      this.say('bowler', this.bowlerOf(inn), this.myTeam, line('sendoff', me.id, rng), { dur: 1800 });
       this.charge.add(8, 'DUEL WON');
       sfx.crowd(0.9);
       await this.sleepReal(this.bot ? 50 : 800);
-      this.fx.bubble(line('departing', them.id, rng), bat().x, bat().y, { dur: 1500 });
+      this.say('batter', this.batterOf(inn), this.oppTeam, line('departing', them.id, rng), { dur: 1500 });
       this.batterMood = { state: 'calm', balls: 0 };
       await this.sleepReal(this.bot ? 50 : 900);
       return;
@@ -2378,31 +2414,30 @@ export class Game {
     const choice = await this.banterChoice();
     if (choice === 'smack') {
       if (wicketFell) {
-        this.fx.bubble(line('sendoff', me.id, rng), bowl().x, bowl().y, { dur: 1800 });
+        this.say('bowler', this.bowlerOf(inn), this.myTeam, line('sendoff', me.id, rng), { dur: 1800 });
         this.charge.add(5, 'SEND-OFF');
         sfx.crowd(0.7);
         await this.sleepReal(this.bot ? 50 : 700);
-        this.fx.bubble(line('departing', them.id, rng), bat().x, bat().y, { dur: 1500 });
+        this.say('batter', this.batterOf(inn), this.oppTeam, line('departing', them.id, rng), { dur: 1500 });
         this.batterMood = { state: 'calm', balls: 0 };
         await this.sleepReal(this.bot ? 50 : 900);
         return;
       }
-      this.fx.bubble(line('sledge', me.id, rng), bowl().x, bowl().y, { dur: 1800 });
+      this.say('bowler', this.bowlerOf(inn), this.myTeam, line('sledge', me.id, rng), { dur: 1800 });
       this.duelStart(inn);   // (it was answered or not by his mood below, but the duel is on: he has been called out)
       await this.sleepReal(this.bot ? 50 : 750);
       const r = sledgeOutcome(them.ai, rng);
-      const h = bat();
       if (r === 'fired') {
         this.batterMood = { state: 'fired', balls: 2 };
-        this.fx.bubble(line('fired', them.id, rng), h.x, h.y, { dur: 1800 });
+        this.say('batter', this.batterOf(inn), this.oppTeam, line('fired', them.id, rng), { dur: 1800 });
         this.fx.word('FIRED UP!', this.W / 2, this.H * 0.3, { size: 48, color: '#ff9f1c', stroke: INK });
       } else if (r === 'rattled') {
         this.batterMood = { state: 'rattled', balls: 2 };
-        this.fx.bubble(line('rattled', them.id, rng), h.x, h.y, { dur: 1800 });
+        this.say('batter', this.batterOf(inn), this.oppTeam, line('rattled', them.id, rng), { dur: 1800 });
         this.fx.word('RATTLED!', this.W / 2, this.H * 0.3, { size: 48, color: '#3ec6ff', stroke: INK });
       } else {
         this.batterMood = { state: 'calm', balls: 0 };
-        this.fx.bubble(line('unfazed', them.id, rng), h.x, h.y, { dur: 1800 });
+        this.say('batter', this.batterOf(inn), this.oppTeam, line('unfazed', them.id, rng), { dur: 1800 });
         this.fx.word('UNFAZED', this.W / 2, this.H * 0.3, { size: 40, color: '#fff4da', stroke: INK });
       }
       await this.sleepReal(this.bot ? 50 : 1000);
@@ -2410,7 +2445,7 @@ export class Game {
       this.charge.add(3, 'COMPOSURE');
       if (rng.chance(0.35)) {
         await this.sleepReal(this.bot ? 50 : 300);
-        this.fx.bubble(line('compliment', them.id, rng), bat().x, bat().y, { dur: 1700 });
+        this.say('batter', this.batterOf(inn), this.oppTeam, line('compliment', them.id, rng), { dur: 1700 });
         this.charge.add(3, 'RESPECT');
         await this.sleepReal(this.bot ? 50 : 800);
       }
@@ -2616,7 +2651,7 @@ export class Game {
       this.hitStop(120); sfx.glove(); buzz(60);
       this.fx.burst(hs.x, hs.y, { color: '#ffe14d', r: 220 });
       this.fx.word('SNAFFLED!', hs.x, hs.y - 40, { size: 60 });
-      this.fx.bubble('Got it!', this.W * 0.55, this.H * 0.55);
+      this.say('keeper', this.keeperPlayer(), this.myTeam, 'Got it!', { dur: 1200 });
     } else {
       S.kball.done = false; S.kball.miss = true;
       this.fx.word('BUTTERFINGERS!', this.W / 2, this.H * 0.32, { size: 52 });
