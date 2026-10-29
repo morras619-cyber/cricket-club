@@ -33,7 +33,7 @@ export function finishLight(ctx, W, H, hy, night = 0) {
   if (quality.high) {
     ctx.globalCompositeOperation = 'soft-light';
     const g = ctx.createRadialGradient(W / 2, H * 0.7, 0, W / 2, H * 0.7, Math.max(W * 0.95, H * 0.62));
-    g.addColorStop(0, `rgba(255,238,185,${0.8 + 0.2 * night})`); g.addColorStop(0.55, 'rgba(255,238,185,0.22)'); g.addColorStop(1, 'rgba(255,236,190,0)');
+    g.addColorStop(0, `rgba(255,238,185,${0.42 + 0.14 * night})`); g.addColorStop(0.55, 'rgba(255,238,185,0.12)'); g.addColorStop(1, 'rgba(255,236,190,0)');
     ctx.fillStyle = g; ctx.fillRect(0, hy, W, H - hy);
     ctx.globalCompositeOperation = 'source-over';
   }

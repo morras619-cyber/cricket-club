@@ -52,8 +52,10 @@ function image(src) {
 }
 const loaded = img => img && img.complete && img.naturalWidth > 0;
 
+// ?painted=0 in the address (or sixcharge.painted = 0) shows the old stance instead of the painted one, to compare
+export const painted = { off: (() => { try { return /[?&]painted=0/.test(location.search) || localStorage.getItem('sixcharge.painted') === '0'; } catch { return false; } })() };
 export function loadKitSprites(...teamIds) {
-  for (const view of ['front', 'back', 'bat-back', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
+  for (const view of ['front', 'back', 'bat-back', 'bat-ready', 'field']) if (!views[view] && KIT_SHEETS[view]) views[view] = openView(view);
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -132,6 +134,7 @@ const PREMIUM = {
   storm: ['#6a22c4', '#2a0b5a', '#f2b21b'], royals: ['#ec2f9a', '#5c0c3a', '#ffffff'],
   india: ['#1c5ad6', '#0b2a6e', '#ff9933'], pakistan: ['#0d7a3c', '#063d1d', '#ffffff'],
 };
+const TARGET_HSV = c => hsv(c[0], c[1], c[2]);
 function premiumOf(team) {
   if (PREMIUM[team.id]) return PREMIUM[team.id].map(hexRgb);
   const c = hexRgb(team.suit);
@@ -159,6 +162,18 @@ function teamSheet(view, team) {
       w[1] = tn[i] / 255; w[2] = tn[i + 1] / 255; w[0] = Math.max(0, 1 - w[1] - w[2]);
       const L = tn[i + 2];
       let r = 0, gg = 0, b = 0;
+      if (meta.hsv) {
+        // (a painted sheet: the hue becomes the club's, the colour's depth and light stay as painted)
+        const [pr, pg, pb] = [p[i], p[i + 1], p[i + 2]], [ph, ps, pv] = hsv(pr, pg, pb);
+        for (let k = 0; k < 3; k++) {
+          if (!w[k]) continue;
+          const t = pal[k], [th, ts, tv] = TARGET_HSV(t), [, rs, rv] = meta.hsv[k];
+          const o = rgb(th, Math.min(1, ps * ts / Math.max(rs, 0.05)), Math.min(1, pv * tv / Math.max(rv, 0.05)));
+          r += w[k] * o[0]; gg += w[k] * o[1]; b += w[k] * o[2];
+        }
+        p[i] = r; p[i + 1] = gg; p[i + 2] = b;
+        continue;
+      }
       for (let k = 0; k < 3; k++) {
         if (!w[k]) continue;
         const t = pal[k], q = L / ref[k], sh = q <= 1 ? q ** 0.9 : 0, hi = q > 1 ? Math.min(0.7, (q - 1) * 0.8) : 0;
@@ -458,9 +473,16 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
   const sheet = playerSheet('bat-back', team, look, false);
   if (!sheet) return false;
   const [bh, bw] = buildOf(look), meta = KIT_SHEETS['bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
+  // the stance he waits in is painted (img/kit/bat-ready.*, tools/build_bat_ready.py) once its sheet is in; every other pose is the old sheet's
+  const rd = KIT_SHEETS['bat-ready'] && !painted.off ? playerSheet('bat-ready', team, look, false) : null, rm = KIT_SHEETS['bat-ready'];
   const one = (name, alpha) => {
-    const [sx, sy, w, h, ax, ay] = meta.frames[POSE_BAT[name] ?? 0];
     ctx.globalAlpha = alpha;
+    if (name === 'ready' && rd) {
+      const [sx, sy, w, h, ax, ay] = rm.frames[0], kr = kPerM * BAT_HEIGHT_M / rm.refPx * bh, kxr = kr * bw;
+      ctx.drawImage(rd, sx, sy, w, h, px - ax * kxr, py - ay * kr, w * kxr, h * kr);
+      return;
+    }
+    const [sx, sy, w, h, ax, ay] = meta.frames[POSE_BAT[name] ?? 0];
     ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   };
   ctx.save();
