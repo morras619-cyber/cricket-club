@@ -141,9 +141,53 @@ const PREMIUM = {
 const TARGET_HSV = c => hsv(c[0], c[1], c[2]);
 function premiumOf(team) {
   if (PREMIUM[team.id]) return PREMIUM[team.id].map(hexRgb);
-  const c = hexRgb(team.suit);
-  return [c, c.map(x => x * 0.38), hexRgb(team.trim)];
+  const c = hexRgb(team.suit), [h, sa, v] = hsv(...c);
+  // (the yoke and side panels: the same colour, deeper: not the shirt scaled towards black, which left a lime shirt with olive patches and a red one with brown)
+  return [c, rgb(h, Math.min(1, sa * 1.08), v * 0.6), hexRgb(team.trim)];
 }
+// A colour at every step of its shading, 0 to 2.5 times the brightness it was drawn at (in hundredths): shadows are the colour darkened with a little more
+// of its colour (not just scaled towards black, which turns yellow to olive and red to brown), lights run on towards white.
+function shades(t) {
+  const [h, s, v] = hsv(t[0], t[1], t[2]), lut = new Float32Array(251 * 3);
+  for (let n = 0; n <= 250; n++) {
+    const q = n / 100;
+    let o;
+    if (q <= 1) { const sh = q ** 0.9; o = rgb(h, Math.min(1, s * (1 + 0.3 * (1 - sh))), v * sh); }
+    else { const hi = Math.min(0.7, (q - 1) * 0.8); o = t.map(x => x + (255 - x) * hi); }
+    lut.set(o, n * 3);
+  }
+  return lut;
+}
+
+// The cloth's brightness (the tone picture's blue channel) with the painted blotches taken out: a masked box blur (radius R, kit pixels only, so the
+// outlines do not bleed in), then each pixel keeps only the part of its difference from the blur that is a real fold or stitch (more than a little).
+// Returns the smoothed brightness for every pixel (the first pass is done once per sheet and club).
+function smoothTone(tn, m, W, H, R = 3) {
+  const n = W * H, val = new Float32Array(n), cnt = new Float32Array(n);
+  for (let i = 0; i < n; i++) if (m[i * 4 + 2] === 255 && tn[i * 4 + 2]) { val[i] = tn[i * 4 + 2]; cnt[i] = 1; }
+  const blur = (a, b) => {   // (a running sum along rows, then columns)
+    const t = new Float32Array(n), u = new Float32Array(n);
+    for (const [src, dst] of [[a, t], [b, u]]) {
+      for (let y = 0; y < H; y++) { let acc = 0; const o = y * W; for (let x = -R; x < W; x++) { if (x + R < W) acc += src[o + x + R]; if (x - R - 1 >= 0) acc -= src[o + x - R - 1]; if (x >= 0) dst[o + x] = acc; } }
+    }
+    const t2 = new Float32Array(n), u2 = new Float32Array(n);
+    for (const [src, dst] of [[t, t2], [u, u2]]) {
+      for (let x = 0; x < W; x++) { let acc = 0; for (let y = -R; y < H; y++) { if (y + R < H) acc += src[(y + R) * W + x]; if (y - R - 1 >= 0) acc -= src[(y - R - 1) * W + x]; if (y >= 0) dst[y * W + x] = acc; } }
+    }
+    return [t2, u2];
+  };
+  const [sv, sc] = blur(val, cnt), out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    if (!cnt[i]) continue;
+    const b = sv[i] / sc[i], d = val[i] - b, a = Math.abs(d), k = a <= 10 ? 0 : a >= 30 ? 1 : (a - 10) / 20;
+    out[i] = b + d * k * k * (3 - 2 * k);
+  }
+  return out;
+}
+
+// (the smoothed brightness is the same for every club: made once for each sheet)
+const smoothed = new Map();
+const smoothTones = (view, tn, m, W, H) => { if (!smoothed.has(view)) smoothed.set(view, smoothTone(tn, m, W, H)); return smoothed.get(view); };
 
 // ---------- the club's kit ----------
 const teamCache = new Map();
@@ -160,14 +204,14 @@ function teamSheet(view, team) {
   if (data.tone) {
     // each colour shaded by the cloth's brightness against that colour's drawn brightness, then
     // mixed by the soft weights (so panel edges and piping blend, no patches)
-    const tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0];
+    const tgt0 = !!meta.hsv, tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0], luts = pal.map(shades), sm = tgt0 ? null : smoothTones(view, tn, m, c.width, c.height);
     // (a painted sheet: the hue becomes the club's, the colour's depth and light stay as painted;
     // the club's colours are worked out once, not per pixel)
     const tgt = meta.hsv && pal.map((t, k) => { const [th, ts, tv] = TARGET_HSV(t), [, rs, rv] = meta.hsv[k]; return [th, ts / Math.max(rs, 0.05), tv / Math.max(rv, 0.05)]; });
     for (let i = 0; i < p.length; i += 4) {
       if (m[i + 2] !== 255 || !p[i + 3] || !tn[i + 2]) continue;
       w[1] = tn[i] / 255; w[2] = tn[i + 1] / 255; w[0] = Math.max(0, 1 - w[1] - w[2]);
-      const L = tn[i + 2];
+      const L = sm ? sm[i >> 2] : tn[i + 2];
       let r = 0, gg = 0, b = 0;
       if (tgt) {
         const [, ps, pv] = hsv(p[i], p[i + 1], p[i + 2]);
@@ -181,10 +225,8 @@ function teamSheet(view, team) {
       }
       for (let k = 0; k < 3; k++) {
         if (!w[k]) continue;
-        const t = pal[k], q = L / ref[k], sh = q <= 1 ? q ** 0.9 : 0, hi = q > 1 ? Math.min(0.7, (q - 1) * 0.8) : 0;
-        r += w[k] * (q <= 1 ? t[0] * sh : t[0] + (255 - t[0]) * hi);
-        gg += w[k] * (q <= 1 ? t[1] * sh : t[1] + (255 - t[1]) * hi);
-        b += w[k] * (q <= 1 ? t[2] * sh : t[2] + (255 - t[2]) * hi);
+        const n = Math.min(250, Math.round(L / ref[k] * 100)) * 3, lt = luts[k];
+        r += w[k] * lt[n]; gg += w[k] * lt[n + 1]; b += w[k] * lt[n + 2];
       }
       p[i] = r; p[i + 1] = gg; p[i + 2] = b;
     }
