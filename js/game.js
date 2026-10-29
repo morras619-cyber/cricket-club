@@ -1,4 +1,5 @@
 import { CFG, phaseFor } from './config.js';
+import { finishLight, NIGHT } from './light.js';
 import { makeRng } from './rng.js';
 import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
@@ -3446,6 +3447,7 @@ export class Game {
     items.sort((a, b2) => b2.d - a.d);
     for (const it of items) it.fn();
     if (kind === 'bowl') this.drawBowlOverlay(cam);
+    finishLight(this.ctx, this.W, this.H, cam.hy, NIGHT[this.ground?.time] ?? 1);
 
     // Read the Bowler: where it will land
     if (kind === 'bat' && S.read && !S.read.none && (S.readPre || (S.delivery && this.gameTime - S.ballT0 < (S.delivery.bounceT ?? 0) + 0.05))) this.drawReadMark(cam);

@@ -1,4 +1,5 @@
 import { peopleSheet, loadPeopleMask } from './looks.js';
+import { softShadow } from './light.js';
 import { sheetOf, teamById } from './teams.js';
 import { drawKitBatter } from './kitsprite.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
@@ -141,8 +142,7 @@ export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   const { a = 1 } = fr, f = old(fr.f), prev = old(fr.prev);
   ctx.save();
   // ground shadow
-  ctx.fillStyle = 'rgba(10,8,20,0.28)';
-  ctx.beginPath(); ctx.ellipse(px, py, 0.55 * kPerM, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  softShadow(ctx, px, py, 0.55 * kPerM, 0.12 * kPerM, 0.28);
   if (opts.glow) { ctx.shadowColor = opts.glow; ctx.shadowBlur = 22; }
   // the previous frame fades out underneath, which reads as motion blur on a fast swing
   if (prev && a < 1) drawOne(ctx, img, prev, px, py, k, (1 - a) * 0.6);

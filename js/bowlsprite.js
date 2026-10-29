@@ -416,6 +416,7 @@ const DELIVERY = [['release', 90], ['follow1', 120], ['follow2', 140], ['follow3
 // a spinner, drawn from the fast bowler's sheets: an easier stride and an unhurried follow-through
 const SPIN_DELIVERY = [['release', 90], ['follow1', 200], ['follow2', 240], ['follow3', 280], ['finish', Infinity]];
 
+import { softShadow } from './light.js';
 import { peopleSheet, peopleFrame, loadPeopleMask, hairHex, skinHex } from './looks.js';
 import { loadKitSprites, drawKitSprite } from './kitsprite.js';
 import { PACE_STEPS } from './squads.js';
@@ -634,8 +635,7 @@ export function drawBowlSprite(ctx, px, py, kPerM, frame, team, flip = false, vi
   const [sx, sy, w, h, ax, ay, s] = v.frames[frame];
   const [bh, bw] = buildOf(look), k = kPerM * REF_HEIGHT_M / v.refPx * s * bh, kx = k * bw; // his own build
   ctx.save();
-  ctx.fillStyle = 'rgba(10,8,20,0.26)';
-  ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  softShadow(ctx, px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0.26);
   ctx.translate(px, py);
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(img, sx, sy, w, h, -ax * kx, -ay * k, w * kx, h * k);
@@ -652,8 +652,7 @@ export function drawKeeperSprite(ctx, px, py, kPerM, frame, team, view, { flip =
   const [sx, sy, w, h, ax, ay, hw] = v.frames[frame];
   const k = kPerM * HELMET_M / hw;
   ctx.save();
-  ctx.fillStyle = 'rgba(10,8,20,0.26)';
-  ctx.beginPath(); ctx.ellipse(px, py, (frame.startsWith('dive') ? 1.1 : 0.55) * kPerM, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  softShadow(ctx, px, py, (frame.startsWith('dive') ? 1.1 : 0.55) * kPerM, 0.12 * kPerM, 0.26);
   ctx.translate(px, py - lift * kPerM);
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(img, sx, sy, w, h, -ax * k, -ay * k, w * k, h * k);

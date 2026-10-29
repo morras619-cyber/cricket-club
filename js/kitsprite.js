@@ -1,6 +1,7 @@
 // The plain-kit bowler (img/kit/, tools/build_kit_sheets.py): one bald body per view, repainted
 // for each club (kit), then for each player (skin, hair), with the club crest on the front of the
 // shirt and the player's last name and number on the back (style: tools/kit/SHIRT_PRINT.md).
+import { softShadow } from './light.js';
 import { KIT_SHEETS } from './kitsheets.js';
 import { skinHex, hairHex, hsv, rgb } from './looks.js';
 import { buildOf } from './builds.js';
@@ -423,8 +424,7 @@ export function drawKitFielder(ctx, px, py, kPerM, frame, team, look, flip = fal
   const [, , w, h, ax, ay] = KIT_SHEETS.field.frames[idx], [bh, bw] = buildOf(look);
   const k = kPerM / FIELD_PX_PER_M * bh, kx = k * bw;
   ctx.save();
-  ctx.fillStyle = 'rgba(10,8,20,0.28)';
-  ctx.beginPath(); ctx.ellipse(px, py, Math.max(w * 0.32, 60) * kx, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  softShadow(ctx, px, py, Math.max(w * 0.32, 60) * kx, 0.12 * kPerM, 0.28);
   if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 14; }
   ctx.translate(px, py - lift * kPerM);
   if (flip) ctx.scale(-1, 1);
@@ -445,8 +445,7 @@ export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look)
   // his own build: taller or shorter, broader or slighter, about his feet
   const [bh, bw] = buildOf(look), k = kPerM * REF_HEIGHT_M / meta.refPx * bh, kx = k * bw;
   ctx.save();
-  ctx.fillStyle = 'rgba(10,8,20,0.26)';
-  ctx.beginPath(); ctx.ellipse(px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  softShadow(ctx, px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0.26);
   ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   ctx.restore();
   return true;
@@ -465,8 +464,7 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
     ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   };
   ctx.save();
-  ctx.fillStyle = 'rgba(10,8,20,0.28)';
-  ctx.beginPath(); ctx.ellipse(px, py, 0.55 * kPerM * bw, 0.12 * kPerM, 0, 0, Math.PI * 2); ctx.fill();
+  softShadow(ctx, px, py, 0.55 * kPerM * bw, 0.12 * kPerM, 0.28);
   if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 22; }
   if (prev && a < 1) one(prev, (1 - a) * 0.6);
   one(f, 1);
