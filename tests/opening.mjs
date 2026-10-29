@@ -39,6 +39,14 @@ await page.waitForTimeout(6500);
 await page.mouse.move(300, 560); await page.mouse.down(); await page.mouse.move(300, 380, { steps: 4 }); await page.mouse.up();   // a shot
 await page.waitForFunction(() => /34\s*\/\s*2/.test(document.querySelector('.hud-top')?.textContent || ''), null, { timeout: 9000 });
 check(true, 'bowled first ball: 34/2');
+await page.waitForFunction(() => /4 HOURS LATER/i.test(document.querySelector('.cm-card')?.textContent || ''), null, { timeout: 12000 });
+check(true, 'a black card says 4 hours later');
+await page.waitForSelector('.cm-next', { state: 'visible', timeout: 8000 });
+await page.waitForTimeout(500);
+let coach = false;
+for (let i = 0; i < 8; i++) { await page.click('.cm-next'); await page.waitForTimeout(300); if (/cut from the team, effective immediately/.test(await page.textContent('#comic'))) coach = true; }
+check(coach, 'the night scene ends with the coach\'s message: cut from the team, effective immediately');
+await page.click('.cm-next');
 await page.waitForFunction(() => !document.getElementById('region').hidden, null, { timeout: 15000 });
 check(true, 'the story moves on to the region choice');
 check(errors.length === 0, `no page errors${errors.length ? ': ' + errors[0] : ''}`);

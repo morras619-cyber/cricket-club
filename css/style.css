@@ -1446,3 +1446,10 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .cm-chirp.up { opacity: 1; }
 .cm-chirp .chirp { width: 100%; max-width: 520px; margin: 0 auto; }
 .cm-chirp .cm-go { position: absolute; left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-family: var(--display); font-size: 22px; letter-spacing: 1px; padding: 9px 30px; border-radius: 12px; border: 3px solid var(--ink); background: #ffd23f; color: var(--ink); box-shadow: 0 4px 0 rgba(0, 0, 0, .4); }
+.cm-fans { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.cm-fan { position: absolute; display: flex; gap: 9px; align-items: flex-start; padding: 8px 12px 9px 8px; background: #10286b; border: 3px solid #1f45a8; border-radius: 16px; color: #f4f7ff; box-shadow: 0 4px 0 rgba(0, 0, 0, .4); }
+.cm-fan.in { animation: cmpop .35s cubic-bezier(.2, 1.4, .4, 1) both; transform-origin: 20% 50%; }
+.cm-fan b { font-family: var(--display); font-size: 14px; letter-spacing: .5px; }
+.cm-fan small { font-size: 12px; font-weight: 700; color: #8ea6e6; }
+.cm-fan p { margin: 1px 0 0; font-weight: 800; font-size: clamp(13px, 3.8vw, 16px); line-height: 1.22; }
+.cm-av { flex: none; width: 40px; height: 40px; border-radius: 50%; background: #12307f url(../img/chirp/avatars.webp) 0 0 / 800% 700% no-repeat; box-shadow: 0 0 0 2px #dfe8ff; }

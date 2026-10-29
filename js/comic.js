@@ -1,6 +1,8 @@
 // Comic panels for the story: a full picture per panel, with the words drawn by the game (the pictures carry no text) in speech bubbles
 // whose tail points at the speaker's mouth (or at the phone for a message). Every tap brings the next bubble; when a panel has said
 // everything the next tap brings the next panel.
+import { FANS, faceStyle } from './chirp.js';
+
 const $ = id => document.getElementById(id);
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
@@ -17,41 +19,76 @@ export const OPENING = [
   { img: 'img/story/open-1.webp', beats: [{ say: "Don't be scared. Not tonight." }] },   // (the phone is dark again)
 ];
 
+// four hours later: Kabir in bed, scrolling through Chirp. The angry fans, and then the message from his coach (the coach's name is a placeholder)
+const fan = (handle, text) => { const i = FANS.findIndex(f => f[1] === handle), f = FANS[i]; return { fan: { name: f[0], handle: f[1], text, face: faceStyle(i) } }; };
+const BED = { mouth: [0.41, 0.43], sayAt: { left: 0.5, width: 0.46, bottom: 0.395 }, phone: [0.56, 0.5], msgBelow: true };
+export const NIGHT = [
+  { img: 'img/story/night-1.webp', ...BED, beats: [
+    { say: "Don't read it, Kabir. Don't read it." },
+    fan('imran_ultra', 'CHOKER. Thirty thousand watching and he scored ZERO. 🤡'),
+    fan('meera_mad', 'A golden duck in a FINAL? Horrible. Just horrible.'),
+  ] },
+  { img: 'img/story/night-2.webp', ...BED, beats: [
+    fan('jamal_jaffa', 'He needs to be playing in the third division. Send him back down.'),
+    fan('zawadi_z', 'Worst signing in Thunder history. #SellKabir'),
+    fan('kate_the_crease', "I've seen better batting at a school fete."),
+    { say: "Maybe they're right..." },
+  ] },
+  { img: 'img/story/night-3.webp', ...BED, beats: [
+    { msg: { who: 'COACH MERCER', text: 'Kabir, the club has decided. You are cut from the team, effective immediately.' } },
+    { say: '...What?' },
+  ] },
+];
+
 let box = null;
 function build() {
   if (box) return box;
   box = mk('div', 'comic'); box.id = 'comic'; box.hidden = true;
-  box.innerHTML = '<div class="cm-art"><div class="cm-pic"></div><div class="cm-shade"></div><div class="cm-sfx"></div>'
+  box.innerHTML = '<div class="cm-art"><div class="cm-pic"></div><div class="cm-shade"></div><div class="cm-sfx"></div><div class="cm-fans"></div>'
     + '<div class="cm-speech"><svg class="cm-tail" aria-hidden="true"><path/></svg><div class="cm-bub"><b></b><p></p></div></div></div>'
     + '<div class="cm-btns"><button class="cm-skip">Skip</button><span class="cm-dots"></span><button class="cm-next">Next</button></div>';
   $('app').append(box);
   return box;
 }
 
-// the bubble up, with its tail to the point (fractions of the picture): the speech sits above-right of the head, a message above the phone.
-// The bubble and its tail are one outline (one path), so no line crosses where the tail joins.
-function place(b, art, beat) {
-  const sp = b.querySelector('.cm-speech'), bub = b.querySelector('.cm-bub'), tail = b.querySelector('.cm-tail'), sfx = b.querySelector('.cm-sfx');
+// the bubble up, with its tail to the point (fractions of the picture). The bubble and its tail are one outline (one path), so no line
+// crosses where the tail joins. A panel may say where the mouth and the phone are, where his bubble sits (sayAt) and whether a message
+// bubble goes above the phone (default) or below it (msgBelow).
+function place(b, art, beat, p = {}) {
+  const sp = b.querySelector('.cm-speech'), bub = b.querySelector('.cm-bub'), tail = b.querySelector('.cm-tail'), sfx = b.querySelector('.cm-sfx'), fans = b.querySelector('.cm-fans');
   const W = art.clientWidth, H = art.clientHeight, msg = !!beat.msg;
   sfx.hidden = !beat.sfx; sfx.textContent = beat.sfx || '';
+  // a fan's comment: a small bubble that stays, the next one below it
+  if (beat.fan) {
+    const n = fans.children.length % 3, f = beat.fan, c = mk('div', 'cm-fan');
+    const av = mk('i', 'cm-av'); if (f.face) av.setAttribute('style', f.face);
+    const t = mk('div', ''); t.append(mk('b', '', f.name), mk('small', '', ` @${f.handle}`), mk('p', '', f.text));
+    c.append(av, t);
+    c.style.top = `${H * (0.565 + 0.145 * n)}px`; c.style.left = `${W * (n % 2 ? 0.1 : 0.03)}px`; c.style.width = `${W * 0.87}px`;
+    if (!n) fans.innerHTML = '';
+    fans.append(c); c.classList.add('in');
+  }
   sp.hidden = !beat.say && !msg;
   if (sp.hidden) return;
   sp.classList.toggle('msg', msg);
   bub.querySelector('b').textContent = msg ? beat.msg.who : ''; bub.querySelector('b').hidden = !msg;
   bub.querySelector('p').textContent = msg ? beat.msg.text : beat.say;
-  const bw = W * (msg ? 0.62 : 0.52), left = msg ? W - bw - W * 0.03 : W * 0.46;
+  const at = p.sayAt || { left: 0.46, width: 0.52, bottom: 0.155 };
+  const bw = W * (msg ? 0.62 : at.width), left = msg ? W - bw - W * 0.03 : W * at.left;
   bub.style.width = `${bw}px`; bub.style.left = `${left}px`; bub.style.top = '0px';
-  const bh = bub.offsetHeight, top = Math.max(H * 0.015, H * (msg ? 0.8 : 0.155) - bh), bottom = top + bh;
+  const bh = bub.offsetHeight, below = msg && p.msgBelow;
+  const top = below ? H * 0.585 : Math.max(H * 0.015, H * (msg ? 0.8 : at.bottom) - bh), bottom = top + bh;
   bub.style.top = `${top}px`;
-  const [tx, ty] = (msg ? PHONE : MOUTH).map((v, k) => v * (k ? H : W));
+  const [tx, ty] = (msg ? (p.phone || PHONE) : (p.mouth || MOUTH)).map((v, k) => v * (k ? H : W));
   const xa = msg ? left + bw * 0.8 : left + bw * 0.24, xb = msg ? left + bw * 0.62 : left + bw * 0.1, r = 18;
   // (his tail stops short of his face: it points at the mouth without touching it)
   let tipX = tx, tipY = ty;
   if (!msg) { const mx = (xa + xb) / 2, dx = tx - mx, dy = ty - bottom, len = Math.hypot(dx, dy) || 1, gap = Math.min(W * 0.075, len * 0.6); tipX = tx - dx / len * gap; tipY = ty - dy / len * gap; }
   tail.setAttribute('viewBox', `0 0 ${W} ${H}`); tail.setAttribute('width', W); tail.setAttribute('height', H);
-  tail.querySelector('path').setAttribute('d',
-    `M${left + r},${top} H${left + bw - r} Q${left + bw},${top} ${left + bw},${top + r} V${bottom - r} Q${left + bw},${bottom} ${left + bw - r},${bottom}`
-    + ` H${xa} L${tipX},${tipY} L${xb},${bottom} H${left + r} Q${left},${bottom} ${left},${bottom - r} V${top + r} Q${left},${top} ${left + r},${top} Z`);
+  const d = below
+    ? `M${left + r},${top} H${xb} L${tipX},${tipY} L${xa},${top} H${left + bw - r} Q${left + bw},${top} ${left + bw},${top + r} V${bottom - r} Q${left + bw},${bottom} ${left + bw - r},${bottom} H${left + r} Q${left},${bottom} ${left},${bottom - r} V${top + r} Q${left},${top} ${left + r},${top} Z`
+    : `M${left + r},${top} H${left + bw - r} Q${left + bw},${top} ${left + bw},${top + r} V${bottom - r} Q${left + bw},${bottom} ${left + bw - r},${bottom} H${xa} L${tipX},${tipY} L${xb},${bottom} H${left + r} Q${left},${bottom} ${left},${bottom - r} V${top + r} Q${left},${top} ${left + r},${top} Z`;
+  tail.querySelector('path').setAttribute('d', d);
   sp.style.transformOrigin = `${tipX}px ${tipY}px`;
 }
 
@@ -64,7 +101,7 @@ export function playComic(panels = OPENING) {
     let i = 0, j = 0;
     const beat = () => {
       const p = panels[i], bt = p.beats[j];
-      place(b, art, bt);
+      place(b, art, bt, p);
       for (const e of [q('.cm-speech'), q('.cm-sfx')]) { e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); }
       const last = i === panels.length - 1 && j === p.beats.length - 1;
       q('.cm-next').textContent = last ? 'Go on' : 'Next';
@@ -73,6 +110,7 @@ export function playComic(panels = OPENING) {
     const panel = () => {
       const p = panels[i], pic = q('.cm-pic');
       pic.style.backgroundImage = `url(${p.img})`;
+      q('.cm-fans').innerHTML = '';
       pic.classList.remove('go'); void pic.offsetWidth; pic.classList.add('go');   // (restarts the slow push-in)
       [...dots.children].forEach((d, k) => d.classList.toggle('on', k <= i));
       beat();
