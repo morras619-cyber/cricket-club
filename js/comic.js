@@ -40,7 +40,7 @@ export const NIGHT = [
   ] },
 ];
 
-// the next morning: the bag packed, the tunnel out of the Thunderdome, the bus stop, Uncle Dev, and the old ground (the man in the suit is the owner; his name is not said)
+// the next morning: the bag packed, the tunnel out of the Thunderdome, the bus stop, Uncle Dev, and the old ground (the man in the suit is the owner, Vikram Rane; his name is not said)
 const say = (text, at, mouth) => ({ say: text, at: { left: at[0], width: at[1], bottom: at[2] }, mouth });
 const fanBeat = h => fan(h, 'Walk away from cricket, Kabir. For everyone\'s sake.');
 export const EXIT = [
@@ -53,7 +53,7 @@ export const EXIT = [
   { img: 'img/story/exit-7.webp', beats: [say('They chased you out, beta.', [0.3, 0.5, 0.15], [0.76, 0.22])] },
   { img: 'img/story/exit-8.webp', beats: [say("Come on. Let's chase them back.", [0.3, 0.5, 0.17], [0.76, 0.27])] },
   { img: 'img/story/exit-9.webp', beats: [say('With what, Dev? A bag and a bat?', [0.04, 0.5, 0.24], [0.25, 0.35]), say('And a ground. Wait until you see it.', [0.5, 0.46, 0.17], [0.66, 0.25])] },
-  { img: 'img/story/exit-10.webp', beats: [say('Not much to look at, is it?', [0.5, 0.46, 0.3], [0.66, 0.39]), say('Then I will build my own club. And one day I will beat them.', [0.04, 0.55, 0.3], [0.38, 0.4])] },
+  { img: 'img/story/exit-10.webp', beats: [say('Not much to look at, is it?', [0.5, 0.46, 0.3], [0.7, 0.4]), say('Then I will build my own club. And one day I will beat them.', [0.04, 0.55, 0.3], [0.38, 0.41])] },
 ];
 
 let box = null;
