@@ -24,7 +24,7 @@ import { preMatch } from './rivals.js';
 import { ensureChirp, faceOfPress, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
-import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing } from './audio.js';
+import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute } from './audio.js';
 import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
@@ -810,6 +810,7 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   if (mode === 'quick') await quickTip();
   game.matchActive = true;
+  crowdMute.on = !!opts.trial;   // (the nets have no crowd)
   startAmbience();
   let summary;
   try {
@@ -825,6 +826,7 @@ async function startMatch(opts) {
   } finally {
     game.matchActive = false;
     stopAmbience(); crowdStop(); game.crowdLive = false;
+    crowdMute.on = false;
   }
   if (opts.opening || opts.trial) { game.quit(); return summary; }   // (the story's final: no result screen, the story goes on)
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)

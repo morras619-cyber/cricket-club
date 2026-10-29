@@ -1,6 +1,8 @@
 // Synthesised sound effects (no audio files to download). Starts on the first user gesture.
 let ac = null, master = null, noiseBuf = null;
 export const sound = { on: true, haptics: true };
+// the net trials have no crowd: nothing of a crowd is heard while this is on (the bed, the cheers, the groans, the boos, the singing, the applause)
+export const crowdMute = { on: false };
 
 export function unlockAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); musicSync(); return; }
@@ -101,7 +103,7 @@ export const sfx = {
   stumps() { noise(0.25, { gain: 0.8, freq: 900, q: 1.2 }); tone(220, 0.2, { type: 'square', gain: 0.15, to: 80 }); },
   glove() { noise(0.12, { gain: 0.7, freq: 400, q: 1 }); tone(110, 0.15, { gain: 0.6, to: 60 }); },
   trombone() { [392, 370, 349, 262].forEach((f, i) => tone(f, i === 3 ? 0.6 : 0.22, { type: 'sawtooth', gain: 0.12, delay: i * 0.22, to: i === 3 ? 220 : null })); },
-  crowd(intensity = 1) { if (ac && ac.currentTime < roarUntil) return; /* (the boundary cheer is the crowd) */ noise(1.6 * intensity, { gain: 0.18 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
+  crowd(intensity = 1) { if (crowdMute.on) return; if (ac && ac.currentTime < roarUntil) return; /* (the boundary cheer is the crowd) */ noise(1.6 * intensity, { gain: 0.18 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
   whoosh() { noise(0.35, { gain: 0.4, freq: 600, q: 0.6, type: 'lowpass', attack: 0.1 }); },
   boom() { tone(70, 0.8, { gain: 0.9, to: 30 }); noise(0.6, { gain: 0.6, freq: 200, q: 0.5, type: 'lowpass' }); },
   zap() { tone(1400, 0.18, { type: 'sawtooth', gain: 0.18, to: 200 }); noise(0.15, { gain: 0.3, freq: 4000, q: 3 }); },
@@ -141,6 +143,7 @@ function loadCheer() {
 const CHEER_SOFT = 0.7;   // (the cheers were too loud: every cheer and roar plays at this much of its level)
 // sec: seconds until the ball clears the rope. power: how loud (1.1 a four, 1.3 a six, 1.45 a perfect six)
 export function cheerStart(sec, power = 1.2) {
+  if (crowdMute.on) return;
   cheerStop(0.15); singDuck(0.4);
   if (!ready()) return;
   if (!cheerBuf) { loadCheer(); return; }
@@ -177,6 +180,7 @@ function loadBowlCrowd() {
   return bowlLoading;
 }
 export function crowdOhh() {
+  if (crowdMute.on) return;
   crowdFade(0.15);
   if (!ready()) return;
   if (!bowlBufs) { loadBowlCrowd(); return; }
@@ -196,6 +200,7 @@ function crowdFade(sec) {
 }
 // the ball is decided: 'wicket', 'dot' (a miss or a block) or 'runs'/'abort' (only the build-up fading away)
 export function crowdResolve(kind) {
+  if (crowdMute.on) return;
   const was = !!ohhNow;
   if (kind === 'wicket' || kind === 'dot') singDuck(0.4);
   crowdFade(kind === 'wicket' ? 0.9 : kind === 'dot' ? 0.3 : 0.6); // (the build-up outlasts the wicket cheer's attack, so there is no dip between them)
@@ -248,6 +253,7 @@ function loadRuns() {
   return runsLoading;
 }
 export function crowdRuns(delay = 0) {
+  if (crowdMute.on) return;
   if (!ready()) return;
   if (!runsBuf || !moodBufs) { loadRuns(); loadMood(); return; }
   const now = ac.currentTime, t = now + Math.max(0, delay);
@@ -273,6 +279,7 @@ function loadSix() {
   return sixLoading;
 }
 export function sixMusic(sec = 0) {
+  if (crowdMute.on) return 0;
   if (!ready()) return 0;
   if (!sixBuf) { loadSix(); return 0; }
   const t = ac.currentTime + Math.max(0, sec), d = sixBuf.duration, src = ac.createBufferSource(), g = ac.createGain();
@@ -297,6 +304,7 @@ export function crowdSong(teamId) {
 }
 // sing for `sec` seconds starting `delay` seconds from now, at volume `vol`
 export function crowdSing(delay = 0, sec = 5, vol = 0.5) {
+  if (crowdMute.on) return;
   if (!ready()) return;
   const buf = song || defaultSong;
   if (!buf) { if (!songsLoading) crowdSong(songFor || 'thunder'); return; }   // (the singing has not arrived yet: it is fetched now and plays next time)
@@ -323,6 +331,7 @@ function singDuck(sec = 0.4) {
 const CLAP_VOL = 0.15;
 let clapNext = 0, clapUntil = 0;
 export function crowdClap(delay = 0) {
+  if (crowdMute.on) return;
   if (!ready()) return;
   if (!moodBufs) { loadMood(); return; }
   const now = ac.currentTime, t = now + Math.max(0, delay);
@@ -337,6 +346,7 @@ export function crowdClap(delay = 0) {
 let lastBoo = -1;
 // a boo, never the one just heard
 export function crowdBoo(delay = 0) {
+  if (crowdMute.on) return;
   if (!ready()) return;
   if (!moodBufs) { loadMood(); return; }
   singDuck(0.4);
@@ -362,6 +372,7 @@ function loadAmbience() {
   return ambLoading;
 }
 export function startAmbience() {
+  if (crowdMute.on) { stopAmbience(); return; }
   stopAmbience();
   if (!ready()) return;
   const run = ++ambRun;

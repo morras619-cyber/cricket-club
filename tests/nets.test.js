@@ -14,3 +14,13 @@ test('a ball struck in the nets stays inside the cage and comes to rest', async 
     assert.ok(Math.hypot(a.x - b.x, a.z - b.z) < 0.3, 'at rest');
   }
 });
+
+// the nets have no crowd: with the mute on, the crowd's sounds do nothing (no audio is started, and none is needed to be)
+test('the crowd is muted in the nets', async () => {
+  const a = await import('../js/audio.js');
+  a.crowdMute.on = true;
+  try {
+    assert.equal(a.sixMusic(1), 0);
+    a.startAmbience(); a.cheerStart(1); a.crowdOhh(); a.crowdResolve('wicket'); a.crowdRuns(0); a.crowdSing(0); a.crowdClap(0); a.crowdBoo(0); a.sfx.crowd(1);
+  } finally { a.crowdMute.on = false; }
+});
