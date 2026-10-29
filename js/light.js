@@ -6,6 +6,9 @@ import { quality } from './quality.js';
 const KEY = 'sixcharge.light';
 const off = (() => { try { return /[?&]light=0/.test(location.search) || localStorage.getItem(KEY) === '0'; } catch { return false; } })();
 export const light = { on: !off };
+// how much darker the whole picture is laid (a gentle tint of night over it) and how strong the pool of warm light on the ground is: both kept low, as the
+// match views were coming out lighter than they should
+const DARKEN = 0.09, POOL = 0.7;
 // how dark the ground's time of day is: 0 day .. 1 night
 export const NIGHT = { night: 1, storm: 1, dusk: 0.7, evening: 0.6, sunset: 0.3, overcast: 0, day: 0 };
 
@@ -32,7 +35,7 @@ export function groundLight(ctx, W, H, hy, night = 0) {
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
   const g = ctx.createRadialGradient(W / 2, H * 0.7, 0, W / 2, H * 0.7, Math.max(W * 0.95, H * 0.62));
-  g.addColorStop(0, `rgba(255,238,185,${0.42 + 0.14 * night})`); g.addColorStop(0.55, 'rgba(255,238,185,0.12)'); g.addColorStop(1, 'rgba(255,236,190,0)');
+  g.addColorStop(0, `rgba(255,238,185,${(0.42 + 0.14 * night) * POOL})`); g.addColorStop(0.55, `rgba(255,238,185,${0.12 * POOL})`); g.addColorStop(1, 'rgba(255,236,190,0)');
   ctx.fillStyle = g; ctx.fillRect(0, hy, W, H - hy);
   ctx.restore();
 }
@@ -41,6 +44,8 @@ export function groundLight(ctx, W, H, hy, night = 0) {
 export function finishLight(ctx, W, H, hy, night = 0) {
   if (!light.on) return;
   ctx.save();
+  // the whole picture a little darker
+  ctx.fillStyle = `rgba(6,8,24,${DARKEN})`; ctx.fillRect(0, 0, W, H);
   // a vignette: the corners fall away
   const v = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.28, W / 2, H * 0.55, H * 0.78);
   v.addColorStop(0, 'rgba(4,6,20,0)'); v.addColorStop(1, `rgba(4,6,20,${0.4 + 0.14 * night})`);
