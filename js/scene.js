@@ -394,8 +394,16 @@ function renderBuilt(cam, art, v, im) {
   // (below the horizon the picture's own pitch must stay exactly where the camera puts the real one: only the stand above it is enlarged)
   const gh = (v.h - v.above) * k0, gw = v.w * k0;
   if (hy + gh < H) { g.fillStyle = v.bottom; g.fillRect(0, hy + gh - 1, W, H - hy - gh + 1); }
-  g.drawImage(im, 0, 0, v.w, v.above, dx, dy, dw, hy - dy);
-  g.drawImage(im, 0, v.above, v.w, v.h - v.above, W / 2 - gw / 2, hy, gw, gh);
+  // (a picture narrower than the screen, v.tile: copies of it mirrored side by side, so a wide screen still has stands and trees to its edges)
+  const copies = v.tile && dw < W ? Math.ceil((W / dw - 1) / 2) : 0;
+  for (let i = -copies; i <= copies; i++) {
+    g.save();
+    g.translate(W / 2 + i * dw, 0);
+    if (i % 2) g.scale(-1, 1);
+    g.drawImage(im, 0, 0, v.w, v.above, -dw / 2, dy, dw, hy - dy);
+    g.drawImage(im, 0, v.above, v.w, v.h - v.above, -gw / 2, hy, gw, gh);
+    g.restore();
+  }
   // a ground with a strip of its own: it is laid over the rendered one, row by row, in this camera's perspective
   const sa = stripFor(art);
   if (sa) layStrip(g, cam, sa, W, hy, H, dpr);   // (it is laid over the rendered pitch: the creases are drawn again on it)
