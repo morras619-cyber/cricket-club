@@ -14,7 +14,9 @@ import { newLeague, simLeague, advance, playerResult, table, finish, nextFixture
 import { NATIONS, pickNation } from './nations.js';
 import { randomLook } from './looks.js';
 import { ensureRivals, nemesisOf, say, afterMatch, messageNote, rivalKind } from './rivals.js';
-import { ensureChirp, afterMatchPopularity, seasonPopularity, postMatch, postFan, postMilestone, storyOf, sponsorBonus, compact } from './chirp.js';
+import { ensureChirp, afterMatchPopularity, seasonPopularity, storyOf, sponsorBonus, compact } from './chirp.js';
+import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
+import { memOf } from './chirpfacts.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -232,6 +234,7 @@ export function signFind(c, id) {
   const p = c.players[id];
   if (!p?.scouted || p.team || c.money < p.scouted.price || clubPlayers(c, c.club).length >= MAX_SQUAD) return false;
   sign(c, p, c.club, p.scouted.price);
+  chirpSigned(c, p, p.scouted.price, 'scouted');
   return true;
 }
 export function finishScouts(c) { if (c.phase === 'scouts') startAuction(c); }
@@ -307,6 +310,7 @@ export function chooseClub(c, teamId) {
   if (c.club ? teamId !== c.club : !isUnlocked(c, t)) return false;
   if (c.club !== teamId) c.lineup = null;
   c.club = teamId;
+  ensureChirp(c).startDiv = c.chirp.startDiv || divisionOf(c, teamId);   // (where the club started: the fans remember it)
   refreshRivals(c);
   // your scouts' finds come first, at their set price; then the auction
   if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c);
@@ -425,12 +429,70 @@ export function assessLot(c, lot) {
     now, after, bid, left,
   };
 }
+// ---------- what Chirp makes of the club's story ----------
+// where the club started and where it is now, for the fans who remember (null before there is anything to remember)
+export function journeyOf(c) {
+  const from = c.chirp?.startDiv || c.history?.[0]?.div, now = c.club && divisionOf(c, c.club);
+  return from && now ? { from: divisionName(from), div: divisionName(now), yrs: Math.max(1, c.history?.length || 0), yrsn: `${Math.max(1, c.history?.length || 0)} season${Math.max(1, c.history?.length || 0) === 1 ? '' : 's'}` } : null;
+}
+const notable = p => ovr(p) >= 72 || (p.stats?.all?.runs || 0) >= 60 || (p.stats?.all?.wkts || 0) >= 8;
+// a post for a big signing (a few a season, so the feed is not all signings)
+function chirpSigned(c, p, price, kind = null) {
+  if (!c.chirp || c.phase === 'pick') return;
+  const mem = memOf(c);
+  mem.signs = mem.signs?.season === c.season ? mem.signs : { season: c.season, n: 0 };
+  const type = kind || (ovr(p) >= 82 ? 'signedStar' : price >= 1.2 && ovr(p) < 70 ? 'signedOverpay' : price >= 1.2 ? 'signedBig' : p.age <= 20 && (p.pot || 0) >= 80 ? 'signedYoung' : ovr(p) >= 74 && price <= 0.4 ? 'signedBargain' : null);
+  if (!type || mem.signs.n >= 3) { chirpStoryQuiet(c, { t: kind || 'signed', pid: p.id, price }); return; }
+  mem.signs.n++;
+  chirpStory(c, { t: type, pid: p.id, price, journey: journeyOf(c) });
+}
+// only the memory: the fans will remember him (who left, who came), but there is no post
+function chirpStoryQuiet(c, ev) { if (c.chirp) { memOf(c).events = [...memOf(c).events, { ...ev, season: c.season }].slice(-40); if (ev.t === 'signed' || ev.t === 'scouted') delete memOf(c).former[ev.pid]; } }
+// a player of mine leaves (his contract ended, he retired, he was let go): the fans remember, and say so if he mattered
+function chirpLeft(c, p, kind) {
+  if (!c.chirp) return;
+  const mem = memOf(c);
+  mem.lefts = mem.lefts?.season === c.season ? mem.lefts : { season: c.season, n: 0 };
+  if (notable(p) && mem.lefts.n < 3) { mem.lefts.n++; chirpStory(c, { t: kind, pid: p.id, journey: journeyOf(c) }); } else chirpStoryQuiet(c, { t: kind === 'contractEnd' ? 'left' : kind, pid: p.id });
+  mem.former[p.id] = { season: c.season, kind };
+}
+// at the start of the season: a good player whose deal is in its last season (a couple of posts, so the feed is not all contracts)
+function chirpContracts(c) {
+  if (!c.chirp || !c.club) return;
+  let n = 0;
+  for (const p of clubPlayers(c, c.club).sort((a, b) => ovr(b) - ovr(a))) {
+    if (n >= 2 || ovr(p) < 76 || p.contract !== 1 || p.heroId) continue;
+    n++; chirpStory(c, { t: 'contractWorry', pid: p.id, left: 1, journey: journeyOf(c) });
+  }
+}
+// you let a player go
+export function releasePlayer(c, id) {
+  const p = c.players[id];
+  if (!p || p.team !== c.club) return false;
+  chirpLeft(c, p, 'released');
+  p.team = null; p.contract = 0;
+  return true;
+}
+// after the auction: a player who left us and joined another club (the fans notice)
+function chirpPoached(c) {
+  if (!c.chirp) return;
+  const mem = memOf(c);
+  let posts = 0;
+  for (const [pid, f] of Object.entries(mem.former)) {
+    const p = c.players[pid];
+    if (!p || f.poached || !p.team || p.team === c.club || p.retired) continue;
+    f.poached = true;
+    if (posts < 2 && notable(p)) { posts++; chirpStory(c, { t: 'poached', pid, they: p.team, journey: journeyOf(c) }); }
+  }
+}
 function sign(c, p, teamId, price, out = null) {
+  const was = p.team;
   p.team = teamId;
   const rng = makeRng(hashStr(`${p.id}-${c.season}-c`));
   p.contract = p.age >= PEAK_AGE ? 1 : rng.int(1, 3);
   if (teamId === c.club) c.money = round2(c.money - price); else c.budgets[teamId] = round2(c.budgets[teamId] - price);
   c.auction?.results.push(out?.length ? { pid: p.id, team: teamId, price, out } : { pid: p.id, team: teamId, price });
+  if (teamId === c.club && was !== c.club) chirpSigned(c, p, price);
 }
 // The rival clubs bid in a fixed order for each lot (seeded: the same career and lot always go the same way).
 const bidOrder = (c, lot) => {
@@ -514,6 +576,7 @@ export function finishAuction(c) {
     }
   }
   c.auction.done = true;
+  chirpPoached(c);
   startSeason(c);
 }
 
@@ -525,6 +588,7 @@ export function startSeason(c) {
   c.league.season = c.season;
   refreshRivals(c);   // (a new division has a new rival)
   for (const p of Object.values(c.players)) p.stats.season = blankStats();
+  chirpContracts(c);
 }
 
 // A simulated match between two AI clubs, ball by ball, so every player gets a scorecard. favour: a club that is stronger in it
@@ -686,8 +750,7 @@ export function afterLeagueMatch(c, summary) {
   const mine = summary.innings.find(i => i.side === 'player'), theirs = summary.innings.find(i => i.side === 'ai'), won = result.winner === c.club, opp = summary.oppTeam.id;
   const gained = afterMatchPopularity(c, { won, derby: !!rivalKind(c, opp), upset: clubRating(c, opp) > clubRating(c, c.club) + 3, bigWin: Math.abs(mine.runs - theirs.runs) >= 25 });
   const story = storyOf(c, { won, first: summary.innings[0], second: summary.innings[1], tiebreak: summary.result.tiebreak });
-  postMatch(c, { me: c.club, they: opp, mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, won, story });
-  postFan(c, { won, they: opp, mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, story }, makeRng(hashStr(`${c.seed}-fan-${c.season}-${c.league.results?.length || 0}`)));
+  chirpAfterMatch(c, summary, { won, opp, derby: !!rivalKind(c, opp), mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, story, journey: journeyOf(c) });
   notes.push(`📈 ${gained >= 0 ? '+' : '−'}${compact(Math.abs(gained))} followers on Chirp`);
   if (finish(c.league)) notes.push(...endSeason(c));
   return notes;
@@ -777,7 +840,8 @@ function applyMoves(c, notes) {
   if (ev) {
     seasonPopularity(c, ev);
     const club = teamById(c.club).name;
-    postMilestone(c, (ev === 'promoted' ? `PROMOTED! ${club} are heading up to ${divisionName(h.promoted)} next season. 🎉` : ev === 'relegated' ? `${club} are relegated to ${divisionName(h.relegated)}. They will need a big rebuild. 💔` : `CHAMPIONS! ${club} win the title in ${divisionName(h.div)}! 🏆`) + clubMemory(c, ev));
+    const text = (ev === 'promoted' ? `PROMOTED! ${club} are heading up to ${divisionName(h.promoted)} next season. 🎉` : ev === 'relegated' ? `${club} are relegated to ${divisionName(h.relegated)}. They will need a big rebuild. 💔` : `CHAMPIONS! ${club} win the title in ${divisionName(h.div)}! 🏆`) + clubMemory(c, ev);
+    chirpMilestone(c, text, ev, { div: divisionName(h.promoted || h.relegated || h.div), pos: `${h.pos}${['th', 'st', 'nd', 'rd'][h.pos % 100 > 10 && h.pos % 100 < 14 ? 0 : h.pos % 10] || 'th'}`, journey: journeyOf(c) });
   }
   c.moveNews = [
     `⬆️ ${teamById(M.d2up).name} are promoted to the Asian Super League`, `⬇️ ${teamById(M.aslDown).name} lose the play-off and go down to Division 2`,
@@ -792,6 +856,7 @@ export function afterPlayoff(c, summary) {
   c.moves.aslDown = won ? c.playoff.opp : c.club;
   c.history.at(-1).playoff = { opp: c.playoff.opp, won };
   notes.push(won ? `🛡️ You win the play-off: ${teamById(c.club).name} stay in the Super League!` : `The play-off is lost.`);
+  if (won) chirpMilestone(c, `SAFE! ${teamById(c.club).name} win the relegation play-off and stay in the Super League. 🛡️`, 'survivedPlayoff', { div: divisionName('asl'), journey: journeyOf(c) });
   applyMoves(c, notes);
   c.playoff = null;
   c.phase = 'done';
@@ -808,12 +873,14 @@ export function nextSeason(c) {
     p.age++;
     if (p.age < PEAK_AGE) grow(c, p, p.age <= 23 ? rng.int(1, 4) : p.age <= 28 ? rng.int(0, 2) : rng.int(0, 1));
     else if (p.age >= 34 && !p.heroId) for (const k of primary(p)) p[k] = Math.max(30, p[k] - rng.int(0, 2));
+    const mine = p.team === c.club;
     if (!p.heroId && p.age >= 36 && rng.chance(0.35 + (p.age - 36) * 0.3)) {
+      if (mine) chirpLeft(c, p, 'retired');
       p.retired = true; p.team = null; p.retiredIn = c.season;
       c.news.push(`👋 ${p.name} retires at ${p.age}`);
       continue;
     }
-    if (p.team && --p.contract <= 0) { p.team = null; p.contract = 0; }
+    if (p.team && --p.contract <= 0) { if (mine) chirpLeft(c, p, 'contractEnd'); p.team = null; p.contract = 0; }
     p.form = 0;
   }
   const kids = youthIntake(c, rng, 7);

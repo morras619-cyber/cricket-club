@@ -32,6 +32,8 @@ export class Innings {
     // stamina (stamina.js): everyone starts on FULL; people keeps who each id is, for his type
     this.energy = {};
     this.people = {};
+    // every legal ball as it was played, for the stories told about the match afterwards (chirpfacts.js): who faced it, who bowled it, runs, wicket
+    this.detail = [];
   }
 
   energyOf(id) { return id && this.energy[id] != null ? this.energy[id] : FULL; }
@@ -117,6 +119,7 @@ export class Innings {
       if (wicket && !runOut) f.wkts++;
     }
     this.tireBall({ runs, missed });
+    this.detail.push({ b: c.id || null, w: this.curBowler, r: runs, k: !!wicket, ro: !!runOut });
     if (wicket) { this.stints.push({ ...c, out: true, how: runOut ? 'run out' : f ? `b ${f.short}` : 'out' }); this.cur = freshStint(); }
     // they crossed: 1, 3 or 5 runs puts the other man on strike (a wicket brings the new man in on strike)
     else if (runs % 2 === 1) this.swapStrike();

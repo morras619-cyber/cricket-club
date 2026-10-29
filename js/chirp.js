@@ -91,7 +91,7 @@ export const CROWD_TIMING = 0.08;   // (a full house widens your timing windows 
 // {me}: your club, {they}: the other club, {sp}: who posted, {mine} {theirs}: the scores, {by}: how it was won ("6 runs", "2 wickets"), {n}: the length of a run of results.
 // The lines about a match come in groups by how the match really went: the base group fits any result, then 'Thriller' (decided by a hair),
 // 'Rout' (one-sided), 'Solid' and 'Super' (a tie settled in the Super Over) add to it. 'Streak' and 'Break' groups are for runs of wins or losses.
-// The last 90 lines said are not chosen again, so the same words are not heard twice.
+// The last 260 lines said are not chosen again, so the same words are not heard twice.
 const SAY = {
   mine: {
     win: ['Told you! Never doubted them. 👏', 'That is why I pay for the season ticket!', 'Pinch me. Are we really playing this well?', 'Pure class from the lads today.', 'I have not stopped smiling since the last ball.',
@@ -177,7 +177,7 @@ const NEEDS_MATCH = /\{(mine|theirs|by|n)\}/;
 const TONE = { thriller: 'Thriller', rout: 'Rout', solid: 'Solid', super: 'Super' };
 // the lines for a group and a kind: the ones for any result, and the ones for how this match really went
 const poolOf = (group, key, tone) => { const g = SAY[group]; return [...g[key], ...(g[key + (TONE[tone] || '')] || [])]; };
-// a line nobody has heard lately: the last 90 are remembered in the career, and a line about a match is only used when there is a match
+// a line nobody has heard lately: the last 260 are remembered in the career, and a line about a match is only used when there is a match
 function pickFresh(c, pool, rng, hasMatch) {
   const P = ensureChirp(c);
   P.recent = P.recent || [];
@@ -187,7 +187,7 @@ function pickFresh(c, pool, rng, hasMatch) {
   const line = cand[rng.int(0, cand.length - 1)];
   const at = P.recent.indexOf(line); if (at >= 0) P.recent.splice(at, 1);   // (said again: it moves to the newest place, so the list stays in order of when each was last heard)
   P.recent.push(line);
-  if (P.recent.length > 90) P.recent.shift();
+  if (P.recent.length > 260) P.recent.shift();
   return line;
 }
 const pickFrom = (arr, rng) => arr[rng.int(0, arr.length - 1)];
@@ -268,13 +268,13 @@ export function engagement(c, by, salt) {
   const likes = Math.max(3, Math.round(reachOf(c, by) * rng.range(0.018, 0.06) * (0.65 + buzz * 0.7)));
   return { likes, shares: Math.max(0, Math.round(likes * rng.range(0.06, 0.16))), replies: Math.max(1, Math.round(likes * rng.range(0.02, 0.07))) };
 }
-export function addPost(c, { by, text, kind, salt, n = 3, pic = null, ctx = null }) {
+export function addPost(c, { by, text, kind, salt, n = 3, pic = null, ctx = null, fact = null, comments = null }) {
   const P = ensureChirp(c);
   P.posts++;
   const rng = makeRng(hash(`${c.seed}|${c.season}|${P.posts}|${kind}|${text}`));
-  const post = { id: P.posts, season: c.season, kind, by, text, pic, ctx, ...engagement(c, by, salt || `${kind}${P.posts}`) };
-  post.comments = commentsFor(c, post, rng, n);
-  P.feed = [post, ...P.feed].slice(0, 40);
+  const post = { id: P.posts, season: c.season, kind, by, text, pic, ctx, ...(fact ? { fact: { type: fact.type, pid: fact.pid } } : {}), ...engagement(c, by, salt || `${kind}${P.posts}`) };
+  post.comments = comments ? comments(post, rng) : commentsFor(c, post, rng, n);
+  P.feed = [post, ...P.feed].slice(0, 60);
   return post;
 }
 
@@ -289,22 +289,22 @@ const TAIL = {
   win: { thriller: ['A thriller to the last ball! 🔥', 'Nerves of steel at the death. 🧊', 'It went right down to the wire.'], rout: ['A statement win. 💪', 'Dominant from start to finish.', 'Never in doubt.'], solid: ['A professional performance.', 'Job done.', 'Two big points in the bag.'], super: ['Settled in the Super Over. Unforgettable. 😮'] },
   loss: { thriller: ['So close. Heartbreak. 💔', 'Fine margins decided it.', 'They had it, and let it slip away.'], rout: ['Not their day.', 'A tough afternoon from start to finish.', 'Questions to answer after that one.'], solid: ['They could not quite get there.', 'Not enough in the end.', 'Back to the drawing board.'], super: ['Lost in the Super Over. Cruel. 💔'] },
 };
-export function postMatch(c, { me, they, mine, theirs, won, story }) {
+export function postMatch(c, { me, they, mine, theirs, won, story, extra = '', comments = null }) {
   const rng = makeRng(hash(`${c.seed}|${c.season}|${me}|${they}|${mine}|${theirs}`));
   const pi = rng.int(0, PRESS.length - 1), [name, outlet] = PRESS[pi];
   const tone = story?.tone || 'solid', tail = pickFresh(c, TAIL[won ? 'win' : 'loss'][tone], rng, false);
   const verb = story?.how === 'tie' ? 'tie with' : won ? 'beat' : 'lose to';
-  const text = `FT: ${teamById(me).name} ${mine} ${verb} ${teamById(they).name} ${theirs}${story ? ` ${story.by}` : ''}. ${tail}`;
-  return addPost(c, { by: { type: 'press', name, handle: handleOf(name), outlet, verified: true, face: faceOfPress(pi) }, text, kind: won ? 'win' : 'loss', salt: `ft${c.season}${they}`, ctx: { they, mine, theirs, won, ...storyCtx(story) } });
+  const text = `FT: ${teamById(me).name} ${mine} ${verb} ${teamById(they).name} ${theirs}${story ? ` ${story.by}` : ''}. ${tail}${extra ? ` ${extra}` : ''}`;
+  return addPost(c, { by: { type: 'press', name, handle: handleOf(name), outlet, verified: true, face: faceOfPress(pi) }, text, kind: won ? 'win' : 'loss', salt: `ft${c.season}${they}`, ctx: { they, mine, theirs, won, ...storyCtx(story) }, comments });
 }
 const storyCtx = st => (st ? { tone: st.tone, amount: st.amount, streak: st.streak, snap: st.snap } : {});
 // a fan of your club, after the match: his own post, not a reply
-export function postFan(c, { won, they = null, mine = null, theirs = null, story = null }, rng) {
+export function postFan(c, { won, they = null, mine = null, theirs = null, story = null, comments = null }, rng) {
   const i = rng.int(0, FANS.length - 1), f = FANS[i];
   const ctx = they ? { they, mine, theirs, won, ...storyCtx(story) } : null;
   const hot = hotRun(story?.streak), key = story?.snap ? 'winBreak' : hot === (won ? 'W' : 'L') ? (won ? 'winStreak' : 'lossStreak') : won ? 'win' : 'loss';
   const line = pickFresh(c, poolOf('post', key, ctx?.tone), rng, !!ctx);
-  return addPost(c, { by: { type: 'fan', name: f[0], handle: '@' + f[1], face: faceOfFan(i) }, text: fill(line, { me: teamById(c.club).name, they: they ? teamById(they).name : '', mine, theirs, by: story?.amount, n: story?.streak?.n }), kind: 'fan', n: 2, salt: `fan${c.season}${i}`, ctx });
+  return addPost(c, { by: { type: 'fan', name: f[0], handle: '@' + f[1], face: faceOfFan(i) }, text: fill(line, { me: teamById(c.club).name, they: they ? teamById(they).name : '', mine, theirs, by: story?.amount, n: story?.streak?.n }), kind: 'fan', n: 2, salt: `fan${c.season}${i}`, ctx, comments });
 }
 // the season's big moments, from the press
 export function postMilestone(c, text) {

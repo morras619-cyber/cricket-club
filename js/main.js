@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS } from './grounds.js';
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -1577,7 +1577,7 @@ function chirpPanel(c) {
   box.append(el('p', 'cperk', `${perk > 0 ? `Your fans bring ${money(perk)} extra in sponsorship every season. ` : 'Win matches and your followers grow: big clubs earn more from sponsors. '}${lift >= 0.1 ? `At home, your crowd widens your timing by ${lift}%.` : 'A bigger, hotter crowd will widen your timing at home.'}`));
   const feed = el('div', 'cfeed');
   const next = nextMatchPost(c); if (next) feed.append(next);
-  P.feed.slice(0, 8).forEach((post, k) => feed.append(chirpPost(c, post, k + 1)));
+  P.feed.slice(0, 14).forEach((post, k) => feed.append(chirpPost(c, post, k + 1)));
   if (!P.feed.length && !next) feed.append(el('p', 'cperk', 'Quiet for now. Play a match and Chirp will have something to say.'));
   box.append(feed);
   requestAnimationFrame(() => box.querySelectorAll('[data-n]').forEach(n => countUp(n, +n.dataset.n)));
@@ -1733,7 +1733,7 @@ function careerSquad(c, body) {
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
       confirmTap(rel, 'Tap again to release', () => {
-        c.players[p.id].team = null; c.players[p.id].contract = 0; saveProfile(profile); renderCareer();
+        releasePlayer(c, p.id); saveProfile(profile); renderCareer();
       });
       r.append(rel);
     }
