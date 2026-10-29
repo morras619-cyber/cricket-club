@@ -42,6 +42,8 @@ class Cancel extends Error {}
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+// the batter seen from behind is drawn this far (m) to the right of where he stands, so his body is half in line with the stumps (drawing only)
+const BAT_BACK_DX = 0.27;
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 // the game's pace while you field a catch / a run-out pick-up (the timing bar crosses at this pace; the
 // green stays as many ms of real time whatever it is)
@@ -1284,7 +1286,7 @@ export class Game {
   }
   // the bat's arc through the swing
   swingArc(team, kind) {
-    const set = this.fxSet(team), b = this.S.batter, p = set && this.cams[kind]?.project(b.x, 0, b.z);
+    const set = this.fxSet(team), b = this.S.batter, p = set && this.cams[kind]?.project(b.x + (kind === 'bat' ? BAT_BACK_DX : 0), 0, b.z);
     if (!p) return;
     const front = kind === 'bowl'; // seen from the bowler's end the swing runs the other way
     this.fx.effect(set, 'arc', p.x + (front ? -0.2 : 0.35) * p.k, p.y - 0.75 * p.k, { w: 1.5 * p.k, dur: 280, grow: 1.05, flip: front, rot: front ? 0.3 : -0.2 });
@@ -3223,7 +3225,7 @@ export class Game {
     if (b.anim === 'celebrate' && !batterBack) push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.celebrate(), { back: batterBack, emblem: b.emblem, helmet: true }));
     else push(b.z, () => {
       // seen from behind, the batter is the hand-drawn sprite; from the front (bowling view) the drawn figure
-      const p = batterBack && cam.project(b.x, 0, b.z);
+      const p = batterBack && cam.project(b.x + BAT_BACK_DX, 0, b.z);
       const aura = p && kind === 'bat' && (this.armed.thunder || b.glow === '#5fc8ff') && this.fxSet(this.myTeam);
       if (aura) this.thunderAura(ctx, aura, p, 'back');
       if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) { if (aura) this.thunderAura(ctx, aura, p, 'front'); return; }
