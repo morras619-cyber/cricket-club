@@ -271,7 +271,7 @@ export class Game {
     this.crowdLift = opts.crowd && this.home === this.myTeam.id ? CROWD_TIMING * opts.crowd : 0;
     this.pitch = pitchOf(this.home);
     preloadEffects('electric');
-    setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; });
+    setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; }, { nets: !!opts.trial });
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
     // hero levels: stronger heroes and cheaper signature powers
     this.levels = opts.levels || {};

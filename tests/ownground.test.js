@@ -17,3 +17,17 @@ for (const level of [1, 2, 3]) test(`the level-${level} ground has its three vie
     assert.match(a.top, /^#[0-9a-f]{6}$/); assert.match(a.bottom, /^#[0-9a-f]{6}$/);
   }
 });
+
+// tools/build_nets.py: the cricket nets (level 1), the practice ground with the net lane drawn in each camera's perspective; used for the net trials
+test('the cricket nets have their three views, each with its pictures and a horizon inside it', () => {
+  const m = GROUND_ART.nets1.views;
+  for (const v of ['bat', 'bowl', 'keeper']) {
+    for (const x of ['', '-tint', '-uv']) {
+      const f = new URL(`../img/ground/nets1/view-${v}${x}.webp`, import.meta.url);
+      assert.ok(existsSync(f) && statSync(f).size > 100, `nets1 view-${v}${x}.webp`);
+    }
+    const a = m[v];
+    assert.ok(a.f > 0 && a.w > 0 && a.h > a.above && a.above > 0, `${v}: focal length, size and horizon`);
+  }
+  assert.ok(GROUND_ART.nets1.stumps && GROUND_ART.nets1.top, 'the stumps and the view from above (the club ground\'s) are there');
+});

@@ -54,8 +54,10 @@ function seeded(n) { let s = n; return () => (s = (s * 16807) % 2147483647) / 21
 let HOME = 'thunder';
 let logo = null;
 let groundListener = null;
-export function setGround(teamId, onChange) {
+let NETS = false;   // the cricket nets instead of the stadium (the net trials): your own club's practice ground
+export function setGround(teamId, onChange, opts = {}) {
   HOME = teamId;
+  NETS = !!opts.nets;
   groundListener = onChange;
   logo = new Image();
   logo.onload = () => groundListener?.(); // repaint once the club's crest has loaded
@@ -71,7 +73,7 @@ export function setGround(teamId, onChange) {
 const ART = {};
 // (your own club's ground: its level's grey build, painted in your colours and crest)
 const levelOf = t => stadiumTest.level || t.stadium;
-const artKey = team => { const t = teamById(team); return t.custom ? `${team}|own${levelOf(t)}|${t.suit}|${t.trim}|${logoSrc(team).length}` : team; };
+const artKey = team => { const t = teamById(team); return t.custom ? `${team}|${NETS ? 'nets1' : `own${levelOf(t)}`}|${t.suit}|${t.trim}|${logoSrc(team).length}` : team; };
 // the pitch, grass and stumps a ground may share with another (meta.share) rather than carry its own copies
 const SHARED = new Set(['pitch', 'grass', 'stumps', 'stumps-broken']);
 // creases, kept on the pitch: white, with a fine ink edge only where they're big enough to
@@ -161,7 +163,7 @@ function stripOnly(team) {
 const stripFor = art => (art?.pitchFresh ? art : stripOnly(HOME));
 const pw = p => p.naturalWidth || p.width, ph = p => p.naturalHeight || p.height;
 function loadArt(team) {
-  const T = teamById(team), key = artKey(team), dir = T.custom ? `own${levelOf(T)}` : team;
+  const T = teamById(team), key = artKey(team), dir = T.custom ? (NETS ? 'nets1' : `own${levelOf(T)}`) : team;
   const meta = GROUND_ART[dir];
   if (!meta || ART[key]) return;
   const a = (ART[key] = { meta, ready: false, team });
@@ -193,7 +195,8 @@ function loadOwnArt(team, key, a, dir) {
   const done = () => { if (--left === 0) { a.ready = true; if (artKey(HOME) === key) groundListener?.(); } };
   for (const [k, f] of Object.entries(files)) { const im = new Image(); fetchImg(im, `img/ground/thunder/${f}.webp`, done, () => { a.failed = true; }); a[k] = im; } // (the pitch, grass and stumps are the same pictures for every club's own ground: one copy ships)
   a.logo = { naturalWidth: 0 };
-  paintGround(+dir.slice(3), teamById(team), logoSrc(team)).then(v => {
+  const [, art, level] = /^(\D+)(\d+)$/.exec(dir);
+  paintGround(+level, teamById(team), logoSrc(team), undefined, art).then(v => {
     a['view-bat'] = v.bat; a['view-bowl'] = v.bowl; a['view-keeper'] = v.keeper; a.topView = v.top;
     done();
   }, () => { a.failed = true; });

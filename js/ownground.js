@@ -94,13 +94,14 @@ const frame = () => new Promise(r => setTimeout(r, 0));
 
 // The whole ground for a club at a level: { bat, bowl, keeper, top } as canvases. One view at a
 // time, so the phone never holds more than one view's pixels at once.
-export async function paintGround(level, club, crestSrc, views = ['bat', 'bowl', 'keeper', 'top']) {
-  const dir = `img/ground/own${level}/`;
+// (art 'nets': the cricket nets, whose own pictures stand for the bat, bowl and keeper cameras; the view from above is the club's ground at that level)
+export async function paintGround(level, club, crestSrc, views = ['bat', 'bowl', 'keeper', 'top'], art = 'own') {
+  const dirOf = v => `img/ground/${v === 'top' ? 'own' : art}${level}/`;
   await document.fonts?.load?.('40px Bangers').catch(() => {});
   const crest = await load(crestSrc).catch(() => null);
   const pics = pictures(club, crest), out = {};
   for (const v of views) {
-    const [base, tint, uv] = await Promise.all(['', '-tint', '-uv'].map(x => load(`${dir}view-${v}${x}.webp`)));
+    const [base, tint, uv] = await Promise.all(['', '-tint', '-uv'].map(x => load(`${dirOf(v)}view-${v}${x}.webp`)));
     out[v] = paint(base, tint, uv, base.naturalWidth, base.naturalHeight, club, pics);
     await frame();
   }
