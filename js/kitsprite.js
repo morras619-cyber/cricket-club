@@ -228,6 +228,7 @@ function crestCanvas(id) {
 // the name and number, laid out as one block 400 units wide (centre at 0, 0): name cap height
 // 52, gap 26, number cap height 190; each line squeezed only if wider than the block
 const BLOCK = { w: 400, name: 52, gap: 26, num: 190 };
+const ROYALS_NAME_Y = -190;   // the surname's middle, in block units above the print's centre (the Royals print no number)
 function printLine(g, text, cap, cy, fill, edge) {
   g.font = `800 ${Math.round(cap / 0.7)}px "Barlow Condensed", "Arial Narrow", sans-serif`;
   const asc = g.measureText('H').actualBoundingBoxAscent || cap, size = Math.round(cap / 0.7) * cap / asc;
@@ -321,7 +322,9 @@ function playerSheet(view, team, look, mirror) {
     const edge = close || view === 'royals-back' ? `rgb(${hexRgb(team.suit).map(x => Math.round(x * 0.35)).join(',')})` : null;
     const hb = BLOCK.name + BLOCK.gap + BLOCK.num;
     for (const [x, y, w, sx, sy, ang, ndx, ndy, udx, udy] of meta.place) {
-      for (const [text, cap, cy, dx, dy] of [[name, BLOCK.name, -hb / 2 + BLOCK.name / 2, ndx, ndy], [String(num), BLOCK.num, hb / 2 - BLOCK.num / 2, udx, udy]]) {
+      // (the Royals' back carries the surname alone, higher up on the shirt)
+      const lines = view === 'royals-back' ? [[name, BLOCK.name, ROYALS_NAME_Y, ndx, ndy]] : [[name, BLOCK.name, -hb / 2 + BLOCK.name / 2, ndx, ndy], [String(num), BLOCK.num, hb / 2 - BLOCK.num / 2, udx, udy]];
+      for (const [text, cap, cy, dx, dy] of lines) {
         lg.save();
         lg.translate(mx(x + dx), y + dy); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(w / BLOCK.w * sx, w / BLOCK.w * sy);
         printLine(lg, text, cap, cy, fill, edge);
