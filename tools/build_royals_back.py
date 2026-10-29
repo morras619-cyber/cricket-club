@@ -12,7 +12,7 @@ recolour.
 
 The poses are the same drawings as the Thunder back sheet (img/kit/back.webp), smaller, so the Thunder hairstyle layers
 (img/kit/back-hair-<style>.webp) are carried over: each pose's layer is scaled and shifted to sit on the Royals head (ALIGN
-below, found by matching the two heads' skin areas: they overlap 86 to 96% (poses 5 and 10, the bent ones, by eye)). Each pose has empty room round it for hair that
+below, found by matching the two outlines' head areas: they overlap 88 to 99%). Each pose has empty room round it for hair that
 stands up or hangs.
 
 usage (repo root): python3 tools/build_royals_back.py       needs numpy, scipy and Pillow
@@ -27,11 +27,11 @@ from scipy import ndimage as ndi
 SRC = 'tools/kit/src/royals-back.png'
 OUT = 'img/kit/royals-back'
 PAD_T, PAD_S, PAD_B = 46, 16, 6   # room round each pose (hair that stands up, hangs, or is wider than the head)
-GROW = 1.06            # (hair over the Royals' fuller head)
 LIFT = 0.12            # (of the print's width: the block rides above the crown's middle, so the name clears its points)
 TILT = {3: 6, 4: -10, 5: -14, 6: 10, 7: 12}   # the lean of the torso in the poses that bend
 # per pose: scale and shift (x, y) that put the Thunder pose's hair onto this pose, in this pose's own box before the room is added
-ALIGN = [(0.9, -8, -22), (0.9, -11, -23), (0.89, -10, -22), (0.88, -6, -22), (0.87, -8, -8), (0.9, -2, -7), (0.92, -8, -21), (0.92, 2, -22), (0.94, -8, -24), (0.92, -5, -24)]
+ALIGN = [(0.88, -5, -21), (0.88, -7, -22), (0.88, -8, -21), (0.90, -7, -24), (0.87, -8, -8),
+         (0.91, -2, -9), (0.93, -8, -21), (0.97, -3, -23), (0.94, -8, -23), (0.92, -5, -24)]
 
 
 def cut_poses(im):
@@ -133,12 +133,6 @@ def main():
             sc, ox, oy = ALIGN[k]
             part = full.crop((tf[0], tf[1], tf[0] + tf[2], tf[1] + tf[3]))
             part = part.resize((max(1, round(part.width * sc)), max(1, round(part.height * sc))), Image.LANCZOS)
-            bb = part.getbbox()
-            if bb:   # (the Royals' head is a little fuller than Thunder's: the hair grows by GROW, its middle and its lower edge staying put)
-                big = part.resize((round(part.width * GROW), round(part.height * GROW)), Image.LANCZOS)
-                bg = big.getbbox()
-                part = Image.new('RGBA', part.size, (0, 0, 0, 0))
-                part.paste(big, (round((bb[0] + bb[2]) / 2 - (bg[0] + bg[2]) / 2), bb[3] - bg[3]))
             tmp = Image.new('RGBA', (cw[k], ch[k]), (0, 0, 0, 0))
             tmp.alpha_composite(part, (PAD_S + ox, PAD_T + oy)) if (PAD_S + ox >= 0 and PAD_T + oy >= 0) else tmp.paste(part, (PAD_S + ox, PAD_T + oy))
             layer.alpha_composite(tmp, (offs[k], 0))
