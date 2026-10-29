@@ -1,5 +1,7 @@
-// Sledges, comebacks and compliments. Keyed by hero id where a hero has their own voice.
-export const LINES = {
+import { MORE } from './banter-more.js';
+
+// Sledges, comebacks and compliments. Keyed by hero id where a hero has their own voice. (banter-more.js adds many more to every group.)
+const BASE = {
   // you (bowling) after a good ball
   sledge: {
     zara: ['Blink and you\'re back in the hut.', 'That one had your name on it.', 'Next one\'s faster. Pack your kit.', 'Too quick for you? Get used to it.', 'You heard that one. You didn\'t see it.', 'I\'ve got six of those an over.', 'Feel the breeze? That was the ball.', 'Speed check: you\'re late.'],
@@ -36,6 +38,13 @@ export const LINES = {
   heatBatter: ['Bowl it! I\'ll send it to the moon!', 'Your best ball? I\'ll take it apart.', 'I\'m taking you down, bowler.', 'Come on then. Show me what you\'ve got!', 'Every ball is mine now.', 'You started this. I\'ll finish it.'],
   batterRevenge: ['Talk now, bowler!', 'That one\'s for you!', 'Sky high. Told you!', 'Go fetch.', 'Still talking?', 'Words, meet bat.'],
 };
+
+// the base lines with the rest added to every group (a group with hero voices gets them as generic lines)
+export const LINES = Object.fromEntries(Object.entries(BASE).map(([k, g]) => [k, Array.isArray(g) ? [...g, ...(MORE[k] || [])] : { ...g, generic: [...(g.generic || []), ...(MORE[k] || [])] }]));
+for (const k of Object.keys(MORE)) if (!LINES[k]) LINES[k] = [...MORE[k]];
+
+// every line there is, with no repeats
+export const allLines = () => [...new Set(Object.values(LINES).flatMap(g => (Array.isArray(g) ? g : Object.values(g).flat())))];
 
 // A line from the group, never one of the last few said from it (so the same words don't come round
 // again soon).

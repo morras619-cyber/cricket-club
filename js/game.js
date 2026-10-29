@@ -1328,7 +1328,10 @@ export class Game {
       this.hitStop(40); this.fx.word('NICE!', this.W / 2, this.H * 0.3, { size: 46, color: '#3ec6ff', stroke: INK });
       this.fx.sparks(at.x, at.y, 10); this.fx.shake(6); sfx.bat('good'); buzz(25);
     } else {
-      sfx.thin(); this.fx.shake(2); buzz(10); this.sayMine('Oops!', { dur: 900 });
+      sfx.thin(); this.fx.shake(2); buzz(10);
+      // (a word from him now and then, never on every bad shot)
+      const r = makeRng((this.realTime | 0) + 7), inn = this.innings[this.innings.length - 1];
+      if (r.chance(0.2) && (inn?.balls ?? 0) - (this.lastBadSay ?? -9) >= 3) { this.lastBadSay = inn?.balls ?? 0; this.sayMine(line('badShot', null, r), { dur: 1300 }); }
       this.timingBar(err, grade);
     }
   }
@@ -2651,7 +2654,7 @@ export class Game {
       this.hitStop(120); sfx.glove(); buzz(60);
       this.fx.burst(hs.x, hs.y, { color: '#ffe14d', r: 220 });
       this.fx.word('SNAFFLED!', hs.x, hs.y - 40, { size: 60 });
-      this.say('keeper', this.keeperPlayer(), this.myTeam, 'Got it!', { dur: 1200 });
+      this.say('keeper', this.keeperPlayer(), this.myTeam, line('keeperCatch', null, makeRng((this.realTime | 0) + 11)), { dur: 1200 });
     } else {
       S.kball.done = false; S.kball.miss = true;
       this.fx.word('BUTTERFINGERS!', this.W / 2, this.H * 0.32, { size: 52 });
