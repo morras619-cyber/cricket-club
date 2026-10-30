@@ -65,7 +65,7 @@ const tapAt = async (fx, fy) => { const r = await page.evaluate(([fx, fy]) => { 
 await tapAt(0.504, 0.446);
 check(await page.evaluate(() => !document.getElementById('mapSheet').hidden && document.getElementById('mapName').textContent === 'Stadium'), 'tapping the stadium selects it');
 await tapAt(0.766, 0.592);
-check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Clubhouse' && document.getElementById('mapOpen').hidden), 'the clubhouse says coming soon, with nothing to open');
+check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Clubhouse' && !document.getElementById('mapOpen').hidden), 'the clubhouse opens from the map');
 // the merchandise factory: open it from the map, hire, order, be away for three hours, and a tampered till is noticed
 await tapAt(0.750, 0.749);
 check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Merchandise factory' && !document.getElementById('mapOpen').hidden), 'the merchandise factory opens from the map');
