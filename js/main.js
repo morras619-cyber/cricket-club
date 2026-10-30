@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, officeRow, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, officeRow, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
 import * as MD from './stamina.js';
@@ -813,7 +813,7 @@ async function startMatch(opts) {
       const c = profile.career;
       const f = c.phase === 'playoff' ? c.playoff : nextFixture(c.league);
       team = c.club; opp = f.opp; home = f.home;
-      pools = { mine: clubPool(c, team), opp: clubPool(c, opp) };
+      pools = { mine: chemPool(c, clubPool(c, team)), opp: clubPool(c, opp) };   // (the clubhouse: players linked by chemistry get a little extra rating)
       lineup = c.lineup;
     }
     if (mode === 'challenge') {
@@ -1269,7 +1269,7 @@ const BUILDINGS = {
   shop: { name: 'Club shop', desc: 'Kits and extras', open: () => { shopFrom = null; renderShop(); } },
   apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
   medical: { name: 'Medical centre', desc: 'Fitness, beds and physios', open: () => renderMedical(false) },
-  clubhouse: { name: 'Clubhouse', desc: 'Coming soon', soon: true },
+  clubhouse: { name: 'Clubhouse', desc: 'Chemistry, rivals and supporter events', open: () => renderClubhouse(false) },
   merch: { name: 'Merchandise factory', desc: 'Make jerseys the fans want', open: () => renderMerch(false) },
 };
 let mapPick = null, mapPaceTimer = 0;
@@ -1303,7 +1303,7 @@ function renderClubMap(test = false) {
   clearInterval(mapPaceTimer); mapPaceTimer = setInterval(() => { if ($('clubmap').hidden) { clearInterval(mapPaceTimer); return; } fillPace($('mapPace'), c); fillBuild($('mapBuild'), c); }, 30000);
   $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
   const info = () => {
-    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE), medical: !!c.medical && (Object.keys(c.medical.knocked).length > 0 || Object.values(c.medical.fit).some(f => f < 50)), merch: (c.merch?.till || 0) >= 100, training: clock.state === 'ok' && TG.drillsLeft(c.training || {}, serverNow()) > 0 };   // (a red dot: something to do there)
+    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE), medical: !!c.medical && (Object.keys(c.medical.knocked).length > 0 || Object.values(c.medical.fit).some(f => f < 50)), merch: (c.merch?.till || 0) >= 100, training: clock.state === 'ok' && TG.drillsLeft(c.training || {}, serverNow()) > 0, clubhouse: !!c.history?.length && paradeDue(c) };   // (a red dot: something to do there)
     clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
   };
   info();
@@ -1347,11 +1347,12 @@ async function syncClock() {
 const serverNow = () => clock.base + (performance.now() - clock.perf);
 // the club's money, in $50k steps ($k in, $k out)
 // ---------- the builders (js/pacing.js): club XP and level, and upgrades that take builder time ----------
-const BUILD_NAME = { office: 'Club office', stadium: 'Stadium', training: 'Training ground', academy: 'Youth academy', medical: 'Medical centre', merch: 'Merchandise factory' };
-const levelOfBuilding = (c, id) => (id === 'stadium' ? stadiumLvl(c) : id === 'office' ? c.office?.level || 1 : c[id]?.level || 0);
+const BUILD_NAME = { clubhouse: 'Clubhouse', office: 'Club office', stadium: 'Stadium', training: 'Training ground', academy: 'Youth academy', medical: 'Medical centre', merch: 'Merchandise factory' };
+const levelOfBuilding = (c, id) => (id === 'stadium' ? stadiumLvl(c) : id === 'office' ? c.office?.level || 1 : id === 'clubhouse' ? c.clubhouse?.level || 1 : c[id]?.level || 0);
 const applyBuilding = (c, id, lv) => {
   if (id === 'stadium') setStadiumLevel(c, lv);
   else if (id === 'office') office(c).level = lv;
+  else if (id === 'clubhouse') clubhouse(c).level = lv;
   else if (id === 'training') TG.setLevel(c.training, lv);
   else if (id === 'academy') AC.setLevel(c.academy, lv);
   else if (id === 'medical') MD.medSetLevel(c.medical, lv);
@@ -1369,6 +1370,7 @@ const buildCtx = c => ({ now: serverNow(), trusted: clock.state === 'ok', level:
 // finished buildings (only on a time the server confirmed)
 function buildTick(c) {
   if (!c.build) ensureBuild(c);
+  if (c.clubhouse && (clock.state === 'ok' || clock.state === 'local')) { const ev = settleEvents(c, { now: serverNow(), trusted: clock.state === 'ok' }); for (const e of ev) ui.toast(`🎉 ${CLUB.EVENTS[e.kind].name}: ${e.gain} new followers`); if (ev.length) saveProfile(profile); }
   if (c.office && (clock.state === 'ok' || clock.state === 'local')) { const r = officeTick(c, { now: serverNow(), trusted: clock.state === 'ok' }); for (const n of r.left || []) ui.toast(`${n} left the office: the wages were not paid`); }
   const done = PC.settleBuilds(c, buildCtx(c));
   if (done.length) { saveProfile(profile); for (const j of done) ui.toast(`🏗️ ${BUILD_NAME[j.id]} is now level ${j.to}`); }
@@ -1967,6 +1969,103 @@ function paintOffice(c) {
   sh.replaceChildren(card);
 }
 $('setOffice').addEventListener('click', () => { unlockAudio(); sfx.click(); renderOffice(true); });
+
+// ---------- the clubhouse: chemistry, the rivalry board, supporter events ----------
+let clubTab = 'chem', clubSheet = null, clubTest = false, clubTimer = 0;
+async function renderClubhouse(test = false) {
+  clubTest = test;
+  const c = test ? demoCareer() : career();
+  ui.show('clubhouse');
+  $('clubhouseBack').onclick = () => { clearInterval(clubTimer); clubTimer = 0; clubSheet = null; sfx.click(); if (clubTest) renderSettings(); else if (fromMap) renderClubMap(); else renderCareer(); };
+  $('clubhouseSheet').hidden = true;
+  $('clubhouseBody').replaceChildren(el('p', 'mf-empty', 'Checking the time with the server…'));
+  await syncClock();
+  if (test && !c.league) startSeason(c);
+  clubhouse(c);
+  paintClubhouse(c);
+  clearInterval(clubTimer);
+  clubTimer = setInterval(() => { if ($('clubhouse').hidden) { clearInterval(clubTimer); clubTimer = 0; return; } paintClubhouse(c); }, 20000);
+}
+function paintClubhouse(c) {
+  buildTick(c);
+  const h = clubhouse(c), club = teamById(c.club), now = serverNow(), trusted = clock.state === 'ok', P = ensureChirp(c);
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) clubSheet = null; } saveProfile(profile); paintClubhouse(c); };
+  const links = chemLinks(c), row = clubhouseRow(c);
+  $('clubhouseLede').textContent = clubTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
+  $('clubhouseLvl').replaceChildren(ico('factory'), el('span', '', `LV ${h.level}`));
+  const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
+  $('clubhouseStats').replaceChildren(stat('heart', 'red', String(links.length), 'chemistry links'), stat('users', 'blue', compact(P.fans), 'followers'), stat('star', 'gold', buzzWord(P.buzz), 'buzz'));
+  const tb = $('clubhouseTest'); tb.hidden = !clubTest;
+  if (clubTest) {
+    const chip = (label, fn) => mfBtn('chipbtn', [el('span', '', label)], () => { fn(); sfx.click(); saveProfile(profile); paintClubhouse(c); });
+    const ids = clubPlayers(c, c.club).map(p => p.id);
+    tb.replaceChildren(el('b', '', 'TEST'), chip('+10 games', () => { for (let i = 0; i < 10; i++) chemAfterMatch(c, ids); }), chip('+5 hours', () => { for (const e of h.events) e.end -= 5 * 3600000; for (const k of Object.keys(h.cool)) h.cool[k] -= 5 * 3600000; }),
+      chip('Title', () => { c.history = [...(c.history || []), { season: c.season, pos: 1, div: 'd3' }]; }), chip('+$1M', () => { c.money += 1; }));
+  }
+  const free = eventSlots(c) - h.events.length > 0;
+  const tabs = [['chem', 'heart', 'Chemistry', 0], ['rivals', 'trophy', 'Rivals', 0], ['events', 'star', 'Events', free && trusted ? '!' : 0], ['house', 'factory', 'Clubhouse', canBuild(c, 'clubhouse') ? '!' : 0]];
+  $('clubhouseTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${clubTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { clubTab = id; clubSheet = null; sfx.click(); paintClubhouse(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
+  const body = $('clubhouseBody');
+  body.replaceChildren();
+  const info = (icon, text) => { const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
+  if (clubTab === 'chem') {
+    const bonus = chemBonus(c), col = el('div', 'mf-col');
+    col.append(info('heart', links.length ? `${bonus.size} of your players get extra rating from their links: half a point for a link, a whole point for a strong one, up to ${row.cap}.` : 'No links yet. Players of one nation link at once; others link after 10 matches together.'));
+    for (const l of links.slice(0, 4)) {
+      const a = c.players[l.a], b = c.players[l.b], card = el('div', 'mf-card'), inf = el('div', 'mf-info'), bar = el('div', `mf-bar${l.kind === 2 ? ' green' : ''}`), f = el('i');
+      f.style.width = `${Math.min(100, Math.round(l.pts / CLUB.STRONG * 100))}%`; bar.append(f);
+      inf.append(el('b', '', `${lastName(a.name)} & ${lastName(b.name)}`), bar, el('small', '', `${l.kind === 2 ? 'Strong link' : 'Link'} · ${a.nation === b.nation ? 'same nation · ' : ''}${Math.min(l.pts, CLUB.STRONG)}/${CLUB.STRONG}`));
+      card.append(frameOf(playerFace(a, 44)), frameOf(playerFace(b, 44)), inf);
+      col.append(card);
+    }
+    body.append(col);
+  } else if (clubTab === 'rivals') {
+    const col = el('div', 'mf-col'), board = rivalBoard(c);
+    for (const r of board) {
+      const card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head'), crest = el('img', 'mf-crest'); crest.src = logoSrc(r.id); crest.alt = '';
+      hd.append(crest, el('b', '', teamById(r.id).name), el('span', 'mf-stars', r.kind === 'nemesis' ? 'Nemesis' : 'Rival'));
+      const rec = el('div', 'mf-row'); rec.append(ico(r.w >= r.l ? 'up' : 'warn'), el('span', '', `You ${r.w} – ${r.l} them${r.run ? ` · ${r.run > 0 ? 'won' : 'lost'} ${Math.abs(r.run)} in a row` : ''}`));
+      card.append(hd, rec);
+      if (r.said) card.append(el('p', 'sheetnote', `${r.who}: "${r.said}"`));
+      col.append(card);
+    }
+    if (!board.length) col.append(info('warn', 'Your rivals appear when you take a club.'));
+    col.append(info('clock', 'Matches against real clubs, with revenge matches, come later.'));
+    body.append(col);
+  } else if (clubTab === 'events') {
+    const col = el('div', 'mf-col'), IC = { fanday: 'users', charity: 'heart', parade: 'trophy' };
+    for (const [kind, E] of Object.entries(CLUB.EVENTS)) {
+      const card = el('div', 'mf-card'), inf = el('div', 'mf-info'), run = h.events.find(e => e.kind === kind);
+      inf.append(el('b', '', E.name), el('small', '', `${money(eventCost(c, kind))} · ${E.hours} h · about +${Math.round(Math.max(E.min, P.fans * E.fans) * row.boost)} followers`));
+      if (run) {
+        const total = E.hours * 3600000, left = Math.max(0, run.end - now), bar = el('div', 'mf-bar green'), f = el('i'); f.style.width = `${Math.max(3, Math.round((1 - left / total) * 100))}%`; bar.append(f);
+        inf.append(bar, el('small', '', left > 0 ? `${durfmt(left)} left` : 'finishing…'));
+        card.append(ico(IC[kind]), inf);
+      } else {
+        const why = whyNoEvent(c, kind, { now, trusted });
+        const go = mfBtn('chipbtn', [el('span', '', 'Hold')], () => done(startEvent(c, kind, { now: serverNow(), trusted: clock.state === 'ok' })));
+        go.disabled = !!why;
+        if (why) inf.append(el('small', '', why));
+        card.append(ico(IC[kind]), inf, go);
+      }
+      col.append(card);
+    }
+    col.append(info('clock', `${h.events.length} of ${eventSlots(c)} place${eventSlots(c) > 1 ? 's' : ''} busy. Events run on real time, also while you are away.`));
+    body.append(col);
+  } else {
+    const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
+    hd.append(ico('factory'), el('b', '', `Clubhouse level ${h.level}`), el('span', 'mf-stars', '★'.repeat(PC.lookOf(h.level))));
+    card.append(hd);
+    const r1 = el('div', 'mf-row'); r1.append(ico('heart'), el('span', '', `Chemistry gives up to ${row.cap} rating point${row.cap > 1 ? 's' : ''}`));
+    const r2 = el('div', 'mf-row'); r2.append(ico('star'), el('span', '', `${eventSlots(c)} event place${eventSlots(c) > 1 ? 's' : ''} · events win ×${row.boost.toFixed(1)} followers`));
+    card.append(r1, r2, ...buildBlock(c, 'clubhouse', () => paintClubhouse(c)));
+    col.append(card);
+    if (h.log.length) { const e = h.log[h.log.length - 1]; col.append(info('check', `Last event: ${CLUB.EVENTS[e.kind].name}, +${e.gain} followers`)); }
+    body.append(col);
+  }
+  $('clubhouseSheet').hidden = true;
+}
+$('setClubhouse').addEventListener('click', () => { unlockAudio(); sfx.click(); renderClubhouse(true); });
 
 // ---------- the youth academy (js/academy.js): scouts on trips, trial drills, prospects raised until 18 ----------
 let acadTab = 'prospects', acadSheet = null, acadTimer = 0, acadReport = null, acadTest = false, acadRegion = 'oceania';

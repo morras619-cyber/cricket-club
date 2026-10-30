@@ -254,6 +254,24 @@ check(await page.evaluate(() => window.__sixcharge.demo.office.staff.length === 
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-staff.png') });
 await page.evaluate(() => document.getElementById('officeBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the club office is the settings');
+// the clubhouse: from the settings (a practice club): chemistry links, the rivals, supporter events, the level; no scrolling
+await page.evaluate(() => document.getElementById('setClubhouse').click()); await page.waitForTimeout(1500);
+const clubTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#clubhouseTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(300); };
+const clubFits = async () => page.evaluate(() => { const m = document.querySelector('#clubhouse .mf'), b = document.getElementById('clubhouseBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
+check(await page.evaluate(() => !document.getElementById('clubhouse').hidden && document.querySelectorAll('#clubhouseTabs .mf-tab').length === 4 && document.querySelectorAll('#clubhouseBody .mf-card .mf-frame canvas').length >= 2) && await clubFits(), 'the settings open the clubhouse: four tabs, and the chemistry links with framed portraits, fitting the screen');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'clubhouse-chemistry.png') });
+await clubTab('Rivals');
+check(await page.evaluate(() => /Thunder Strikers/.test(document.getElementById('clubhouseBody').textContent) && document.querySelectorAll('#clubhouseBody .mf-crest').length === 2) && await clubFits(), 'the rivals tab shows the nemesis and the division rival with their crests, and fits');
+await clubTab('Events');
+check(await page.evaluate(() => [...document.querySelectorAll('#clubhouseBody .chipbtn')].map(b => b.disabled).join() === 'false,false,true') && await clubFits(), 'three events: the parade is locked until a title or a promotion, and it fits');
+await page.evaluate(() => document.querySelector('#clubhouseBody .chipbtn').click()); await page.waitForTimeout(400);
+check(await page.evaluate(() => window.__sixcharge.demo.clubhouse.events.length === 1 && document.querySelectorAll('#clubhouseBody .mf-bar').length === 1 && /left/.test(document.getElementById('clubhouseBody').textContent)), 'an event is held: it runs on the clock and shows the time left');
+await page.evaluate(() => [...document.querySelectorAll('#clubhouseTest .chipbtn')].find(b => /5 hours/.test(b.textContent)).click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => window.__sixcharge.demo.clubhouse.events.length === 0 && window.__sixcharge.demo.chirp.fans > 900), 'after the hours the supporters came: followers went up');
+await clubTab('Clubhouse');
+check(await page.evaluate(() => /Clubhouse level 1/.test(document.getElementById('clubhouseBody').textContent) && /Build level 2/.test(document.getElementById('clubhouseBody').textContent)) && await clubFits(), 'the Clubhouse tab shows the level and the Build button, fitting the screen');
+await page.evaluate(() => document.getElementById('clubhouseBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the clubhouse is the settings');
 // an AI power answered by a club with no hero of its own (a stand-in captain): the answer cards must draw, not throw (this froze matches)
 await page.evaluate(() => document.getElementById('mapBack')?.click?.());
 const cardOk = await page.evaluate(() => {

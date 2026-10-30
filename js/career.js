@@ -13,8 +13,8 @@ import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating,
 import { newLeague, simLeague, advance, playerResult, table, finish, nextFixture } from './tournament.js';
 import { NATIONS, pickNation } from './nations.js';
 import { randomLook } from './looks.js';
-import { ensureRivals, nemesisOf, say, afterMatch, messageNote, rivalKind } from './rivals.js';
-import { ensureChirp, afterMatchPopularity, seasonPopularity, storyOf, sponsorBonus, compact } from './chirp.js';
+import { ensureRivals, nemesisOf, say, afterMatch, messageNote, rivalKind, meetings, speakerOf } from './rivals.js';
+import { ensureChirp, afterMatchPopularity, seasonPopularity, storyOf, sponsorBonus, compact, postMilestone } from './chirp.js';
 import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
 import { memOf } from './chirpfacts.js';
 import { fameAfter, startFame } from './merch.js';
@@ -831,6 +831,7 @@ export function recordPlayerMatch(c, summary) {
     ids.push(...bat.keys(), ...bowl.keys());
   }
   played(c, ids);
+  chemAfterMatch(c, ids);
   // the medical centre: each of my players who played loses fitness by the stamina he used (he started the match on his fitness)
   const used = new Map();
   for (const inn of summary.innings) for (const [id, e] of Object.entries(inn.energy || {})) if (c.players[id]?.team === c.club) used.set(id, (used.get(id) || 0) + Math.max(0, fitnessOf(c, id) - e));
@@ -947,6 +948,108 @@ export function settleObjective(c, pos) {
   o.board = [...(o.board || []), { season: ob.season, div: ob.div, target: ob.target, pos, met, reward: ob.reward }].slice(-6);
   o.objective = null;
   return [met ? `🏛️ The board is pleased: you finished ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}, inside their target of ${ob.target}. A bonus of ${money(ob.reward)}.` : `🏛️ The board wanted a top ${ob.target} finish. You came ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}: no bonus this year.`];
+}
+// ---------- the clubhouse: chemistry, the rivalry board, supporter events ----------
+// Chemistry: two of your players who share a nation, or have played matches together, become linked; a link gives both a little extra rating in your matches
+// (never more than CLUB.ROWS cap: one point at level 1, two from level 3). The rivalry board shows your nemesis and your division's rival. Supporter events win
+// followers and buzz (Chirp) and take real hours; the clubhouse has places for one, two or three at a time (levels 1, 5, 10, like the picture).
+// c.clubhouse = { level, together: { 'a|b': games }, events: [{ kind, end }], cool: { kind: ms }, parade: season, log }. Money is in $M.
+export const CLUB = {
+  ROWS: [null, { cap: 1, boost: 1 }, { cap: 2, boost: 1.5 }, { cap: 2, boost: 2.5 }],   // the rows for level 1, 5 and 10 (levelRow fills in between): chemistry's most rating points, and how many more followers an event wins
+  NATION: 10, LINK: 10, STRONG: 25, GAMES_MAX: 40,   // a shared nation is worth 10 points; a link from 10 points, a strong one from 25; a match together is a point
+  HOUR: 3600000, COOL: 12 * 3600000,
+  EVENTS: {
+    fanday: { name: 'Fan day', about: 'Open the gates to your supporters for the day.', cost: 0.15, hours: 4, fans: 0.04, min: 150, buzz: 0.08 },
+    charity: { name: 'Charity match', about: 'A friendly with local legends for a good cause.', cost: 0.25, hours: 8, fans: 0.06, min: 250, buzz: 0.12 },
+    parade: { name: 'Victory parade', about: 'An open-top bus through town, after a title or a promotion.', cost: 0.4, hours: 6, fans: 0.1, min: 400, buzz: 0.25, needs: 'a title or a promotion' },
+  },
+};
+export const clubhouse = c => {
+  const h = (c.clubhouse ||= { level: 1, together: {}, events: [], cool: {}, parade: 0, log: [] });
+  h.level ||= 1; h.together ||= {}; h.events ||= []; h.cool ||= {}; h.log ||= [];
+  return h;
+};
+export const clubhouseRow = c => levelRow(CLUB.ROWS, clubhouse(c).level);
+export const eventSlots = c => lookOf(clubhouse(c).level);
+const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+// a match is over: the players of yours who took part have played together
+export function chemAfterMatch(c, ids) {
+  if (!c.club) return;
+  const h = clubhouse(c), mine = [...new Set(ids)].filter(id => c.players[id]?.team === c.club).sort();
+  for (let i = 0; i < mine.length; i++) for (let j = i + 1; j < mine.length; j++) { const k = `${mine[i]}|${mine[j]}`; h.together[k] = Math.min(CLUB.GAMES_MAX, (h.together[k] || 0) + 1); }
+  if (Object.keys(h.together).length > 600) for (const k of Object.keys(h.together)) { const [a, b] = k.split('|'); if (c.players[a]?.team !== c.club || c.players[b]?.team !== c.club) delete h.together[k]; }
+}
+export const linkPoints = (c, a, b) => (c.players[a].nation === c.players[b].nation ? CLUB.NATION : 0) + (clubhouse(c).together[pairKey(a, b)] || 0);
+export const linkKind = pts => (pts >= CLUB.STRONG ? 2 : pts >= CLUB.LINK ? 1 : 0);   // 0 none, 1 a link, 2 a strong link
+// the links in the squad, the strongest first
+export function chemLinks(c) {
+  const sq = clubPlayers(c, c.club), out = [];
+  for (let i = 0; i < sq.length; i++) for (let j = i + 1; j < sq.length; j++) {
+    const pts = linkPoints(c, sq[i].id, sq[j].id), kind = linkKind(pts);
+    if (kind) out.push({ a: sq[i].id, b: sq[j].id, pts, kind });
+  }
+  return out.sort((x, y) => y.pts - x.pts);
+}
+// the rating points each of your players gets from his links: half a point for a link, a whole one for a strong link, up to the clubhouse's most
+export function chemBonus(c) {
+  const sums = new Map(), cap = clubhouseRow(c).cap, out = new Map();
+  for (const l of chemLinks(c)) for (const id of [l.a, l.b]) sums.set(id, (sums.get(id) || 0) + (l.kind === 2 ? 1 : 0.5));
+  for (const [id, v] of sums) { const b = Math.min(cap, Math.floor(v)); if (b > 0) out.set(id, b); }
+  return out;
+}
+// the match's copies of your players, with the bonus in their batting and bowling
+export function chemPool(c, pool) {
+  const bonus = chemBonus(c);
+  return pool.map(p => { const b = bonus.get(p.id); return b ? { ...p, bat: Math.min(99, p.bat + b), bowlSkill: p.bowl ? Math.min(99, p.bowlSkill + b) : p.bowlSkill } : p; });
+}
+// the rivalry board: your nemesis and your division's rival, with the record between you and the last thing each said
+export function rivalBoard(c) {
+  if (!c.rivals) return [];
+  const ids = [[nemesisOf(c), 'nemesis'], [c.rivals.div, 'division']].filter(([id], i, a) => id && id !== c.club && a.findIndex(x => x[0] === id) === i);
+  return ids.map(([id, kind]) => ({ id, kind, who: speakerOf(c, id), ...meetings(c, id), said: c.rivals.inbox.find(m => m.from === id)?.text || null }));
+}
+// supporter events
+export const eventCost = (c, kind) => Math.max(0.05, Math.round(CLUB.EVENTS[kind].cost * dealScale(c) * 20) / 20);
+export function paradeDue(c) {
+  const last = c.history?.at(-1);
+  return !!last && (last.pos === 1 || !!last.promoted) && clubhouse(c).parade !== last.season;
+}
+// ctx: { now, trusted }
+export function whyNoEvent(c, kind, ctx) {
+  const E = CLUB.EVENTS[kind], h = clubhouse(c);
+  if (!E) return 'No such event';
+  if (h.events.some(e => e.kind === kind)) return 'Already on';
+  if (h.events.length >= eventSlots(c)) return 'All your places are busy';
+  if ((h.cool[kind] || 0) > ctx.now) return 'Wait a little before the next one';
+  if (kind === 'parade' && !paradeDue(c)) return `Needs ${E.needs}`;
+  if (!ctx.trusted) return 'The clubhouse needs the server clock: try again when you are online';
+  if (c.money + 1e-9 < eventCost(c, kind)) return 'Not enough money in the club';
+  return null;
+}
+export function startEvent(c, kind, ctx) {
+  const why = whyNoEvent(c, kind, ctx), h = clubhouse(c), E = CLUB.EVENTS[kind];
+  if (why) return { ok: false, why };
+  const cost = eventCost(c, kind), end = ctx.now + E.hours * CLUB.HOUR;
+  c.money = round2(c.money - cost); book(c, 'out', 'buildings', cost);
+  h.events.push({ kind, end }); h.cool[kind] = end + CLUB.COOL;
+  if (kind === 'parade') h.parade = c.history.at(-1).season;
+  return { ok: true, cost };
+}
+// events that have finished (only on a time the server confirmed): the supporters come out
+export function settleEvents(c, ctx) {
+  const h = clubhouse(c), done = [];
+  if (!ctx.trusted) return done;
+  for (const e of [...h.events].sort((x, y) => x.end - y.end)) {
+    if (e.end > ctx.now) continue;
+    const E = CLUB.EVENTS[e.kind], P = ensureChirp(c), boost = clubhouseRow(c).boost;
+    const gain = Math.round(Math.max(E.min, P.fans * E.fans) * boost);
+    P.fans += gain; P.buzz = Math.min(1, P.buzz + E.buzz);
+    h.events = h.events.filter(x => x !== e);
+    h.log = [...h.log, { kind: e.kind, season: c.season, gain }].slice(-6);
+    postMilestone(c, `${teamById(c.club).name} ${e.kind === 'parade' ? 'take the trophy through the streets' : e.kind === 'charity' ? 'play a charity match' : 'open the gates for a fan day'}: ${compact(gain)} new followers.`);
+    done.push({ kind: e.kind, gain });
+  }
+  return done;
 }
 // who is on a short contract (seasons left; the soonest to go first)
 export const contractList = c => clubPlayers(c, c.club).filter(p => p.contract < 50).sort((a, b) => a.contract - b.contract || ovr(b) - ovr(a));
