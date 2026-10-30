@@ -286,7 +286,7 @@ function renderHome() {
   // the small print on the mode blocks: one line each, as the blocks were drawn
   const lines = (...l) => l.filter(Boolean).map(x => `• ${x}`).join('\n');
   const club = c?.club ? teamById(c.club).name : '';
-  $('leagueSub').textContent = !c ? lines('Pick a club', 'Win the auction', 'Build a dynasty')
+  $('leagueSub').textContent = !c ? lines('Create your club', 'Win the auction', 'Build a dynasty')
     : c.phase === 'pick' ? lines(`Season ${c.season}`, 'Pick your club')
       : c.phase === 'scouts' ? lines(`Season ${c.season} · ${club}`, 'Your scouts are home', `${money(c.money)} to spend`)
       : c.phase === 'playoff' ? lines(`Season ${c.season} · ${club}`, 'Relegation play-off!')
