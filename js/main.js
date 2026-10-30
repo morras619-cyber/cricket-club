@@ -1190,6 +1190,7 @@ const BUILDINGS = {
   apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
   medical: { name: 'Medical centre', desc: 'Coming soon', soon: true },
   clubhouse: { name: 'Clubhouse', desc: 'Coming soon', soon: true },
+  merch: { name: 'Merchandise factory', desc: 'Coming soon', soon: true },
 };
 let mapPick = null;
 const clubMap = createClubMap($('mapCanvas'), {

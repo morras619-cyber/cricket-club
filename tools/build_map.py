@@ -17,8 +17,8 @@ from scipy import ndimage as ndi
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC, OUT = os.path.join(HERE, 'map'), os.path.join(HERE, '..', 'img', 'map')
-FLIP = ['apartment', 'academy', 'clubhouse']   # the buildings on the right of the road, turned to face it (their fronts look to the lower right as drawn)
-NAMES = ['stadium', 'training', 'office', 'apartment', 'medical', 'academy', 'clubhouse', 'shop']
+FLIP = ['apartment', 'academy', 'clubhouse', 'merch']   # the buildings on the right of the road, turned to face it (their fronts look to the lower right as drawn)
+NAMES = ['stadium', 'training', 'office', 'apartment', 'medical', 'academy', 'clubhouse', 'shop', 'merch']
 GREY = 0.7              # js/clubmap.js: the grey a club-coloured surface is made in
 BLUE_V, YEL_V = 0.84, 1.0   # the brightness (V) of the painted blue (#1f5fd6) and yellow (#ffd23f)
 WIDTH = 1100            # a building's width in the game (the pictures are 1448 wide; the map is seen at most about this big)
