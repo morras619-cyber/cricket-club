@@ -330,7 +330,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .title-fx { position: absolute; left: 50%; top: 50%; width: 124%; max-width: none; height: auto; transform: translate(-50%, -50%); animation: titlefx 3.6s ease-in-out infinite; }
 .title-logo { position: relative; display: block; width: 100%; height: auto; filter: drop-shadow(0 6px 12px rgba(0, 0, 40, .5)); animation: titlepop .7s cubic-bezier(.2, 1.4, .4, 1) both; }
 /* a slow shine crosses the lettering, cut to the logo's own shape */
-.title-shine { position: absolute; inset: 0; -webkit-mask: url(../img/menu/title-logo.webp) center / 100% 100% no-repeat; mask: url(../img/menu/title-logo.webp) center / 100% 100% no-repeat; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .75) 50%, transparent 62%) -140% 0 / 60% 100% no-repeat; animation: titleshine 4.2s ease-in-out 1.2s infinite; mix-blend-mode: overlay; }
+.title-shine { position: absolute; inset: 0; -webkit-mask: url(../img/logo-sixcharge.webp) center / 100% 100% no-repeat; mask: url(../img/logo-sixcharge.webp) center / 100% 100% no-repeat; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .75) 50%, transparent 62%) -140% 0 / 60% 100% no-repeat; animation: titleshine 4.2s ease-in-out 1.2s infinite; mix-blend-mode: overlay; }
 .title-heroes { position: relative; display: block; width: 112%; max-width: none; height: auto; margin-top: -26px; margin-bottom: -34px; pointer-events: none; }
 @keyframes titlefx { 0%, 100% { opacity: .78; } 50% { opacity: 1; } }
 @keyframes titlepop { from { transform: scale(.86); opacity: 0; } to { transform: none; opacity: 1; } }
