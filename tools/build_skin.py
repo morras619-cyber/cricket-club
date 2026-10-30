@@ -66,6 +66,7 @@ def build():
     nine('SC .mf-qty button', 'btn-blue', 46, 9, 440, 'color: #fff;')
     nine('SC .mf-qty button.on', 'btn-yellow', 46, 9, 440, 'color: #14102a;')
     out.append("SC .mf-fin, SC .mf-role { padding: 0 2px; } SC .mf-collect { min-height: 40px; } SC .mf-qty button { min-height: 38px; padding: 0 2px; }")
+    out.append("SC .mf-card .mf-badge { background: linear-gradient(#ff7a85, #d6283c); border: 2px solid #fff; border-radius: 9px; min-width: 0; padding: 0 5px; height: 17px; line-height: 13px; font-size: 9px; top: 4px; right: 4px; text-shadow: none; }")
     out.append(B)
     return '\n'.join(out).replace('SC ', SC + ' ')
 css = open(CSS).read()
