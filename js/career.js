@@ -452,7 +452,7 @@ export const STADIUMS = [null,
 const STADIUM_ROWS = [null, { ticket: 0.1 }, { ticket: 0.2 }, { ticket: 0.4 }];
 export const stadiumLevel = c => (c.custom ? c.custom.stadium || 1 : 0);   // the look (1-3)
 export const stadiumLvl = c => (c.custom ? c.custom.stadiumLvl || [1, 1, 5, 10][c.custom.stadium || 1] : 0);   // the level (1-10)
-export const ticketOf = c => Math.round(levelRow(STADIUM_ROWS, stadiumLvl(c)).ticket * 100) / 100;
+export const ticketOf = c => Math.round(levelRow(STADIUM_ROWS, stadiumLvl(c)).ticket * (1 + trophyBuffs(c).tickets) * 1000) / 1000;
 export function setStadiumLevel(c, level) { c.custom.stadiumLvl = level; c.custom.stadium = lookOf(level); setMyClub(c.custom); }
 // what stops the ground reaching a level, besides the money, the builder and the club level (pacing.js whyNot)
 export const stadiumBlocked = (c, to) => (to >= 10 && divisionOf(c, c.club) === 'd3' ? 'The Arena is for clubs out of Division 3' : null);
@@ -899,7 +899,7 @@ export const SPONSORS = {
   power: { name: 'Meteor Energy', tag: 'Risky', about: 'Nothing at all unless you hit 9 sixes in the 7 matches', per: 0, bonus: 0.9, goal: { kind: 'sixes', n: 9, text: 'Hit 9 sixes in the 7 matches' } },
 };
 export const dealScale = c => DEAL.SCALE[divisionOf(c, c.club)] ?? 1;
-export const dealWorth = (c, id, slot = 'shirt') => { const S = SPONSORS[id], k = dealScale(c) * OFFICE.SLOT_PAY[slot] * officeRow(c).pay * (1 + accountantBonus(c)); return { per: S.per * k, bonus: S.bonus * k, top: (S.per * DEAL.MATCHES + S.bonus) * k }; };
+export const dealWorth = (c, id, slot = 'shirt') => { const S = SPONSORS[id], k = dealScale(c) * OFFICE.SLOT_PAY[slot] * officeRow(c).pay * (1 + accountantBonus(c)) * (1 + trophyBuffs(c).sponsor) * managerPay(c); return { per: S.per * k, bonus: S.bonus * k, top: (S.per * DEAL.MATCHES + S.bonus) * k }; };
 // a slot holds one deal; a sponsor is in one slot at a time
 export function signSponsor(c, id, slot = 'shirt') {
   const o = office(c), at = OFFICE.SLOTS.indexOf(slot);
@@ -1052,6 +1052,82 @@ export function settleEvents(c, ctx) {
   }
   return done;
 }
+// ---------- the apartment: the trophy cabinet, the manager's reputation and salary, the story, the decor ----------
+// Your own place. Everything here is worked out from the club's history (so a career from before the apartment finds it already full): the trophies are
+// the titles and promotions, each KIND giving one small permanent bonus the first time (popularity and money, never rating); the manager's points come
+// from every season played, titles and promotions, and from the decor; the salary is paid each season and spent on decor. The level (builder, pacing.js)
+// gives places for decor and a bigger salary. The manager's level raises sponsor pay and lets you sign better players (the reputation cap, repCap).
+// c.apartment = { level, decor: { id: true }, spent, life: { played, won } }. Money is in $M.
+export const APT = {
+  ROWS: [null, { slots: 3, pay: 1 }, { slots: 6, pay: 1.25 }, { slots: 9, pay: 1.5 }],   // the rows for level 1, 5 and 10 (levelRow fills in between): places for decor, and the salary
+  MR_AT: [0, 0, 40, 120, 260, 450, 700, 1000, 1400, 1900, 2500],   // the points that make manager level n (index n)
+  FACTOR: { d3: 1, d2: 1.5, asl: 2.5 }, SEASON: 10, TITLE: 60, PROMOTED: 40,   // points for a season played, for a title (times the division's factor) and for a promotion
+  SPONSOR_PER_LEVEL: 0.02,
+  DECOR: {
+    lamp: { name: 'Reading lamp', cost: 0.1, mp: 10 }, plant: { name: 'Big plant', cost: 0.1, mp: 10 }, sofa: { name: 'Leather sofa', cost: 0.15, mp: 15 },
+    rug: { name: 'Team rug', cost: 0.25, mp: 20 }, poster: { name: 'Framed poster', cost: 0.2, mp: 20 }, coffee: { name: 'Coffee machine', cost: 0.5, mp: 40 },
+    shelf: { name: 'Bookcase', cost: 0.4, mp: 40 }, tv: { name: 'Big TV', cost: 0.8, mp: 60 }, statue: { name: 'Golden statue', cost: 2.5, mp: 160 },
+  },
+  TROPHIES: {
+    'promo-d2': { name: 'Promotion to Division 2', buff: { sponsor: 0.02 }, text: '+2% sponsor pay' },
+    'promo-asl': { name: 'Promotion to the Super League', buff: { sponsor: 0.03 }, text: '+3% sponsor pay' },
+    'title-d3': { name: 'Division 3 champions', buff: { fans: 0.02 }, text: '+2% follower growth' },
+    'title-d2': { name: 'Division 2 champions', buff: { fans: 0.03, tickets: 0.03 }, text: '+3% followers, +3% gate money' },
+    'title-asl': { name: 'Super League champions', buff: { fans: 0.05, tickets: 0.05, merch: 0.05 }, text: '+5% followers, gate money and jersey demand' },
+  },
+};
+export const apartment = c => {
+  const a = (c.apartment ||= { level: 1, decor: {}, spent: 0, life: { played: 0, won: 0 } });
+  a.level ||= 1; a.decor ||= {}; a.spent ||= 0; a.life ||= { played: 0, won: 0 };
+  return a;
+};
+export const aptRow = c => levelRow(APT.ROWS, apartment(c).level);
+export const decorSlots = c => aptRow(c).slots;
+// the cabinet: each kind of trophy with how many times you won it and when last
+export function trophiesOf(c) {
+  const out = {};
+  for (const h of c.history || []) {
+    const kinds = [];
+    if (h.pos === 1) kinds.push(`title-${h.div}`);
+    if (h.promoted && APT.TROPHIES[`promo-${h.promoted}`]) kinds.push(`promo-${h.promoted}`);
+    for (const k of kinds) if (APT.TROPHIES[k]) { const t = (out[k] ||= { id: k, count: 0, last: 0 }); t.count++; t.last = h.season; }
+  }
+  return Object.values(out);
+}
+// the permanent bonuses: one for each kind of trophy won (a second title of a kind adds nothing)
+export function trophyBuffs(c) {
+  const b = { sponsor: 0, fans: 0, tickets: 0, merch: 0 };
+  for (const t of trophiesOf(c)) for (const [k, v] of Object.entries(APT.TROPHIES[t.id].buff)) b[k] += v;
+  return b;
+}
+export const decorPoints = c => Object.keys(apartment(c).decor).reduce((n, id) => n + (APT.DECOR[id]?.mp || 0), 0);
+export const mgrPoints = c => (c.history || []).reduce((n, h) => n + APT.SEASON + (h.pos === 1 ? APT.TITLE * (APT.FACTOR[h.div] || 1) : 0) + (h.promoted ? APT.PROMOTED : 0), 0) + decorPoints(c);
+export const mgrLevel = c => { const pts = mgrPoints(c); let n = 1; while (n < 10 && pts >= APT.MR_AT[n + 1]) n++; return n; };
+export const mgrShare = c => { const n = mgrLevel(c), pts = mgrPoints(c); return n >= 10 ? 1 : (pts - APT.MR_AT[n]) / (APT.MR_AT[n + 1] - APT.MR_AT[n]); };
+export const managerPay = c => 1 + APT.SPONSOR_PER_LEVEL * (mgrLevel(c) - 1);   // sponsors pay more to a manager with a name
+export const repBonus = c => Math.floor(mgrLevel(c) / 2);                           // ... and better players sign for him
+// the salary: paid at the end of every season (more in a better division, and for a title or a promotion), spent on decor
+export const salaryEarned = c => Math.round((c.history || []).reduce((n, h) => n + 0.3 * (DIV_MONEY[h.div] ?? 1) * (1 + (h.pos === 1 ? 1 : 0) + (h.promoted ? 0.5 : 0)), 0) * aptRow(c).pay * 100) / 100;
+export const salaryCash = c => Math.max(0, round2(salaryEarned(c) - apartment(c).spent));
+export function buyDecor(c, id) {
+  const a = apartment(c), D = APT.DECOR[id];
+  if (!D) return { ok: false, why: 'No such item' };
+  if (a.decor[id]) return { ok: false, why: 'You have it already' };
+  if (Object.keys(a.decor).length >= decorSlots(c)) return { ok: false, why: 'The apartment is full: build it bigger for more places' };
+  if (salaryCash(c) + 1e-9 < D.cost) return { ok: false, why: 'Not enough salary saved' };
+  a.spent = round2(a.spent + D.cost); a.decor[id] = true;
+  return { ok: true };
+}
+// a league match of yours is over (the lifetime record starts when the apartment does)
+export function aptMatch(c, won) { const l = apartment(c).life; l.played++; if (won) l.won++; }
+// the story so far, season by season (newest first)
+export function storyLog(c) {
+  return [...(c.history || [])].reverse().slice(0, 6).map(h => {
+    const nth = n => `${n}${['st', 'nd', 'rd'][n - 1] || 'th'}`;
+    return { season: h.season, text: `${h.pos === 1 ? '🏆 Champions' : `Finished ${nth(h.pos)}`} in ${divisionName(h.div)}${h.promoted ? ' · promoted' : h.relegated ? ' · relegated' : ''}`, title: h.pos === 1, promoted: !!h.promoted };
+  });
+}
+
 // ---------- the club shop: gear for your players (club cash), looks for the ground and the ball (diamonds), a few deals each day ----------
 // Gear gives one player a little rating (a bat for the batting, grips for the bowling, shoes for both); it wears out after SHOP.USES of your matches the
 // player took part in. A player carries one thing; the armoury holds so many (the shop's level). Three of the nine are on offer each day (the server's UTC
@@ -1291,7 +1367,7 @@ export function sellProspect(c, id) {
 // The best players only sign for clubs with the standing: none rated 80 or more for a Division 3 club, a few for Division 2 (up to 84), any for the top division.
 // (players you already have stay, whatever happens)
 export const REP_CAP = { asl: 99, d2: 84, d3: 79 };
-export const repCap = c => REP_CAP[divisionOf(c, c.club)] ?? 99;
+export const repCap = c => Math.min(99, (REP_CAP[divisionOf(c, c.club)] ?? 99) + repBonus(c));
 export function repBlock(c, p) {
   const cap = repCap(c);
   return ovr(p) > cap ? `Players rated ${cap + 1} or more will not sign for a ${divisionName(divisionOf(c, c.club))} club` : null;
@@ -1317,7 +1393,7 @@ export const fameOf = p => p.fame ?? startFame(ovr(p));
 export const merchRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { fame: fameOf(p), name: p.name }]));
 // the jerseys a day the fans want, in all: the crowd your ground holds, how far the factory's name reaches, and a little for your followers on Chirp
 const CROWD_ROWS = [null, { n: 80 }, { n: 200 }, { n: 350 }], REACH_ROWS = [null, { n: 0.5 }, { n: 0.75 }, { n: 1 }];
-export const merchDemand = c => levelRow(CROWD_ROWS, Math.max(1, stadiumLvl(c))).n * levelRow(REACH_ROWS, c.merch?.level || 1).n * (1 + Math.min(0.15, (c.chirp?.fans || 0) / 100000 * 0.15));
+export const merchDemand = c => levelRow(CROWD_ROWS, Math.max(1, stadiumLvl(c))).n * levelRow(REACH_ROWS, c.merch?.level || 1).n * (1 + Math.min(0.15, (c.chirp?.fans || 0) / 100000 * 0.15)) * (1 + trophyBuffs(c).merch);
 // the league matches left in a player's contract (the season he is in, and the full seasons after it)
 export function matchesLeft(c, p) {
   const per = c.league?.rounds?.length || 14, now = c.league && c.league.stage === 'group' ? Math.max(0, per - c.league.round) : 0;
@@ -1332,6 +1408,7 @@ export function afterLeagueMatch(c, summary) {
   notes.push(...scoutReports(c));
   notes.push(...groundWeek(c));
   const result = playerResult(c.league, summary);
+  aptMatch(c, result.winner === c.club);
   const lvUp = addXp(c, XP.MATCH + (result.winner === c.club ? XP.WIN : 0));
   if (lvUp) notes.push(`⭐ Club level ${lvUp}: your buildings can grow bigger`);
   notes.push(...advance(c.league, result, (a, b, rng) => simCareerMatch(c, a, b, rng)));
@@ -1340,7 +1417,7 @@ export function afterLeagueMatch(c, summary) {
   notes.push(...afterMatch(c, summary.oppTeam.id, result.winner === c.club, id => clubRating(c, id), top).map(messageNote));
   // Chirp: the press and a fan post about it, and your club's followers and buzz move
   const mine = summary.innings.find(i => i.side === 'player'), theirs = summary.innings.find(i => i.side === 'ai'), won = result.winner === c.club, opp = summary.oppTeam.id;
-  const gained = afterMatchPopularity(c, { won, derby: !!rivalKind(c, opp), upset: clubRating(c, opp) > clubRating(c, c.club) + 3, bigWin: Math.abs(mine.runs - theirs.runs) >= 25 });
+  const gained = afterMatchPopularity(c, { boost: 1 + trophyBuffs(c).fans, won, derby: !!rivalKind(c, opp), upset: clubRating(c, opp) > clubRating(c, c.club) + 3, bigWin: Math.abs(mine.runs - theirs.runs) >= 25 });
   const story = storyOf(c, { won, first: summary.innings[0], second: summary.innings[1], tiebreak: summary.result.tiebreak });
   chirpAfterMatch(c, summary, { won, opp, derby: !!rivalKind(c, opp), mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, story, journey: journeyOf(c) });
   notes.push(`📈 ${gained >= 0 ? '+' : '−'}${compact(Math.abs(gained))} followers on Chirp`);

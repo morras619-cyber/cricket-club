@@ -57,10 +57,10 @@ export function followersOf(c, id) {
 // the buzz around the club, 0 (silent) to 1 (the talk of the league), as a word
 export const buzzWord = b => (b > 0.8 ? 'On fire' : b > 0.6 ? 'Hot' : b > 0.4 ? 'Warm' : b > 0.2 ? 'Quiet' : 'Cold');
 // the match is over: the club's followers and buzz move. Returns how many followers it gained (negative: lost).
-export function afterMatchPopularity(c, { won, derby = false, bigWin = false, upset = false }) {
+export function afterMatchPopularity(c, { won, derby = false, bigWin = false, upset = false, boost = 1 }) {
   const P = ensureChirp(c), before = P.fans;
   if (won) {
-    P.fans += Math.round(P.fans * 0.012 * (derby ? 2 : 1) * (upset ? 1.6 : 1) + 40);
+    P.fans += Math.round((P.fans * 0.012 * (derby ? 2 : 1) * (upset ? 1.6 : 1) + 40) * boost);   // (boost: the apartment's trophy cabinet)
     P.buzz = Math.min(1, P.buzz + 0.12 + (derby ? 0.08 : 0) + (bigWin ? 0.05 : 0));
   } else {
     P.fans = Math.max(100, P.fans - Math.round(P.fans * 0.004));

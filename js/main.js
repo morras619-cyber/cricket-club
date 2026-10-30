@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, officeRow, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
 import * as MD from './stamina.js';
@@ -1367,7 +1367,7 @@ const BUILDINGS = {
   office: { name: 'Club office', desc: 'The books, sponsors and the board', open: () => renderOffice(false) },
   academy: { name: 'Youth academy', desc: 'Scouts and young prospects', open: () => renderAcademy(false) },
   shop: { name: 'Club shop', desc: 'Gear, looks and daily deals', open: () => { shopFrom = null; renderShop(); } },
-  apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
+  apartment: { name: 'Your apartment', desc: 'Trophies, your reputation and your story', open: () => renderApartment(false) },
   medical: { name: 'Medical centre', desc: 'Fitness, beds and physios', open: () => renderMedical(false) },
   clubhouse: { name: 'Clubhouse', desc: 'Chemistry, rivals and supporter events', open: () => renderClubhouse(false) },
   merch: { name: 'Merchandise factory', desc: 'Make jerseys the fans want', open: () => renderMerch(false) },
@@ -1447,13 +1447,14 @@ async function syncClock() {
 const serverNow = () => clock.base + (performance.now() - clock.perf);
 // the club's money, in $50k steps ($k in, $k out)
 // ---------- the builders (js/pacing.js): club XP and level, and upgrades that take builder time ----------
-const BUILD_NAME = { shop: 'Club shop', clubhouse: 'Clubhouse', office: 'Club office', stadium: 'Stadium', training: 'Training ground', academy: 'Youth academy', medical: 'Medical centre', merch: 'Merchandise factory' };
-const levelOfBuilding = (c, id) => (id === 'stadium' ? stadiumLvl(c) : id === 'office' ? c.office?.level || 1 : id === 'clubhouse' ? c.clubhouse?.level || 1 : id === 'shop' ? c.shop?.level || 1 : c[id]?.level || 0);
+const BUILD_NAME = { apartment: 'Your apartment', shop: 'Club shop', clubhouse: 'Clubhouse', office: 'Club office', stadium: 'Stadium', training: 'Training ground', academy: 'Youth academy', medical: 'Medical centre', merch: 'Merchandise factory' };
+const levelOfBuilding = (c, id) => (id === 'stadium' ? stadiumLvl(c) : id === 'office' ? c.office?.level || 1 : id === 'clubhouse' ? c.clubhouse?.level || 1 : id === 'shop' ? c.shop?.level || 1 : id === 'apartment' ? c.apartment?.level || 1 : c[id]?.level || 0);
 const applyBuilding = (c, id, lv) => {
   if (id === 'stadium') setStadiumLevel(c, lv);
   else if (id === 'office') office(c).level = lv;
   else if (id === 'clubhouse') clubhouse(c).level = lv;
   else if (id === 'shop') shopOf(c).level = lv;
+  else if (id === 'apartment') apartment(c).level = lv;
   else if (id === 'training') TG.setLevel(c.training, lv);
   else if (id === 'academy') AC.setLevel(c.academy, lv);
   else if (id === 'medical') MD.medSetLevel(c.medical, lv);
@@ -2167,6 +2168,101 @@ function paintClubhouse(c) {
   $('clubhouseSheet').hidden = true;
 }
 $('setClubhouse').addEventListener('click', () => { unlockAudio(); sfx.click(); renderClubhouse(true); });
+
+// ---------- your apartment: the trophy cabinet, the manager's reputation and salary, the story, the decor ----------
+let aptTab = 'cabinet', aptSheet = null, aptTest = false;
+function renderApartment(test = false) {
+  aptTest = test;
+  const c = test ? demoCareer() : career();
+  ui.show('apartment');
+  aptSheet = null; $('apartmentSheet').hidden = true;
+  $('apartmentBack').onclick = () => { aptSheet = null; sfx.click(); if (aptTest) renderSettings(); else if (fromMap) renderClubMap(); else renderCareer(); };
+  if (!c.club) { $('apartmentTabs').replaceChildren(); $('apartmentStats').replaceChildren(); $('apartmentLede').textContent = ''; $('apartmentLvl').replaceChildren(); $('apartmentBody').replaceChildren(el('p', 'mf-empty', 'Build your club first: the apartment is yours once you have one.')); return; }
+  apartment(c);
+  paintApartment(c);
+}
+const DECOR_ICON = { lamp: 'star', plant: 'heart', sofa: 'users', rug: 'box', poster: 'chart', coffee: 'clock', shelf: 'box', tv: 'ball', statue: 'trophy' };
+function paintApartment(c) {
+  buildTick(c);
+  const a = apartment(c), row = aptRow(c), lvl = mgrLevel(c), trophies = trophiesOf(c);
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) aptSheet = null; } saveProfile(profile); paintApartment(c); };
+  $('apartmentLede').textContent = aptTest ? `Practice club (nothing is saved) · salary ${money(salaryCash(c))}` : `${teamById(c.club).name} · salary ${money(salaryCash(c))}`;
+  $('apartmentLvl').replaceChildren(ico('factory'), el('span', '', `LV ${a.level}`));
+  const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
+  $('apartmentStats').replaceChildren(stat('star', 'gold', `LV ${lvl}`, 'manager'), stat('coin', 'blue', money(salaryCash(c)), 'salary saved'), stat('trophy', 'red', String(trophies.reduce((n, t) => n + t.count, 0)), 'trophies'));
+  const tb = $('apartmentTest'); tb.hidden = !aptTest;
+  if (aptTest) {
+    const chip = (label, fn) => mfBtn('chipbtn', [el('span', '', label)], () => { fn(); sfx.click(); saveProfile(profile); paintApartment(c); });
+    const add = (o) => { c.history = [...(c.history || []), { season: (c.history?.length || 0) + 1, div: 'd3', pos: 5, ...o }]; };
+    tb.replaceChildren(el('b', '', 'TEST'), chip('Season', () => add({})), chip('D3 title', () => add({ pos: 1 })), chip('Promoted', () => add({ pos: 2, promoted: 'd2' })), chip('League title', () => add({ pos: 1, div: 'asl' })));
+  }
+  const tabs = [['cabinet', 'trophy', 'Cabinet', 0], ['manager', 'star', 'Manager', 0], ['story', 'chart', 'Story', 0], ['decor', 'heart', 'Decor', 0], ['house', 'factory', 'Home', canBuild(c, 'apartment') ? '!' : 0]];
+  $('apartmentTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${aptTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { aptTab = id; aptSheet = null; sfx.click(); paintApartment(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
+  const body = $('apartmentBody');
+  body.replaceChildren();
+  const info = (icon, text) => { const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
+  if (aptTab === 'cabinet') {
+    const col = el('div', 'mf-col');
+    for (const [id, T] of Object.entries(APT.TROPHIES)) {
+      const won = trophies.find(t => t.id === id), card = el('div', `mf-card${won ? '' : ' empty'}`), inf = el('div', 'mf-info');
+      inf.append(el('b', '', won ? `${T.name}${won.count > 1 ? ` ×${won.count}` : ''}` : T.name), el('small', '', won ? `${T.text} · last in season ${won.last}` : `Not won yet · ${T.text}`));
+      card.append(ico(won ? 'trophy' : 'warn', won ? 'on' : ''), inf);
+      col.append(card);
+    }
+    col.append(info('star', 'Each kind of trophy gives its bonus once, for good. A second title of the same kind is for the pride.'));
+    body.append(col);
+  } else if (aptTab === 'manager') {
+    const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head'), bar = el('div', 'mf-bar green'), f = el('i');
+    f.style.width = `${Math.max(3, Math.round(mgrShare(c) * 100))}%`; bar.append(f);
+    hd.append(ico('star', 'on'), el('b', '', `Manager level ${lvl}`), el('span', 'mf-stars', `${mgrPoints(c)} pts`));
+    card.append(hd, bar);
+    const r1 = el('div', 'mf-row'); r1.append(ico('coin'), el('span', '', `Sponsors pay ×${managerPay(c).toFixed(2)}`));
+    const r2 = el('div', 'mf-row'); r2.append(ico('users'), el('span', '', `Players up to ${repCap(c)} rating will sign for you${repBonus(c) ? ` (+${repBonus(c)} for your name)` : ''}`));
+    card.append(r1, r2); col.append(card);
+    const life = a.life, pct = life.played ? Math.round(life.won / life.played * 100) : 0;
+    col.append(info('chart', `${(c.history || []).length} season${(c.history || []).length === 1 ? '' : 's'} played · ${trophies.reduce((n, t) => n + t.count, 0)} trophies · ${life.played ? `${life.won} wins in ${life.played} matches (${pct}%) since the apartment` : 'matches are counted from now on'}`));
+    col.append(info('clock', 'Points come from every season, titles and promotions, and from the decor.'));
+    body.append(col);
+  } else if (aptTab === 'story') {
+    const col = el('div', 'mf-col'), log = storyLog(c);
+    for (const l of log) { const card = el('div', 'mf-card'); card.append(ico(l.title ? 'trophy' : l.promoted ? 'up' : 'check', l.title || l.promoted ? 'on' : ''), el('span', 'mf-row', `Season ${l.season}: ${l.text}`)); col.append(card); }
+    if (!log.length) col.append(info('clock', 'Your story starts when your first season ends.'));
+    body.append(col);
+  } else if (aptTab === 'decor') {
+    const own = Object.keys(a.decor).length, grid = el('div', 'mf-grid three');
+    for (const [id, D] of Object.entries(APT.DECOR)) {
+      const have = !!a.decor[id], card = el('button', `mf-card stack${have ? ' pick' : ''}`), r = el('div', 'mf-row');
+      r.append(ico(DECOR_ICON[id], have ? 'on' : ''), el('span', '', `+${D.mp} pts`));
+      card.append(el('b', '', D.name), r, el('small', '', have ? 'Yours' : money(D.cost)));
+      card.addEventListener('click', () => { if (!have) { aptSheet = { type: 'decor', id }; sfx.click(); paintApartment(c); } });
+      grid.append(card);
+    }
+    body.append(info('heart', `Furnish your place with your salary: ${own} of ${decorSlots(c)} places used.`), grid);
+  } else {
+    const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
+    hd.append(ico('factory'), el('b', '', `Apartment level ${a.level}`), el('span', 'mf-stars', '★'.repeat(PC.lookOf(a.level))));
+    card.append(hd);
+    const r1 = el('div', 'mf-row'); r1.append(ico('heart'), el('span', '', `${decorSlots(c)} places for decor`));
+    const r2 = el('div', 'mf-row'); r2.append(ico('coin'), el('span', '', `Salary ×${row.pay.toFixed(2)}`));
+    card.append(r1, r2, ...buildBlock(c, 'apartment', () => paintApartment(c)));
+    col.append(card); body.append(col);
+  }
+  const sh = $('apartmentSheet');
+  sh.hidden = !aptSheet;
+  if (!aptSheet) return;
+  sh.onclick = e => { if (e.target === sh) { aptSheet = null; paintApartment(c); } };
+  const card = el('div', 'mf-sheet-card'), close = mfBtn('mf-x', [ico('cross')], () => { aptSheet = null; sfx.click(); paintApartment(c); });
+  if (aptSheet.type === 'decor') {
+    const D = APT.DECOR[aptSheet.id], hd = el('div', 'mf-sheet-head'); hd.append(ico(DECOR_ICON[aptSheet.id]), el('b', '', D.name), close);
+    const go = mfBtn('mf-big', [ico('coin'), el('span', '', `Buy · ${money(D.cost)} salary`)], () => { const res = buyDecor(c, aptSheet.id); if (res.ok) sfx.dhol(); done(res, true); });
+    go.disabled = salaryCash(c) < D.cost || Object.keys(a.decor).length >= decorSlots(c);
+    card.append(hd, el('p', 'sheetnote', `+${D.mp} manager points. You have ${money(salaryCash(c))} saved.`), go);
+    if (Object.keys(a.decor).length >= decorSlots(c)) card.append(el('p', 'sheetnote', 'The apartment is full: build it bigger for more places.'));
+    else if (salaryCash(c) < D.cost) card.append(el('p', 'sheetnote', 'Not enough salary saved: it is paid at the end of each season.'));
+  } else { aptSheet = null; sh.hidden = true; return; }
+  sh.replaceChildren(card);
+}
+$('setApartment').addEventListener('click', () => { unlockAudio(); sfx.click(); renderApartment(true); });
 
 // ---------- the youth academy (js/academy.js): scouts on trips, trial drills, prospects raised until 18 ----------
 let acadTab = 'prospects', acadSheet = null, acadTimer = 0, acadReport = null, acadTest = false, acadRegion = 'oceania';

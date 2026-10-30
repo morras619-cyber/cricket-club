@@ -297,6 +297,28 @@ await shopTab('Shop');
 check(await page.evaluate(() => /Club shop level 1/.test(document.getElementById('shopBody').textContent) && /Build level 2/.test(document.getElementById('shopBody').textContent)) && await shopFits(), 'the Shop tab shows the level and the Build button');
 await page.evaluate(() => document.getElementById('shopBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the shop is the settings');
+// the apartment: from the settings (a practice club): the trophy cabinet, the manager, the story, the decor, the level; no scrolling
+await page.evaluate(() => document.getElementById('setApartment').click()); await page.waitForTimeout(1200);
+const aptTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#apartmentTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(300); };
+const aptFits = async () => page.evaluate(() => { const m = document.querySelector('#apartment .mf'), b = document.getElementById('apartmentBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
+check(await page.evaluate(() => !document.getElementById('apartment').hidden && document.querySelectorAll('#apartmentTabs .mf-tab').length === 5 && document.querySelectorAll('#apartmentBody .mf-card.empty').length === 5) && await aptFits(), 'the settings open the apartment: five tabs and an empty cabinet with five kinds of trophy to win');
+for (const t of ['D3 title', 'Promoted', 'League title']) await page.evaluate(t => [...document.querySelectorAll('#apartmentTest .chipbtn')].find(b => b.textContent === t).click(), t);
+await page.waitForTimeout(300);
+check(await page.evaluate(() => document.querySelectorAll('#apartmentBody .mf-card.empty').length === 2 && document.querySelectorAll('#apartmentBody .ico.on').length === 3) && await aptFits(), 'three trophies are won: they light up in the cabinet');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'apartment-cabinet.png') });
+await aptTab('Manager');
+check(await page.evaluate(() => /Manager level [2-9]/.test(document.getElementById('apartmentBody').textContent) && /Sponsors pay/.test(document.getElementById('apartmentBody').textContent)) && await aptFits(), 'the manager has a level and what it gives, and it fits');
+await aptTab('Story');
+check(await page.evaluate(() => document.querySelectorAll('#apartmentBody .mf-card').length === 3) && await aptFits(), 'the story lists the seasons');
+await aptTab('Decor');
+check(await page.evaluate(() => document.querySelectorAll('#apartmentBody .mf-grid .mf-card').length === 9) && await aptFits(), 'nine pieces of decor to buy with the salary, fitting the screen');
+await page.evaluate(() => [...document.querySelectorAll('#apartmentBody .mf-grid .mf-card')][0].click()); await page.waitForTimeout(300);
+await page.evaluate(() => [...document.querySelectorAll('#apartmentSheet button')].find(b => /Buy/.test(b.textContent)).click()); await page.waitForTimeout(400);
+check(await page.evaluate(() => Object.keys(window.__sixcharge.demo.apartment.decor).length === 1), 'a piece of decor is bought with the salary');
+await aptTab('Home');
+check(await page.evaluate(() => /Apartment level 1/.test(document.getElementById('apartmentBody').textContent) && /Build level 2/.test(document.getElementById('apartmentBody').textContent)) && await aptFits(), 'the Home tab shows the level and the Build button');
+await page.evaluate(() => document.getElementById('apartmentBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the apartment is the settings');
 // an AI power answered by a club with no hero of its own (a stand-in captain): the answer cards must draw, not throw (this froze matches)
 await page.evaluate(() => document.getElementById('mapBack')?.click?.());
 const cardOk = await page.evaluate(() => {
