@@ -1,7 +1,7 @@
 import { peopleSheet, loadPeopleMask } from './looks.js';
 import { softShadow } from './light.js';
 import { sheetOf, teamById } from './teams.js';
-import { drawKitBatter } from './kitsprite.js';
+import { drawKitBatter, painted } from './kitsprite.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
 // tools/build_batter_sprites.py, so a single frame table serves every team.
@@ -61,7 +61,8 @@ export function shotAnim(shot) {
   if (shot.kind === 'block') return 'block';
   if (shot.kind === 'leave') return 'leave';
   const a = shot.angle;
-  if (shot.loft && a >= -15 * DEG && a <= 55 * DEG) return 'loft';
+  // a lifted straight or off-side drive has its own poses only in the painted sheet; with the old sheet (the one in play) it is the plain straight or cover drive
+  if (shot.loft && !painted.off && a >= -15 * DEG && a <= 55 * DEG) return 'loft';
   if (a > 110 * DEG) return 'rsweep';
   if (a > 55 * DEG) return 'cut';
   if (a > 15 * DEG) return 'cover';

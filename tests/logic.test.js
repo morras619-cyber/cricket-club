@@ -255,7 +255,8 @@ test('each swipe direction plays its own shot', async () => {
   assert.equal(shotAnim({ kind: 'block', angle: 0 }), 'block');
   // a lifted drive straight or to the off side has its own finish; a lifted cut or pull is still a cut or pull
   const l = deg => shotAnim({ kind: 'drive', angle: deg * Math.PI / 180, loft: true });
-  assert.equal(l(0), 'loft'); assert.equal(l(35), 'loft'); assert.equal(l(80), 'cut'); assert.equal(l(-80), 'pull');
+  // (the painted batter is off: a lifted drive plays the same pose sequence as the ground one)
+  assert.equal(l(0), 'straight'); assert.equal(l(35), 'cover'); assert.equal(l(80), 'cut'); assert.equal(l(-80), 'pull');
 });
 
 // the swipe is aimed by its flick (its fastest stretch), not by the line from where the finger first touched to where it lifted
