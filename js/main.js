@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -33,6 +33,7 @@ import { createClubMap } from './clubmap.js';
 import * as MF from './merch.js';
 import * as PC from './pacing.js';
 import * as TG from './training.js';
+import * as AC from './academy.js';
 import { initCoach, coachOnce, coachSay, coachAsk, DEV, QUICK_TIPS } from './coach.js';
 import { taunt } from './story.js';
 import { playComic, preloadComic, titleCard, NIGHT, EXIT } from './comic.js';
@@ -1236,7 +1237,7 @@ const BUILDINGS = {
   stadium: { name: 'Stadium', desc: 'Play matches, tickets and ground upgrades', open: () => { careerView = 'hub'; renderCareer(); } },
   training: { name: 'Training ground', desc: 'Coaches train your players', open: () => renderTraining(false) },
   office: { name: 'Club office', desc: 'The books, sponsors and the board', open: () => renderOffice(false) },
-  academy: { name: 'Youth academy', desc: 'Send scouts, sign new players', open: () => { careerView = career().phase === 'scouts' ? 'hub' : 'scouts'; renderCareer(); } },
+  academy: { name: 'Youth academy', desc: 'Scouts and young prospects', open: () => renderAcademy(false) },
   shop: { name: 'Club shop', desc: 'Kits and extras', open: () => { shopFrom = null; renderShop(); } },
   apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
   medical: { name: 'Medical centre', desc: 'Coming soon', soon: true },
@@ -1273,7 +1274,7 @@ function renderClubMap(test = false) {
   clearInterval(mapPaceTimer); mapPaceTimer = setInterval(() => { if ($('clubmap').hidden) { clearInterval(mapPaceTimer); return; } fillPace($('mapPace'), c); }, 30000);
   $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
   const info = () => {
-    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts', merch: (c.merch?.till || 0) >= 100 };   // (a red dot: something to do there)
+    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE), merch: (c.merch?.till || 0) >= 100 };   // (a red dot: something to do there)
     clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
   };
   info();
@@ -1353,9 +1354,10 @@ const ICON = {
   chart: '<path d="M4 20v-8h4v8zM10 20V4h4v16zM16 20V9h4v11z"/>',
   star: '<path d="M12 2l3 7 7 .6-5.3 4.7 1.700 7.200L12 17.500 5.600 21.500l1.700-7.200L2 9.600 9 9z"/>',
   ball: '<circle cx="12" cy="12" r="9"/><path d="M5 8c4 2.500 10 2.500 14 0M5 16c4-2.500 10-2.500 14 0" fill="none" stroke="#14102a" stroke-width="1.600"/>',
+  search: '<circle cx="10" cy="10" r="6"/><path d="M15 15l6 6" fill="none" stroke-width="3"/>',
   cross: '<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="4"/>',
 };
-const ICON_COLOUR = { coin: '#ffd23f', clock: '#ffffff', heart: '#ff4d5e', ball: '#ff4d5e', jersey: '#3b82f6', pencil: '#ffb800', printer: '#8fa0b8', box: '#c98a4b', gear: '#9aa6b2', users: '#5aa0ff', factory: '#ffb800', trophy: '#ffd23f', star: '#ffd23f', chart: '#5aa0ff', warn: '#ffd23f', up: '#34c759' };
+const ICON_COLOUR = { coin: '#ffd23f', clock: '#ffffff', heart: '#ff4d5e', ball: '#ff4d5e', jersey: '#3b82f6', pencil: '#ffb800', printer: '#8fa0b8', box: '#c98a4b', gear: '#9aa6b2', users: '#5aa0ff', factory: '#ffb800', trophy: '#ffd23f', search: '#5aa0ff', star: '#ffd23f', chart: '#5aa0ff', warn: '#ffd23f', up: '#34c759' };
 const ico = (name, cls = '') => { const sp = el('span', `ico ${cls}`.trim()); if (ICON_COLOUR[name]) sp.style.setProperty('--ic', ICON_COLOUR[name]); sp.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`; return sp; };
 const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...content); if (fn) b.addEventListener('click', fn); return b; };
 const frameOf = (node, big = false) => { const f = el('span', `mf-frame${big ? ' big' : ''}`); f.append(node); return f; };
@@ -1673,7 +1675,7 @@ $('setTraining').addEventListener('click', () => { unlockAudio(); sfx.click(); r
 
 // ---------- the club office: the books, the sponsors, the board, the contracts ----------
 let officeTab = 'money', officeSheet = null, officeTest = false;
-const FIN_ICON = { prizes: 'trophy', wins: 'star', tickets: 'users', sponsors: 'coin', merch: 'jersey', board: 'check', players: 'users', buildings: 'factory' };
+const FIN_ICON = { prizes: 'trophy', wins: 'star', tickets: 'users', sponsors: 'coin', merch: 'jersey', transfers: 'users', players: 'users', buildings: 'factory' };
 function renderOffice(test = false) {
   officeTest = test;
   const c = test ? demoCareer() : career();
@@ -1773,6 +1775,176 @@ function paintOffice(c) {
 }
 $('setOffice').addEventListener('click', () => { unlockAudio(); sfx.click(); renderOffice(true); });
 
+// ---------- the youth academy (js/academy.js): scouts on trips, trial drills, prospects raised until 18 ----------
+let acadTab = 'prospects', acadSheet = null, acadTimer = 0, acadReport = null, acadTest = false, acadRegion = 'oceania';
+const acadCtx = c => ({ now: serverNow(), trusted: clock.state === 'ok', bank: merchBank(c), has: id => !!c.players[id]?.prospect, make: t => makeProspect(c, t) });
+function acadTick(c) {
+  if (!c.academy || clock.state === 'none' || clock.state === 'offline') return null;
+  const r = AC.tick(c.academy, acadCtx(c));
+  saveProfile(profile);
+  return r;
+}
+async function renderAcademy(test = false) {
+  acadTest = test;
+  const c = test ? demoCareer() : career();
+  ui.show('academy');
+  $('acadBack').onclick = () => { clearInterval(acadTimer); acadTimer = 0; acadSheet = null; sfx.click(); if (acadTest) renderSettings(); else if (fromMap) renderClubMap(); else renderCareer(); };
+  $('acadBody').replaceChildren(el('p', 'mf-empty', 'Checking the time with the server…'));
+  $('acadSheet').hidden = true;
+  await syncClock();
+  if (clock.state === 'offline') {
+    const e = el('div', 'mf-empty'); e.append(ico('clock'), el('span', '', 'Cannot reach the server. The academy waits until it can check the time. Try again when you are online.'));
+    $('acadBody').replaceChildren(e);
+    return;
+  }
+  if (!c.academy) c.academy = AC.freshAcademy(serverNow());
+  acadReport = acadTick(c);
+  paintAcademy(c);
+  clearInterval(acadTimer);
+  acadTimer = setInterval(() => { if ($('academy').hidden) { clearInterval(acadTimer); acadTimer = 0; return; } acadReport = acadTick(c) || acadReport; paintAcademy(c); }, 15000);
+}
+const TIER_CLS = ['common', 'rare', 'epic', 'super'];
+function paintAcademy(c) {
+  const a = c.academy, L = AC.ACAD.LEVELS[a.level], now = serverNow(), ctx = () => acadCtx(c);
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) acadSheet = null; } saveProfile(profile); acadTick(c); paintAcademy(c); };
+  $('acadLede').textContent = acadTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
+  $('acadLvl').replaceChildren(ico('factory'), el('span', '', `LV ${a.level}`));
+  const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
+  $('acadStats').replaceChildren(stat('coin', 'gold', kfmt(a.fund), 'in the fund'), stat('users', 'blue', `${AC.placesUsed(a)}/${L.slots}`, 'places used'), stat('clock', 'red', kfmt(AC.upkeepPerDay(a)), 'upkeep a day'));
+  const tb = $('acadTest'); tb.hidden = !acadTest;
+  if (acadTest) {
+    const chip = (label, fn) => mfBtn('chipbtn', [el('span', '', label)], () => { fn(); sfx.click(); saveProfile(profile); acadReport = acadTick(c) || acadReport; paintAcademy(c); });
+    tb.replaceChildren(el('b', '', 'TEST'), chip('+1 hour', () => AC.skipTime(a, 3600000)), chip('+12 hours', () => AC.skipTime(a, 12 * 3600000)), chip('+$1M', () => { c.money += 1; }),
+      chip('+1 year', () => { for (const p of prospectsOf(c)) p.age++; academySeason(c, { int: (x, y) => x + Math.floor(Math.random() * (y - x + 1)) }); }));
+  }
+  const note = $('acadNote'), bad = a.unpaidMs > 0 || acadReport?.tampered;
+  const got = acadReport?.arrived?.length ? `A scout is back: ${acadReport.arrived.map(id => c.players[id]?.name).filter(Boolean).join(', ')}.` : acadReport?.revealed?.length ? `A trial drill is done: ${acadReport.revealed.map(id => c.players[id]?.name).filter(Boolean).join(', ')}.` : '';
+  const msg = a.unpaidMs > 0 ? 'The upkeep cannot be paid: the scouts and the drills have stopped.' : acadReport?.tampered ? 'The books did not add up, so the fund was emptied.' : got;
+  note.hidden = !msg; note.className = `mf-note${bad ? ' bad' : ''}`; note.replaceChildren(...(msg ? [ico(bad ? 'warn' : 'up'), el('span', '', msg)] : []));
+  const ready = prospectsOf(c).filter(p => p.age >= AC.ACAD.PLAY_AGE).length, canUp = AC.nextUpgrade(a) && c.money >= AC.nextUpgrade(a).up;
+  const tabs = [['prospects', 'users', 'Prospects', ready], ['trips', 'search', 'Trips', a.trips.length], ['seniors', 'star', 'Seniors', c.phase === 'scouts' ? '!' : 0], ['academy', 'factory', 'Academy', canUp ? '!' : 0]];
+  $('acadTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${acadTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { acadTab = id; acadSheet = null; sfx.click(); paintAcademy(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
+  const body = $('acadBody');
+  body.replaceChildren();
+  const left = ms => durfmt(Math.max(0, ms));
+  if (acadTab === 'prospects') {
+    const grid = el('div', 'mf-grid three'), list = prospectsOf(c);
+    for (const p of list) {
+      const rev = a.revealed[p.id], tier = p.academy?.tier ?? 0, drill = a.drills[p.id], card = el('button', 'mf-card stack'), r = el('div', 'mf-row');
+      r.append(el('span', '', String(ovr(p))), ico('up'), el('span', rev ? `tier ${TIER_CLS[tier]}` : '', rev ? String(p.pot) : '?'));
+      const st = el('div', `mf-row ${p.age >= AC.ACAD.PLAY_AGE ? 'ok' : 'no'}`); st.append(el('span', '', drill ? `drill ${left(drill - now)}` : p.age >= AC.ACAD.PLAY_AGE ? 'ready' : `age ${p.age}`));
+      card.append(frameOf(playerFace(p, 64)), el('b', '', lastName(p.name)), el('small', `tier ${rev ? TIER_CLS[tier] : 'unknown'}`, rev ? AC.TIERS[tier] : 'Unknown'), r, st);
+      card.addEventListener('click', () => { acadSheet = { type: 'prospect', id: p.id }; sfx.click(); paintAcademy(c); });
+      grid.append(card);
+    }
+    for (let i = list.length; i < L.slots; i++) {
+      const trip = a.trips[i - list.length];
+      const card = el('button', 'mf-card stack empty'); card.append(ico(trip ? 'search' : 'plus'), el('b', '', trip ? `Back in ${left(trip.end - now)}` : 'Free place'));
+      card.addEventListener('click', () => { acadTab = 'trips'; sfx.click(); paintAcademy(c); });
+      grid.append(card);
+    }
+    body.append(grid);
+    const foot = el('div', 'mf-card'); foot.append(ico('clock'), el('span', 'mf-row', `Prospects cannot play until they are ${AC.ACAD.PLAY_AGE}. They grow ${AC.ACAD.GROW[0]} to ${AC.ACAD.GROW[1]} rating a season. They are not part of your squad of ${MAX_SQUAD}.`)); body.append(foot);
+  } else if (acadTab === 'trips') {
+    const col = el('div', 'mf-col');
+    for (const t of a.trips) {
+      const R = SCOUT_REGIONS[t.region], card = el('div', 'mf-card'), info = el('div', 'mf-info'), bar = el('div', 'mf-bar green'), f = el('i');
+      f.style.width = `${Math.max(3, Math.min(100, Math.round(100 - (t.end - now) / (t.hours * 3600000) * 100)))}%`; bar.append(f);
+      const im = document.createElement('img'); im.src = `img/region/card-${t.region}.webp`; im.alt = '';
+      info.append(el('b', '', `${R.name} · ${t.hours} h`), bar, el('div', 'mf-row', `back in ${left(t.end - now)}`));
+      card.append(frameOf(im), info); col.append(card);
+    }
+    if (a.trips.length < L.trips) {
+      const go = el('button', 'mf-card empty'); go.append(ico('plus'), el('b', '', AC.placesUsed(a) >= L.slots ? 'No free place: promote or sell a prospect' : 'Send a scout'));
+      go.addEventListener('click', () => { if (AC.placesUsed(a) >= L.slots) return ui.toast('The academy is full: promote or sell a prospect first'); acadSheet = { type: 'trip' }; sfx.click(); paintAcademy(c); });
+      col.append(go);
+    }
+    const foot = el('div', 'mf-card'); foot.append(ico('warn'), el('span', 'mf-row', `${a.trips.length} of ${L.trips} scout${L.trips > 1 ? 's' : ''} away. A scout holds a place for his find. Longer trips find better prospects.`)); col.append(foot);
+    body.append(col);
+  } else if (acadTab === 'seniors') {
+    const col = el('div', 'mf-col');
+    if (c.phase === 'scouts') {
+      const sg = mfBtn('mf-big', [ico('star'), el('span', '', 'Your scouts are home: sign their finds')], () => { clearInterval(acadTimer); fromMap = false; careerView = 'hub'; renderCareer(); });
+      col.append(sg);
+    }
+    const note2 = el('div', 'mf-card'); note2.append(ico('warn'), el('span', 'mf-row', `A senior scout works a whole season (${money(SCOUT_FEE)}) and finds up to 3 ready players. You sign them before next season's auction.`)); col.append(note2);
+    const grid = el('div', 'mf-grid');
+    for (const [id, R] of Object.entries(SCOUT_REGIONS)) {
+      const out = scoutOut(c, id), finds = out ? c.scouting[id].finds.length : 0, card = el('div', 'mf-card stack');
+      const im = document.createElement('img'); im.src = `img/region/card-${id}.webp`; im.alt = '';
+      const go = mfBtn('chipbtn', [el('span', '', out ? `${finds}/3 found` : `Send · ${money(SCOUT_FEE)}`)], () => { if (sendScout(c, id)) { sfx.full(); ui.toast(`Your scout is off to ${R.name}`); done({ ok: true }); } else ui.toast(c.phase !== 'season' ? 'Scouts can only be sent during a season' : 'Not enough money'); });
+      go.disabled = out || c.money < SCOUT_FEE;
+      card.append(frameOf(im), el('b', '', R.name), el('small', '', R.tag), go);
+      grid.append(card);
+    }
+    col.append(grid);
+    body.append(col);
+  } else {
+    const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
+    hd.append(ico('factory'), el('b', '', `Academy level ${a.level}`), el('span', 'mf-stars', '★'.repeat(a.level)));
+    card.append(hd);
+    const pips = (name, have, max) => { const d = el('div', 'mf-pips'); for (let i = 0; i < max; i++) d.append(ico(name, i < have ? 'on' : '')); return d; };
+    const r1 = el('div', 'mf-row'); r1.append(ico('users'), el('span', '', 'Places'), pips('users', AC.placesUsed(a), L.slots));
+    const r2 = el('div', 'mf-row'); r2.append(ico('search'), el('span', '', 'Scouts'), pips('search', a.trips.length, L.trips));
+    const r3 = el('div', 'mf-row'); r3.append(ico('coin'), el('span', '', `Upkeep ${kfmt(AC.ACAD.UPKEEP)} a day for each prospect`));
+    card.append(r1, r2, r3);
+    const up = AC.nextUpgrade(a);
+    if (up) { const ub = mfBtn('mf-big', [ico('up'), el('span', '', `Upgrade · ${money(up.up)}`)], () => done(AC.upgrade(a, ctx()))); ub.disabled = c.money < up.up; card.append(ub); }
+    else card.append(el('p', 'sheetnote', 'The best academy there is.'));
+    col.append(card);
+    if (a.log.length) { const nw = el('div', 'mf-card'); nw.append(ico('warn'), el('span', 'mf-row', a.log[a.log.length - 1].text)); col.append(nw); }
+    body.append(col);
+  }
+  // the bottom sheets: a prospect, the veterans who can mentor him, a trip
+  const sh = $('acadSheet');
+  sh.hidden = !acadSheet;
+  if (!acadSheet) return;
+  sh.onclick = e => { if (e.target === sh) { acadSheet = null; paintAcademy(c); } };
+  const card = el('div', 'mf-sheet-card');
+  const close = mfBtn('mf-x', [ico('cross')], () => { acadSheet = null; sfx.click(); paintAcademy(c); });
+  if (acadSheet.type === 'prospect') {
+    const p = c.players[acadSheet.id];
+    if (!p?.prospect) { acadSheet = null; sh.hidden = true; return; }
+    const rev = a.revealed[p.id], drill = a.drills[p.id], mentor = c.players[a.mentors[p.id]], hd = el('div', 'mf-sheet-head');
+    hd.append(frameOf(playerFace(p, 96), true), el('b', '', p.name), close);
+    const r1 = el('div', 'mf-row'); r1.append(el('span', '', p.label), el('span', '', `age ${p.age}`), el('span', '', `rating ${ovr(p)}`));
+    const r2 = el('div', 'mf-row'); r2.append(ico('up'), el('span', rev ? `tier ${TIER_CLS[p.academy?.tier ?? 0]}` : '', rev ? `${AC.TIERS[p.academy?.tier ?? 0]}: he can reach ${p.pot}` : 'His ceiling is not known yet'));
+    card.append(hd, r1, r2);
+    if (!rev) card.append(mfBtn('mf-big alt', [ico('clock'), el('span', '', drill ? `Trial drill: ${left(drill - now)} left` : `Trial drill · ${AC.ACAD.DRILL_H} hours · free`)], () => done(AC.startDrill(a, p.id, ctx()))));
+    if (card.lastChild.tagName === 'BUTTON' && drill) card.lastChild.disabled = true;
+    const vets = veteransOf(c);
+    card.append(mfBtn('mf-big alt', [ico('users'), el('span', '', mentor ? `Mentor: ${mentor.name}` : vets.length ? 'Pick a mentor (+1 growth a season)' : 'No veteran aged 30+ to mentor him')], () => { if (vets.length) { acadSheet = { type: 'mentor', id: p.id }; paintAcademy(c); } }));
+    if (!vets.length) card.lastChild.disabled = true;
+    const pr = mfBtn('mf-big', [ico('check'), el('span', '', p.age >= AC.ACAD.PLAY_AGE ? 'Promote to the squad' : `He plays at ${AC.ACAD.PLAY_AGE} (age ${p.age})`)], () => { const r = promoteProspect(c, p.id); if (r.ok) { sfx.full(); ui.toast(`${p.name} joins the squad!`); } done(r, true); });
+    pr.disabled = p.age < AC.ACAD.PLAY_AGE;
+    card.append(pr, mfBtn('mf-big red', [ico('coin'), el('span', '', `Sell · ${money(academyPrice(p))}`)], () => { const r = sellProspect(c, p.id); if (r.ok) ui.toast(`${p.name} sold for ${money(r.price)}`); done(r, true); }));
+  } else if (acadSheet.type === 'mentor') {
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('users'), el('b', '', 'Who mentors him?'), close);
+    const grid = el('div', 'mf-grid'); grid.style.cssText = 'grid-auto-rows: auto';
+    for (const v of veteransOf(c).sort((x, y) => y.age - x.age).slice(0, 4)) {
+      const b = el('button', 'mf-card'), info = el('div', 'mf-info'), r = el('div', 'mf-row'); r.append(el('span', '', `age ${v.age}`), el('span', '', `rating ${ovr(v)}`));
+      info.append(el('b', '', lastName(v.name)), r);
+      b.append(frameOf(playerFace(v, 64)), info);
+      b.addEventListener('click', () => { const r2 = AC.setMentor(a, acadSheet.id, v.id); acadSheet = r2.ok ? { type: 'prospect', id: acadSheet.id } : acadSheet; done(r2); });
+      grid.append(b);
+    }
+    card.append(hd, grid);
+    if (a.mentors[acadSheet.id]) card.append(mfBtn('mf-big red', [ico('cross'), el('span', '', 'No mentor')], () => { AC.setMentor(a, acadSheet.id, null); acadSheet = { type: 'prospect', id: acadSheet.id }; done({ ok: true }); }));
+  } else if (acadSheet.type === 'trip') {
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('search'), el('b', '', 'Send a scout'), close);
+    const chips = el('div', 'mf-qty');
+    for (const [id, R] of Object.entries(SCOUT_REGIONS)) chips.append(mfBtn(id === acadRegion ? 'on' : '', [el('span', '', { africa: 'AFR', europe: 'EUR', namerica: 'N.AM', samerica: 'S.AM', oceania: 'OCE' }[id] || id)], () => { acadRegion = id; paintAcademy(c); }));
+    card.append(hd, chips, el('p', 'sheetnote', `${SCOUT_REGIONS[acadRegion].name}: ${SCOUT_REGIONS[acadRegion].tag}`));
+    for (const h of [12, 24, 48]) {
+      const T = AC.ACAD.TRIPS[h], b = mfBtn('mf-big alt', [ico('clock'), el('span', '', `${h} hours · ${kfmt(T.cost)} · Epic ${T.odds[2]}% · Superhero ${T.odds[3]}%`)], () => done(AC.startTrip(a, acadRegion, h, ctx()), true));
+      b.disabled = c.money * 1000 < T.cost && a.fund < T.cost;
+      card.append(b);
+    }
+  } else { acadSheet = null; sh.hidden = true; return; }
+  sh.replaceChildren(card);
+}
+$('setAcademy').addEventListener('click', () => { unlockAudio(); sfx.click(); renderAcademy(true); });
+
 function renderCareer(notes = careerNotes) {
   const c = career();
   careerNotes = [];
@@ -1791,7 +1963,6 @@ function renderCareer(notes = careerNotes) {
   body.innerHTML = '';
   for (const n of notes) body.append(el('div', 'panel paper notecard', n));
   if (careerView === 'squad' && club) return careerSquad(c, body);
-  if (careerView === 'scouts' && club) { body.append(scoutsPanel(c)); return; }
   careerView = 'hub';
   if (c.news?.length && (c.phase === 'scouts' || c.phase === 'auction') && !c.auction?.results?.length) {
     const n = el('div', 'panel paper statcard'); n.append(el('h3', '', 'Off-season news')); for (const x of c.news) n.append(el('div', 'kotie', x)); body.append(n);
@@ -2227,7 +2398,6 @@ function careerSeason(c, body) {
   }
   body.append(chirpPanel(c));
   if (c.custom) body.append(stadiumPanel(c), groundPanel(c));
-  body.append(scoutsPanel(c));
   body.append(...leaguePanels(c.league));
 }
 
@@ -2375,27 +2545,6 @@ function groundPanel(c) {
   return box;
 }
 // ---------- travelling scouts ----------
-function scoutsPanel(c) {
-  const box = el('div', 'panel paper scoutpanel');
-  box.append(el('h3', '', '🔎 Travelling scouts'));
-  box.append(el('p', 'sheetnote', `Send a scout abroad for the season (${money(SCOUT_FEE)} a region). He finds a player every two matches, up to three, and you can sign them at a set price before next season's auction.`));
-  for (const [id, R] of Object.entries(SCOUT_REGIONS)) {
-    const row = el('div', 'scoutrow');
-    const im = document.createElement('img'); im.src = `img/region/card-${id}.webp`; im.alt = '';
-    const txt = el('div');
-    const out = scoutOut(c, id), finds = out ? c.scouting[id].finds.map(pid => c.players[pid]) : [];
-    txt.append(el('b', '', R.name), el('small', '', out
-      ? (finds.length ? `Found: ${finds.map(p => `${flag(p)} ${p.name}`).join(', ')}` : 'Out scouting: his first report comes after two matches')
-      : R.tag));
-    const btn = el('button', 'chipbtn', out ? `✓ ${finds.length}/3 found` : `Send · ${money(SCOUT_FEE)}`);
-    btn.disabled = out || c.money < SCOUT_FEE;
-    btn.addEventListener('click', () => {
-      if (sendScout(c, id)) { sfx.full(); ui.toast(`Your scout is off to ${R.name}`); saveProfile(profile); renderCareer(); }
-    });
-    row.append(im, txt, btn); box.append(row);
-  }
-  return box;
-}
 // the start of a season: your scouts' finds, yours to sign at a set price before the auction
 function careerScouts(c, body) {
   coachOnce('scoutSign', DEV.scoutSign);

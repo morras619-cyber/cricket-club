@@ -19,6 +19,7 @@ import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
 import { memOf } from './chirpfacts.js';
 import { fameAfter, startFame } from './merch.js';
 import { seasonGain } from './training.js';
+import { tierOf, pickTier, POT_RANGE, ACAD } from './academy.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -484,7 +485,7 @@ function aiMaxes(c, p) {
   return out;
 }
 export function startAuction(c) {
-  const pool = Object.values(c.players).filter(p => !p.team && !p.retired && !inTrial(p)).sort((a, b) => value(b) - value(a));
+  const pool = Object.values(c.players).filter(p => !p.team && !p.retired && !p.prospect && !inTrial(p)).sort((a, b) => value(b) - value(a));
   c.auction = { lots: pool.map(p => p.id), idx: 0, lot: null, results: [] };
   c.phase = 'auction';
   openLot(c);
@@ -844,7 +845,7 @@ export function recordPlayerMatch(c, summary) {
 }
 // ---------- the club office: the books, the sponsors, the board ----------
 // The books: every $M that comes in or goes out of the club is written down by season (office.led[season] = { in: {...}, out: {...} }).
-export const INCOME = { prizes: 'Prizes & season sponsor', wins: 'Win bonuses', tickets: 'Ticket money', sponsors: 'Sponsor deals', merch: 'Merchandise', board: 'Board bonus' };
+export const INCOME = { prizes: 'Prizes & board bonus', wins: 'Win bonuses', tickets: 'Ticket money', sponsors: 'Sponsor deals', merch: 'Merchandise', transfers: 'Players sold' };
 export const OUTGOING = { players: 'Players & scouts', buildings: 'Buildings & staff' };
 export const office = c => (c.office ||= { led: {}, deal: null, pend: 0, objective: null, board: [], log: [] });
 export function book(c, dir, cat, amount) {
@@ -905,13 +906,82 @@ export function settleObjective(c, pos) {
   const o = office(c), ob = o.objective;
   if (!ob) return [];
   const met = pos <= ob.target;
-  if (met) { c.money = round2(c.money + ob.reward); book(c, 'in', 'board', ob.reward); }
+  if (met) { c.money = round2(c.money + ob.reward); book(c, 'in', 'prizes', ob.reward); }
   o.board = [...(o.board || []), { season: ob.season, div: ob.div, target: ob.target, pos, met, reward: ob.reward }].slice(-6);
   o.objective = null;
   return [met ? `🏛️ The board is pleased: you finished ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}, inside their target of ${ob.target}. A bonus of ${money(ob.reward)}.` : `🏛️ The board wanted a top ${ob.target} finish. You came ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}: no bonus this year.`];
 }
 // who is on a short contract (seasons left; the soonest to go first)
 export const contractList = c => clubPlayers(c, c.club).filter(p => p.contract < 50).sort((a, b) => a.contract - b.contract || ovr(b) - ovr(a));
+
+// ---------- the youth academy (js/academy.js): prospects raised over several seasons ----------
+const REGION_ROLES = {
+  africa: [['bat', 'Raw batting talent'], ['bowl', 'Raw pace talent'], ['all', 'Raw all-round talent']],
+  europe: [['bowl', 'Accurate seam prospect'], ['bowl', 'Swing prospect'], ['bat', 'Correct young batter']],
+  namerica: [['bat', 'Power-hitting prospect'], ['bat', 'Six-hitting kid'], ['all', 'Big-hitting all-rounder']],
+  samerica: [['bat', 'Unorthodox young batter'], ['bowl', 'Mystery spin prospect'], ['all', 'Maverick all-rounder']],
+  oceania: [['bowl', 'Tearaway quick prospect'], ['bowl', 'Left-arm quick prospect'], ['all', 'Athletic all-rounder']],
+};
+// a scout comes home: a 15 to 17-year-old nobody has heard of (his ceiling is hidden until a trial drill)
+export function makeProspect(c, trip) {
+  const rng = makeRng(hashStr(`${c.seed}-acad-${trip.id}-${trip.region}-${c.season}`));
+  const R = SCOUT_REGIONS[trip.region] || SCOUT_REGIONS.africa;
+  const used = new Set(Object.values(c.players).map(p => p.name));
+  let name, nation;
+  do { nation = rng.pick(R.nations); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+  const [role, label] = rng.pick(REGION_ROLES[trip.region] || REGION_ROLES.africa);
+  const tier = pickTier(trip.hours, rng.next()), [lo, hi] = POT_RANGE[tier], pot = rng.int(lo, hi);
+  const spin = trip.region === 'samerica' && role !== 'bat';
+  const bowl = role === 'bat' ? null : spin ? rng.pick(['offspin', 'legspin']) : trip.region === 'oceania' ? rng.pick(['express', 'leftpace']) : rng.pick(['express', 'swing', 'seam', 'leftpace']);
+  const base = rng.int(25, 40);
+  const bat = role === 'bowl' ? rng.int(8, 20) : role === 'all' ? base - 4 : base;
+  const bowlSkill = bowl ? (role === 'all' ? base - 4 : base) : 0;
+  const id = `a${c.season}-${trip.id}`;
+  const w = rng.int(0, WEAK.length - 1);
+  const p = newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), role, label, bat, bowl, bowlSkill,
+    trait: `Academy prospect from ${R.name}`, hero: false,
+    ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
+  { age: rng.int(15, 17), pot, team: null, contract: 0, prospect: true, youth: true, app: randomLook(nation, rng) });
+  p.academy = { region: trip.region, season: c.season, tier };
+  c.players[id] = p;
+  return id;
+}
+// the off-season: each prospect grows faster than the squad's youngsters, and faster still beside a veteran who mentors him
+export function academySeason(c, rng) {
+  const a = c.academy;
+  if (!a) return;
+  for (const id of a.prospects) {
+    const p = c.players[id];
+    if (!p) continue;
+    const mentor = c.players[a.mentors[id]];
+    const mentored = mentor && mentor.team === c.club && !mentor.retired && mentor.age >= ACAD.MENTOR_AGE;
+    grow(c, p, rng.int(ACAD.GROW[0], ACAD.GROW[1]) + (mentored ? ACAD.MENTOR_GROW : 0));
+  }
+}
+export const prospectsOf = c => (c.academy?.prospects || []).map(id => c.players[id]).filter(Boolean);
+export const veteransOf = c => clubPlayers(c, c.club).filter(p => p.age >= ACAD.MENTOR_AGE && !p.heroId);
+export const academyPrice = p => Math.max(0.05, round2(value(p) * 0.5));
+// to the squad (he must be 18 and there must be a place) ...
+export function promoteProspect(c, id) {
+  const p = c.players[id], a = c.academy;
+  if (!p?.prospect || !a?.prospects.includes(id)) return { ok: false, why: 'He is not in the academy' };
+  if (p.age < ACAD.PLAY_AGE) return { ok: false, why: `He cannot play until he is ${ACAD.PLAY_AGE}` };
+  if (clubPlayers(c, c.club).length >= MAX_SQUAD) return { ok: false, why: `Your squad is full (${MAX_SQUAD})` };
+  p.prospect = false; p.youth = false; p.team = c.club; p.contract = 3;
+  a.prospects = a.prospects.filter(x => x !== id); delete a.drills[id]; delete a.mentors[id]; a.revealed[id] = true;
+  chirpSigned(c, p, 0, 'academy');
+  return { ok: true };
+}
+// ... or sold: he goes onto the market, and you get half his worth
+export function sellProspect(c, id) {
+  const p = c.players[id], a = c.academy;
+  if (!p?.prospect || !a?.prospects.includes(id)) return { ok: false, why: 'He is not in the academy' };
+  const price = academyPrice(p);
+  c.money = round2(c.money + price); book(c, 'in', 'transfers', price);
+  p.prospect = false; p.team = null;
+  a.prospects = a.prospects.filter(x => x !== id); delete a.drills[id]; delete a.mentors[id];
+  return { ok: true, price };
+}
 
 // ---------- a club's standing: which players will sign for it ----------
 // The best players only sign for clubs with the standing: none rated 80 or more for a Division 3 club, a few for Division 2 (up to 84), any for the top division.
@@ -1100,6 +1170,7 @@ export function nextSeason(c) {
     if (p.team && --p.contract <= 0) { if (mine) chirpLeft(c, p, 'contractEnd'); p.team = null; p.contract = 0; }
     p.form = 0;
   }
+  academySeason(c, rng);
   const kids = youthIntake(c, rng, 7);
   c.news.push(`🎓 ${kids.length} academy graduates join the auction`);
   c.season++;

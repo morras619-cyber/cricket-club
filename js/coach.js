@@ -177,10 +177,10 @@ export const DEV = {
     "Play your fixtures. The top four reach the semi-finals. Set your line-up in Squad.",
   ],
   scoutTip: [
-    "Tip: send scouts to other regions. They find players you can sign before the auction.",
+    "Tip: the Youth academy sends scouts abroad. They find players, and raw teenagers to raise.",
   ],
   scoutFound: [
-    "Your scout sent a report! Check Travelling scouts.",
+    "Your scout sent a report! It is waiting in the Youth academy.",
   ],
   scoutSign: [
     "Your scouts are back! Sign their finds first, before other clubs see them.",

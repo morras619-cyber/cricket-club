@@ -219,6 +219,36 @@ const cardOk = await page.evaluate(() => {
   } catch (e) { return String(e); }
 });
 check(cardOk === true, `the answer cards for a stand-in captain draw without an error (${cardOk})`);
+// the youth academy: from the settings (a practice club): send a scout, wait, a prospect arrives, a trial drill, the other tabs, no scrolling
+await page.evaluate(() => document.getElementById('setAcademy').click()); await page.waitForTimeout(1200);
+check(await page.evaluate(() => !document.getElementById('academy').hidden && document.querySelectorAll('#acadTabs .mf-tab').length === 4 && document.querySelectorAll('#acadBody .mf-card').length >= 3), 'the settings open the youth academy: four tabs, and places for prospects');
+const acFits = async () => page.evaluate(() => { const m = document.querySelector('#academy .mf'), b = document.getElementById('acadBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
+const acTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#acadTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(250); };
+check(await acFits(), 'the prospects tab fits the screen');
+await acTab('Trips');
+await page.evaluate(() => document.querySelector('#acadBody .mf-card.empty').click()); await page.waitForTimeout(250);
+check(await page.evaluate(() => !document.getElementById('acadSheet').hidden && document.querySelectorAll('#acadSheet .mf-big').length === 3), 'the trip sheet offers three lengths');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'academy-trip.png') });
+await page.evaluate(() => document.querySelector('#acadSheet .mf-big').click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => window.__sixcharge.demo.academy.trips.length === 1 && /back in/.test(document.getElementById('acadBody').textContent)) && await acFits(), 'a 12-hour trip is under way and shows its time left');
+await page.evaluate(() => [...document.querySelectorAll('#acadTest .chipbtn')].find(b => /12 hours/.test(b.textContent)).click()); await page.waitForTimeout(700);
+await acTab('Prospects');
+check(await page.evaluate(() => window.__sixcharge.demo.academy.prospects.length === 1 && document.querySelectorAll('#acadBody .mf-card.stack:not(.empty)').length === 1), 'twelve hours later the scout is back with a prospect');
+await page.evaluate(() => document.querySelector('#acadBody .mf-card.stack:not(.empty)').click()); await page.waitForTimeout(250);
+check(await page.evaluate(() => /not known yet/.test(document.getElementById('acadSheet').textContent) && /Trial drill/.test(document.getElementById('acadSheet').textContent)), 'the prospect sheet hides his ceiling until a trial drill');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'academy-prospect.png') });
+await page.evaluate(() => [...document.querySelectorAll('#acadSheet .mf-big')].find(b => /Trial drill/.test(b.textContent)).click()); await page.waitForTimeout(300);
+await page.evaluate(() => { document.getElementById('acadSheet').click(); });
+await page.evaluate(() => [...document.querySelectorAll('#acadTest .chipbtn')].find(b => /12 hours/.test(b.textContent)).click()); await page.waitForTimeout(700);
+check(await page.evaluate(() => { const a = window.__sixcharge.demo.academy; return a.revealed[a.prospects[0]] === true; }), 'six hours of drills later his tier is shown');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'academy-prospects.png') });
+await acTab('Seniors');
+check(await page.evaluate(() => document.querySelectorAll('#acadBody .mf-card.stack').length === 5) && await acFits(), 'the seniors tab has the five regions, and fits the screen');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'academy-seniors.png') });
+await acTab('Academy');
+check(await page.evaluate(() => /Academy level 1/.test(document.getElementById('acadBody').textContent)) && await acFits(), 'the academy tab shows its level, and fits');
+await page.evaluate(() => document.getElementById('acadBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the academy is the settings');
 // the settings' Club map level: cycle to level 3 and the map shows it (and level 2, to draw both)
 await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
 for (const want of [2, 3]) {

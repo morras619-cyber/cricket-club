@@ -891,7 +891,7 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 /* ---------- the new look (title-screen style) on every menu screen ----------
    One stadium-night picture behind, a comic title with an ink outline and a blue slash, yellow / blue buttons with a
    gold keyline (the PLAY button's), and panels framed in gold and ink. The hub and the in-match screens keep their own. */
-#settings, #shop, #pass, #league, #war, #career, #merch, #training, #office, #records, #daily, #trophies, #region, #pickteam, #makeclub, #squad, #stats {
+#settings, #shop, #pass, #league, #war, #career, #merch, #training, #office, #academy, #records, #daily, #trophies, #region, #pickteam, #makeclub, #squad, #stats {
   background: linear-gradient(rgba(2, 10, 56, .5), rgba(2, 10, 56, .28) 38%, rgba(2, 10, 56, .62)), #02103a url(../img/menu/screen-bg.webp) center top / cover no-repeat;
 }
 .screen-inner > .title, .leaguescreen .title { font-size: 42px; color: #ffe94d; font-style: normal; transform: skewX(-8deg) rotate(-1.5deg); -webkit-text-stroke: 0; letter-spacing: 1.5px;
@@ -1492,7 +1492,7 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .map-sheet .bigbtn { flex: none; width: auto; min-width: 96px; padding: 10px 18px; }
 
 /* the merchandise factory (js/merch.js): one screen, no scrolling: icon tabs, picture frames, bottom sheets */
-#merch, #training, #office { overflow: hidden; touch-action: manipulation; }
+#merch, #training, #office, #academy { overflow: hidden; touch-action: manipulation; }
 .mf { --fs: 54px; height: 100%; max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; padding: calc(10px + var(--safe-t)) 12px calc(10px + var(--safe-b)); position: relative; }
 @media (max-height: 720px) { .mf { --fs: 42px; gap: 6px; } }
 .mf .ico, .map-tabs .ico { display: inline-flex; flex: none; width: 22px; height: 22px; }
@@ -1612,3 +1612,11 @@ button.mf-card:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 va
 .mf-fin-v.in { color: #1e7a32; } .mf-fin-v.out { color: #9a2230; }
 .mf-bar.red i { background: linear-gradient(90deg, #d6283c, #ff7a85); }
 @media (max-height: 720px) { .mf-fin { padding: 3px 9px; } }
+
+/* the youth academy: a prospect's tier */
+.mf-card.stack small { font-size: 11px; font-weight: 800; line-height: 1; }
+.mf-card small.tier { padding: 1px 7px; border-radius: 8px; border: 1.5px solid var(--ink); }
+small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff; } small.tier.epic { background: #c79bff; } small.tier.super { background: linear-gradient(#ffe45c, #ffb800); } small.tier.unknown { background: #fff; }
+.mf-row span.tier { padding: 0 6px; border-radius: 7px; border: 1.5px solid var(--ink); }
+.mf-row span.tier.common { background: #d9d9d9; } .mf-row span.tier.rare { background: #7fc4ff; } .mf-row span.tier.epic { background: #c79bff; } .mf-row span.tier.super { background: linear-gradient(#ffe45c, #ffb800); }
+.mf-frame img { object-fit: cover; }
