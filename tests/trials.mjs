@@ -131,6 +131,14 @@ check(await page.evaluate(() => /ready/i.test(document.querySelector('.pacepanel
 await page.evaluate(async () => { const P = await import('/js/pacing.js'); const c = window.__sixcharge.profile.career; for (let i = 0; i < 3; i++) P.spend(c.pace, Date.now()); });
 await page.evaluate(() => document.querySelector('.playbtn').click()); await page.waitForTimeout(1500);
 check(await page.evaluate(() => document.getElementById('hud').hidden && /No match yet/.test(document.querySelector('.pacepanel')?.textContent || '')), 'with no match banked, Play does not start one and the meter shows the wait');
+// the testing switch: in the settings it turns the match limit off, and the same Play then starts a match
+await page.evaluate(() => document.getElementById('careerHome').click()); await page.waitForTimeout(900);
+await page.evaluate(() => document.getElementById('mapSettings').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => /ON/.test(document.getElementById('setTokens').textContent)), 'the match limit is on by default');
+await page.evaluate(() => document.getElementById('setTokens').click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => /OFF/.test(document.getElementById('setTokens').textContent) && localStorage.getItem('sixcharge.tokensOff') === '1'), 'the settings switch turns the match limit off');
+await page.evaluate(() => document.getElementById('settingsBack').click()); await page.waitForTimeout(900);
+check(await page.evaluate(() => /Match limit off/.test(document.getElementById('mapPace').textContent)), 'with the limit off, the map says so');
 await page.evaluate(() => document.getElementById('setClubMap').click()); await page.waitForTimeout(1500);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden && /Test view/.test(document.getElementById('mapSub').textContent)), 'the settings open the club map as a test view');
 // the settings' test of the merch factory: a practice club, time skipping, and back to the settings

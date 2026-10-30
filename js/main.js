@@ -322,6 +322,7 @@ function renderSettings() {
   state('setField', { key: 'Key moments', all: 'Every chance', off: 'Auto' }[game.settings.fielding], game.settings.fielding !== 'off');
   state('setUnits', units.speed === 'mph' ? 'mph' : 'km/h', true);
   $('setMapLevel').textContent = mapLevelText();
+  $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 2 hours)' : 'Match limit: OFF (play freely)';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });
@@ -331,6 +332,11 @@ $('setMapLevel').addEventListener('click', () => {
   mapLevel.v = (mapLevel.v + 1) % 4;
   try { localStorage.setItem('sixcharge.mapLevel', String(mapLevel.v)); } catch { /* private window: it lasts until you reload */ }
   sfx.click(); $('setMapLevel').textContent = mapLevelText();
+});
+$('setTokens').addEventListener('click', () => {
+  tokenSwitch.on = !tokenSwitch.on;
+  try { localStorage.setItem('sixcharge.tokensOff', tokenSwitch.on ? '0' : '1'); } catch { /* private window: it lasts until you reload */ }
+  sfx.click(); renderSettings();
 });
 $('setTrophies').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; renderTrophies(); });
 $('setStats').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; renderStats(); });
@@ -1195,6 +1201,7 @@ const pname = p => `${p.heroId ? '★ ' : p.ability ? '⭐ ' : ''}${flagName(p)}
 const fname = p => `${flag(p)} ${p.name}`.trim(); // flag and plain name, for lists
 // ---------- how fast a season can go (js/pacing.js): a league match costs a token; one comes every two real hours, three are kept ----------
 function fillPace(host, c) {
+  if (!tokenSwitch.on) { host.replaceChildren(ico('ball', 'on'), el('span', 'pace-txt', 'Match limit off (testing)')); return; }
   const ready = clock.state === 'ok' || clock.state === 'local';
   if (!c.pace) { if (!ready) { host.replaceChildren(el('span', 'pace-txt', 'Checking the time…')); return; } c.pace = PC.freshPace(serverNow()); saveProfile(profile); }
   if (ready) PC.refill(c.pace, serverNow(), clock.state === 'ok');
@@ -1203,8 +1210,11 @@ function fillPace(host, c) {
   for (let i = 0; i < PC.PACE.BANK; i++) host.append(ico('ball', i < p.tokens ? 'on' : ''));
   host.append(el('span', 'pace-txt', p.tokens >= PC.PACE.BANK ? 'Matches ready' : `${p.tokens ? `${p.tokens} ready · ` : 'No match yet · '}next in ${PC.fmtWait(PC.nextIn(p, serverNow()))}`));
 }
+// (testing only: the settings' switch for the match meter; off, every match is free. Kept on this device, not in the saved game.)
+const tokenSwitch = { on: (() => { try { return localStorage.getItem('sixcharge.tokensOff') !== '1'; } catch { return true; } })() };
 // start your next league (or play-off) match: it costs a token
 async function takeMatch(c) {
+  if (!tokenSwitch.on) return true;
   await syncClock();
   if (!c.pace) c.pace = PC.freshPace(clock.state === 'offline' ? Date.now() : serverNow());
   const p = c.pace, offline = clock.state === 'offline', now = offline ? p.at : serverNow();   // (no server time: only what is banked can be used)
