@@ -1868,16 +1868,15 @@ function paintAcademy(c) {
       col.append(sg);
     }
     const note2 = el('div', 'mf-card'); note2.append(ico('warn'), el('span', 'mf-row', `A senior scout works a whole season (${money(SCOUT_FEE)}) and finds up to 3 ready players. You sign them before next season's auction.`)); col.append(note2);
-    const grid = el('div', 'mf-grid');
     for (const [id, R] of Object.entries(SCOUT_REGIONS)) {
-      const out = scoutOut(c, id), finds = out ? c.scouting[id].finds.length : 0, card = el('div', 'mf-card stack');
+      const out = scoutOut(c, id), finds = out ? c.scouting[id].finds.length : 0, card = el('div', 'mf-card compact'), info = el('div', 'mf-info');
       const im = document.createElement('img'); im.src = `img/region/card-${id}.webp`; im.alt = '';
       const go = mfBtn('chipbtn', [el('span', '', out ? `${finds}/3 found` : `Send · ${money(SCOUT_FEE)}`)], () => { if (sendScout(c, id)) { sfx.full(); ui.toast(`Your scout is off to ${R.name}`); done({ ok: true }); } else ui.toast(c.phase !== 'season' ? 'Scouts can only be sent during a season' : 'Not enough money'); });
       go.disabled = out || c.money < SCOUT_FEE;
-      card.append(frameOf(im), el('b', '', R.name), el('small', '', R.tag), go);
-      grid.append(card);
+      info.append(el('b', '', R.name), el('small', '', R.tag));
+      card.append(frameOf(im), info, go);
+      col.append(card);
     }
-    col.append(grid);
     body.append(col);
   } else {
     const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');

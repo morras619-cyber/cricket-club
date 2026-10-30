@@ -243,7 +243,7 @@ await page.evaluate(() => [...document.querySelectorAll('#acadTest .chipbtn')].f
 check(await page.evaluate(() => { const a = window.__sixcharge.demo.academy; return a.revealed[a.prospects[0]] === true; }), 'six hours of drills later his tier is shown');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'academy-prospects.png') });
 await acTab('Seniors');
-check(await page.evaluate(() => document.querySelectorAll('#acadBody .mf-card.stack').length === 5) && await acFits(), 'the seniors tab has the five regions, and fits the screen');
+check(await page.evaluate(() => document.querySelectorAll('#acadBody .mf-card .chipbtn').length === 5) && await acFits(), 'the seniors tab has the five regions, and fits the screen');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'academy-seniors.png') });
 await acTab('Academy');
 check(await page.evaluate(() => /Academy level 1/.test(document.getElementById('acadBody').textContent)) && await acFits(), 'the academy tab shows its level, and fits');

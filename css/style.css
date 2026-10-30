@@ -1620,3 +1620,6 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mf-row span.tier { padding: 0 6px; border-radius: 7px; border: 1.5px solid var(--ink); }
 .mf-row span.tier.common { background: #d9d9d9; } .mf-row span.tier.rare { background: #7fc4ff; } .mf-row span.tier.epic { background: #c79bff; } .mf-row span.tier.super { background: linear-gradient(#ffe45c, #ffb800); }
 .mf-frame img { object-fit: cover; }
+
+.mf-card.compact { --fs: 40px; padding: 4px 8px; }
+.mf-card.compact .mf-info small { font-size: 11px; font-weight: 700; opacity: .75; }
