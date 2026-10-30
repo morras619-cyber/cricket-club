@@ -12,8 +12,10 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
+import { setStartEnergy } from './match.js';
+import * as MD from './stamina.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
 import { randomSeed } from './rng.js';
@@ -829,6 +831,7 @@ async function startMatch(opts) {
   crowdMute.on = !!opts.trial;   // (the nets have no crowd)
   startAmbience();
   let summary;
+  setStartEnergy(mode === 'career' && profile.career.medical ? startEnergies(profile.career) : {});   // (the medical centre: your players start the match on their fitness)
   try {
     summary = await game.runMatch({
       mode, story: !!opts.story, opening: !!opts.opening, trial: opts.trial ? { bats: opts.trial.bats.map(id => profile.career.players[id]).map(enginePlayer), bowls: opts.trial.bowls.map(id => profile.career.players[id]).map(enginePlayer) } : null, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
@@ -840,6 +843,7 @@ async function startMatch(opts) {
     showMatchError(e, game.loopError);
     return;
   } finally {
+    setStartEnergy({});
     game.matchActive = false;
     stopAmbience(); crowdStop(); game.crowdLive = false;
     crowdMute.on = false;
@@ -1226,6 +1230,7 @@ async function takeMatch(c) {
 }
 async function playLeagueMatch(c) {
   if (!(await takeMatch(c))) { renderCareer(); return; }
+  if (c.medical && (clock.state === 'ok' || clock.state === 'local')) medTickC(c);   // (the players' fitness is up to date when the match starts)
   startMatch({ mode: 'career' });
 }
 
@@ -1240,7 +1245,7 @@ const BUILDINGS = {
   academy: { name: 'Youth academy', desc: 'Scouts and young prospects', open: () => renderAcademy(false) },
   shop: { name: 'Club shop', desc: 'Kits and extras', open: () => { shopFrom = null; renderShop(); } },
   apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
-  medical: { name: 'Medical centre', desc: 'Coming soon', soon: true },
+  medical: { name: 'Medical centre', desc: 'Fitness, beds and physios', open: () => renderMedical(false) },
   clubhouse: { name: 'Clubhouse', desc: 'Coming soon', soon: true },
   merch: { name: 'Merchandise factory', desc: 'Make jerseys the fans want', open: () => renderMerch(false) },
 };
@@ -1274,7 +1279,7 @@ function renderClubMap(test = false) {
   clearInterval(mapPaceTimer); mapPaceTimer = setInterval(() => { if ($('clubmap').hidden) { clearInterval(mapPaceTimer); return; } fillPace($('mapPace'), c); }, 30000);
   $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
   const info = () => {
-    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE), merch: (c.merch?.till || 0) >= 100 };   // (a red dot: something to do there)
+    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE), medical: !!c.medical && (Object.keys(c.medical.knocked).length > 0 || Object.values(c.medical.fit).some(f => f < 50)), merch: (c.merch?.till || 0) >= 100 };   // (a red dot: something to do there)
     clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
   };
   info();
@@ -1943,6 +1948,164 @@ function paintAcademy(c) {
   sh.replaceChildren(card);
 }
 $('setAcademy').addEventListener('click', () => { unlockAudio(); sfx.click(); renderAcademy(true); });
+
+// ---------- the medical centre (js/stamina.js): fitness between matches, beds, physios ----------
+let medTab = 'squad', medSheet = null, medTimer = 0, medReport = null, medTest = false;
+const medCtx = c => ({ now: serverNow(), trusted: clock.state === 'ok', bank: merchBank(c), has: id => c.players[id]?.team === c.club, nameOf: id => c.players[id]?.name });
+function medTickC(c) {
+  if (!c.medical || clock.state === 'none' || clock.state === 'offline') return null;
+  const r = MD.medTick(c.medical, medCtx(c));
+  saveProfile(profile);
+  return r;
+}
+async function renderMedical(test = false) {
+  medTest = test;
+  const c = test ? demoCareer() : career();
+  ui.show('medical');
+  $('medBack').onclick = () => { clearInterval(medTimer); medTimer = 0; medSheet = null; sfx.click(); if (medTest) renderSettings(); else if (fromMap) renderClubMap(); else renderCareer(); };
+  $('medBody').replaceChildren(el('p', 'mf-empty', 'Checking the time with the server…'));
+  $('medSheet').hidden = true;
+  await syncClock();
+  if (clock.state === 'offline') {
+    const e = el('div', 'mf-empty'); e.append(ico('clock'), el('span', '', 'Cannot reach the server. The medical centre waits until it can check the time. Try again when you are online.'));
+    $('medBody').replaceChildren(e);
+    return;
+  }
+  if (!c.medical) c.medical = MD.freshMedical();
+  medReport = medTickC(c);
+  paintMedical(c);
+  clearInterval(medTimer);
+  medTimer = setInterval(() => { if ($('medical').hidden) { clearInterval(medTimer); medTimer = 0; return; } medReport = medTickC(c) || medReport; paintMedical(c); }, 15000);
+}
+const fitColour = f => (f >= 70 ? 'green' : f >= 40 ? 'amber' : 'red');
+function paintMedical(c) {
+  const m = c.medical, L = MD.MED.LEVELS[m.level], club = teamById(c.club), squad = clubPlayers(c, c.club), ctx = () => medCtx(c);
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) medSheet = null; } saveProfile(profile); medTickC(c); paintMedical(c); };
+  $('medLede').textContent = medTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
+  $('medLvl').replaceChildren(ico('factory'), el('span', '', `LV ${m.level}`));
+  const avg = squad.length ? Math.round(squad.reduce((a, p) => a + MD.fitOf(m, p.id), 0) / squad.length) : 100, hurt = squad.filter(p => MD.isKnocked(m, p.id)).length;
+  const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
+  $('medStats').replaceChildren(stat('heart', 'gold', `${avg}`, 'squad fitness'), stat('warn', 'red', `${hurt}`, 'with a knock'), stat('coin', 'blue', kfmt(MD.medWagePerDay(m)), 'wages a day'));
+  const tb = $('medTest'); tb.hidden = !medTest;
+  if (medTest) {
+    const chip = (label, fn) => mfBtn('chipbtn', [el('span', '', label)], () => { fn(); sfx.click(); saveProfile(profile); medReport = medTickC(c) || medReport; paintMedical(c); });
+    tb.replaceChildren(el('b', '', 'TEST'), chip('+1 hour', () => MD.medSkip(m, 3600000)), chip('+10 hours', () => MD.medSkip(m, 10 * 3600000)), chip('+$1M', () => { c.money += 1; }),
+      chip('Play a match', () => { const list = squad.slice(0, 7).map(p => ({ id: p.id, start: MD.fitOf(m, p.id), drain: 45 })); const hurtIds = MD.medAfterMatch(m, list, Math.random); if (hurtIds.length) ui.toast(`${c.players[hurtIds[0]].name} picked up a knock`); }));
+  }
+  const note = $('medNote'), bad = m.unpaidMs > 0 || medReport?.tampered;
+  const msg = m.unpaidMs > 0 ? 'The wages cannot be paid: the beds have stopped working.' : medReport?.tampered ? 'The books did not add up, so the fund was emptied.' : medReport?.healed > 0 ? 'A knock has healed.' : medReport?.gained > 20 && medReport.away > 2 * 60000 ? `Away: your players got ${medReport.gained} fitness points back.` : '';
+  note.hidden = !msg; note.className = `mf-note${bad ? ' bad' : ''}`; note.replaceChildren(...(msg ? [ico(bad ? 'warn' : 'up'), el('span', '', msg)] : []));
+  const canUp = MD.medNextUpgrade(m) && c.money >= MD.medNextUpgrade(m).up, inBed = m.beds.filter(Boolean).length;
+  const tabs = [['squad', 'users', 'Squad', hurt], ['beds', 'heart', 'Beds', 0], ['staff', 'star', 'Staff', m.physios.length ? 0 : '!'], ['centre', 'factory', 'Centre', canUp ? '!' : 0]];
+  $('medTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${medTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { medTab = id; medSheet = null; sfx.click(); paintMedical(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
+  const body = $('medBody');
+  body.replaceChildren();
+  const hoursToFull = id => { const sp = MD.bedSpeed(m), need = MD.fitCap(m, id) - MD.fitOf(m, id); return sp ? need / (MD.MED.BED * sp) * 3600000 : need / MD.MED.REST * 3600000; };
+  const bar = id => { const f = MD.fitOf(m, id), b = el('div', `mf-bar ${fitColour(f)}`), i = el('i'); i.style.width = `${Math.max(3, Math.round(f))}%`; b.append(i); return b; };
+  if (medTab === 'squad') {
+    const grid = el('div', 'mf-grid'), list = [...squad].sort((a, b) => MD.fitOf(m, a.id) - MD.fitOf(m, b.id)).slice(0, 6);
+    for (const p of list) {
+      const f = Math.round(MD.fitOf(m, p.id)), kn = MD.isKnocked(m, p.id), bed = m.beds.includes(p.id), card = el('button', 'mf-card stack'), r = el('div', 'mf-row');
+      r.append(ico(kn ? 'warn' : 'heart'), el('span', '', `${f}`), el('span', kn ? 'knock' : '', kn ? 'knock' : bed ? 'in bed' : f >= 100 ? 'fit' : ''));
+      card.append(frameOf(playerFace(p, 64)), el('b', '', lastName(p.name)), bar(p.id), r);
+      card.addEventListener('click', () => { medSheet = { type: 'player', id: p.id }; sfx.click(); paintMedical(c); });
+      grid.append(card);
+    }
+    body.append(grid);
+    const foot = el('div', 'mf-card'); foot.append(ico('warn'), el('span', 'mf-row', 'Your most tired players. Anyone under 40 fitness who plays risks a knock. Fitness is how fresh he starts the next match.')); body.append(foot);
+  } else if (medTab === 'beds') {
+    const grid = el('div', 'mf-grid'), work = new Set(MD.workingBeds(m));
+    m.beds.forEach((id, i) => {
+      if (!id) {
+        const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Free bed'));
+        card.addEventListener('click', () => { medSheet = { type: 'pick', index: i }; sfx.click(); paintMedical(c); });
+        grid.append(card); return;
+      }
+      const p = c.players[id], card = el('button', 'mf-card stack'), r = el('div', `mf-row ${work.has(i) ? 'ok' : 'no'}`);
+      r.append(ico(work.has(i) ? 'clock' : 'warn'), el('span', '', work.has(i) ? `${durfmt(hoursToFull(id))} to go` : 'no physio free'));
+      card.append(frameOf(playerFace(p, 64)), el('b', '', lastName(p.name)), bar(id), r);
+      card.addEventListener('click', () => { medSheet = { type: 'player', id }; sfx.click(); paintMedical(c); });
+      grid.append(card);
+    });
+    body.append(grid);
+    const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${inBed} of ${m.beds.length} beds in use. Each physio looks after two beds, so ${m.physios.length} physio${m.physios.length === 1 ? '' : 's'} can treat ${m.physios.length * 2}. A bed heals 4 times as fast as resting.`)); body.append(foot);
+  } else if (medTab === 'staff') {
+    const grid = el('div', 'mf-grid three');
+    for (const ph of m.physios) {
+      const card = el('button', 'mf-card stack'), r = el('div', 'mf-row'); r.append(ico('heart'), el('span', 'mf-stars', '★'.repeat(ph.lvl)));
+      card.append(frameOf(staffFace({ id: `phys-${ph.id}`, name: ph.name }, club, 64)), el('b', '', ph.name.replace('Dr ', '')), el('small', '', 'Physio'), r);
+      card.addEventListener('click', () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); });
+      grid.append(card);
+    }
+    for (let i = m.physios.length; i < L.physios; i++) {
+      const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Hire a physio'));
+      card.addEventListener('click', () => done(MD.hirePhysio(m)));
+      grid.append(card);
+    }
+    body.append(grid);
+    const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${m.physios.length} of ${L.physios} physios · ${kfmt(MD.medWagePerDay(m))} a day. Without a physio the beds do nothing.`)); body.append(foot);
+  } else {
+    const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
+    hd.append(ico('factory'), el('b', '', `Medical centre level ${m.level}`), el('span', 'mf-stars', '★'.repeat(m.level)));
+    card.append(hd);
+    const pips = (name, have, max) => { const d = el('div', 'mf-pips'); for (let i = 0; i < max; i++) d.append(ico(name, i < have ? 'on' : '')); return d; };
+    const r1 = el('div', 'mf-row'); r1.append(ico('heart'), el('span', '', 'Beds'), pips('heart', inBed, L.beds));
+    const r2 = el('div', 'mf-row'); r2.append(ico('star'), el('span', '', 'Physios'), pips('star', m.physios.length, L.physios));
+    const r3 = el('div', 'mf-row'); r3.append(ico('warn'), el('span', '', `A knock is ${Math.round(L.prevent * 100)}% as likely as at level 1`));
+    card.append(r1, r2, r3);
+    const up = MD.medNextUpgrade(m);
+    if (up) { const ub = mfBtn('mf-big', [ico('up'), el('span', '', `Upgrade · ${money(up.up)}`)], () => done(MD.medUpgrade(m, ctx()))); ub.disabled = c.money < up.up; card.append(ub); }
+    else card.append(el('p', 'sheetnote', 'The best medical centre there is.'));
+    col.append(card);
+    if (m.log.length) { const nw = el('div', 'mf-card'); nw.append(ico('check'), el('span', 'mf-row', m.log[m.log.length - 1].text)); col.append(nw); }
+    body.append(col);
+  }
+  const sh = $('medSheet');
+  sh.hidden = !medSheet;
+  if (!medSheet) return;
+  sh.onclick = e => { if (e.target === sh) { medSheet = null; paintMedical(c); } };
+  const card = el('div', 'mf-sheet-card');
+  const close = mfBtn('mf-x', [ico('cross')], () => { medSheet = null; sfx.click(); paintMedical(c); });
+  if (medSheet.type === 'player') {
+    const p = c.players[medSheet.id];
+    if (!p || p.team !== c.club) { medSheet = null; sh.hidden = true; return; }
+    const f = Math.round(MD.fitOf(m, p.id)), kn = MD.isKnocked(m, p.id), idx = m.beds.indexOf(p.id), hd = el('div', 'mf-sheet-head');
+    hd.append(frameOf(playerFace(p, 96), true), el('b', '', p.name), close);
+    const r = el('div', 'mf-row'); r.append(ico('heart'), el('span', '', `fitness ${f}`), ico(kn ? 'warn' : 'check'), el('span', kn ? 'knock' : '', kn ? `knock: stuck at ${MD.MED.KNOCK_CAP} until treated` : f < MD.MED.RISK_BELOW ? 'he would risk a knock' : 'no knock'));
+    card.append(hd, r);
+    if (idx >= 0) card.append(mfBtn('mf-big red', [ico('cross'), el('span', '', 'Out of bed')], () => done(MD.leaveBed(m, idx), true)));
+    else {
+      const free = m.beds.findIndex(b => !b), b = mfBtn('mf-big', [ico('heart'), el('span', '', free < 0 ? 'No free bed' : 'Put in a bed')], () => done(MD.putInBed(m, free, p.id, ctx()), true));
+      b.disabled = free < 0 || (f >= 100 && !kn);
+      card.append(b);
+    }
+  } else if (medSheet.type === 'pick') {
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('heart'), el('b', '', 'Who needs a bed?'), close);
+    const grid = el('div', 'mf-grid'); grid.style.cssText = 'grid-auto-rows: auto';
+    const list = squad.filter(p => !m.beds.includes(p.id) && (MD.fitOf(m, p.id) < 100 || MD.isKnocked(m, p.id))).sort((a, b) => MD.fitOf(m, a.id) - MD.fitOf(m, b.id)).slice(0, 6);
+    for (const p of list) {
+      const b = el('button', 'mf-card'), info = el('div', 'mf-info'), r = el('div', 'mf-row');
+      r.append(ico(MD.isKnocked(m, p.id) ? 'warn' : 'heart'), el('span', '', `${Math.round(MD.fitOf(m, p.id))}`));
+      info.append(el('b', '', lastName(p.name)), r);
+      b.append(frameOf(playerFace(p, 64)), info);
+      b.addEventListener('click', () => done(MD.putInBed(m, medSheet.index, p.id, ctx()), true));
+      grid.append(b);
+    }
+    card.append(hd, grid);
+    if (!list.length) card.append(el('p', 'sheetnote', 'Everyone is fully fit.'));
+  } else if (medSheet.type === 'physio') {
+    const ph = m.physios.find(x => x.id === medSheet.id);
+    if (!ph) { medSheet = null; sh.hidden = true; return; }
+    const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(staffFace({ id: `phys-${ph.id}`, name: ph.name }, club, 96), true), el('b', '', `${ph.name} · Physio`), close);
+    const info = el('div', 'mf-row'); info.append(el('span', 'mf-stars', '★'.repeat(ph.lvl)), ico('coin'), el('span', '', `${kfmt(MD.MED.WAGE * (1 + 0.25 * (ph.lvl - 1)))} a day`));
+    const maxed = ph.lvl >= MD.physioMax(m);
+    const tr = mfBtn('mf-big alt', [ico('up'), el('span', '', maxed ? 'Best for now' : `Train · ${kfmt(MD.physioTrainCost(ph))}`)], () => done(MD.trainPhysio(m, ph.id, ctx())));
+    tr.disabled = maxed;
+    card.append(hd, info, tr, mfBtn('mf-big red', [ico('cross'), el('span', '', 'Let go')], () => done(MD.firePhysio(m, ph.id), true)));
+  } else { medSheet = null; sh.hidden = true; return; }
+  sh.replaceChildren(card);
+}
+$('setMedical').addEventListener('click', () => { unlockAudio(); sfx.click(); renderMedical(true); });
 
 function renderCareer(notes = careerNotes) {
   const c = career();

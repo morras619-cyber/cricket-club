@@ -249,6 +249,29 @@ await acTab('Academy');
 check(await page.evaluate(() => /Academy level 1/.test(document.getElementById('acadBody').textContent)) && await acFits(), 'the academy tab shows its level, and fits');
 await page.evaluate(() => document.getElementById('acadBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the academy is the settings');
+// the medical centre: from the settings (a practice club): a match tires the squad, a physio and a bed bring a player back, no scrolling
+await page.evaluate(() => document.getElementById('setMedical').click()); await page.waitForTimeout(1200);
+check(await page.evaluate(() => !document.getElementById('medical').hidden && document.querySelectorAll('#medTabs .mf-tab').length === 4 && document.querySelectorAll('#medBody .mf-card.stack').length === 6), 'the settings open the medical centre: four tabs and the six most tired players');
+const mdFits = async () => page.evaluate(() => { const m = document.querySelector('#medical .mf'), b = document.getElementById('medBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
+const mdTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#medTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(250); };
+check(await mdFits(), 'the squad tab fits the screen');
+await page.evaluate(() => [...document.querySelectorAll('#medTest .chipbtn')].find(b => /Play a match/.test(b.textContent)).click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => { const m = window.__sixcharge.demo.medical; return Object.values(m.fit).filter(f => f < 100).length === 7 && Math.min(...Object.values(m.fit)) <= 73; }), 'a match tires seven players');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'medical-squad.png') });
+await mdTab('Staff');
+await page.evaluate(() => document.querySelector('#medBody .mf-card.empty').click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => window.__sixcharge.demo.medical.physios.length === 1 && document.querySelectorAll('#medBody .mf-card .mf-frame canvas').length === 1) && await mdFits(), 'a physio is hired, with a picture in a frame');
+await mdTab('Beds');
+await page.evaluate(() => document.querySelector('#medBody .mf-card.empty').click()); await page.waitForTimeout(250);
+await page.evaluate(() => document.querySelector('#medSheet .mf-card').click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => window.__sixcharge.demo.medical.beds.filter(Boolean).length === 1 && /to go/.test(document.getElementById('medBody').textContent)) && await mdFits(), 'a tired player is put in a bed and the time to full shows');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'medical-beds.png') });
+await page.evaluate(() => [...document.querySelectorAll('#medTest .chipbtn')].find(b => /10 hours/.test(b.textContent)).click()); await page.waitForTimeout(700);
+check(await page.evaluate(() => { const m = window.__sixcharge.demo.medical; return m.beds.filter(Boolean).length === 0; }), 'ten hours later the player in the bed is fit again and has left it');
+await mdTab('Centre');
+check(await page.evaluate(() => /Medical centre level 1/.test(document.getElementById('medBody').textContent)) && await mdFits(), 'the centre tab shows the level, and fits');
+await page.evaluate(() => document.getElementById('medBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the medical centre is the settings');
 // the settings' Club map level: cycle to level 3 and the map shows it (and level 2, to draw both)
 await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
 for (const want of [2, 3]) {

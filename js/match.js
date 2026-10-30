@@ -4,6 +4,10 @@ import { FULL, batDrain, bowlDrain } from './stamina.js';
 const freshStint = (p = null) => ({ id: p?.id || null, name: p?.name || null, nation: p?.nation || null, runs: 0, balls: 0, fours: 0, sixes: 0 });
 const freshFig = p => ({ id: p.id, name: p.name, nation: p.nation || null, short: p.short || p.name.split(' ').slice(-1)[0], type: p.bowl || null, balls: 0, runs: 0, wkts: 0, dots: 0 });
 
+// Where a player starts the match: FULL, unless the career says he is not fit (the medical centre: stamina.js). Set before the match, cleared after.
+const START = {};
+export function setStartEnergy(map) { for (const k of Object.keys(START)) delete START[k]; Object.assign(START, map || {}); }
+
 export const oversText = balls => `${Math.floor(balls / 6)}.${balls % 6}`;
 
 export class Innings {
@@ -37,7 +41,7 @@ export class Innings {
     this.detail = [];
   }
 
-  energyOf(id) { return id && this.energy[id] != null ? this.energy[id] : FULL; }
+  energyOf(id) { return id && this.energy[id] != null ? this.energy[id] : (id && START[id]) ?? FULL; }
   tire(id, amount) { if (id) this.energy[id] = Math.max(0, Math.min(FULL, this.energyOf(id) - amount)); }
   // one ball bowled: the man on strike and the bowler tire (or rest) by what happened; the rest of the attack rests a little
   tireBall({ runs = 0, extra = false, missed = false, batter = true }) {

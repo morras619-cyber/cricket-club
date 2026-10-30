@@ -20,6 +20,7 @@ import { memOf } from './chirpfacts.js';
 import { fameAfter, startFame } from './merch.js';
 import { seasonGain } from './training.js';
 import { tierOf, pickTier, POT_RANGE, ACAD } from './academy.js';
+import { freshMedical, medAfterMatch, fitOf } from './stamina.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -836,6 +837,14 @@ export function recordPlayerMatch(c, summary) {
     ids.push(...bat.keys(), ...bowl.keys());
   }
   played(c, ids);
+  // the medical centre: each of my players who played loses fitness by the stamina he used (he started the match on his fitness)
+  const used = new Map();
+  for (const inn of summary.innings) for (const [id, e] of Object.entries(inn.energy || {})) if (c.players[id]?.team === c.club) used.set(id, (used.get(id) || 0) + Math.max(0, fitnessOf(c, id) - e));
+  if (used.size) {
+    const m = (c.medical ||= freshMedical()), rng = makeRng(hashStr(`${c.seed}-knock-${c.season}-${m.matches}`));
+    const hurt = medAfterMatch(m, [...used].map(([id, drain]) => ({ id, start: fitnessOf(c, id), drain })), () => rng.next());
+    for (const id of hurt) c.news.push(`🩹 ${c.players[id].name} picked up a knock: his fitness will stay at 50 until he is treated`);
+  }
   const sixes = [...perf].reduce((n, [id, x]) => n + (c.players[id]?.team === c.club ? (x.bat?.sixes || 0) : 0), 0);
   const dealNotes = officeMatch(c, { won: summary.result.outcome === 'win', sixes });
   for (const p of clubPlayers(c, c.club)) p.fame = fameAfter(fameOf(p), perf.get(p.id), summary.result.outcome === 'win');   // the fans' love, for the jerseys (js/merch.js)
@@ -992,6 +1001,10 @@ export function repBlock(c, p) {
   const cap = repCap(c);
   return ovr(p) > cap ? `Players rated ${cap + 1} or more will not sign for a ${divisionName(divisionOf(c, c.club))} club` : null;
 }
+
+// ---------- the medical centre's view of the club (js/stamina.js) ----------
+export const fitnessOf = (c, id) => fitOf(c.medical, id);
+export const startEnergies = c => Object.fromEntries(clubPlayers(c, c.club).map(p => [p.id, fitnessOf(c, p.id)]).filter(([, f]) => f < 100));
 
 // ---------- the training ground's view of the club (js/training.js) ----------
 // the coaches a player can learn from: batters from a batting coach, bowlers from a pace or a spin coach, all-rounders from either
