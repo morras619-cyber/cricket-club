@@ -133,6 +133,9 @@ export const DEV = {
   trialsDone: [
     "That's a club, beta! No money for the auction yet, so just watch the big clubs buy.",
   ],
+  clubMap: [
+    "Your club, beta. Drag to look around. Tap a building to open it.",
+  ],
   stadium: [
     "Your ground. Home matches bring ticket money. Save up to build it bigger.",
   ],

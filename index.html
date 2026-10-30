@@ -237,6 +237,19 @@ vs a random team</small></button>
     </div>
   </section>
 
+  <section id="clubmap" class="screen" hidden>
+    <canvas id="mapCanvas" aria-label="Your club: drag to look around, tap a building"></canvas>
+    <div class="map-top">
+      <button class="pt-back" id="mapBack" aria-label="Back">‹</button>
+      <div class="map-title"><b id="mapClub"></b><small id="mapSub"></small></div>
+      <button class="coachbtn" id="mapCoach" aria-label="Ask Uncle Dev"><img src="img/menu/coach-dev.webp" alt=""></button>
+    </div>
+    <div class="map-sheet" id="mapSheet" hidden>
+      <div class="map-sheet-txt"><b id="mapName"></b><small id="mapDesc"></small></div>
+      <button class="bigbtn primary" id="mapOpen">Open</button>
+    </div>
+  </section>
+
   <section id="records" class="screen" hidden>
     <div class="screen-inner wide">
       <h2 class="title">League records</h2>

@@ -29,6 +29,7 @@ import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
+import { createClubMap } from './clubmap.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 import { taunt } from './story.js';
 import { playComic, preloadComic, titleCard, NIGHT, EXIT } from './comic.js';
@@ -371,7 +372,7 @@ function renderShop() {
   });
 }
 for (const id of ['btnShop', 'coinPill', 'gemPill']) $(id).addEventListener('click', () => { unlockAudio(); renderShop(); });
-$('shopBack').addEventListener('click', () => renderHome());
+$('shopBack').addEventListener('click', () => { if (fromMap) renderClubMap(); else renderHome(); });
 
 // ---------- season pass ----------
 function renderPass() {
@@ -1175,6 +1176,48 @@ function syncMine(c) { const m = c?.custom || null; if (m !== mineOf) { mineOf =
 const stars = n => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
 const pname = p => `${p.heroId ? '★ ' : p.ability ? '⭐ ' : ''}${flagName(p)}`;
 const fname = p => `${flag(p)} ${p.name}`.trim(); // flag and plain name, for lists
+// ---------- the club map (js/clubmap.js): the hub of the career ----------
+let fromMap = false;
+const mapReady = c => !!c.club && c.phase !== 'pick' && c.phase !== 'trials';
+// what each building opens (the ones that wait for their own features say so)
+const BUILDINGS = {
+  stadium: { name: 'Stadium', desc: 'Play matches, tickets and ground upgrades', open: () => { careerView = 'hub'; renderCareer(); } },
+  training: { name: 'Training ground', desc: 'Your squad and line-up', open: () => { careerView = 'squad'; renderCareer(); } },
+  office: { name: 'Club office', desc: 'Records and results', open: () => renderRecords() },
+  academy: { name: 'Youth academy', desc: 'Send scouts, sign new players', open: () => { careerView = career().phase === 'scouts' ? 'hub' : 'scouts'; renderCareer(); } },
+  shop: { name: 'Club shop', desc: 'Kits and extras', open: () => renderShop() },
+  apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
+  medical: { name: 'Medical centre', desc: 'Coming soon', soon: true },
+  clubhouse: { name: 'Clubhouse', desc: 'Coming soon', soon: true },
+};
+let mapPick = null;
+const clubMap = createClubMap($('mapCanvas'), {
+  onSelect: id => {
+    mapPick = id;
+    $('mapSheet').hidden = !id;
+    if (!id) return;
+    const b = BUILDINGS[id];
+    $('mapName').textContent = b.name; $('mapDesc').textContent = b.desc;
+    $('mapOpen').hidden = !!b.soon;
+    sfx.click();
+  },
+});
+function renderClubMap() {
+  const c = career(), club = teamById(c.club);
+  careerView = 'hub'; fromMap = false;
+  ui.show('clubmap');
+  $('mapSheet').hidden = true; mapPick = null;
+  $('mapClub').textContent = club.name;
+  $('mapSub').textContent = `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
+  const act = { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' };
+  clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
+  clubMap.open(club);
+  coachOnce('clubMap', DEV.clubMap);
+}
+$('mapBack').addEventListener('click', () => { sfx.click(); clubMap.close(); renderHome(); });
+$('mapCoach').addEventListener('click', () => coachSay(DEV.clubMap));
+$('mapOpen').addEventListener('click', () => { const b = BUILDINGS[mapPick]; if (!b || b.soon) return; sfx.click(); clubMap.close(); fromMap = true; b.open(); });
+
 function renderCareer(notes = careerNotes) {
   const c = career();
   careerNotes = [];
@@ -1193,6 +1236,7 @@ function renderCareer(notes = careerNotes) {
   body.innerHTML = '';
   for (const n of notes) body.append(el('div', 'panel paper notecard', n));
   if (careerView === 'squad' && club) return careerSquad(c, body);
+  if (careerView === 'scouts' && club) { body.append(scoutsPanel(c)); return; }
   careerView = 'hub';
   if (c.news?.length && (c.phase === 'scouts' || c.phase === 'auction') && !c.auction?.results?.length) {
     const n = el('div', 'panel paper statcard'); n.append(el('h3', '', 'Off-season news')); for (const x of c.news) n.append(el('div', 'kotie', x)); body.append(n);
@@ -1210,9 +1254,13 @@ $('btnLeague').addEventListener('click', async () => {
     await careerOpening();
   }
   // a new career starts by choosing the region it's played in
-  if (fresh) renderRegion(); else renderCareer();
+  if (fresh) renderRegion(); else if (mapReady(career())) renderClubMap(); else renderCareer();
 });
-$('careerHome').addEventListener('click', () => { if (careerView === 'squad') { careerView = 'hub'; renderCareer(); } else renderHome(); });
+$('careerHome').addEventListener('click', () => {
+  const c = career(), was = careerView;
+  careerView = 'hub';
+  if (mapReady(c)) renderClubMap(); else if (was === 'squad') renderCareer(); else renderHome();
+});
 $('careerSquad').addEventListener('click', () => { careerView = careerView === 'squad' ? 'hub' : 'squad'; renderCareer(); });
 $('careerRecords').addEventListener('click', () => renderRecords());
 $('careerCoach').addEventListener('click', () => {
@@ -1952,7 +2000,7 @@ function renderRecords() {
   body.textContent = '';
   body.append(carousel(boards, window.innerHeight >= 800 ? 3 : 2), reset);
 }
-$('recordsBack').addEventListener('click', () => renderCareer());
+$('recordsBack').addEventListener('click', () => { if (fromMap) renderClubMap(); else renderCareer(); });
 
 // ---------- the daily challenge ----------
 function renderDaily() {

@@ -52,7 +52,22 @@ const squad = await page.evaluate(() => { const c = JSON.parse(localStorage.getI
 check(squad.club === 11 && squad.money === 0 && squad.phase === 'auction', `eleven signed, no money, on to the auction (${JSON.stringify(squad)})`);
 // the ground and its caretaker, on the season's hub
 await page.evaluate(async () => { const C = await import('/js/career.js'); const c = window.__sixcharge.profile.career; C.finishAuction(c); c.money = 1; document.getElementById('btnLeague').click(); });
-await page.waitForTimeout(900);
+await page.waitForTimeout(2500);
+// the club map is the career's hub: tap the stadium, then open it
+check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'the career opens on the club map');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'club-map.png') });
+const tapAt = async (fx, fy) => { const r = await page.evaluate(([fx, fy]) => { const b = document.getElementById('mapCanvas').getBoundingClientRect(), sc = b.width / 1536; return { x: b.left + b.width / 2 + (fx - 0.5) * 1536 * sc, y: b.top + b.height / 2 + (fy - 0.5) * 2304 * sc }; }, [fx, fy]); await page.mouse.click(r.x, r.y); await page.waitForTimeout(300); };
+await tapAt(0.5, 0.435);
+check(await page.evaluate(() => !document.getElementById('mapSheet').hidden && document.getElementById('mapName').textContent === 'Stadium'), 'tapping the stadium selects it');
+await tapAt(0.77, 0.585);
+check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Clubhouse' && document.getElementById('mapOpen').hidden), 'the clubhouse says coming soon, with nothing to open');
+await tapAt(0.5, 0.435);
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'club-map-stadium.png') });
+await page.mouse.move(195, 420); for (let i = 0; i < 8; i++) await page.mouse.wheel(0, -200); await page.waitForTimeout(400);
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'club-map-zoom.png') });
+check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'the map zooms with the wheel without errors');
+await page.evaluate(() => document.getElementById('mapOpen').click());
+await page.waitForTimeout(700);
 check(await page.evaluate(() => /Ground & caretaker/.test(document.querySelector('.groundpanel')?.textContent || '') && /Bare, dry and cracked|bare, dry and cracked/.test(document.querySelector('.groundpanel')?.textContent || '')), 'the hub shows the ground as bare, dry and cracked, with the caretaker to hire');
 await page.evaluate(() => [...document.querySelectorAll('.groundpanel button')].find(b => /Hire caretaker/.test(b.textContent)).click());
 await page.waitForTimeout(700);
