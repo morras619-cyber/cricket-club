@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, merchRoster, merchDemand, matchesLeft, fameOf } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, merchRoster, merchDemand, matchesLeft, fameOf, repBlock } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -31,6 +31,7 @@ import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { createClubMap } from './clubmap.js';
 import * as MF from './merch.js';
+import * as PC from './pacing.js';
 import { initCoach, coachOnce, coachSay, coachAsk, DEV, QUICK_TIPS } from './coach.js';
 import { taunt } from './story.js';
 import { playComic, preloadComic, titleCard, NIGHT, EXIT } from './comic.js';
@@ -1191,6 +1192,31 @@ function syncMine(c) { const m = c?.custom || null; if (m !== mineOf) { mineOf =
 const stars = n => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
 const pname = p => `${p.heroId ? '★ ' : p.ability ? '⭐ ' : ''}${flagName(p)}`;
 const fname = p => `${flag(p)} ${p.name}`.trim(); // flag and plain name, for lists
+// ---------- how fast a season can go (js/pacing.js): a league match costs a token; one comes every two real hours, three are kept ----------
+function fillPace(host, c) {
+  const ready = clock.state === 'ok' || clock.state === 'local';
+  if (!c.pace) { if (!ready) { host.replaceChildren(el('span', 'pace-txt', 'Checking the time…')); return; } c.pace = PC.freshPace(serverNow()); saveProfile(profile); }
+  if (ready) PC.refill(c.pace, serverNow(), clock.state === 'ok');
+  const p = c.pace;
+  host.replaceChildren();
+  for (let i = 0; i < PC.PACE.BANK; i++) host.append(ico('ball', i < p.tokens ? 'on' : ''));
+  host.append(el('span', 'pace-txt', p.tokens >= PC.PACE.BANK ? 'Matches ready' : `${p.tokens ? `${p.tokens} ready · ` : 'No match yet · '}next in ${PC.fmtWait(PC.nextIn(p, serverNow()))}`));
+}
+// start your next league (or play-off) match: it costs a token
+async function takeMatch(c) {
+  await syncClock();
+  if (!c.pace) c.pace = PC.freshPace(clock.state === 'offline' ? Date.now() : serverNow());
+  const p = c.pace, offline = clock.state === 'offline', now = offline ? p.at : serverNow();   // (no server time: only what is banked can be used)
+  const ok = PC.spend(p, now, clock.state === 'ok');
+  saveProfile(profile);
+  if (!ok) ui.toast(offline ? 'No match banked, and the server cannot be reached to check the time' : `Your next match is ready in ${PC.fmtWait(PC.nextIn(p, now))}`);
+  return ok;
+}
+async function playLeagueMatch(c) {
+  if (!(await takeMatch(c))) { renderCareer(); return; }
+  startMatch({ mode: 'career' });
+}
+
 // ---------- the club map (js/clubmap.js): the hub of the career ----------
 let fromMap = false;
 const mapReady = c => !!c.club && c.phase !== 'pick' && c.phase !== 'trials';
@@ -1206,7 +1232,7 @@ const BUILDINGS = {
   clubhouse: { name: 'Clubhouse', desc: 'Coming soon', soon: true },
   merch: { name: 'Merchandise factory', desc: 'Make jerseys the fans want', open: () => renderMerch(false) },
 };
-let mapPick = null;
+let mapPick = null, mapPaceTimer = 0;
 const clubMap = createClubMap($('mapCanvas'), {
   onSelect: id => {
     mapPick = id;
@@ -1231,6 +1257,9 @@ function renderClubMap(test = false) {
   ui.show('clubmap');
   $('mapSheet').hidden = true; mapPick = null;
   $('mapClub').textContent = club.name;
+  fillPace($('mapPace'), c); $('mapPace').hidden = test;
+  syncClock().then(() => { if (!$('clubmap').hidden) fillPace($('mapPace'), c); });
+  clearInterval(mapPaceTimer); mapPaceTimer = setInterval(() => { if ($('clubmap').hidden) { clearInterval(mapPaceTimer); return; } fillPace($('mapPace'), c); }, 30000);
   $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
   const info = () => {
     const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts', merch: (c.merch?.till || 0) >= 100 };   // (a red dot: something to do there)
@@ -1312,9 +1341,10 @@ const ICON = {
   trophy: '<path d="M7 3h10v5a5 5 0 0 1-10 0z"/><path d="M7 5H3v2a4 4 0 0 0 4 4M17 5h4v2a4 4 0 0 1-4 4M12 13v4M8 21h8M10 17h4v4h-4z" fill="none"/>',
   chart: '<path d="M4 20v-8h4v8zM10 20V4h4v16zM16 20V9h4v11z"/>',
   star: '<path d="M12 2l3 7 7 .6-5.3 4.7 1.700 7.200L12 17.500 5.600 21.500l1.700-7.200L2 9.600 9 9z"/>',
+  ball: '<circle cx="12" cy="12" r="9"/><path d="M5 8c4 2.500 10 2.500 14 0M5 16c4-2.500 10-2.500 14 0" fill="none" stroke="#14102a" stroke-width="1.600"/>',
   cross: '<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="4"/>',
 };
-const ICON_COLOUR = { coin: '#ffd23f', clock: '#ffffff', heart: '#ff4d5e', jersey: '#3b82f6', pencil: '#ffb800', printer: '#8fa0b8', box: '#c98a4b', gear: '#9aa6b2', users: '#5aa0ff', factory: '#ffb800', trophy: '#ffd23f', star: '#ffd23f', chart: '#5aa0ff', warn: '#ffd23f', up: '#34c759' };
+const ICON_COLOUR = { coin: '#ffd23f', clock: '#ffffff', heart: '#ff4d5e', ball: '#ff4d5e', jersey: '#3b82f6', pencil: '#ffb800', printer: '#8fa0b8', box: '#c98a4b', gear: '#9aa6b2', users: '#5aa0ff', factory: '#ffb800', trophy: '#ffd23f', star: '#ffd23f', chart: '#5aa0ff', warn: '#ffd23f', up: '#34c759' };
 const ico = (name, cls = '') => { const sp = el('span', `ico ${cls}`.trim()); if (ICON_COLOUR[name]) sp.style.setProperty('--ic', ICON_COLOUR[name]); sp.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`; return sp; };
 const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...content); if (fn) b.addEventListener('click', fn); return b; };
 const frameOf = (node, big = false) => { const f = el('span', `mf-frame${big ? ' big' : ''}`); f.append(node); return f; };
@@ -1847,15 +1877,17 @@ function careerAuction(c, body) {
     const pass = el('button', 'bigbtn auc-pass');
     pass.append(el('b', '', 'Pass'), el('small', '', 'Save your budget'));
     const bidBtn = el('button', 'bigbtn primary auc-bid');
-    const why = mine.length >= MAX_SQUAD ? 'Squad full' : c.money < nextBid(lot) ? 'Not enough money' : 'Make your move';
+    const stand = repBlock(c, p);
+    const why = stand ? 'Will not sign for you yet' : mine.length >= MAX_SQUAD ? 'Squad full' : c.money < nextBid(lot) ? 'Not enough money' : 'Make your move';
     bidBtn.append(el('b', '', `Bid ${money(nextBid(lot))}`), el('small', '', why));
-    bidBtn.disabled = c.money < nextBid(lot) || mine.length >= MAX_SQUAD;
+    bidBtn.disabled = !!stand || c.money < nextBid(lot) || mine.length >= MAX_SQUAD;
     bidBtn.addEventListener('click', () => {
       const r = bid(c);
       if (r === 'won') { ui.toast(`${p.name} signed for ${money(c.auction.results.at(-1).price)}!`); sfx.full(); }
       else if (r === 'outbid') { const L = c.auction.lot; ui.toast(`${teamById(L.leader).name} bid ${money(L.price)}`); sfx.click(); }
       else if (r === 'broke') ui.toast('Not enough money');
       else if (r === 'full') ui.toast(`Your squad is full (${MAX_SQUAD})`);
+      else if (r === 'rep') ui.toast(repBlock(c, p));
       saveProfile(profile); renderCareer();
     });
     pass.addEventListener('click', () => {
@@ -1908,6 +1940,8 @@ function careerSeason(c, body) {
   const f = nextFixture(c.league);
   const me = teamById(c.club);
   body.append(divisionCard(c));
+  const pace = el('div', 'panel paper statcard pace pacepanel'); fillPace(pace, c); body.append(pace);
+  syncClock().then(() => { if (pace.isConnected) fillPace(pace, c); });
   coachOnce('season', DEV.season).then(async shown => {
     // send a scout abroad; then, once one has found someone, what happens next
     if (!Object.keys(c.scouting || {}).length) shown = (await coachOnce('scoutTip', DEV.scoutTip)) || shown;
@@ -1921,7 +1955,7 @@ function careerSeason(c, body) {
     const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
     const best = [...theirs].sort((a, b) => ovr(b) - ovr(a))[0];
     body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
-      () => startMatch({ mode: 'career' }), preMatch(c, o.id)));
+      () => playLeagueMatch(c), preMatch(c, o.id)));
   }
   body.append(chirpPanel(c));
   if (c.custom) body.append(stadiumPanel(c), groundPanel(c));
@@ -2106,7 +2140,7 @@ function careerScouts(c, body) {
     card.append(futCard(p, { size: Math.min(200, window.innerWidth * 0.46) }));
     card.append(el('p', 'lotmeta', `${p.label} · ${ageNote(p)} · bat ${p.bat}${p.bowlSkill ? ` · bowl ${p.bowlSkill}` : ''}`));
     const btn = el('button', 'bigbtn primary', `Sign · ${money(p.scouted.price)}`);
-    btn.disabled = c.money < p.scouted.price || mine.length >= MAX_SQUAD;
+    btn.disabled = c.money < p.scouted.price || mine.length >= MAX_SQUAD || !!repBlock(c, p);
     btn.addEventListener('click', () => {
       if (signFind(c, p.id)) { sfx.full(); ui.toast(`${p.name} signs for ${teamById(c.club).name}!`); saveProfile(profile); renderCareer(); }
     });
@@ -2168,7 +2202,7 @@ function careerPlayoff(c, body) {
   coachOnce(`playoff-${c.season}`, DEV.playoff);
   const me = teamById(c.club), o = teamById(c.playoff.opp);
   body.append(divisionCard(c));
-  body.append(fixtureCard({ ...c.playoff, label: 'Relegation play-off' }, me, o, `Win and you stay in the Asian Super League. Lose and ${me.name} go down to Division 2.`, () => startMatch({ mode: 'career' })));
+  body.append(fixtureCard({ ...c.playoff, label: 'Relegation play-off' }, me, o, `Win and you stay in the Asian Super League. Lose and ${me.name} go down to Division 2.`, () => playLeagueMatch(c)));
   body.append(...leaguePanels(c.league));
 }
 

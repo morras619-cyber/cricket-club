@@ -23,7 +23,7 @@ export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
 export const START_MONEY = 3;          // $M in your first season
 export const SPONSOR = 1;              // $M every season, whatever happens
-export const WIN_BONUS = 0.4;          // $M per league win
+export const WIN_BONUS = 0.4;          // $M per league win in the top division (less lower down: DIV_MONEY)
 export const PRIZE = [10, 7, 5, 4.5, 3.5, 3, 2.5, 2]; // $M by final position
 export const STAR_OVR = 86;            // a regular who gets here becomes a star
 const AI_BUDGET = { 1: 6, 2: 8, 3: 10, 4: 13 };
@@ -233,7 +233,7 @@ function scoutReports(c) {
 export const scoutFinds = c => Object.values(c.players).filter(p => p.scouted && p.scouted.season === c.season - 1 && !p.team && !p.retired);
 export function signFind(c, id) {
   const p = c.players[id];
-  if (!p?.scouted || p.team || c.money < p.scouted.price || clubPlayers(c, c.club).length >= MAX_SQUAD) return false;
+  if (!p?.scouted || p.team || c.money < p.scouted.price || clubPlayers(c, c.club).length >= MAX_SQUAD || repBlock(c, p)) return false;
   sign(c, p, c.club, p.scouted.price);
   chirpSigned(c, p, p.scouted.price, 'scouted');
   return true;
@@ -621,10 +621,11 @@ export function rivalsOf(c, lot) {
     : lot.out?.[team] != null ? { team, state: 'out', at: lot.out[team] }
     : !(lot.maxes[team] > 0) ? { team, state: 'full' } : { team, state: 'in' }));
 }
-// You bid. Returns 'won' | 'outbid' | 'broke' | 'full'.
+// You bid. Returns 'won' | 'outbid' | 'broke' | 'full' | 'rep' (he will not sign for a club of your standing).
 export function bid(c) {
   const lot = c.auction.lot, p = c.players[lot.pid];
   if (squadSize(c, c.club) >= MAX_SQUAD) return 'full';
+  if (repBlock(c, p)) return 'rep';
   const price = nextBid(lot);
   if (c.money < price) return 'broke';
   lot.price = price; lot.leader = c.club;
@@ -833,10 +834,20 @@ export function recordPlayerMatch(c, summary) {
   }
   played(c, ids);
   for (const p of clubPlayers(c, c.club)) p.fame = fameAfter(fameOf(p), perf.get(p.id), summary.result.outcome === 'win');   // the fans' love, for the jerseys (js/merch.js)
-  if (summary.result.outcome === 'win') c.money = round2(c.money + WIN_BONUS);
+  if (summary.result.outcome === 'win') c.money = round2(c.money + WIN_BONUS * (DIV_MONEY[divisionOf(c, c.club)] ?? 1));   // (the lower the division, the smaller the bonus: as with the prizes)
   const ups = clubPlayers(c, c.club).filter(p => ovr(p) > (before.get(p.id) ?? 99)).map(p => `⬆ ${p.name} ${before.get(p.id)} → ${ovr(p)}`);
   return [...ups, ...c.news.slice(newsAt)];
 }
+// ---------- a club's standing: which players will sign for it ----------
+// The best players only sign for clubs with the standing: none rated 80 or more for a Division 3 club, a few for Division 2 (up to 84), any for the top division.
+// (players you already have stay, whatever happens)
+export const REP_CAP = { asl: 99, d2: 84, d3: 79 };
+export const repCap = c => REP_CAP[divisionOf(c, c.club)] ?? 99;
+export function repBlock(c, p) {
+  const cap = repCap(c);
+  return ovr(p) > cap ? `Players rated ${cap + 1} or more will not sign for a ${divisionName(divisionOf(c, c.club))} club` : null;
+}
+
 // ---------- the merchandise factory's view of the club (js/merch.js) ----------
 export const fameOf = p => p.fame ?? startFame(ovr(p));
 // the players under contract: id -> { fame, name }

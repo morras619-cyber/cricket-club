@@ -147,6 +147,7 @@ test('the rival contest: dropouts are recorded when their turn comes, a full squ
   for (const [t, at] of Object.entries(lot.out || {})) assert.ok(lot.maxes[t] < at + 0.51, `${t} dropped out near its limit`);
   // a lot saved before the contest existed (no out, no last) still bids
   const c2 = C.newCareer(8); C.chooseClub(c2, 'kites'); c2.money = 50;
+  c2.divisions.d3 = c2.divisions.d3.filter(id => id !== 'kites'); c2.divisions.asl.push('kites');   // (the top division: no star will refuse to sign)
   const l2 = C.currentLot(c2); delete l2.out; delete l2.last;
   assert.ok(['won', 'outbid'].includes(C.bid(c2)));
 });

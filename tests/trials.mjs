@@ -125,6 +125,12 @@ check(await page.evaluate(() => /Ground & caretaker/.test(document.querySelector
 await page.evaluate(() => [...document.querySelectorAll('.groundpanel button')].find(b => /Hire caretaker/.test(b.textContent)).click());
 await page.waitForTimeout(700);
 check(await page.evaluate(() => /on the job/.test(document.querySelector('.groundpanel')?.textContent || '')), 'the caretaker is hired and on the job');
+// the match meter: three matches banked at the start; with none left, Play does not start a match and the wait is shown
+await page.waitForTimeout(800);
+check(await page.evaluate(() => /ready/i.test(document.querySelector('.pacepanel')?.textContent || '') && !!window.__sixcharge.profile.career.pace), 'the season page shows the match meter, full at the start');
+await page.evaluate(async () => { const P = await import('/js/pacing.js'); const c = window.__sixcharge.profile.career; for (let i = 0; i < 3; i++) P.spend(c.pace, Date.now()); });
+await page.evaluate(() => document.querySelector('.playbtn').click()); await page.waitForTimeout(1500);
+check(await page.evaluate(() => document.getElementById('hud').hidden && /No match yet/.test(document.querySelector('.pacepanel')?.textContent || '')), 'with no match banked, Play does not start one and the meter shows the wait');
 await page.evaluate(() => document.getElementById('setClubMap').click()); await page.waitForTimeout(1500);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden && /Test view/.test(document.getElementById('mapSub').textContent)), 'the settings open the club map as a test view');
 // the settings' test of the merch factory: a practice club, time skipping, and back to the settings
