@@ -21,7 +21,7 @@ plots=[]
 for i,sl in enumerate(ndi.find_objects(lab),1):
     if (lab[sl]==i).sum()>40000:
         ys,xs=np.where(lab==i); plots.append(dict(cx=(xs.min()+xs.max())/2,cy=(ys.min()+ys.max())/2,x0=xs.min(),x1=xs.max(),y1=ys.max()))
-ATLAS={"stadium":[0,681],"training":[681,714],"office":[1395,704],"apartment":[2099,732],"medical":[2831,660],"academy":[3491,743],"clubhouse":[4234,702],"shop":[4936,709],"merch":[5645,675]}
+ATLAS={"stadium":[0,647],"training":[647,714],"office":[1361,704],"apartment":[2065,732],"medical":[2797,660],"academy":[3457,743],"clubhouse":[4200,702],"shop":[4902,709],"merch":[5611,675]}
 atlas=Image.open(R+'img/map/buildings.webp').convert('RGBA'); al=np.array(atlas)[...,3]
 def pick(fx,fy): return min(plots,key=lambda p:(p['cx']/W-fx)**2+(p['cy']/H-fy)**2)
 assign={'stadium':(.503,.444),'training':(.34,.195),'apartment':(.735,.245),'office':(.224,.334),'academy':(.812,.382),'medical':(.24,.584),'clubhouse':(.766,.594),'shop':(.239,.739),'merch':(.749,.757)}

@@ -7,7 +7,7 @@ const GREY = 0.7;                   // the grey every club-coloured surface was 
 // where each building stands: its picture's middle as a share of the map, and how wide it is drawn as a share of the map's width
 // (fitted to the plots in the base picture: the building's base on the plot's ground, inside its walls)
 const SITES = {
-  stadium:  { x: 0.504, y: 0.445, w: 0.306 },
+  stadium:  { x: 0.504, y: 0.446, w: 0.314 },
   training: { x: 0.340, y: 0.158, w: 0.349 },
   apartment:{ x: 0.725, y: 0.211, w: 0.314 },
   office:   { x: 0.224, y: 0.310, w: 0.316 },
@@ -19,7 +19,7 @@ const SITES = {
 };
 const ORDER = Object.keys(SITES).sort((a, b) => SITES[a].y - SITES[b].y);   // far to near, the near ones painted over the far
 // where each building is in img/map/buildings.webp (and its tint in buildings-tint.webp): [row, height], all 1100 wide (tools/build_map.py)
-const ATLAS = {"stadium": [0, 681], "training": [681, 714], "office": [1395, 704], "apartment": [2099, 732], "medical": [2831, 660], "academy": [3491, 743], "clubhouse": [4234, 702], "shop": [4936, 709], "merch": [5645, 675]};
+const ATLAS = {"stadium": [0, 647], "training": [647, 714], "office": [1361, 704], "apartment": [2065, 732], "medical": [2797, 660], "academy": [3457, 743], "clubhouse": [4200, 702], "shop": [4902, 709], "merch": [5611, 675]};
 const AW = 1100;
 const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const load = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
