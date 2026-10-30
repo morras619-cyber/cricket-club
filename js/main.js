@@ -1269,16 +1269,42 @@ function merchTick(c) {
 }
 const kfmt = k => (Math.abs(k) >= 1000 ? `$${(k / 1000).toFixed(2)}M` : `$${Math.round(k * 10) / 10}k`);
 const durfmt = ms => (!Number.isFinite(ms) ? 'never' : ms < 90 * 1000 ? 'a minute' : ms < 90 * 60000 ? `${Math.round(ms / 60000)} min` : ms < 36 * 3600000 ? `${(ms / 3600000).toFixed(1)} h` : `${Math.round(ms / 86400000)} days`);
-let merchSel = null, merchQty = 20, merchTimer = 0, merchReport = null;
+let merchTab = 'fans', merchSheet = null, merchQty = 20, merchTimer = 0, merchReport = null;
+// the icons (24 x 24, drawn with the game's thick dark outline)
+const ICON = {
+  jersey: '<path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3c-1 2-7 2-8 0z"/>',
+  coin: '<circle cx="12" cy="12" r="9"/><text x="12" y="16.6" text-anchor="middle" font-size="12" font-weight="900" fill="#14102a" stroke="none">$</text>',
+  pencil: '<path d="M4 20l1-5L15 5l4 4L9 19z"/><path d="M13 7l4 4" fill="none"/>',
+  printer: '<path d="M7 9V4h10v5z"/><path d="M5 9h14a2 2 0 0 1 2 2v5h-3v4H6v-4H3v-5a2 2 0 0 1 2-2z"/>',
+  box: '<path d="M3 8l9-5 9 5v9l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v9" fill="none"/>',
+  gear: '<circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.4" fill="#14102a"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" fill="none" stroke-width="3"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6zM15 14c3 0 6 1.5 6 5h-4"/>',
+  factory: '<path d="M3 21V10l6 4v-4l6 4V5h4v16z"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2" fill="none" stroke-width="2"/>',
+  warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5" fill="none" stroke="#14102a" stroke-width="2.4"/>',
+  plus: '<path d="M12 4v16M4 12h16" fill="none" stroke="currentColor" stroke-width="4"/>',
+  heart: '<path d="M12 21C4 14 3 9 7 6c2.5-1.500 4.500 0 5 1.500C12.500 6 14.500 4.500 17 6c4 3 3 8-5 15z"/>',
+  up: '<path d="M12 3l8 9h-5v9H9v-9H4z"/>',
+  check: '<path d="M4 13l5 5L20 6" fill="none" stroke="currentColor" stroke-width="4"/>',
+  cross: '<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="4"/>',
+};
+const ICON_COLOUR = { coin: '#ffd23f', clock: '#ffffff', heart: '#ff4d5e', jersey: '#3b82f6', pencil: '#ffb800', printer: '#8fa0b8', box: '#c98a4b', gear: '#9aa6b2', users: '#5aa0ff', factory: '#ffb800', warn: '#ffd23f', up: '#34c759' };
+const ico = (name, cls = '') => { const sp = el('span', `ico ${cls}`.trim()); if (ICON_COLOUR[name]) sp.style.setProperty('--ic', ICON_COLOUR[name]); sp.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`; return sp; };
+const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...content); if (fn) b.addEventListener('click', fn); return b; };
+const frameOf = (node, big = false) => { const f = el('span', `mf-frame${big ? ' big' : ''}`); f.append(node); return f; };
+const playerFace = (p, size = 64) => (p.heroId ? portrait(heroById(p.heroId), size, 'celebrate') : portraitFace(p, p.team ? teamById(p.team) : null, size) || faceEl(p, kitOf(p), size));
+const staffFace = (s, club, size = 64) => faceEl({ id: `staff-${s.id}`, name: s.name, nation: 'IN' }, club, size);
+const lastName = n => n.split(' ').slice(-1)[0];
 async function renderMerch() {
   const c = career();
   ui.show('merch');
-  $('merchBack').onclick = () => { clearInterval(merchTimer); merchTimer = 0; sfx.click(); if (fromMap) renderClubMap(); else renderCareer(); };
-  $('merchBody').replaceChildren(el('p', 'sheetnote', 'Checking the time with the server…'));
+  $('merchBack').onclick = () => { clearInterval(merchTimer); merchTimer = 0; merchSheet = null; sfx.click(); if (fromMap) renderClubMap(); else renderCareer(); };
+  $('merchBody').replaceChildren(el('p', 'mf-empty', 'Checking the time with the server…'));
+  $('merchSheet').hidden = true;
   await syncClock();
   if (clock.state === 'offline') {
-    $('merchBody').replaceChildren(el('div', 'panel paper statcard', 'Cannot reach the server. The factory waits until it can check the time: that is what stops clock tricks. Try again when you are online.'));
-    $('merchLede').textContent = '';
+    const e = el('div', 'mf-empty'); e.append(ico('clock'), el('span', '', 'Cannot reach the server. The factory waits until it can check the time (that is what stops clock tricks). Try again when you are online.'));
+    $('merchBody').replaceChildren(e);
     return;
   }
   if (!c.merch) c.merch = MF.freshMerch(serverNow());
@@ -1289,94 +1315,130 @@ async function renderMerch() {
   merchTimer = setInterval(() => { if ($('merch').hidden) { clearInterval(merchTimer); merchTimer = 0; return; } merchReport = merchTick(c) || merchReport; paintMerch(c); }, 15000);
 }
 function paintMerch(c) {
-  const m = c.merch, body = $('merchBody'), roster = merchRoster(c), dmap = MF.demandMap(m, merchCtx(c));
+  const m = c.merch, club = teamById(c.club), roster = merchRoster(c), dmap = MF.demandMap(m, merchCtx(c)), L = MF.MERCH.LEVELS[m.level];
   const ctx = () => merchCtx(c);
-  const done = r => { if (r && r.ok === false) ui.toast(r.why); else sfx.click(); saveProfile(profile); merchTick(c); paintMerch(c); };
-  $('merchLede').textContent = `Level ${m.level} · till ${kfmt(m.till)} · club ${money(c.money)}`;
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) merchSheet = null; } saveProfile(profile); merchTick(c); paintMerch(c); };
+  // the top: the till, what it earns and costs, and the button to collect
+  $('merchLede').textContent = `${club.name} · club ${money(c.money)}`;
+  const lv = $('merchLvl'); lv.replaceChildren(ico('factory'), el('span', '', `LV ${m.level}`));
+  const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const t = el('div'); t.append(el('span', '', big), el('small', '', small)); d.append(ico(name), t); return d; };
+  const col = mfBtn('mf-collect', [ico('coin'), el('span', '', 'Collect')], () => { const r = MF.collect(m, ctx()); done(r); if (r.ok) ui.toast(`${kfmt(r.k)} to the club`); });
+  col.disabled = m.till < 50;
+  $('merchStats').replaceChildren(stat('coin', 'gold', kfmt(m.till), 'in the till'), stat('jersey', 'blue', String(m.sold), 'sold'), stat('clock', 'red', kfmt(MF.wagePerDay(m)), 'a day costs'), col);
+  const note = $('merchNote'), bad = m.unpaidMs > 0 || merchReport?.tampered;
+  const msg = m.unpaidMs > 0 ? `The wages cannot be paid: the work has stopped${m.unpaidMs > 24 * 3600000 ? `, and staff leave in ${durfmt(MF.MERCH.QUIT - m.unpaidMs)}` : ''}.`
+    : merchReport?.tampered ? 'The books did not add up, so the till was emptied.'
+    : clock.state === 'local' ? 'The server gave no time: only the first hour away counts.'
+    : merchReport && merchReport.away > 2 * 60000 ? `Away${merchReport.capped ? ' (ten hours count)' : ''}: ${merchReport.sold} jerseys sold, ${merchReport.till >= 0 ? '+' : ''}${kfmt(merchReport.till)}.` : '';
+  note.hidden = !msg; note.className = `mf-note${bad ? ' bad' : ''}`; note.replaceChildren(...(msg ? [ico(bad ? 'warn' : 'coin'), el('span', '', msg)] : []));
+  // the tabs
+  const canUp = MF.nextUpgrade(m) && c.money >= MF.nextUpgrade(m).up;
+  const tabs = [['fans', 'jersey', 'Fans', 0], ['making', 'printer', 'Making', m.queue.length], ['staff', 'users', 'Staff', 0], ['factory', 'factory', 'Factory', canUp ? '!' : 0]];
+  $('merchTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${merchTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { merchTab = id; merchSheet = null; sfx.click(); paintMerch(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
+  const body = $('merchBody');
   body.replaceChildren();
-  // the till, and what happened while you were away
-  const top = el('div', 'panel paper statcard');
-  const row = el('div', 'scoutrow');
-  const t = el('div'); t.append(el('b', '', `Till ${kfmt(m.till)}`), el('small', '', `Wages and machines: ${kfmt(MF.wagePerDay(m))} a day · jerseys sold so far ${m.sold}`));
-  const col = el('button', 'chipbtn', 'Collect'); col.disabled = m.till < 50;
-  col.addEventListener('click', () => { const r = MF.collect(m, ctx()); done(r); if (r.ok) ui.toast(`${kfmt(r.k)} to the club`); });
-  row.append(t, col); top.append(row);
-  if (merchReport && merchReport.away > 2 * 60000) top.append(el('p', 'sheetnote', `While you were away${merchReport.capped ? ' (only the first ten hours count)' : ''}: ${merchReport.sold} jerseys sold, ${merchReport.till >= 0 ? '+' : ''}${kfmt(merchReport.till)} in the till.`));
-  if (merchReport?.tampered) top.append(el('p', 'sheetnote', 'The books did not add up, so the till was emptied.'));
-  if (clock.state === 'local') top.append(el('p', 'sheetnote', 'The server did not give a time: only the first hour away counts.'));
-  if (m.unpaidMs > 0) top.append(el('p', 'sheetnote', `⚠ The wages cannot be paid: the work has stopped${m.unpaidMs > 24 * 3600000 ? ` and the staff will leave in ${durfmt(MF.MERCH.QUIT - m.unpaidMs)}` : ''}.`));
-  body.append(top);
-  // what the fans want
-  const fans = el('div', 'panel paper statcard');
-  fans.append(el('h3', '', 'What the fans want'));
-  fans.append(el('p', 'sheetnote', 'Fans want jerseys of players they love. A player is loved for how he plays. A jersey needs a design first.'));
-  const list = [...roster].sort((a, b) => (dmap.get(b[0]) || 0) - (dmap.get(a[0]) || 0));
-  for (const [pid, info] of list.slice(0, 8)) {
-    const p = c.players[pid], r = el('div', 'scoutrow');
-    const tx = el('div');
-    const stock = m.live[pid] || 0, queued = m.queue.filter(o => o.pid === pid).reduce((a, o) => a + o.left, 0);
-    tx.append(el('b', '', info.name), el('small', '', `${Math.round(dmap.get(pid) || 0)} fans a day want his jersey · fame ${Math.round(info.fame)} · ${m.designs[pid] ? `designed (${'★'.repeat(m.designs[pid])})` : 'no design yet'} · in stock ${stock}${queued > 0.5 ? ` · making ${Math.ceil(queued)}` : ''}${m.vint[pid] ? ` · vintage ${m.vint[pid].n}` : ''} · ${p.contract >= 50 ? 'signed for good' : `${matchesLeft(c, p)} matches left on his deal`}`));
-    const b = el('button', 'chipbtn', merchSel === pid ? 'Chosen' : 'Make');
-    b.addEventListener('click', () => { merchSel = pid; sfx.click(); paintMerch(c); });
-    r.append(tx, b); fans.append(r);
+  if (merchTab === 'fans') {
+    // the fans: the six players they want most
+    const grid = el('div', 'mf-grid');
+    for (const [pid, info] of [...roster].sort((a, b) => (dmap.get(b[0]) || 0) - (dmap.get(a[0]) || 0)).slice(0, 6)) {
+      const p = c.players[pid], stock = m.live[pid] || 0, forever = p.contract >= 50;
+      const card = el('button', `mf-card stack${merchSheet?.pid === pid ? ' pick' : ''}`);
+      const bar = el('div', 'mf-bar'); const fill = el('i'); fill.style.width = `${Math.max(4, info.fame)}%`; bar.append(fill);
+      const r1 = el('div', 'mf-row'); r1.append(ico('heart'), el('span', '', String(Math.round(dmap.get(pid) || 0))), ico('jersey'), el('span', '', String(stock)));
+      const r2 = el('div', `mf-row ${m.designs[pid] ? 'ok' : 'no'}`); r2.append(ico(m.designs[pid] ? 'check' : 'pencil'), el('span', '', m.designs[pid] ? 'designed' : 'no design'), ico('clock'), el('span', '', forever ? '∞' : String(matchesLeft(c, p))));
+      card.append(frameOf(playerFace(p, 72)), el('b', '', lastName(info.name)), bar, r1, r2);
+      card.addEventListener('click', () => { merchSheet = { type: 'order', pid }; sfx.click(); paintMerch(c); });
+      grid.append(card);
+    }
+    body.append(grid);
+  } else if (merchTab === 'making') {
+    if (!m.queue.length) { const e = el('div', 'mf-empty'); e.append(ico('printer'), el('span', '', 'Nothing in production. Pick a player in Fans to start a batch.')); body.append(e); }
+    else {
+      const grid = el('div', 'mf-col');
+      m.queue.slice(0, 4).forEach((o, i) => {
+        const p = c.players[o.pid], card = el('div', 'mf-card'), info = el('div', 'mf-info'), designed = !!m.designs[o.pid];
+        const frac = designed ? (o.qty - o.left) / o.qty : m.designing[o.pid] || 0;
+        const bar = el('div', 'mf-bar green'); const fill = el('i'); fill.style.width = `${Math.max(3, Math.round(frac * 100))}%`; bar.append(fill);
+        const row = el('div', 'mf-row'); row.append(ico(designed ? 'printer' : 'pencil'), el('span', '', designed ? `${Math.ceil(o.left)} to go` : 'designing…'));
+        info.append(el('b', '', `${lastName(p.name)} · ${o.qty}`), bar, row);
+        card.append(frameOf(playerFace(p, 64)), info, mfBtn('mf-x', [ico('cross')], () => done(MF.cancel(m, i))));
+        grid.append(card);
+      });
+      body.append(grid);
+    }
+  } else if (merchTab === 'staff') {
+    const grid = el('div', 'mf-grid three');
+    for (const s of m.staff) {
+      const card = el('button', 'mf-card stack'), stars = el('span', 'mf-stars', '★'.repeat(s.lvl)), r = el('div', 'mf-row');
+      r.append(ico({ designer: 'pencil', printer: 'printer', packer: 'box' }[s.role]), stars);
+      card.append(frameOf(staffFace(s, club, 64)), el('b', '', s.name), r);
+      card.addEventListener('click', () => { merchSheet = { type: 'staff', id: s.id }; sfx.click(); paintMerch(c); });
+      grid.append(card);
+    }
+    for (let i = m.staff.length; i < L.staff; i++) {
+      const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Hire'));
+      card.addEventListener('click', () => { merchSheet = { type: 'hire' }; sfx.click(); paintMerch(c); });
+      grid.append(card);
+    }
+    body.append(grid);
+    const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${m.staff.length} of ${L.staff} places used · ${kfmt(MF.wagePerDay(m))} a day${MF.nextUpgrade(m) ? ' · upgrade the factory for more places' : ''}`)); body.append(foot);
+  } else {
+    const grid = el('div', 'mf-col');
+    const up = MF.nextUpgrade(m);
+    const lvl = el('div', 'mf-card col');
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('factory'), el('b', '', `Factory level ${m.level}`), el('span', 'mf-stars', '★'.repeat(m.level)));
+    lvl.append(hd);
+    const pips = (name, have, max) => { const d = el('div', 'mf-pips'); for (let i = 0; i < max; i++) d.append(ico(name, i < have ? 'on' : '')); return d; };
+    const cap = (name, label, have, max, extra) => { const r = el('div', 'mf-row'); r.append(ico(name), el('span', '', label), pips(name, have, max)); if (extra) r.append(extra); return r; };
+    lvl.append(cap('users', 'Staff', m.staff.length, L.staff), cap('gear', 'Machines', m.machines, L.machines, L.machines > m.machines ? mfBtn('chipbtn', [el('span', '', `Buy ${kfmt(MF.MERCH.MACHINE_COST)}`)], () => done(MF.buyMachine(m, ctx()))) : null));
+    const wr = el('div', 'mf-row'); wr.append(ico('box'), el('span', '', `Warehouse ${L.stock} each`), ico('printer'), el('span', '', `${L.batch} a printer`)); lvl.append(wr);
+    if (up) { const ub = mfBtn('mf-big', [ico('up'), el('span', '', `Upgrade · ${money(up.up)}`)], () => done(MF.upgrade(m, ctx()))); ub.disabled = c.money < up.up; lvl.append(ub); }
+    else lvl.append(el('p', 'sheetnote', 'The best factory there is.'));
+    grid.append(lvl);
+    if (m.log.length) { const nw = el('div', 'mf-card'); const e = m.log[m.log.length - 1]; nw.append(ico('warn'), el('span', 'mf-row', e.text)); grid.append(nw); }
+    body.append(grid);
   }
-  for (const [pid, v] of Object.entries(m.vint)) if (!roster.has(pid)) fans.append(el('p', 'sheetnote', `${c.players[pid]?.name || pid}: ${v.n} vintage jerseys left (sold cheaply, fading)`));
-  for (const [pid, l] of Object.entries(m.left)) fans.append(el('p', 'sheetnote', `${c.players[pid]?.name || pid} has left: his ${m.live[pid] || 0} jerseys sell at full price a little longer`));
-  body.append(fans);
-  // an order
-  if (merchSel && roster.has(merchSel)) {
-    const o = el('div', 'panel paper statcard'), p = c.players[merchSel], max = MF.maxOrder(m);
+  // a bottom sheet: an order, a hire, a member of staff
+  const sh = $('merchSheet');
+  sh.hidden = !merchSheet;
+  if (!merchSheet) return;
+  sh.onclick = e => { if (e.target === sh) { merchSheet = null; paintMerch(c); } };
+  const card = el('div', 'mf-sheet-card');
+  const close = mfBtn('mf-x', [ico('cross')], () => { merchSheet = null; sfx.click(); paintMerch(c); });
+  if (merchSheet.type === 'order' && roster.has(merchSheet.pid)) {
+    const pid = merchSheet.pid, p = c.players[pid], max = MF.maxOrder(m), hd = el('div', 'mf-sheet-head');
     merchQty = Math.max(1, Math.min(merchQty, max));
-    o.append(el('h3', '', `Jerseys for ${p.name}`));
-    const qrow = el('div', 'scoutrow');
-    const sel = el('select');
-    for (const q of [...new Set([5, 10, 20, 50, 100, max].filter(x => x <= max))].sort((a, b) => a - b)) { const op = el('option', '', `${q} jerseys`); op.value = q; if (q === merchQty) op.selected = true; sel.append(op); }
-    sel.addEventListener('change', () => { merchQty = +sel.value; paintMerch(c); });
-    const go = el('button', 'chipbtn', `Make · cloth ${kfmt(merchQty * MF.MERCH.MATERIAL)}`);
-    go.addEventListener('click', () => done(MF.order(m, merchSel, merchQty, ctx())));
-    qrow.append(sel, go); o.append(qrow);
-    const ms = MF.forecast(m, merchSel, merchQty), left = p.contract >= 50 ? Infinity : matchesLeft(c, p) * m.pace;
-    o.append(el('p', 'sheetnote', `Ready in about ${durfmt(ms)}${MF.staffOf(m, 'printer').length ? '' : ' (you need a printer)'}. About ${Math.round(MF.wasteRate(m) * 100)}% are spoiled on the way.`));
-    if (Number.isFinite(ms) && ms > left) o.append(el('p', 'sheetnote', `⚠ At your pace (${durfmt(m.pace)} a match) ${p.name}'s contract ends in about ${durfmt(left)}. This batch will not all be ready: what is unmade is cancelled, and what is made sells as cheap vintage stock after two days.`));
-    body.append(o);
-  }
-  // the queue
-  if (m.queue.length) {
-    const q = el('div', 'panel paper statcard'); q.append(el('h3', '', 'Being made'));
-    m.queue.forEach((o, i) => {
-      const r = el('div', 'scoutrow'), tx = el('div');
-      tx.append(el('b', '', `${c.players[o.pid]?.name || o.pid}: ${Math.ceil(o.left)} to go`), el('small', '', m.designs[o.pid] ? 'printing' : 'being designed'));
-      const b = el('button', 'chipbtn', 'Cancel'); b.addEventListener('click', () => done(MF.cancel(m, i)));
-      r.append(tx, b); q.append(r);
-    });
-    body.append(q);
-  }
-  // the staff and the machines
-  const st = el('div', 'panel paper statcard');
-  st.append(el('h3', '', `Staff ${m.staff.length}/${MF.MERCH.LEVELS[m.level].staff}`));
-  for (const s of m.staff) {
-    const r = el('div', 'scoutrow'), tx = el('div');
-    tx.append(el('b', '', `${s.name} · ${MF.ROLES[s.role].name} ${'★'.repeat(s.lvl)}`), el('small', '', `wage ${kfmt(MF.ROLES[s.role].wage * (1 + 0.25 * (s.lvl - 1)))} a day`));
-    const tr = el('button', 'chipbtn', s.lvl >= MF.staffMax(m) ? 'Best for now' : `Train · ${kfmt(MF.trainCost(s))}`); tr.disabled = s.lvl >= MF.staffMax(m);
-    tr.addEventListener('click', () => done(MF.train(m, s.id, ctx())));
-    const fi = el('button', 'chipbtn', 'Let go'); fi.addEventListener('click', () => done(MF.fire(m, s.id)));
-    r.append(tx, tr, fi); st.append(r);
-  }
-  const hire = el('div', 'scoutrow');
-  for (const [role, R] of Object.entries(MF.ROLES)) { const b = el('button', 'chipbtn', `Hire ${R.name.toLowerCase()} · ${kfmt(R.wage)}/day`); b.title = R.about; b.addEventListener('click', () => done(MF.hire(m, role))); hire.append(b); }
-  st.append(hire);
-  st.append(el('p', 'sheetnote', 'Designer: draws each jersey first. Printer: makes them. Packer: fewer are spoiled.'));
-  const L = MF.MERCH.LEVELS[m.level], mr = el('div', 'scoutrow'), mt = el('div');
-  mt.append(el('b', '', `Machines ${m.machines}/${L.machines}`), el('small', '', 'A machine makes one printer twice as fast'));
-  const mb = el('button', 'chipbtn', `Buy · ${kfmt(MF.MERCH.MACHINE_COST)}`); mb.disabled = m.machines >= L.machines; mb.addEventListener('click', () => done(MF.buyMachine(m, ctx())));
-  mr.append(mt, mb); st.append(mr);
-  body.append(st);
-  // the building
-  const up = MF.nextUpgrade(m), bd = el('div', 'panel paper statcard');
-  bd.append(el('h3', '', `The factory: level ${m.level}`), el('p', 'sheetnote', `Room for ${L.staff} staff and ${L.machines} machines · ${L.batch} jerseys a printer at a time · ${L.stock} of each player's jersey in the warehouse`));
-  if (up) { const ub = el('button', 'bigbtn primary', `Upgrade · ${money(up.up)}`); ub.disabled = c.money < up.up; ub.addEventListener('click', () => done(MF.upgrade(m, ctx()))); bd.append(ub); }
-  body.append(bd);
-  if (m.log.length) { const lg = el('div', 'panel paper statcard'); lg.append(el('h3', '', 'News')); for (const e of m.log.slice(-5).reverse()) lg.append(el('p', 'sheetnote', e.text)); body.append(lg); }
+    hd.append(frameOf(playerFace(p, 96), true), el('b', '', p.name), close);
+    const facts = el('div', 'mf-row'); facts.append(ico('heart'), el('span', '', `${Math.round(dmap.get(pid) || 0)} fans a day`), ico('jersey'), el('span', '', `${m.live[pid] || 0} in stock`), ico('clock'), el('span', '', p.contract >= 50 ? 'signed for good' : `${matchesLeft(c, p)} matches left`));
+    const qty = el('div', 'mf-qty');
+    for (const q of [...new Set([10, 20, 50, max].filter(x => x <= max))].sort((a, b) => a - b)) { const b = mfBtn(q === merchQty ? 'on' : '', [el('span', '', String(q))], () => { merchQty = q; paintMerch(c); }); qty.append(b); }
+    const ms = MF.forecast(m, pid, merchQty), left = p.contract >= 50 ? Infinity : matchesLeft(c, p) * m.pace;
+    const eta = el('div', 'mf-row'); eta.append(ico('clock'), el('span', '', MF.staffOf(m, 'printer').length ? `ready in about ${durfmt(ms)}` : 'hire a printer first'), ico('box'), el('span', '', `${Math.round(MF.wasteRate(m) * 100)}% spoiled`));
+    const go = mfBtn('mf-big', [ico('jersey'), el('span', '', `Make ${merchQty} · cloth ${kfmt(merchQty * MF.MERCH.MATERIAL)}`)], () => done(MF.order(m, pid, merchQty, ctx()), true));
+    card.append(hd, facts, qty, eta);
+    if (Number.isFinite(ms) && ms > left) { const w = el('div', 'mf-warn'); w.append(ico('warn'), el('span', '', `At your pace (${durfmt(m.pace)} a match) his contract ends in about ${durfmt(left)}, before this batch is done. What is unmade is cancelled; what is made sells as cheap vintage stock after two days.`)); card.append(w); }
+    card.append(go);
+  } else if (merchSheet.type === 'hire') {
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('users'), el('b', '', 'Hire someone'), close);
+    const roles = el('div', 'mf-roles');
+    for (const [role, R] of Object.entries(MF.ROLES)) {
+      const b = el('button', 'mf-role'), t = el('div'); t.append(el('b', '', R.name), el('small', '', `${R.about} ${kfmt(R.wage)} a day.`));
+      b.append(ico({ designer: 'pencil', printer: 'printer', packer: 'box' }[role]), t);
+      b.addEventListener('click', () => done(MF.hire(m, role), true));
+      roles.append(b);
+    }
+    card.append(hd, roles);
+  } else if (merchSheet.type === 'staff') {
+    const s = m.staff.find(x => x.id === merchSheet.id);
+    if (!s) { merchSheet = null; sh.hidden = true; return; }
+    const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(staffFace(s, club, 96), true), el('b', '', `${s.name} · ${MF.ROLES[s.role].name}`), close);
+    const info = el('div', 'mf-row'); info.append(el('span', 'mf-stars', '★'.repeat(s.lvl)), ico('coin'), el('span', '', `${kfmt(MF.ROLES[s.role].wage * (1 + 0.25 * (s.lvl - 1)))} a day`));
+    const maxed = s.lvl >= MF.staffMax(m);
+    const tr = mfBtn('mf-big alt', [ico('up'), el('span', '', maxed ? 'Best for now' : `Train · ${kfmt(MF.trainCost(s))}`)], () => done(MF.train(m, s.id, ctx())));
+    tr.disabled = maxed;
+    card.append(hd, info, tr, mfBtn('mf-big red', [ico('cross'), el('span', '', 'Let go')], () => done(MF.fire(m, s.id), true)));
+  } else { merchSheet = null; sh.hidden = true; return; }
+  sh.replaceChildren(card);
 }
 addEventListener('visibilitychange', () => { if (!document.hidden && !$('merch').hidden) renderMerch(); });
 
