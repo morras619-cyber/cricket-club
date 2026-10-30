@@ -38,6 +38,24 @@ export function coachSay(lines) {
   return queue;
 }
 
+// a question with two answers (the same card, two buttons): resolves true for the first, false for the second
+export function coachAsk(text, yes = 'Yes', no = 'Later') {
+  queue = queue.then(() => new Promise(done => {
+    const box = $('coach'), line = $('coachText'), next = $('coachNext'), skip = $('coachSkip');
+    line.textContent = text; next.textContent = yes; skip.textContent = no; skip.hidden = false;
+    const close = v => {
+      box.classList.remove('up');
+      next.onclick = skip.onclick = null; skip.textContent = 'Skip';
+      setTimeout(() => { box.hidden = true; done(v); }, 220);
+    };
+    next.onclick = e => { e.stopPropagation(); close(true); };
+    skip.onclick = e => { e.stopPropagation(); close(false); };
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add('up'));
+  }));
+  return queue;
+}
+
 // his advice for a moment, the first time it comes up (then never again unless asked)
 export function coachOnce(key, lines) {
   if (!store || store.seen(key)) return Promise.resolve(false);
@@ -114,6 +132,7 @@ export const DEV = {
     "What did I tell you? A natural!",
     "Now the real thing, beta: build your own club in the Super League. Tap the button below.",
   ],
+  tutorialAsk: "Your club is born, beta! Want a quick batting lesson before the first match? It is always in Settings, too.",
   quickTeam: [
     "Pick your side, beta. Swipe through the clubs and check their ratings underneath.",
     "Each club plays differently: big hitters, swing bowlers, spinners. Choose one that suits how you like to play.",

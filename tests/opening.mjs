@@ -20,7 +20,7 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [], fails = [];
 page.on('pageerror', e => errors.push(String(e.stack || e)));
 page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
-await page.addInitScript(() => { try { if (!localStorage.getItem('sixcharge.profile.v1')) localStorage.setItem('sixcharge.profile.v1', JSON.stringify({ tutorialDone: true, coachSeen: { welcome: 1 } })); } catch {} });
+await page.addInitScript(() => { try { if (!localStorage.getItem('sixcharge.profile.v1')) localStorage.setItem('sixcharge.profile.v1', JSON.stringify({ coachSeen: { welcome: 1 } })); } catch {} });
 const check = (ok, what) => { console.log(ok ? 'ok  ' : 'FAIL', what); if (!ok) fails.push(what); };
 await page.goto(`http://localhost:${server.address().port}/`); await page.waitForTimeout(900);
 await page.evaluate(() => document.getElementById('tPlay').click()); await page.waitForTimeout(1800);   // (Play goes straight into the career: its opening story)

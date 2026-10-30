@@ -3,7 +3,7 @@ const KEY = 'sixcharge.profile.v1';
 export const DAILY = [50, 60, 70, 80, 90, 100, 250];
 
 const fresh = () => ({
-  name: '', xp: 0, coins: 0, gems: 0, matches: 0, wins: 0, best: 0, tutorialDone: false,
+  name: '', xp: 0, coins: 0, gems: 0, matches: 0, wins: 0, best: 0, tutorialDone: false, tutorialOffered: false,
   team: 'thunder',
   unlocked: [], // signed heroes (your own team's star is always yours)
   lineups: {}, // per team id: { order: [player ids], attack: [player ids] }

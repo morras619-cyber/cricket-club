@@ -20,7 +20,7 @@ const page = await browser.newPage({ viewport: { width: vw, height: vh } });
 const errors = [], fails = [];
 page.on('pageerror', e => errors.push(String(e.stack || e)));
 page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
-await page.addInitScript(() => { window.__SIXCHARGE_BOT = true; window.__SIXCHARGE_SPEED = 4; try { if (!localStorage.getItem('sixcharge.profile.v1')) localStorage.setItem('sixcharge.profile.v1', JSON.stringify({ tutorialDone: true, coachSeen: { welcome: 1 } })); } catch {} });   // (a player who has done the tutorial: Play goes straight to the career)
+await page.addInitScript(() => { window.__SIXCHARGE_BOT = true; window.__SIXCHARGE_SPEED = 4; try { if (!localStorage.getItem('sixcharge.profile.v1')) localStorage.setItem('sixcharge.profile.v1', JSON.stringify({ coachSeen: { welcome: 1 } })); } catch {} });   // (a new player: Play goes straight to the career, and the tutorial is offered after the club is built)
 const check = (ok, what) => { console.log(ok ? 'ok  ' : 'FAIL', what); if (!ok) fails.push(what); };
 await page.goto(`http://localhost:${server.address().port}/`); await page.waitForTimeout(900);
 await page.evaluate(() => { document.getElementById('tPlay').click(); });   // (Play goes straight into the career: a new one starts with its region)
@@ -33,6 +33,10 @@ check(await page.evaluate(() => document.querySelectorAll('#mkChants button').le
 await page.evaluate(() => { document.querySelector('#mkChants button[data-k="vipers"]').click(); document.querySelector('#mkPitches button[data-p="turner"]').click(); }); await page.waitForTimeout(300);
 await page.fill('#mkNameIn', 'Harbour Kings'); await page.waitForTimeout(300);
 await page.evaluate(() => document.getElementById('mkGo').click()); await page.waitForTimeout(800);
+check(await page.evaluate(() => !document.getElementById('coach').hidden && /batting lesson/.test(document.getElementById('coachText').textContent) && document.getElementById('coachNext').textContent === 'Yes, teach me'), 'once the club is built, Uncle Dev offers the tutorial');
+await page.waitForTimeout(500);
+await page.evaluate(() => document.getElementById('coachSkip').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => window.__sixcharge.profile.tutorialOffered === true && window.__sixcharge.profile.tutorialDone === false && document.getElementById('coach').hidden), 'a "Later" is remembered: he does not ask again');
 check(/Go to the nets/.test(await page.textContent('#careerBody')), 'a new club goes to the nets, with nobody signed');
 check(await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('sixcharge.profile.v1')).career; return c.custom.chant === 'vipers' && c.custom.pitch === 'turner'; }), 'the chant and the pitch chosen are the club\'s');
 await page.evaluate(() => [...document.querySelectorAll('#careerBody button')].find(b => /Go to the nets/.test(b.textContent)).click());
@@ -135,6 +139,10 @@ check(await page.evaluate(async () => { const t = document.getElementById('merch
 check(await page.evaluate(() => !window.__sixcharge.profile.career.merch || window.__sixcharge.profile.career.merch.staff.length === 2), 'the practice factory does not touch the saved career');
 await page.evaluate(() => document.getElementById('merchBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the practice factory is the settings');
+await page.evaluate(() => document.getElementById('setTutorial').click()); await page.waitForTimeout(700);
+check(await page.evaluate(() => !document.getElementById('cover').hidden), 'the tutorial can be played again from the settings');
+await page.evaluate(() => document.getElementById('coverBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the tutorial is the settings');
 // the settings' Club map level: cycle to level 3 and the map shows it (and level 2, to draw both)
 await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
 for (const want of [2, 3]) {

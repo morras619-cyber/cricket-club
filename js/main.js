@@ -31,7 +31,7 @@ import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { createClubMap } from './clubmap.js';
 import * as MF from './merch.js';
-import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
+import { initCoach, coachOnce, coachSay, coachAsk, DEV, QUICK_TIPS } from './coach.js';
 import { taunt } from './story.js';
 import { playComic, preloadComic, titleCard, NIGHT, EXIT } from './comic.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
@@ -247,12 +247,12 @@ function renderTitle() {
   $('tStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
 }
 // (a player who has not done the tutorial goes to it first: the same one as the Tutorial button)
-$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) showCover(); else renderHome(); });
+$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); renderHome(); });   // (a new player sees the story first, then builds a club; Uncle Dev offers the tutorial after that)
 // where the settings, the shop, the trophies, the stats and the tutorial go back to (there is no hub): the title, the club map, or the settings
 let settingsFrom = null, shopFrom = null, moreFrom = null;
 $('tSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = renderTitle; renderSettings(); });
 for (const id of ['tCoinPill', 'tGemPill']) $(id).addEventListener('click', () => { unlockAudio(); shopFrom = renderTitle; renderShop(); });
-$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) showCover(); else renderHome(); });
+$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); renderHome(); });
 
 // ---------- home: the hub ----------
 // There is no hub screen: Play goes into the Super League. (?modes=all brings the old hub back, for the tests.)
@@ -1694,8 +1694,15 @@ $('mkGo').addEventListener('click', () => {
     sfx.dhol(); saveProfile(profile);
     careerNotes = [`🏟️ ${name} are born! They take the place of ${c.custom.gone} in Division 3.`];
     renderCareer();
+    offerTutorial();
   }
 });
+// the first time a club is born, Uncle Dev offers the tutorial: once, and only to a player who has not done it (it stays in the settings)
+async function offerTutorial() {
+  if (profile.tutorialDone || profile.tutorialOffered) return;
+  profile.tutorialOffered = true; saveProfile(profile);
+  if (await coachAsk(DEV.tutorialAsk, 'Yes, teach me', 'Later')) { moreFrom = () => renderCareer(); showCover(); }
+}
 
 // ---------- the nets: the new club's first squad (career.js net trials) ----------
 let trialSel = null;
