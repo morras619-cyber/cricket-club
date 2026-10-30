@@ -30,7 +30,7 @@ import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
-import { storyIntro, taunt } from './story.js';
+import { taunt } from './story.js';
 import { playComic, preloadComic, titleCard, NIGHT, EXIT } from './comic.js';
 import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
@@ -244,11 +244,11 @@ function renderTitle() {
   $('tName').textContent = t.name;
   $('tStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
 }
-// (a player who has not done the tutorial goes to it first: the story of the Thunder Strikers)
-$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) startStory(); else renderHome(); });
+// (a player who has not done the tutorial goes to it first: the same one as the Tutorial button)
+$('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) showCover(); else renderHome(); });
 $('tSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
 for (const id of ['tCoinPill', 'tGemPill']) $(id).addEventListener('click', () => { unlockAudio(); renderShop(); });
-$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) startStory(); else renderHome(); });
+$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!profile.tutorialDone && !challenge) showCover(); else renderHome(); });
 
 // ---------- home: the hub ----------
 function renderHome() {
@@ -726,14 +726,6 @@ function coverTipsShow() {
 }
 $('coverTips').addEventListener('click', () => { tutTips = !tutTips; profile.tutTips = tutTips; saveProfile(profile); sfx.click(); coverTipsShow(); });
 $('coverGo').addEventListener('click', () => startMatch({ mode: 'tutorial' }));
-
-// ---------- the first-time story ----------
-// Uncle Dev tells it (a few panels), then the match at the Thunderdome against the unbeaten Thunder Strikers
-async function startStory() {
-  tutTips = true;   // (his advice can't be turned off the first time)
-  if (!window.__SIXCHARGE_BOT) { ui.show(null); await storyIntro(); }
-  startMatch({ mode: 'tutorial', story: true });
-}
 
 // ---------- match ----------
 // The match stopped on an error (a bug): what it was, to read out, and the way back to the menu.
