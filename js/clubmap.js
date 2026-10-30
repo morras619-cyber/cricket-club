@@ -12,14 +12,14 @@ const SITES = {
   apartment:{ x: 0.725, y: 0.211, w: 0.314 },
   office:   { x: 0.224, y: 0.310, w: 0.316 },
   academy:  { x: 0.808, y: 0.356, w: 0.295 },
-  medical:  { x: 0.236, y: 0.569, w: 0.320 },
+  medical:  { x: 0.234, y: 0.570, w: 0.320 },
   clubhouse:{ x: 0.767, y: 0.582, w: 0.309 },
   shop:     { x: 0.231, y: 0.719, w: 0.341 },
   merch:    { x: 0.750, y: 0.749, w: 0.313 },
 };
 const ORDER = Object.keys(SITES).sort((a, b) => SITES[a].y - SITES[b].y);   // far to near, the near ones painted over the far
 // where each building is in img/map/buildings.webp (and its tint in buildings-tint.webp): [row, height], all 1100 wide (tools/build_map.py)
-const ATLAS = {"stadium": [0, 647], "training": [647, 714], "office": [1361, 704], "apartment": [2065, 732], "medical": [2797, 660], "academy": [3457, 743], "clubhouse": [4200, 702], "shop": [4902, 709], "merch": [5611, 675]};
+const ATLAS = {"stadium": [0, 647], "training": [647, 714], "office": [1361, 704], "apartment": [2065, 732], "medical": [2797, 651], "academy": [3448, 743], "clubhouse": [4191, 702], "shop": [4893, 709], "merch": [5602, 675]};
 const AW = 1100;
 const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const load = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
