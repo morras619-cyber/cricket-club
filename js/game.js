@@ -6,7 +6,7 @@ import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
-import { gradeTiming, swipeToShot, resolveContact } from './shots.js';
+import { gradeTiming, swipeToShot, resolveContact, aimVector } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
@@ -188,20 +188,23 @@ export class Game {
     const evReal = e => this.realTime + (e.timeStamp - this.lastNow) * this.speed;
     cv.addEventListener('pointerdown', e => {
       e.preventDefault(); unlockAudio();
-      this.g = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t0: evReal(e) };
+      this.g = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t0: evReal(e), path: [{ x: e.clientX, y: e.clientY, t: evReal(e) }] };
       try { cv.setPointerCapture(e.pointerId); } catch { /* ignore */ }
       this.emit('down', { ...this.g, t: this.g.t0 });
     });
     cv.addEventListener('pointermove', e => {
       if (!this.g || e.pointerId !== this.g.id) return;
       this.g.x = e.clientX; this.g.y = e.clientY;
+      // (every move the browser coalesced into this one, so a fast flick keeps its whole path)
+      for (const c of e.getCoalescedEvents ? e.getCoalescedEvents() : [e]) { this.g.path.push({ x: c.clientX, y: c.clientY, t: evReal(c) }); if (this.g.path.length > 80) this.g.path.shift(); }
       this.emit('move', { ...this.g, t: evReal(e) });
     });
     cv.addEventListener('pointerup', e => {
       if (!this.g || e.pointerId !== this.g.id) return;
       const g = this.g; this.g = null;
       g.x = e.clientX; g.y = e.clientY;
-      this.emit('up', { ...g, dx: g.x - g.x0, dy: g.y - g.y0, t: evReal(e) });
+      const tUp = evReal(e), aim = aimVector(g.path, g.x0, g.y0, g.x, g.y, tUp);   // (ax, ay: the direction of the flick at the length of the swipe; dx, dy stay the whole swipe)
+      this.emit('up', { ...g, dx: g.x - g.x0, dy: g.y - g.y0, ax: aim.dx, ay: aim.dy, t: tUp });
     });
     cv.addEventListener('pointercancel', () => { this.g = null; });
 
@@ -212,7 +215,7 @@ export class Game {
   // Synthetic input for the automated playtest bot.
   botInput(type, data = {}) {
     const g = { x0: this.W / 2, y0: this.H * 0.7, dx: 0, dy: 0, t: this.realTime, t0: this.realTime - 120, ...data };
-    g.x = g.x0 + g.dx; g.y = g.y0 + g.dy;
+    g.x = g.x0 + g.dx; g.y = g.y0 + g.dy; g.ax = g.dx; g.ay = g.dy;
     this.emit(type, g);
   }
 
@@ -939,10 +942,10 @@ export class Game {
         const tap = Math.hypot(g.dx, g.dy) < 28 && g.t - g.t0 < 320;
         const tg = this.realToGame(tap ? g.t0 : g.t);
         if (tg < S.ballT0 + 0.15) { S.batter.angle = -0.4; return; }
-        swing = { t: tg, dx: g.dx, dy: g.dy, defend: tap };
+        swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, defend: tap };
         S.batter.swingT0 = this.realTime;
         if (!tap) this.swingArc(this.myTeam, 'bat');
-        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.dx, g.dy, this.loftPx, this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
+        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.ax ?? g.dx, g.ay ?? g.dy, this.loftPx, this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
     if (this.bot) this.botBat(d, S, fx, rng);

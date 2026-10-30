@@ -20,8 +20,27 @@ export function swipeToShot(dx, dy, loftPx = 110, loft = null) {
   return { kind: 'drive', angle, loft: loft ?? len > loftPx, len };
 }
 
+// Where the swipe was aimed: the direction of its fastest stretch (the flick itself), at the length of the whole swipe. The straight line from where the finger first
+// touched to where it lifted bends the shot away from the flick whenever the swipe starts with a rest or a wobble or drifts sideways as the finger comes off; the flick
+// is the part the player means. path: [{ x, y, t }] oldest first. Falls back to the whole swipe when no stretch is long and quick enough to read.
+export function aimVector(path, x0, y0, x, y, tUp, minPx = 28) {
+  const whole = { dx: x - x0, dy: y - y0 }, wl = Math.hypot(whole.dx, whole.dy);
+  if (!path || path.length < 3 || wl < minPx) return whole;
+  let best = null;
+  for (let i = 0; i < path.length - 1; i++) {
+    // the shortest stretch from i that spans at least 24 ms and 12 px
+    for (let j = i + 1; j < path.length; j++) {
+      const dt = path[j].t - path[i].t, dx = path[j].x - path[i].x, dy = path[j].y - path[i].y, len = Math.hypot(dx, dy);
+      if (dt >= 24 && len >= 12) { const v = len / dt; if (!best || v > best.v) best = { v, dx, dy, len }; break; }
+    }
+  }
+  if (!best) return whole;
+  return { dx: best.dx / best.len * wl, dy: best.dy / best.len * wl };
+}
+
 const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };
-const SPREAD = { perfect: 0.04, good: 0.12, early: 0.25, late: 0.25 };
+// how far the ball strays from the swipe's direction (a standard deviation, radians), by the timing grade: a clean contact goes where the finger went
+const SPREAD = { perfect: 0.025, good: 0.07, early: 0.16, late: 0.16 };
 
 function isAgainstLine(angle, d) {
   const full = ['full', 'yorker', 'good', 'fulltoss'].includes(d.length);

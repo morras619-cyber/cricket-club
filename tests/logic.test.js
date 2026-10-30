@@ -257,3 +257,32 @@ test('each swipe direction plays its own shot', async () => {
   const l = deg => shotAnim({ kind: 'drive', angle: deg * Math.PI / 180, loft: true });
   assert.equal(l(0), 'loft'); assert.equal(l(35), 'loft'); assert.equal(l(80), 'cut'); assert.equal(l(-80), 'pull');
 });
+
+// the swipe is aimed by its flick (its fastest stretch), not by the line from where the finger first touched to where it lifted
+test('the aim of a swipe is its flick, and the whole swipe when no stretch is long and quick enough', async () => {
+  const { aimVector } = await import('../js/shots.js');
+  // rests, flicks up and a little right, then drifts left as the finger comes off
+  const path = [{ x: 200, y: 600, t: 0 }, { x: 201, y: 600, t: 250 }, { x: 205, y: 560, t: 270 }, { x: 215, y: 500, t: 290 }, { x: 228, y: 440, t: 310 }, { x: 232, y: 400, t: 330 }, { x: 205, y: 395, t: 360 }, { x: 150, y: 398, t: 390 }];
+  const a = aimVector(path, 200, 600, 150, 398, 400);
+  assert.ok(Math.abs(Math.atan2(a.dx, -a.dy)) < 0.35, `the flick was nearly straight: ${a.dx.toFixed(0)}, ${a.dy.toFixed(0)}`);   // (the whole swipe's own line is about -14 degrees)
+  assert.ok(Math.abs(Math.hypot(a.dx, a.dy) - Math.hypot(-50, -202)) < 1, 'at the length of the whole swipe');
+  assert.deepEqual(aimVector([{ x: 0, y: 0, t: 0 }, { x: 1, y: 0, t: 5 }, { x: 2, y: 0, t: 9 }], 0, 0, 40, -138, 20), { dx: 40, dy: -138 }, 'nothing long and quick enough: the whole swipe');
+  assert.deepEqual(aimVector(null, 5, 5, 25, -95, 100), { dx: 20, dy: -100 }, 'no path: the whole swipe');
+  const straight = [{ x: 0, y: 300, t: 0 }, { x: 0, y: 200, t: 100 }, { x: 0, y: 100, t: 200 }];
+  assert.equal(aimVector(straight, 0, 300, 0, 100, 200).dx, 0);
+});
+
+// a clean contact goes where the finger went: the spread of the ball's direction by timing grade
+test('a Perfect and a Good contact go close to the swipe, a Late or Early one a little further off', async () => {
+  const { resolveContact } = await import('../js/shots.js');
+  const { makeRng } = await import('../js/rng.js');
+  const d = makeDelivery({ x: 0.1, length: 'good', kmh: 130 });
+  const sd = grade => {
+    const rng = makeRng(11), xs = [];
+    for (let i = 0; i < 400; i++) { const r = resolveContact({ grade, errMs: 0, shot: { kind: 'drive', angle: 0.3, loft: false, len: 150 }, d, rng }); if (r.outcome === 'hit' && !r.label) xs.push(r.angle - 0.3); }
+    const m = xs.reduce((a, b) => a + b, 0) / xs.length; return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length);
+  };
+  const p = sd('perfect'), g = sd('good'), l = sd('late');
+  assert.ok(p < 0.04 && g < 0.09 && l < 0.2, `spread perfect ${p.toFixed(3)} good ${g.toFixed(3)} late ${l.toFixed(3)}`);
+  assert.ok(p < g && g < l);
+});

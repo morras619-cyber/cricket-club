@@ -37,19 +37,19 @@ export const OLD_FRAME = { cut4: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rswee
 // frame, ms on screen. The swing starts when the finger lifts, which is the moment of contact,
 // so the downswing is brief and the contact frame lands almost at once.
 export const SEQ = {
-  drive: [['drive1', 25], ['drive2', 35], ['drive3', Infinity]],
+  drive: [['drive1', 40], ['drive2', 55], ['drive3', Infinity]],
   ondrive: [['ondrive1', 160], ['ondrive2', Infinity]], // through the ball, round to the leg side
   straight: [['straight1', 160], ['straight3', Infinity]], // bat through the line, a high finish with the bat held up
-  loft: [['cover0', 30], ['cover2', 40], ['loft1', Infinity]], // a lifted drive: through the ball, eyes up, a high finish
-  cover: [['cover0', 30], ['cover2', 40], ['cover3', Infinity]], // down, through the ball, high finish: off side
+  loft: [['cover0', 45], ['cover2', 55], ['loft1', Infinity]], // a lifted drive: through the ball, eyes up, a high finish
+  cover: [['cover0', 45], ['cover2', 55], ['cover3', Infinity]], // down, through the ball, high finish: off side
   pull: [['pull1', 150], ['pull2', Infinity]], // swung across to leg, through
-  cut: [['cut1', 25], ['cutflat', 30], ['cut3', 100], ['cut4', Infinity]],
+  cut: [['cut1', 40], ['cutflat', 45], ['cut3', 110], ['cut4', Infinity]],
   rsweep: [['rsweep1', 60], ['rsweep2', 130], ['rsweep3', Infinity]], // down on one knee, swept fine on the off side
   block: [['def1', Infinity]],   // (one pose: the bat grounded in front of him, no extra move)
   leave: [['leave1', 170], ['leave2', Infinity]],
   bowled: [['bowled', Infinity]], // beaten: looking back at the stumps
 };
-const BLEND_MS = 40;
+const BLEND_MS = 70;   // (how long the frame before is faded out under the next: longer, so the poses flow into each other)
 
 // Which animation a swipe plays: each direction its own shot, so the bat goes where the ball goes.
 // angle: 0 straight back past the bowler, + toward the off side (right of the screen), − leg side.
