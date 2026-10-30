@@ -22,9 +22,9 @@ for i,sl in enumerate(ndi.find_objects(lab),1):
         ys,xs=np.where(lab==i); plots.append(dict(cx=xs.mean(),cy=ys.mean(),x0=xs.min(),x1=xs.max()))
 ATLAS={"stadium":[0,681],"training":[681,714],"office":[1395,704],"apartment":[2099,732],"medical":[2831,660],"academy":[3491,743],"clubhouse":[4234,702],"shop":[4936,709]}
 atlas=Image.open(R+'img/map/buildings.webp').convert('RGBA'); al=np.array(atlas)[...,3]
-plots.append(dict(cx=0.5*W,cy=0.455*H,x0=0.285*W,x1=0.715*W))
+plots.append(dict(cx=0.505*W,cy=0.465*H,x0=0.33*W,x1=0.68*W))
 def pick(fx,fy): return min(plots,key=lambda p:(p['cx']/W-fx)**2+(p['cy']/H-fy)**2)
-assign={'stadium':(.5,.455),'training':(.31,.18),'apartment':(.68,.22),'office':(.22,.32),'academy':(.8,.345),'medical':(.23,.58),'clubhouse':(.78,.59),'shop':(.22,.71)}
+assign={'stadium':(.505,.465),'training':(.32,.20),'apartment':(.72,.24),'office':(.23,.34),'academy':(.79,.37),'medical':(.21,.58),'clubhouse':(.80,.60),'shop':(.24,.74)}
 out={}; canvas=base.convert('RGBA')
 for n,(fx,fy) in assign.items():
     p=pick(fx,fy); row,h=ATLAS[n]; m=al[row:row+h]>60
