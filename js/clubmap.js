@@ -16,19 +16,21 @@ const SITES = {
   shop:      { x: 0.23, y: 0.725, w: 0.36 },
 };
 const ORDER = Object.keys(SITES).sort((a, b) => SITES[a].y - SITES[b].y);   // far to near, the near ones painted over the far
-const SOURCES = { stadium: [1100, 681], training: [1100, 714], office: [1100, 704], apartment: [1100, 732], medical: [1100, 660], academy: [1100, 743], clubhouse: [1100, 702], shop: [1100, 709] };
+// where each building is in img/map/buildings.webp (and its tint in buildings-tint.webp): [row, height], all 1100 wide (tools/build_map.py)
+const ATLAS = {"stadium": [0, 681], "training": [681, 714], "office": [1395, 704], "apartment": [2099, 732], "medical": [2831, 660], "academy": [3491, 743], "clubhouse": [4234, 702], "shop": [4936, 709]};
+const AW = 1100;
 const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const load = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
 const frame = () => new Promise(r => setTimeout(r, 0));
 
 // one building painted in the club's colours: a canvas, and where it is solid (a coarse alpha grid, for taps)
-function paint(base, tint, club) {
-  const w = base.naturalWidth, h = base.naturalHeight;
+function paint(base, tint, id, club) {
+  const [row, h] = ATLAS[id], w = AW;
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true });
-  g.drawImage(base, 0, 0);
+  g.drawImage(base, 0, row, w, h, 0, 0, w, h);
   const B = g.getImageData(0, 0, w, h), o = B.data;
-  g.clearRect(0, 0, w, h); g.drawImage(tint, 0, 0);
+  g.clearRect(0, 0, w, h); g.drawImage(tint, 0, row, w, h, 0, 0, w, h);
   const T = g.getImageData(0, 0, w, h).data;
   const su = rgbOf(club.suit).map(v => v / (255 * GREY)), tr = rgbOf(club.trim).map(v => v / (255 * GREY));
   for (let i = 0; i < o.length; i += 4) {
@@ -45,7 +47,7 @@ function paint(base, tint, club) {
 
 export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
   const g = canvas.getContext('2d');
-  let base = null, club = null, info = {}, selected = null, shown = false, dirty = false, session = 0;
+  let base = null, sheets = null, club = null, info = {}, selected = null, shown = false, dirty = false, session = 0;
   const art = {};              // id -> { canvas, solid ... }
   const cache = new Map();     // 'suit|trim' -> art (the last club painted stays)
   let vw = 1, vh = 1, dpr = 1, scale = 1, minScale = 0, maxScale = 3, ox = 0, oy = 0;   // the camera: map px * scale + offset = css px
@@ -188,10 +190,11 @@ export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
       const key = `${c.suit}|${c.trim}`;
       if (cache.has(key)) { for (const id of ORDER) art[id] = cache.get(key)[id]; redraw(); onFirstDraw?.(); return; }
       const set = {};
+      sheets ||= await Promise.all([load('img/map/buildings.webp'), load('img/map/buildings-tint.webp')]);
+      if (mine !== session) return;
       for (const id of [...ORDER].sort((a, b) => (a === 'stadium' ? -1 : b === 'stadium' ? 1 : 0))) {
-        const [b, t] = await Promise.all([load(`img/map/${id}.webp`), load(`img/map/${id}-tint.webp`)]);
+        set[id] = art[id] = paint(sheets[0], sheets[1], id, club); redraw(); await frame();
         if (mine !== session) return;
-        set[id] = art[id] = paint(b, t, club); redraw(); await frame();
       }
       cache.clear(); cache.set(key, set);
       onFirstDraw?.();

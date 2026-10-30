@@ -5,9 +5,9 @@ usage: python3 tools/build_map.py [name ...]      (all of them when none is name
 
 SOURCE (tools/map): base.png (the empty estate, 2048 x 3072) and one picture per building at level 1 (stadium, training, office, apartment, medical,
 academy, clubhouse, shop), each on flat magenta (or already transparent). Roofs, awnings and seats are one royal blue; trim is one golden yellow.
-OUT (img/map): base.webp, and per building <name>.webp (the cut-out, the blue and yellow turned into a grey ramp, so the club's colour multiplied
-on gives the club's colour at the painted brightness) and <name>-tint.webp (R the main colour's weight, G the trim's), plus map.json (each
-building's size in its picture; where it sits on the map is in js/clubmap.js).
+OUT (img/map): base.webp, buildings.webp (the eight cut-outs one under the other, the blue and yellow turned into a grey ramp, so the club's colour
+multiplied on gives the club's colour at the painted brightness) and buildings-tint.webp (R the main colour's weight, G the trim's); where each
+building is in them is printed (ATLAS, in js/clubmap.js), and where it stands on the map is SITES there.
 Needs numpy, Pillow and scipy.
 """
 import json, os, sys
@@ -79,24 +79,23 @@ def build(name):
     sz = (w, round(rgb.shape[0] * w / rgb.shape[1]))
     base = Image.fromarray((np.dstack([out, al]) * 255 + .5).astype(np.uint8), 'RGBA').resize(sz, Image.LANCZOS)
     tn = Image.fromarray((tint * 255 + .5).astype(np.uint8), 'RGB').resize(sz, Image.LANCZOS)
-    base.save(os.path.join(OUT, name + '.webp'), quality=90, method=6)
-    tn.save(os.path.join(OUT, name + '-tint.webp'), quality=90, method=6)
-    return dict(w=sz[0], h=sz[1])
+    return base, tn
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    names = sys.argv[1:] or ['base'] + NAMES
-    meta = json.load(open(os.path.join(OUT, 'map.json'))) if os.path.exists(os.path.join(OUT, 'map.json')) else {}
-    for n in names:
-        if n == 'base':
-            im = Image.open(os.path.join(SRC, 'base.png')).convert('RGB')
-            im.resize((1536, 2304), Image.LANCZOS).save(os.path.join(OUT, 'base.webp'), quality=84, method=6)
-            meta['base'] = dict(w=1536, h=2304)
-        else:
-            meta[n] = build(n)
+    im = Image.open(os.path.join(SRC, 'base.png')).convert('RGB')
+    im.resize((1536, 2304), Image.LANCZOS).save(os.path.join(OUT, 'base.webp'), quality=84, method=6)
+    parts = {n: build(n) for n in (sys.argv[1:] or NAMES)}
+    # all the buildings in one picture (and their tints in another), one under the other: the map is published with a limit on its files
+    H = sum(b.size[1] for b, _ in parts.values())
+    atlas, tints, y, meta = Image.new('RGBA', (WIDTH, H)), Image.new('RGB', (WIDTH, H)), 0, {}
+    for n, (b, t) in parts.items():
+        atlas.paste(b, (0, y)); tints.paste(t, (0, y)); meta[n] = [y, b.size[1]]; y += b.size[1]
         print(n, meta[n])
-    json.dump(meta, open(os.path.join(OUT, 'map.json'), 'w'), indent=1)
+    atlas.save(os.path.join(OUT, 'buildings.webp'), quality=90, method=6, exact=True)
+    tints.save(os.path.join(OUT, 'buildings-tint.webp'), quality=90, method=6)
+    print('ATLAS =', json.dumps(meta))   # (js/clubmap.js: where each building is in the picture: [row, height], all WIDTH wide)
 
 
 if __name__ == '__main__':
