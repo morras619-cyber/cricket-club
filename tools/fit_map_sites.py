@@ -2,7 +2,7 @@
 """Where the buildings stand on the club map (SITES in js/clubmap.js): each is fitted to its plot in img/map/base.webp (the plot found by its bare ground),
 its base's middle on the plot's middle and its base as wide as the plot (times K).
 
-usage: python3 tools/fit_map_sites.py [K [preview.png]]      (K 1.2 by default; prints SITES, saves a preview of the buildings on the map)
+usage: python3 tools/fit_map_sites.py [K [preview.png [margin [level]]]]      (K 1.2 by default, level 1; prints SITES of the level, saves a preview of the buildings on the map)
 (the stadium is fitted to the round plot in the middle, which has no bare ground: its place is given by hand below, and SITES's stadium was then made a little smaller)
 """
 import os
@@ -12,6 +12,8 @@ from scipy import ndimage as ndi
 R=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..')+os.sep
 K=float(sys.argv[1]) if len(sys.argv)>1 else 1.2
 MARGIN=float(sys.argv[3]) if len(sys.argv)>3 else 30
+LEVEL=int(sys.argv[4]) if len(sys.argv)>4 else 1
+SFX='' if LEVEL==1 else str(LEVEL)
 base=Image.open(R+'img/map/base.webp').convert('RGB').resize((1536,2304),Image.LANCZOS); W,H=base.size   # (the original: the pads are found by their bare ground)
 a=np.array(base).astype(float); r,g,b=a[...,0],a[...,1],a[...,2]
 dirt=(g>r*1.25)&(g>b*1.6)&(g>95)&(g<185)
@@ -21,8 +23,8 @@ plots=[]
 for i,sl in enumerate(ndi.find_objects(lab),1):
     if (lab[sl]==i).sum()>40000:
         ys,xs=np.where(lab==i); plots.append(dict(cx=(xs.min()+xs.max())/2,cy=(ys.min()+ys.max())/2,x0=xs.min(),x1=xs.max(),y1=ys.max()))
-ATLAS={"stadium":[0,647],"training":[647,645],"office":[1292,688],"apartment":[1980,764],"medical":[2744,651],"academy":[3395,659],"clubhouse":[4054,601],"shop":[4655,709],"merch":[5364,675]}
-atlas=Image.open(R+'img/map/buildings.webp').convert('RGBA'); al=np.array(atlas)[...,3]
+ATLAS=json.load(open(R+'tools/map/atlas%d.json'%LEVEL))
+atlas=Image.open(R+'img/map/buildings%s.webp'%SFX).convert('RGBA'); al=np.array(atlas)[...,3]
 def pick(fx,fy): return min(plots,key=lambda p:(p['cx']/W-fx)**2+(p['cy']/H-fy)**2)
 assign={'stadium':(.503,.444),'training':(.34,.195),'apartment':(.735,.245),'office':(.224,.334),'academy':(.812,.382),'medical':(.24,.584),'clubhouse':(.766,.594),'shop':(.239,.739),'merch':(.749,.757)}
 out={}; canvas=Image.open(R+'img/map/base.webp').convert('RGBA').resize((W,H))

@@ -74,6 +74,15 @@ await page.waitForTimeout(700);
 check(await page.evaluate(() => /on the job/.test(document.querySelector('.groundpanel')?.textContent || '')), 'the caretaker is hired and on the job');
 await page.evaluate(() => document.getElementById('setClubMap').click()); await page.waitForTimeout(1500);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden && /Test view/.test(document.getElementById('mapSub').textContent)), 'the settings open the club map as a test view');
+// the settings' Club map level: cycle to level 3 and the map shows it (and level 2, to draw both)
+await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
+for (const want of [2, 3]) {
+  while (!new RegExp(`level: ${want}`).test(await page.evaluate(() => document.getElementById('setMapLevel').textContent))) await page.evaluate(() => document.getElementById('setMapLevel').click());
+  await page.evaluate(() => document.getElementById('setClubMap').click()); await page.waitForTimeout(3500);
+  check(await page.evaluate(w => new RegExp(`level ${w}`).test(document.getElementById('mapSub').textContent), want), `the settings' map level ${want} opens the map at level ${want}`);
+  if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, `club-map-level${want}.png`) });
+  await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(400);
+}
 check(errors.length === 0, `no page errors${errors.length ? ': ' + errors[0] : ''}`);
 await browser.close(); server.close();
 process.exit(fails.length ? 1 : 0);

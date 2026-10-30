@@ -315,11 +315,17 @@ function renderSettings() {
   state('setHaptics', sound.haptics ? 'On' : 'Off', sound.haptics);
   state('setField', { key: 'Key moments', all: 'Every chance', off: 'Auto' }[game.settings.fielding], game.settings.fielding !== 'off');
   state('setUnits', units.speed === 'mph' ? 'mph' : 'km/h', true);
+  $('setMapLevel').textContent = mapLevelText();
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
 $('settingsBack').addEventListener('click', () => renderHome());
 $('setClubMap').addEventListener('click', () => { unlockAudio(); sfx.click(); renderClubMap(true); });
+$('setMapLevel').addEventListener('click', () => {
+  mapLevel.v = (mapLevel.v + 1) % 4;
+  try { localStorage.setItem('sixcharge.mapLevel', String(mapLevel.v)); } catch { /* private window: it lasts until you reload */ }
+  sfx.click(); $('setMapLevel').textContent = mapLevelText();
+});
 $('setStory').addEventListener('click', () => { unlockAudio(); careerOpening().then(renderSettings); });   // (the career's opening story again; it plays by itself only the first time)
 $('setStadiumTest').addEventListener('click', () => {   // (testing only: shows your own club's ground at level 1, 2 or 3 in your next match; the saved game is not touched)
   stadiumTest.level = (stadiumTest.level + 1) % 4;
@@ -1204,6 +1210,10 @@ const clubMap = createClubMap($('mapCanvas'), {
     sfx.click();
   },
 });
+// which level of the buildings the map shows: 0 follows your stadium's level, 1-3 shows that level (the settings' Club map level, to look at them)
+const mapLevelText = () => (mapLevel.v ? `Club map level: ${mapLevel.v}` : 'Club map level: follows your stadium');
+const mapLevel = { v: (() => { try { return +localStorage.getItem('sixcharge.mapLevel') || 0; } catch { return 0; } })() };
+const levelOfMap = c => mapLevel.v || (c.club ? Math.min(3, Math.max(1, stadiumLevel(c))) : 1);
 let mapTest = false;   // the map opened from the settings to look at it: your club's colours (or a stand-in club), nothing opens, nothing is changed
 function renderClubMap(test = false) {
   mapTest = test;
@@ -1212,10 +1222,10 @@ function renderClubMap(test = false) {
   ui.show('clubmap');
   $('mapSheet').hidden = true; mapPick = null;
   $('mapClub').textContent = club.name;
-  $('mapSub').textContent = test ? 'Test view · nothing opens' : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
+  $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
   const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' };
   clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
-  clubMap.open(club);
+  clubMap.open(club, levelOfMap(c));
   if (!test) coachOnce('clubMap', DEV.clubMap);
 }
 $('mapBack').addEventListener('click', () => { sfx.click(); clubMap.close(); if (mapTest) renderSettings(); else renderHome(); });

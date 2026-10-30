@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """The club map: the base picture and the eight buildings (tools/map/*.png), cut out and made ready to be painted in the club's colours.
 
-usage: python3 tools/build_map.py [name ...]      (all of them when none is named)
+usage: python3 tools/build_map.py [level ...]      (levels 1, 2 and 3 when none is named)
 
-SOURCE (tools/map): base.png (the empty estate, 2048 x 3072) and one picture per building at level 1 (stadium, training, office, apartment, medical,
-academy, clubhouse, shop), each on flat magenta (or already transparent). Roofs, awnings and seats are one royal blue; trim is one golden yellow.
-OUT (img/map): base.webp (the empty estate: plain lawns, roads well clear of them), buildings.webp (the eight cut-outs one under the other, the blue and yellow turned into a grey ramp, so the club's colour
-multiplied on gives the club's colour at the painted brightness) and buildings-tint.webp (R the main colour's weight, G the trim's); where each
-building is in them is printed (ATLAS, in js/clubmap.js), and where it stands on the map is SITES there.
+SOURCE (tools/map): base.png (the empty estate, 2048 x 3072) and one picture per building and level (stadium, training, office, apartment, medical,
+academy, clubhouse, shop, merch: <name>.png is level 1, <name>2.png level 2, <name>3.png level 3), each transparent, or on flat magenta or white. Roofs, awnings and seats are one royal blue; trim is one golden yellow.
+OUT (img/map): base.webp (the empty estate: plain lawns, roads well clear of them), and per level buildings[2|3].webp (the cut-outs one under the other, the blue and yellow turned
+into a grey ramp, so the club's colour multiplied on gives the club's colour at the painted brightness) and buildings[2|3]-tint.webp (R the main colour's weight, G the trim's);
+where each building is in them is tools/map/atlas<level>.json (ATLAS in js/clubmap.js), and where it stands on the map is SITES there (tools/fit_map_sites.py).
 Needs numpy, Pillow and scipy.
 """
 import json, os, sys
@@ -60,8 +60,8 @@ def cutout(im):
     return rgb, al
 
 
-def build(name):
-    rgb, al = cutout(Image.open(os.path.join(SRC, name + '.png')))
+def build(name, level=1):
+    rgb, al = cutout(Image.open(os.path.join(SRC, name + ('' if level == 1 else str(level)) + '.png')))
     ys, xs = np.where(al > 0.5)
     pad = 6
     x0, x1, y0, y1 = max(xs.min() - pad, 0), min(xs.max() + pad + 1, al.shape[1]), max(ys.min() - pad, 0), min(ys.max() + pad + 1, al.shape[0])
@@ -96,17 +96,21 @@ def build(name):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    Image.open(os.path.join(SRC, 'base.png')).convert('RGB').resize((1536, 2304), Image.LANCZOS).save(os.path.join(OUT, 'base.webp'), quality=84, method=6)
-    parts = {n: build(n) for n in (sys.argv[1:] or NAMES)}
-    # all the buildings in one picture (and their tints in another), one under the other: the map is published with a limit on its files
-    H = sum(b.size[1] for b, _ in parts.values())
-    atlas, tints, y, meta = Image.new('RGBA', (WIDTH, H)), Image.new('RGB', (WIDTH, H)), 0, {}
-    for n, (b, t) in parts.items():
-        atlas.paste(b, (0, y)); tints.paste(t, (0, y)); meta[n] = [y, b.size[1]]; y += b.size[1]
-        print(n, meta[n])
-    atlas.save(os.path.join(OUT, 'buildings.webp'), quality=90, method=6, exact=True)
-    tints.save(os.path.join(OUT, 'buildings-tint.webp'), quality=90, method=6)
-    print('ATLAS =', json.dumps(meta))   # (js/clubmap.js: where each building is in the picture: [row, height], all WIDTH wide)
+    levels = [int(x) for x in sys.argv[1:]] or [1, 2, 3]
+    if 1 in levels:
+        Image.open(os.path.join(SRC, 'base.png')).convert('RGB').resize((1536, 2304), Image.LANCZOS).save(os.path.join(OUT, 'base.webp'), quality=84, method=6)
+    for lv in levels:
+        parts = {n: build(n, lv) for n in NAMES}
+        # all the buildings of a level in one picture (and their tints in another), one under the other: the map is published with a limit on its files
+        H = sum(b.size[1] for b, _ in parts.values())
+        atlas, tints, y, meta = Image.new('RGBA', (WIDTH, H)), Image.new('RGB', (WIDTH, H)), 0, {}
+        for n, (b, t) in parts.items():
+            atlas.paste(b, (0, y)); tints.paste(t, (0, y)); meta[n] = [y, b.size[1]]; y += b.size[1]
+        sfx = '' if lv == 1 else str(lv)
+        atlas.save(os.path.join(OUT, f'buildings{sfx}.webp'), quality=90, method=6, exact=True)
+        tints.save(os.path.join(OUT, f'buildings{sfx}-tint.webp'), quality=90, method=6)
+        json.dump(meta, open(os.path.join(SRC, f'atlas{lv}.json'), 'w'))   # where each building is in the picture: [row, height], all WIDTH wide (js/clubmap.js ATLAS)
+        print('level', lv, json.dumps(meta))
 
 
 if __name__ == '__main__':

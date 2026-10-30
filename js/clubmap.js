@@ -4,30 +4,58 @@
 // tap a building to select it. Which building does what is main.js's (setBuildings).
 const MAP_W = 1536, MAP_H = 2304;   // the base picture
 const GREY = 0.7;                   // the grey every club-coloured surface was made in (tools/build_map.py)
-// where each building stands: its picture's middle as a share of the map, and how wide it is drawn as a share of the map's width
+// the three levels of every building. Where each building stands: its picture's middle as a share of the map, and how wide it is drawn as a share of the map's width
 // (fitted to the plots in the base picture: the building's base on the plot's ground, inside its walls)
 const SITES = {
-  stadium:  { x: 0.504, y: 0.446, w: 0.314 },
-  training: { x: 0.344, y: 0.165, w: 0.351 },
-  apartment:{ x: 0.732, y: 0.207, w: 0.319 },
-  office:   { x: 0.224, y: 0.312, w: 0.315 },
-  academy:  { x: 0.810, y: 0.364, w: 0.294 },
-  medical:  { x: 0.234, y: 0.570, w: 0.320 },
-  clubhouse:{ x: 0.766, y: 0.592, w: 0.309 },
-  shop:     { x: 0.231, y: 0.719, w: 0.341 },
-  merch:    { x: 0.750, y: 0.749, w: 0.313 },
+  1: {
+    stadium:  { x: 0.504, y: 0.446, w: 0.314 },
+    training: { x: 0.344, y: 0.165, w: 0.351 },
+    apartment:{ x: 0.732, y: 0.207, w: 0.319 },
+    office:   { x: 0.224, y: 0.312, w: 0.315 },
+    academy:  { x: 0.810, y: 0.364, w: 0.294 },
+    medical:  { x: 0.234, y: 0.570, w: 0.320 },
+    clubhouse:{ x: 0.766, y: 0.592, w: 0.309 },
+    shop:     { x: 0.231, y: 0.719, w: 0.341 },
+    merch:    { x: 0.750, y: 0.749, w: 0.313 },
+  },
+  2: {
+    stadium:  { x: 0.504, y: 0.445, w: 0.306 },
+    training: { x: 0.342, y: 0.163, w: 0.349 },
+    apartment:{ x: 0.727, y: 0.211, w: 0.313 },
+    office:   { x: 0.224, y: 0.310, w: 0.316 },
+    academy:  { x: 0.812, y: 0.364, w: 0.299 },
+    medical:  { x: 0.236, y: 0.569, w: 0.320 },
+    clubhouse:{ x: 0.769, y: 0.581, w: 0.309 },
+    shop:     { x: 0.232, y: 0.725, w: 0.341 },
+    merch:    { x: 0.750, y: 0.745, w: 0.309 },
+  },
+  3: {
+    stadium:  { x: 0.504, y: 0.437, w: 0.308 },
+    training: { x: 0.340, y: 0.158, w: 0.349 },
+    apartment:{ x: 0.729, y: 0.211, w: 0.313 },
+    office:   { x: 0.226, y: 0.306, w: 0.315 },
+    academy:  { x: 0.808, y: 0.356, w: 0.295 },
+    medical:  { x: 0.236, y: 0.561, w: 0.320 },
+    clubhouse:{ x: 0.771, y: 0.581, w: 0.309 },
+    shop:     { x: 0.231, y: 0.724, w: 0.344 },
+    merch:    { x: 0.748, y: 0.744, w: 0.310 },
+  },
 };
-const ORDER = Object.keys(SITES).sort((a, b) => SITES[a].y - SITES[b].y);   // far to near, the near ones painted over the far
-// where each building is in img/map/buildings.webp (and its tint in buildings-tint.webp): [row, height], all 1100 wide (tools/build_map.py)
-const ATLAS = {"stadium": [0, 647], "training": [647, 645], "office": [1292, 688], "apartment": [1980, 764], "medical": [2744, 651], "academy": [3395, 659], "clubhouse": [4054, 601], "shop": [4655, 709], "merch": [5364, 675]};
+const orderOf = lv => Object.keys(SITES[lv]).sort((a, b) => SITES[lv][a].y - SITES[lv][b].y);   // far to near, the near ones painted over the far
+// where each building is in img/map/buildings[2|3].webp (and its tint in buildings[2|3]-tint.webp), by level: [row, height], all 1100 wide (tools/build_map.py)
+const ATLAS = {
+  1: {"stadium": [0, 647], "training": [647, 645], "office": [1292, 688], "apartment": [1980, 764], "medical": [2744, 651], "academy": [3395, 659], "clubhouse": [4054, 601], "shop": [4655, 709], "merch": [5364, 675]},
+  2: {"stadium": [0, 681], "training": [681, 666], "office": [1347, 704], "apartment": [2051, 729], "medical": [2780, 660], "academy": [3440, 642], "clubhouse": [4082, 714], "shop": [4796, 648], "merch": [5444, 722]},
+  3: {"stadium": [0, 755], "training": [755, 714], "office": [1469, 745], "apartment": [2214, 737], "medical": [2951, 745], "academy": [3696, 743], "clubhouse": [4439, 712], "shop": [5151, 656], "merch": [5807, 725]},
+};
 const AW = 1100;
 const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const load = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
 const frame = () => new Promise(r => setTimeout(r, 0));
 
 // one building painted in the club's colours: a canvas, and where it is solid (a coarse alpha grid, for taps)
-function paint(base, tint, id, club) {
-  const [row, h] = ATLAS[id], w = AW;
+function paint(base, tint, id, club, lv) {
+  const [row, h] = ATLAS[lv][id], w = AW;
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true });
   g.drawImage(base, 0, row, w, h, 0, 0, w, h);
@@ -49,7 +77,7 @@ function paint(base, tint, id, club) {
 
 export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
   const g = canvas.getContext('2d');
-  let base = null, sheets = null, club = null, info = {}, selected = null, shown = false, dirty = false, session = 0;
+  let base = null, sheets = null, club = null, level = 1, ORDER = orderOf(1), info = {}, selected = null, shown = false, dirty = false, session = 0;
   const art = {};              // id -> { canvas, solid ... }
   const cache = new Map();     // 'suit|trim' -> art (the last club painted stays)
   let vw = 1, vh = 1, dpr = 1, scale = 1, minScale = 0, maxScale = 3, ox = 0, oy = 0;   // the camera: map px * scale + offset = css px
@@ -64,7 +92,7 @@ export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
   };
   const redraw = () => { if (!dirty) { dirty = true; requestAnimationFrame(draw); } };
   const toMap = (px, py) => [(px - ox) / scale, (py - oy) / scale];
-  const rectOf = id => { const S = SITES[id], a = art[id]; if (!a) return null; const w = S.w * MAP_W, h = w * a.h / a.w; return { x: S.x * MAP_W - w / 2, y: S.y * MAP_H - h / 2, w, h }; };
+  const rectOf = id => { const S = SITES[level][id], a = art[id]; if (!a) return null; const w = S.w * MAP_W, h = w * a.h / a.w; return { x: S.x * MAP_W - w / 2, y: S.y * MAP_H - h / 2, w, h }; };
 
   function fit() {
     const r = canvas.getBoundingClientRect();
@@ -185,17 +213,20 @@ export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
     reset() { scale = minScale; clamp(); redraw(); },
     get ready() { return ORDER.every(id => art[id]); },
     // the map for a club (its colours); the base shows at once, the buildings as each is painted
-    async open(c) {
+    async open(c, lv = 1) {
       shown = true; club = c; selected = null; const mine = ++session;
+      if (lv !== level) { level = lv; ORDER = orderOf(lv); for (const k of Object.keys(art)) delete art[k]; sheets = null; }
       fit(); redraw();
       if (!base) { base = await load('img/map/base.webp').catch(() => null); redraw(); }
-      const key = `${c.suit}|${c.trim}`;
+      const key = `${c.suit}|${c.trim}|${lv}`;
       if (cache.has(key)) { for (const id of ORDER) art[id] = cache.get(key)[id]; redraw(); onFirstDraw?.(); return; }
       const set = {};
-      sheets ||= await Promise.all([load('img/map/buildings.webp'), load('img/map/buildings-tint.webp')]);
+      for (const k of Object.keys(art)) delete art[k];
+      const sfx = lv === 1 ? '' : String(lv);
+      sheets ||= await Promise.all([load(`img/map/buildings${sfx}.webp`), load(`img/map/buildings${sfx}-tint.webp`)]);
       if (mine !== session) return;
       for (const id of [...ORDER].sort((a, b) => (a === 'stadium' ? -1 : b === 'stadium' ? 1 : 0))) {
-        set[id] = art[id] = paint(sheets[0], sheets[1], id, club); redraw(); await frame();
+        set[id] = art[id] = paint(sheets[0], sheets[1], id, club, lv); redraw(); await frame();
         if (mine !== session) return;
       }
       cache.clear(); cache.set(key, set);
