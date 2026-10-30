@@ -700,7 +700,8 @@ export function startSeason(c) {
 
 // A simulated match between two AI clubs, ball by ball, so every player gets a scorecard. favour: a club that is stronger in it
 // and must win (the match is played again, off the record, until it does: only the match that stands is written into the stats).
-export function simCareerMatch(c, a, b, rng, favour = null) {
+// (raw: an object to hand the two innings back in, instead of writing them into the stats: the economy simulation, tools/sim_economy.mjs, plays your own matches this way)
+export function simCareerMatch(c, a, b, rng, favour = null, raw = null) {
   let ia, ib, winner, tries = 0;
   do {
     ia = simInnings(c, a, b, rng, null, favour); ib = simInnings(c, b, a, rng, ia.runs + 1, favour);
@@ -708,6 +709,7 @@ export function simCareerMatch(c, a, b, rng, favour = null) {
   } while (favour && (a === favour || b === favour) && winner !== favour && ++tries < 25);
   // (a result that would still not go their way after all that has its scores turned round: practically never)
   if (favour && (a === favour || b === favour) && winner !== favour) { [ia, ib] = [ib, ia]; winner = favour; }
+  if (raw) { raw.ia = ia; raw.ib = ib; return { a, b, ia: stripInnings(ia), ib: stripInnings(ib), winner }; }
   commitInnings(c, ia); commitInnings(c, ib);
   const la = lineupOf(c, a), lb = lineupOf(c, b);
   played(c, [...la.order, ...la.attack, ...lb.order, ...lb.attack].filter(Boolean).map(p => p.id));
