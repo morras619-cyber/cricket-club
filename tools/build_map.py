@@ -5,7 +5,7 @@ usage: python3 tools/build_map.py [name ...]      (all of them when none is name
 
 SOURCE (tools/map): base.png (the empty estate, 2048 x 3072) and one picture per building at level 1 (stadium, training, office, apartment, medical,
 academy, clubhouse, shop), each on flat magenta (or already transparent). Roofs, awnings and seats are one royal blue; trim is one golden yellow.
-OUT (img/map): base.webp, buildings.webp (the eight cut-outs one under the other, the blue and yellow turned into a grey ramp, so the club's colour
+OUT (img/map): base.webp (the estate with the empty pads painted over as lawn), buildings.webp (the eight cut-outs one under the other, the blue and yellow turned into a grey ramp, so the club's colour
 multiplied on gives the club's colour at the painted brightness) and buildings-tint.webp (R the main colour's weight, G the trim's); where each
 building is in them is printed (ATLAS, in js/clubmap.js), and where it stands on the map is SITES there.
 Needs numpy, Pillow and scipy.
@@ -17,6 +17,7 @@ from scipy import ndimage as ndi
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC, OUT = os.path.join(HERE, 'map'), os.path.join(HERE, '..', 'img', 'map')
+FLIP = ['apartment', 'academy', 'clubhouse']   # the buildings on the right of the road, turned to face it (their fronts look to the lower right as drawn)
 NAMES = ['stadium', 'training', 'office', 'apartment', 'medical', 'academy', 'clubhouse', 'shop']
 GREY = 0.7              # js/clubmap.js: the grey a club-coloured surface is made in
 BLUE_V, YEL_V = 0.84, 1.0   # the brightness (V) of the painted blue (#1f5fd6) and yellow (#ffd23f)
@@ -79,13 +80,19 @@ def build(name):
     sz = (w, round(rgb.shape[0] * w / rgb.shape[1]))
     base = Image.fromarray((np.dstack([out, al]) * 255 + .5).astype(np.uint8), 'RGBA').resize(sz, Image.LANCZOS)
     tn = Image.fromarray((tint * 255 + .5).astype(np.uint8), 'RGB').resize(sz, Image.LANCZOS)
+    if name in FLIP:
+        base, tn = base.transpose(Image.FLIP_LEFT_RIGHT), tn.transpose(Image.FLIP_LEFT_RIGHT)
     return base, tn
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    im = Image.open(os.path.join(SRC, 'base.png')).convert('RGB')
-    im.resize((1536, 2304), Image.LANCZOS).save(os.path.join(OUT, 'base.webp'), quality=84, method=6)
+    # the estate with its empty pads painted over (tools/clear_pads.py): the buildings bring their own ground
+    import cv2
+    sys.path.insert(0, HERE)
+    from clear_pads import clear
+    a = cv2.imread(os.path.join(SRC, 'base.png'))[..., ::-1].astype(np.float32)
+    Image.fromarray(clear(a).astype(np.uint8)).resize((1536, 2304), Image.LANCZOS).save(os.path.join(OUT, 'base.webp'), quality=84, method=6)
     parts = {n: build(n) for n in (sys.argv[1:] or NAMES)}
     # all the buildings in one picture (and their tints in another), one under the other: the map is published with a limit on its files
     H = sum(b.size[1] for b, _ in parts.values())

@@ -7,14 +7,14 @@ const GREY = 0.7;                   // the grey every club-coloured surface was 
 // where each building stands: its picture's middle as a share of the map, and how wide it is drawn as a share of the map's width
 // (fitted to the plots in the base picture: the building's base on the plot's ground, inside its walls)
 const SITES = {
-  stadium:  { x: 0.505, y: 0.431, w: 0.353 },
+  stadium:  { x: 0.505, y: 0.431, w: 0.370 },
   training: { x: 0.325, y: 0.168, w: 0.318 },
-  apartment:{ x: 0.708, y: 0.215, w: 0.296 },
-  office:   { x: 0.220, y: 0.310, w: 0.360 },
-  academy:  { x: 0.800, y: 0.342, w: 0.333 },
-  medical:  { x: 0.212, y: 0.550, w: 0.374 },
-  clubhouse:{ x: 0.801, y: 0.563, w: 0.373 },
-  shop:     { x: 0.240, y: 0.707, w: 0.388 },
+  apartment:{ x: 0.713, y: 0.216, w: 0.296 },
+  office:   { x: 0.221, y: 0.312, w: 0.359 },
+  academy:  { x: 0.784, y: 0.342, w: 0.338 },
+  medical:  { x: 0.213, y: 0.550, w: 0.374 },
+  clubhouse:{ x: 0.795, y: 0.562, w: 0.377 },
+  shop:     { x: 0.239, y: 0.707, w: 0.388 },
 };
 const ORDER = Object.keys(SITES).sort((a, b) => SITES[a].y - SITES[b].y);   // far to near, the near ones painted over the far
 // where each building is in img/map/buildings.webp (and its tint in buildings-tint.webp): [row, height], all 1100 wide (tools/build_map.py)

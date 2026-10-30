@@ -59,7 +59,7 @@ if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_
 const tapAt = async (fx, fy) => { const r = await page.evaluate(([fx, fy]) => { const b = document.getElementById('mapCanvas').getBoundingClientRect(), sc = b.width / 1536; return { x: b.left + b.width / 2 + (fx - 0.5) * 1536 * sc, y: b.top + b.height / 2 + (fy - 0.5) * 2304 * sc }; }, [fx, fy]); await page.mouse.click(r.x, r.y); await page.waitForTimeout(300); };
 await tapAt(0.505, 0.431);
 check(await page.evaluate(() => !document.getElementById('mapSheet').hidden && document.getElementById('mapName').textContent === 'Stadium'), 'tapping the stadium selects it');
-await tapAt(0.801, 0.564);
+await tapAt(0.795, 0.562);
 check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Clubhouse' && document.getElementById('mapOpen').hidden), 'the clubhouse says coming soon, with nothing to open');
 await tapAt(0.505, 0.431);
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'club-map-stadium.png') });

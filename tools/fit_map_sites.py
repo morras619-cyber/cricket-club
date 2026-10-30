@@ -11,7 +11,7 @@ import numpy as np, json, sys
 from scipy import ndimage as ndi
 R=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..')+os.sep
 K=float(sys.argv[1]) if len(sys.argv)>1 else 1.2
-base=Image.open(R+'img/map/base.webp').convert('RGB'); W,H=base.size
+base=Image.open(R+'tools/map/base.png').convert('RGB').resize((1536,2304),Image.LANCZOS); W,H=base.size   # (the original: the pads are found by their bare ground)
 a=np.array(base).astype(float); r,g,b=a[...,0],a[...,1],a[...,2]
 dirt=(r>g*0.95)&(r>90)&(r-b>35)&(g>60)&(r<230)
 dirt=ndi.binary_opening(dirt,iterations=3)
@@ -25,7 +25,7 @@ atlas=Image.open(R+'img/map/buildings.webp').convert('RGBA'); al=np.array(atlas)
 plots.append(dict(cx=0.505*W,cy=0.465*H,x0=0.33*W,x1=0.68*W))
 def pick(fx,fy): return min(plots,key=lambda p:(p['cx']/W-fx)**2+(p['cy']/H-fy)**2)
 assign={'stadium':(.505,.465),'training':(.32,.20),'apartment':(.72,.24),'office':(.23,.34),'academy':(.79,.37),'medical':(.21,.58),'clubhouse':(.80,.60),'shop':(.24,.74)}
-out={}; canvas=base.convert('RGBA')
+out={}; canvas=Image.open(R+'img/map/base.webp').convert('RGBA').resize((W,H))
 for n,(fx,fy) in assign.items():
     p=pick(fx,fy); row,h=ATLAS[n]; m=al[row:row+h]>60
     ys,xs=np.where(m); sy0,sy1=ys.min(),ys.max()
