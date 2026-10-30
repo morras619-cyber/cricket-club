@@ -103,6 +103,11 @@ check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'ba
 // the daily challenge is a tab of the career (on the map and on the season page), and Play from the title goes straight to the map
 const mapTab = async name => page.evaluate(n => [...document.querySelectorAll('#mapTabs .map-tab')].find(b => b.textContent.includes(n)).click(), name);
 check(await page.evaluate(() => [...document.querySelectorAll('#mapTabs .map-tab')].map(b => b.textContent.replace('!', '')).join() === 'Season,Squad,Records,Daily'), 'the map has the tabs Season, Squad, Records and Daily');
+await tapAt(0.224, 0.312); await page.waitForTimeout(300);
+check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Club office' && !document.getElementById('mapOpen').hidden), 'the club office opens from the map');
+await page.evaluate(() => document.getElementById('mapOpen').click()); await page.waitForTimeout(700);
+check(await page.evaluate(() => !document.getElementById('office').hidden && document.querySelectorAll('#officeBody .mf-fin').length === 8), 'the real club office shows the books');
+await page.evaluate(() => document.getElementById('officeBack').click()); await page.waitForTimeout(1200);
 await mapTab('Daily'); await page.waitForTimeout(600);
 check(await page.evaluate(() => !document.getElementById('daily').hidden), 'the Daily tab opens the daily challenge');
 await page.evaluate(() => document.getElementById('dailyBack').click()); await page.waitForTimeout(1200);
@@ -178,6 +183,29 @@ check(await page.evaluate(() => { const t = window.__sixcharge.demo.training; re
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'training.png') });
 await page.evaluate(() => document.getElementById('trainBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the training ground is the settings');
+// the club office: from the settings (a practice club): the books, a sponsor deal, the board, the contracts, with no scrolling
+await page.evaluate(() => document.getElementById('setOffice').click()); await page.waitForTimeout(1200);
+check(await page.evaluate(() => !document.getElementById('office').hidden && document.querySelectorAll('#officeTabs .mf-tab').length === 4 && document.querySelectorAll('#officeBody .mf-fin').length === 8), 'the settings open the club office: four tabs, and the books with eight lines');
+const offTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#officeTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(250); };
+const offFits = async () => page.evaluate(() => { const m = document.querySelector('#office .mf'), b = document.getElementById('officeBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
+check(await offFits(), 'the books fit the screen');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-money.png') });
+await offTab('Sponsors');
+check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card .chipbtn').length === 3) && await offFits(), 'three sponsor deals to choose from, and they fit the screen');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-sponsors.png') });
+await page.evaluate(() => [...document.querySelectorAll('#officeBody .mf-card .chipbtn')][0].click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => window.__sixcharge.demo.office.deal?.id === 'steady' && document.querySelectorAll('#officeBody .mf-pips .ico').length === 7), 'a sponsor is signed: seven matches of progress show');
+for (let i = 0; i < 2; i++) await page.evaluate(() => [...document.querySelectorAll('#officeTest .chipbtn')].find(b => /Win/.test(b.textContent)).click());
+await page.waitForTimeout(300);
+check(await page.evaluate(() => window.__sixcharge.demo.office.deal.played === 2 && document.querySelectorAll('#officeBody .mf-pips .ico.on').length === 2) && await offFits(), 'two matches played: two pips light up');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-deal.png') });
+await offTab('Board');
+check(await page.evaluate(() => /Finish in the top/.test(document.getElementById('officeBody').textContent)) && await offFits(), 'the board has its target for the season, and it fits the screen');
+await offTab('Contracts');
+check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card.stack').length >= 4) && await offFits(), 'the contracts tab shows players with their seasons left, and fits');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-contracts.png') });
+await page.evaluate(() => document.getElementById('officeBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the club office is the settings');
 // the settings' Club map level: cycle to level 3 and the map shows it (and level 2, to draw both)
 await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
 for (const want of [2, 3]) {

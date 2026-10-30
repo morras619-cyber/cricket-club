@@ -157,7 +157,7 @@ const FINDS = 3, EVERY = 2;
 export const scoutOut = (c, region) => c.scouting?.[region]?.season === c.season;
 export function sendScout(c, region) {
   if (scoutOut(c, region) || c.money < SCOUT_FEE || c.phase !== 'season') return false;
-  c.money = round2(c.money - SCOUT_FEE);
+  c.money = round2(c.money - SCOUT_FEE); book(c, 'out', 'players', SCOUT_FEE);
   c.scouting = { ...c.scouting, [region]: { season: c.season, matches: 0, finds: [] } };
   return true;
 }
@@ -327,7 +327,7 @@ export const groundCond = c => c.custom?.cond ?? 1;
 export const hasCaretaker = c => !!c.custom?.caretaker;
 export function hireCaretaker(c) {
   if (!c.custom || c.custom.caretaker || c.money < CARE.HIRE) return false;
-  c.money = round2(c.money - CARE.HIRE);
+  c.money = round2(c.money - CARE.HIRE); book(c, 'out', 'buildings', CARE.HIRE);
   c.custom.caretaker = true; c.custom.careWeeks = 0;
   setMyClub(c.custom);
   return true;
@@ -343,7 +343,7 @@ export function groundWeek(c) {
   if (!m || m.cond === undefined) return notes;
   if (m.caretaker) {
     if (c.money >= CARE.WAGE) {
-      c.money = round2(c.money - CARE.WAGE);
+      c.money = round2(c.money - CARE.WAGE); book(c, 'out', 'buildings', CARE.WAGE);
       const before = m.cond; m.cond = Math.min(1, round3(m.cond + CARE.GAIN)); m.careWeeks = (m.careWeeks || 0) + 1;
       notes.push(`🌱 Your caretaker worked on ${m.ground} (wage ${money(CARE.WAGE)})${m.cond >= 1 ? ': it is in perfect order' : m.cond - before > 0 && m.careWeeks === 2 ? ': the grass is greening up' : ''}`);
     } else {
@@ -457,7 +457,7 @@ export function upgradeBlock(c) {
 export function upgradeStadium(c) {
   if (upgradeBlock(c)) return false;
   const next = STADIUMS[stadiumLevel(c) + 1];
-  c.money = round2(c.money - next.cost);
+  c.money = round2(c.money - next.cost); book(c, 'out', 'buildings', next.cost);
   c.custom.stadium = stadiumLevel(c) + 1;
   setMyClub(c.custom);
   return true;
@@ -593,7 +593,7 @@ function sign(c, p, teamId, price, out = null) {
   p.team = teamId;
   const rng = makeRng(hashStr(`${p.id}-${c.season}-c`));
   p.contract = p.age >= PEAK_AGE ? 1 : rng.int(1, 3);
-  if (teamId === c.club) c.money = round2(c.money - price); else c.budgets[teamId] = round2(c.budgets[teamId] - price);
+  if (teamId === c.club) { c.money = round2(c.money - price); book(c, 'out', 'players', price); } else c.budgets[teamId] = round2(c.budgets[teamId] - price);
   c.auction?.results.push(out?.length ? { pid: p.id, team: teamId, price, out } : { pid: p.id, team: teamId, price });
   if (teamId === c.club && was !== c.club) chirpSigned(c, p, price);
 }
@@ -693,6 +693,7 @@ export function startSeason(c) {
   refreshRivals(c);   // (a new division has a new rival)
   for (const p of Object.values(c.players)) p.stats.season = blankStats();
   chirpContracts(c);
+  setObjective(c);
 }
 
 // A simulated match between two AI clubs, ball by ball, so every player gets a scorecard. favour: a club that is stronger in it
@@ -834,11 +835,84 @@ export function recordPlayerMatch(c, summary) {
     ids.push(...bat.keys(), ...bowl.keys());
   }
   played(c, ids);
+  const sixes = [...perf].reduce((n, [id, x]) => n + (c.players[id]?.team === c.club ? (x.bat?.sixes || 0) : 0), 0);
+  const dealNotes = officeMatch(c, { won: summary.result.outcome === 'win', sixes });
   for (const p of clubPlayers(c, c.club)) p.fame = fameAfter(fameOf(p), perf.get(p.id), summary.result.outcome === 'win');   // the fans' love, for the jerseys (js/merch.js)
-  if (summary.result.outcome === 'win') c.money = round2(c.money + WIN_BONUS * (DIV_MONEY[divisionOf(c, c.club)] ?? 1));   // (the lower the division, the smaller the bonus: as with the prizes)
+  if (summary.result.outcome === 'win') { const wb = round2(WIN_BONUS * (DIV_MONEY[divisionOf(c, c.club)] ?? 1)); c.money = round2(c.money + wb); book(c, 'in', 'wins', wb); }   // (the lower the division, the smaller the bonus: as with the prizes)
   const ups = clubPlayers(c, c.club).filter(p => ovr(p) > (before.get(p.id) ?? 99)).map(p => `⬆ ${p.name} ${before.get(p.id)} → ${ovr(p)}`);
-  return [...ups, ...c.news.slice(newsAt)];
+  return [...ups, ...c.news.slice(newsAt), ...dealNotes];
 }
+// ---------- the club office: the books, the sponsors, the board ----------
+// The books: every $M that comes in or goes out of the club is written down by season (office.led[season] = { in: {...}, out: {...} }).
+export const INCOME = { prizes: 'Prizes & season sponsor', wins: 'Win bonuses', tickets: 'Ticket money', sponsors: 'Sponsor deals', merch: 'Merchandise', board: 'Board bonus' };
+export const OUTGOING = { players: 'Players & scouts', buildings: 'Buildings & staff' };
+export const office = c => (c.office ||= { led: {}, deal: null, pend: 0, objective: null, board: [], log: [] });
+export function book(c, dir, cat, amount) {
+  if (!amount || !c.club) return;
+  const l = (office(c).led[c.season] ||= { in: {}, out: {} });
+  l[dir][cat] = round3((l[dir][cat] || 0) + amount);
+}
+export const seasonBooks = (c, season = c.season) => office(c).led[season] || { in: {}, out: {} };
+export const totalOf = o => Object.values(o).reduce((a, b) => a + b, 0);
+
+// The sponsors: a deal lasts seven of your league matches. The better the division, the bigger the money. (Pennies are kept until they make $0.05M.)
+export const DEAL = { MATCHES: 7, SCALE: { asl: 1, d2: 0.6, d3: 0.4 } };
+export const SPONSORS = {
+  steady: { name: 'Harbour Bank', tag: 'Steady', about: 'Pays something every match, whatever happens', per: 0.05, bonus: 0, goal: null },
+  form: { name: 'Volt Drinks', tag: 'Form', about: 'A little each match and a big bonus if you win 4 of the 7', per: 0.02, bonus: 0.45, goal: { kind: 'wins', n: 4, text: 'Win 4 of the 7 matches' } },
+  power: { name: 'Meteor Energy', tag: 'Risky', about: 'Nothing at all unless you hit 9 sixes in the 7 matches', per: 0, bonus: 0.9, goal: { kind: 'sixes', n: 9, text: 'Hit 9 sixes in the 7 matches' } },
+};
+export const dealScale = c => DEAL.SCALE[divisionOf(c, c.club)] ?? 1;
+export const dealWorth = (c, id) => { const S = SPONSORS[id], k = dealScale(c); return { per: S.per * k, bonus: S.bonus * k, top: (S.per * DEAL.MATCHES + S.bonus) * k }; };
+export function signSponsor(c, id) {
+  const o = office(c);
+  if (!SPONSORS[id] || o.deal) return false;
+  o.deal = { id, played: 0, wins: 0, sixes: 0, paid: 0 };
+  return true;
+}
+function payOut(c, amount, cat) {
+  const o = office(c);
+  o.pend = round3((o.pend || 0) + amount);
+  const whole = Math.floor(o.pend * 20 + 1e-9) / 20;
+  if (whole > 0) { c.money = round2(c.money + whole); o.pend = round3(o.pend - whole); book(c, 'in', cat, whole); if (o.deal) o.deal.paid = round3(o.deal.paid + whole); }
+}
+// one of your league matches is over: the deal runs on
+export function officeMatch(c, { won, sixes }) {
+  const o = office(c), d = o.deal, notes = [];
+  if (!d) return notes;
+  const S = SPONSORS[d.id], w = dealWorth(c, d.id);
+  d.played++; if (won) d.wins++; d.sixes += sixes || 0;
+  payOut(c, w.per, 'sponsors');
+  if (d.played >= DEAL.MATCHES) {
+    const got = S.goal ? (S.goal.kind === 'wins' ? d.wins : d.sixes) >= S.goal.n : false;
+    if (S.goal && got) payOut(c, w.bonus, 'sponsors');
+    o.log = [...(o.log || []), { season: c.season, id: d.id, got: !S.goal || got, paid: d.paid }].slice(-6);
+    notes.push(`📣 The ${S.name} deal is over: ${money(d.paid)} paid${S.goal ? (got ? ', and you earned the bonus!' : `, and the bonus was missed (${S.goal.kind === 'wins' ? d.wins + ' wins' : d.sixes + ' sixes'})`) : ''}`);
+    o.deal = null;
+  }
+  return notes;
+}
+// The board: each season it sets a target for the table. Reach it and it pays a bonus.
+export function setObjective(c) {
+  if (!c.club || !c.league) return null;
+  const div = divisionOf(c, c.club), ids = c.divisions[div];
+  const rank = [...ids].sort((a, b) => clubRating(c, b) - clubRating(c, a)).indexOf(c.club) + 1;
+  const target = Math.max(2, Math.ceil(rank * 0.6));
+  return (office(c).objective = { season: c.season, div, rank, target, reward: round2(0.5 * (DIV_MONEY[div] ?? 1)) });
+}
+export const objectiveOf = c => { const o = office(c); if (!o.objective && c.league && c.phase === 'season') setObjective(c); return o.objective; };
+export function settleObjective(c, pos) {
+  const o = office(c), ob = o.objective;
+  if (!ob) return [];
+  const met = pos <= ob.target;
+  if (met) { c.money = round2(c.money + ob.reward); book(c, 'in', 'board', ob.reward); }
+  o.board = [...(o.board || []), { season: ob.season, div: ob.div, target: ob.target, pos, met, reward: ob.reward }].slice(-6);
+  o.objective = null;
+  return [met ? `🏛️ The board is pleased: you finished ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}, inside their target of ${ob.target}. A bonus of ${money(ob.reward)}.` : `🏛️ The board wanted a top ${ob.target} finish. You came ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}: no bonus this year.`];
+}
+// who is on a short contract (seasons left; the soonest to go first)
+export const contractList = c => clubPlayers(c, c.club).filter(p => p.contract < 50).sort((a, b) => a.contract - b.contract || ovr(b) - ovr(a));
+
 // ---------- a club's standing: which players will sign for it ----------
 // The best players only sign for clubs with the standing: none rated 80 or more for a Division 3 club, a few for Division 2 (up to 84), any for the top division.
 // (players you already have stay, whatever happens)
@@ -875,7 +949,7 @@ export function afterLeagueMatch(c, summary) {
   const f = nextFixture(c.league), home = f && f.home === c.club && stadiumLevel(c);
   const notes = recordPlayerMatch(c, summary);
   // your own ground's gate money
-  if (home) { const tk = STADIUMS[home].ticket; c.money = round2(c.money + tk); notes.push(`🎟️ ${STADIUMS[home].fans} fans at ${c.custom.ground}: +${money(tk)} in ticket money`); }
+  if (home) { const tk = STADIUMS[home].ticket; c.money = round2(c.money + tk); book(c, 'in', 'tickets', tk); notes.push(`🎟️ ${STADIUMS[home].fans} fans at ${c.custom.ground}: +${money(tk)} in ticket money`); }
   notes.push(...scoutReports(c));
   notes.push(...groundWeek(c));
   const result = playerResult(c.league, summary);
@@ -911,10 +985,11 @@ export function endSeason(c) {
     const ord = d === myDiv ? order : finalOrder(leagues[d]), k = DIV_MONEY[d];
     ord.forEach((id, i) => {
       const prize = round2(PRIZE[i] * k);
-      if (id === c.club) { const fans = sponsorBonus(c); c.money = round2(c.money + prize + SPONSOR + fans); notes.push(`You finished ${i + 1}${['st', 'nd', 'rd'][i] || 'th'} in ${divisionName(d)}: ${money(prize)} prize money + ${money(SPONSOR)} sponsorship${fans > 0 ? ` + ${money(fans)} from your ${compact(c.chirp.fans)} fans` : ''}`); }
+      if (id === c.club) { const fans = sponsorBonus(c); c.money = round2(c.money + prize + SPONSOR + fans); book(c, 'in', 'prizes', prize + SPONSOR + fans); notes.push(`You finished ${i + 1}${['st', 'nd', 'rd'][i] || 'th'} in ${divisionName(d)}: ${money(prize)} prize money + ${money(SPONSOR)} sponsorship${fans > 0 ? ` + ${money(fans)} from your ${compact(c.chirp.fans)} fans` : ''}`); }
       else c.budgets[id] = round2((c.budgets[id] || 0) + prize + AI_INCOME * k);
     });
   }
+  notes.push(...settleObjective(c, order.indexOf(c.club) + 1));
   c.titles[leagues.asl.champion] = (c.titles[leagues.asl.champion] || 0) + 1;
   if (myDiv !== 'asl' && leagues.asl.champion === DYNASTY) notes.push(`⚡ ${teamById(DYNASTY).name} win the Asian Super League again: title number ${c.titles[DYNASTY]}. They look unbeatable. Climb to the Super League and take them on!`);
   const season = Object.values(c.players);
