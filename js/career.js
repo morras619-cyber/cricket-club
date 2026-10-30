@@ -850,7 +850,37 @@ export function recordPlayerMatch(c, summary) {
 // The books: every $M that comes in or goes out of the club is written down by season (office.led[season] = { in: {...}, out: {...} }).
 export const INCOME = { prizes: 'Prizes & board bonus', wins: 'Win bonuses', tickets: 'Ticket money', sponsors: 'Sponsor deals', merch: 'Merchandise', transfers: 'Players sold' };
 export const OUTGOING = { players: 'Players & scouts', buildings: 'Buildings & staff' };
-export const office = c => (c.office ||= { led: {}, deal: null, pend: 0, objective: null, board: [], log: [] });
+// The office has ten levels (pacing.js). The level gives sponsor pay, the board's bonus (and how much it asks), and the places for staff; the
+// sponsor slots (shirt, ground, kit) open with the picture: 1, then 2 at level 5, then 3 at level 10.
+export const OFFICE = {
+  ROWS: [null, { pay: 1, ask: 0.6, reward: 1 }, { pay: 1.2, ask: 0.55, reward: 1.6 }, { pay: 1.5, ask: 0.5, reward: 2.5 }],   // the rows for level 1, 5 and 10 (levelRow fills in between): sponsor pay, the share of its rank the board asks, the board's bonus
+  SLOTS: ['shirt', 'ground', 'kit'], SLOT_PAY: { shirt: 1, ground: 0.6, kit: 0.4 },
+  WAGE: { accountant: 12, agent: 12 }, TRAIN: 20, STAFF_LVL_MAX: 3,      // $k a day for a level 1 officer (+25% a level); training him costs $k x his level
+  CAP: 10 * 3600000, CAP_UNVERIFIED: 3600000, QUIT: 72 * 3600000, DAY: 86400000,
+  EXTEND: 2, FEE: 0.3, CONTRACT_MAX: 5, FORECAST_LEVEL: 3,   // an agent adds two seasons to a contract for 30% of the player's value; five seasons at most; the Money tab forecasts from this level
+};
+export const OFFICERS = {
+  accountant: { name: 'Accountant', about: 'Haggles with the sponsors: every deal pays 10% more for each of his levels.' },
+  agent: { name: 'Agent', about: 'Talks players into longer contracts: one a season for each of his levels, for less money.' },
+};
+const OFFICER_NAMES = ['Mehta', 'Qureshi', 'Fernando', 'Iyer', 'Sheikh', 'Perera', 'Bose', 'Hussain', 'Naidu', 'Rahman'];
+export const office = c => {
+  const o = (c.office ||= { led: {}, deals: {}, pend: 0, objective: null, board: [], log: [], level: 1, staff: [], nextId: 1, last: null, owed: 0, unpaidMs: 0, ext: {} });
+  if (!o.deals) { o.deals = o.deal ? { shirt: { ...o.deal, slot: 'shirt' } } : {}; delete o.deal; }   // (a career from before the slots: its one deal is the shirt's)
+  o.level ||= 1; o.staff ||= []; o.nextId ||= 1; o.owed ||= 0; o.unpaidMs ||= 0; o.ext ||= {}; if (o.last === undefined) o.last = null;
+  return o;
+};
+export const officeRow = c => levelOfficeRow(office(c).level);
+const levelOfficeRow = level => levelRow(OFFICE.ROWS, level);
+export const officeSlots = c => lookOf(office(c).level);
+export const officePlaces = c => Math.min(2, lookOf(office(c).level));
+export const officerMax = c => Math.min(OFFICE.STAFF_LVL_MAX, lookOf(office(c).level) + 1);
+const officerSpeed = s => 1 + 0.25 * (s.lvl - 1);
+export const officerWage = s => OFFICE.WAGE[s.role] * officerSpeed(s);   // $k a day
+export const officeWagePerDay = c => office(c).staff.reduce((a, s) => a + officerWage(s), 0);
+// the officers work while their wages are paid
+const officer = (c, role) => { const o = office(c); return o.unpaidMs > 0 ? null : o.staff.find(s => s.role === role) || null; };
+export const accountantBonus = c => 0.1 * (officer(c, 'accountant')?.lvl || 0);
 export function book(c, dir, cat, amount) {
   if (!amount || !c.club) return;
   const l = (office(c).led[c.season] ||= { in: {}, out: {} });
@@ -867,32 +897,36 @@ export const SPONSORS = {
   power: { name: 'Meteor Energy', tag: 'Risky', about: 'Nothing at all unless you hit 9 sixes in the 7 matches', per: 0, bonus: 0.9, goal: { kind: 'sixes', n: 9, text: 'Hit 9 sixes in the 7 matches' } },
 };
 export const dealScale = c => DEAL.SCALE[divisionOf(c, c.club)] ?? 1;
-export const dealWorth = (c, id) => { const S = SPONSORS[id], k = dealScale(c); return { per: S.per * k, bonus: S.bonus * k, top: (S.per * DEAL.MATCHES + S.bonus) * k }; };
-export function signSponsor(c, id) {
-  const o = office(c);
-  if (!SPONSORS[id] || o.deal) return false;
-  o.deal = { id, played: 0, wins: 0, sixes: 0, paid: 0 };
+export const dealWorth = (c, id, slot = 'shirt') => { const S = SPONSORS[id], k = dealScale(c) * OFFICE.SLOT_PAY[slot] * officeRow(c).pay * (1 + accountantBonus(c)); return { per: S.per * k, bonus: S.bonus * k, top: (S.per * DEAL.MATCHES + S.bonus) * k }; };
+// a slot holds one deal; a sponsor is in one slot at a time
+export function signSponsor(c, id, slot = 'shirt') {
+  const o = office(c), at = OFFICE.SLOTS.indexOf(slot);
+  if (!SPONSORS[id] || at < 0 || at >= officeSlots(c) || o.deals[slot] || Object.values(o.deals).some(d => d.id === id)) return false;
+  o.deals[slot] = { id, slot, played: 0, wins: 0, sixes: 0, paid: 0 };
   return true;
 }
-function payOut(c, amount, cat) {
+function payOut(c, amount, cat, deal) {
   const o = office(c);
   o.pend = round3((o.pend || 0) + amount);
   const whole = Math.floor(o.pend * 20 + 1e-9) / 20;
-  if (whole > 0) { c.money = round2(c.money + whole); o.pend = round3(o.pend - whole); book(c, 'in', cat, whole); if (o.deal) o.deal.paid = round3(o.deal.paid + whole); }
+  if (whole > 0) { c.money = round2(c.money + whole); o.pend = round3(o.pend - whole); book(c, 'in', cat, whole); if (deal) deal.paid = round3(deal.paid + whole); }
 }
-// one of your league matches is over: the deal runs on
+// one of your league matches is over: the deals run on
 export function officeMatch(c, { won, sixes }) {
-  const o = office(c), d = o.deal, notes = [];
-  if (!d) return notes;
-  const S = SPONSORS[d.id], w = dealWorth(c, d.id);
-  d.played++; if (won) d.wins++; d.sixes += sixes || 0;
-  payOut(c, w.per, 'sponsors');
-  if (d.played >= DEAL.MATCHES) {
-    const got = S.goal ? (S.goal.kind === 'wins' ? d.wins : d.sixes) >= S.goal.n : false;
-    if (S.goal && got) payOut(c, w.bonus, 'sponsors');
-    o.log = [...(o.log || []), { season: c.season, id: d.id, got: !S.goal || got, paid: d.paid }].slice(-6);
-    notes.push(`📣 The ${S.name} deal is over: ${money(d.paid)} paid${S.goal ? (got ? ', and you earned the bonus!' : `, and the bonus was missed (${S.goal.kind === 'wins' ? d.wins + ' wins' : d.sixes + ' sixes'})`) : ''}`);
-    o.deal = null;
+  const o = office(c), notes = [];
+  for (const slot of OFFICE.SLOTS) {
+    const d = o.deals[slot];
+    if (!d) continue;
+    const S = SPONSORS[d.id], w = dealWorth(c, d.id, slot);
+    d.played++; if (won) d.wins++; d.sixes += sixes || 0;
+    payOut(c, w.per, 'sponsors', d);
+    if (d.played >= DEAL.MATCHES) {
+      const got = S.goal ? (S.goal.kind === 'wins' ? d.wins : d.sixes) >= S.goal.n : false;
+      if (S.goal && got) payOut(c, w.bonus, 'sponsors', d);
+      o.log = [...(o.log || []), { season: c.season, id: d.id, slot, got: !S.goal || got, paid: d.paid }].slice(-6);
+      notes.push(`📣 The ${S.name} deal is over: ${money(d.paid)} paid${S.goal ? (got ? ', and you earned the bonus!' : `, and the bonus was missed (${S.goal.kind === 'wins' ? d.wins + ' wins' : d.sixes + ' sixes'})`) : ''}`);
+      delete o.deals[slot];
+    }
   }
   return notes;
 }
@@ -901,8 +935,8 @@ export function setObjective(c) {
   if (!c.club || !c.league) return null;
   const div = divisionOf(c, c.club), ids = c.divisions[div];
   const rank = [...ids].sort((a, b) => clubRating(c, b) - clubRating(c, a)).indexOf(c.club) + 1;
-  const target = Math.max(2, Math.ceil(rank * 0.6));
-  return (office(c).objective = { season: c.season, div, rank, target, reward: round2(0.5 * (DIV_MONEY[div] ?? 1)) });
+  const row = officeRow(c), target = Math.max(2, Math.ceil(rank * row.ask));
+  return (office(c).objective = { season: c.season, div, rank, target, reward: round2(0.5 * (DIV_MONEY[div] ?? 1) * row.reward) });
 }
 export const objectiveOf = c => { const o = office(c); if (!o.objective && c.league && c.phase === 'season') setObjective(c); return o.objective; };
 export function settleObjective(c, pos) {
@@ -916,6 +950,68 @@ export function settleObjective(c, pos) {
 }
 // who is on a short contract (seasons left; the soonest to go first)
 export const contractList = c => clubPlayers(c, c.club).filter(p => p.contract < 50).sort((a, b) => a.contract - b.contract || ovr(b) - ovr(a));
+// ---------- the officers: wages by the day from the club's money (time is the server's, as for the other buildings) ----------
+const onok = { ok: true }, onno = why => ({ ok: false, why });
+// ctx: { now, trusted }; the away time counts for ten hours at most (an hour if the time was not checked with the server)
+export function officeTick(c, ctx) {
+  const o = office(c);
+  if (o.last == null) { o.last = ctx.now; return { ms: 0 }; }
+  const dt = ctx.now - o.last;
+  if (dt < 0) return { skipped: 'clock' };
+  o.last = ctx.now;
+  if (!o.staff.length) { o.owed = 0; o.unpaidMs = 0; return { ms: 0 }; }
+  const run = Math.min(dt, ctx.trusted ? OFFICE.CAP : OFFICE.CAP_UNVERIFIED);
+  o.owed = round3(o.owed + officeWagePerDay(c) / 1000 * run / OFFICE.DAY);
+  const whole = Math.floor(o.owed * 20 + 1e-9) / 20;
+  if (whole > 0 && c.money + 1e-9 >= whole) { c.money = round2(c.money - whole); o.owed = round3(o.owed - whole); book(c, 'out', 'buildings', whole); }
+  o.unpaidMs = o.owed >= 0.05 - 1e-9 ? o.unpaidMs + run : 0;   // (a bill of $0.05M or more that the club could not pay)
+  const left = [];
+  while (o.unpaidMs >= OFFICE.QUIT && o.staff.length) { const g = o.staff.pop(); o.unpaidMs -= OFFICE.DAY; left.push(g.name); o.log = [...(o.log || []), { season: c.season, quit: g.name }].slice(-6); }
+  return { ms: run, left };
+}
+export function hireOfficer(c, role) {
+  const o = office(c);
+  if (!OFFICERS[role]) return onno('No such officer');
+  if (o.staff.some(s => s.role === role)) return onno('You have one already');
+  if (o.staff.length >= officePlaces(c)) return onno(`The office has room for ${officePlaces(c)}: build it bigger for more`);
+  const id = o.nextId++;
+  o.staff.push({ id, role, lvl: 1, name: `${role === 'agent' ? 'Ms' : 'Mr'} ${OFFICER_NAMES[(id * 3 + role.length) % OFFICER_NAMES.length]}` });
+  return onok;
+}
+export function fireOfficer(c, id) { const o = office(c), i = o.staff.findIndex(s => s.id === id); if (i < 0) return onno('Not on the staff'); o.staff.splice(i, 1); return onok; }
+export const officerTrainCost = s => round2(OFFICE.TRAIN * s.lvl / 1000);
+export function trainOfficer(c, id) {
+  const s = office(c).staff.find(x => x.id === id);
+  if (!s) return onno('Not on the staff');
+  if (s.lvl >= officerMax(c)) return onno(s.lvl >= OFFICE.STAFF_LVL_MAX ? 'Already the best' : 'Build the office bigger to train further');
+  const cost = officerTrainCost(s);
+  if (c.money < cost) return onno('Not enough money');
+  c.money = round2(c.money - cost); book(c, 'out', 'buildings', cost); s.lvl++;
+  return onok;
+}
+// the agent: a player in his last season can be kept for two more
+export const extensionsLeft = c => { const a = officer(c, 'agent'); return a ? Math.max(0, a.lvl - (office(c).ext[c.season] || 0)) : 0; };
+export const extendFee = (c, p) => { const a = office(c).staff.find(s => s.role === 'agent'); return Math.max(0.1, round2(value(p) * OFFICE.FEE * (1 - 0.1 * ((a?.lvl || 1) - 1)))); };
+export function extendContract(c, pid) {
+  const p = c.players[pid], o = office(c);
+  if (!p || p.team !== c.club) return onno('He is not in your squad');
+  if (p.contract > 1 || p.contract >= 50) return onno('Only a player in his last season can be extended');
+  if (!officer(c, 'agent')) return onno(o.staff.some(s => s.role === 'agent') ? 'The agent has not been paid' : 'You need an agent');
+  if (extensionsLeft(c) < 1) return onno('The agent has done all he can this season');
+  const fee = extendFee(c, p);
+  if (c.money < fee) return onno('Not enough money');
+  c.money = round2(c.money - fee); book(c, 'out', 'players', fee);
+  p.contract = Math.min(OFFICE.CONTRACT_MAX, p.contract + OFFICE.EXTEND); o.ext[c.season] = (o.ext[c.season] || 0) + 1;
+  return { ok: true, fee };
+}
+// what the season looks like at this rate (from the Money tab's level): the net so far, spread over the matches of the season
+export function forecast(c) {
+  if (office(c).level < OFFICE.FORECAST_LEVEL || !c.league || c.league.stage !== 'group') return null;
+  const per = c.league.rounds?.length || 14, played = c.league.round || 0;
+  if (played < 1) return null;
+  const b = seasonBooks(c), net = totalOf(b.in) - totalOf(b.out);
+  return { net: round2(net * per / played), played, per };
+}
 
 // ---------- the youth academy (js/academy.js): prospects raised over several seasons ----------
 const REGION_ROLES = {

@@ -122,8 +122,8 @@ function manage(c, now, rng) {
     if (MD.fitOf(md, p.id) < 85 || MD.isKnocked(md, p.id)) MD.putInBed(md, free, p.id, dctx(c, now));
   }
   // upgrades: the finished ones are settled, then the cheapest level any building can have goes up, keeping a reserve (one builder; a second is never bought here)
-  const bctx = { now, trusted: true, bank: bankOf(c), level: id => (id === 'stadium' ? C.stadiumLvl(c) : c[id]?.level || 0), blocked: (id, to) => (id === 'stadium' ? C.stadiumBlocked(c, to) : null),
-    apply: (id, lv) => { if (id === 'stadium') C.setStadiumLevel(c, lv); else if (id === 'merch') MF.setLevel(m, lv); else if (id === 'training') TG.setLevel(t, lv); else if (id === 'academy') AC.setLevel(a, lv); else MD.medSetLevel(md, lv); } };
+  const bctx = { now, trusted: true, bank: bankOf(c), level: id => (id === 'stadium' ? C.stadiumLvl(c) : id === 'office' ? C.office(c).level : c[id]?.level || 0), blocked: (id, to) => (id === 'stadium' ? C.stadiumBlocked(c, to) : null),
+    apply: (id, lv) => { if (id === 'stadium') C.setStadiumLevel(c, lv); else if (id === 'office') C.office(c).level = lv; else if (id === 'merch') MF.setLevel(m, lv); else if (id === 'training') TG.setLevel(t, lv); else if (id === 'academy') AC.setLevel(a, lv); else MD.medSetLevel(md, lv); } };
   for (const j of PC.settleBuilds(c, bctx)) c.upLog = [...(c.upLog || []), `${j.id}${j.to}@${Math.round((now - T0) / DAY)}`];
   const options = PC.IDS.filter(id => !PC.whyNot(c, id, bctx)).map(id => [id, PC.costOf(id, bctx.level(id) + 1)]).sort((x, y) => x[1] - y[1]);
   for (const [id, cost] of options) if (afford(cost)) { PC.startBuild(c, id, bctx); break; }

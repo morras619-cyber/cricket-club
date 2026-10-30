@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
 import * as MD from './stamina.js';
@@ -1347,10 +1347,11 @@ async function syncClock() {
 const serverNow = () => clock.base + (performance.now() - clock.perf);
 // the club's money, in $50k steps ($k in, $k out)
 // ---------- the builders (js/pacing.js): club XP and level, and upgrades that take builder time ----------
-const BUILD_NAME = { stadium: 'Stadium', training: 'Training ground', academy: 'Youth academy', medical: 'Medical centre', merch: 'Merchandise factory' };
-const levelOfBuilding = (c, id) => (id === 'stadium' ? stadiumLvl(c) : c[id]?.level || 0);
+const BUILD_NAME = { office: 'Club office', stadium: 'Stadium', training: 'Training ground', academy: 'Youth academy', medical: 'Medical centre', merch: 'Merchandise factory' };
+const levelOfBuilding = (c, id) => (id === 'stadium' ? stadiumLvl(c) : id === 'office' ? c.office?.level || 1 : c[id]?.level || 0);
 const applyBuilding = (c, id, lv) => {
   if (id === 'stadium') setStadiumLevel(c, lv);
+  else if (id === 'office') office(c).level = lv;
   else if (id === 'training') TG.setLevel(c.training, lv);
   else if (id === 'academy') AC.setLevel(c.academy, lv);
   else if (id === 'medical') MD.medSetLevel(c.medical, lv);
@@ -1368,6 +1369,7 @@ const buildCtx = c => ({ now: serverNow(), trusted: clock.state === 'ok', level:
 // finished buildings (only on a time the server confirmed)
 function buildTick(c) {
   if (!c.build) ensureBuild(c);
+  if (c.office && (clock.state === 'ok' || clock.state === 'local')) { const r = officeTick(c, { now: serverNow(), trusted: clock.state === 'ok' }); for (const n of r.left || []) ui.toast(`${n} left the office: the wages were not paid`); }
   const done = PC.settleBuilds(c, buildCtx(c));
   if (done.length) { saveProfile(profile); for (const j of done) ui.toast(`🏗️ ${BUILD_NAME[j.id]} is now level ${j.to}`); }
   return done;
@@ -1810,9 +1812,10 @@ function renderOffice(test = false) {
 }
 function paintOffice(c) {
   const club = teamById(c.club), o = office(c), books = seasonBooks(c), last = seasonBooks(c, c.season - 1);
-  const done = (r, close = false) => { if (r === false) ui.toast('Not now'); else { sfx.click(); if (close) officeSheet = null; } saveProfile(profile); paintOffice(c); };
+  buildTick(c);
+  const done = (r, close = false) => { if (r === false || r?.ok === false) ui.toast(r?.why || 'Not now'); else { sfx.click(); if (close) officeSheet = null; } saveProfile(profile); paintOffice(c); };
   $('officeLede').textContent = officeTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · season ${c.season} · club ${money(c.money)}`;
-  $('officeLvl').replaceChildren(ico('coin'), el('span', '', money(c.money)));
+  $('officeLvl').replaceChildren(ico('factory'), el('span', '', `LV ${o.level}`));
   const inn = totalOf(books.in), out = totalOf(books.out), net = Math.round((inn - out) * 100) / 100;
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   $('officeStats').replaceChildren(stat('up', 'gold', money(inn), 'came in'), stat('cross', 'red', money(out), 'went out'), stat('coin', 'blue', `${net >= 0 ? '+' : '−'}${money(Math.abs(net))}`, 'this season'));
@@ -1822,8 +1825,8 @@ function paintOffice(c) {
     tb.replaceChildren(el('b', '', 'TEST'), chip('Win +2 sixes', () => officeMatch(c, { won: true, sixes: 2 })), chip('Loss', () => officeMatch(c, { won: false, sixes: 0 })),
       chip('Board met', () => { if (!objectiveOf(c)) return ['No target right now']; return settleObjective(c, 2); }), chip('+$1M', () => { c.money += 1; }));
   }
-  const canSign = !o.deal;
-  const tabs = [['money', 'chart', 'Money', 0], ['sponsors', 'star', 'Sponsors', canSign ? '!' : 0], ['board', 'trophy', 'Board', 0], ['contracts', 'users', 'Contracts', 0]];
+  const freeSlot = OFFICE.SLOTS.some((sl, i) => i < officeSlots(c) && !o.deals[sl]);
+  const tabs = [['money', 'chart', 'Money', 0], ['sponsors', 'star', 'Sponsors', freeSlot ? '!' : 0], ['board', 'trophy', 'Board', 0], ['contracts', 'users', 'Contracts', 0], ['office', 'factory', 'Office', canBuild(c, 'office') ? '!' : 0]];
   $('officeTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${officeTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { officeTab = id; officeSheet = null; sfx.click(); paintOffice(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
   const body = $('officeBody');
   body.replaceChildren();
@@ -1842,31 +1845,29 @@ function paintOffice(c) {
     for (const [k, l] of Object.entries(OUTGOING)) rows.append(row('out', k, l));
     body.append(rows);
     const lastNet = Math.round((totalOf(last.in) - totalOf(last.out)) * 100) / 100;
-    const foot = el('div', 'mf-card'); foot.append(ico('clock'), el('span', 'mf-row', c.season > 1 || totalOf(last.in) ? `Last season: ${money(totalOf(last.in))} in, ${money(totalOf(last.out))} out (${lastNet >= 0 ? '+' : '−'}${money(Math.abs(lastNet))})` : 'This is your first season: the books start here.')); body.append(foot);
+    const fc = forecast(c);
+    const foot = el('div', 'mf-card'); foot.append(ico('clock'), el('span', 'mf-row', fc ? `At this rate the season ends ${fc.net >= 0 ? '+' : '−'}${money(Math.abs(fc.net))} (${fc.played} of ${fc.per} matches played)` : c.season > 1 || totalOf(last.in) ? `Last season: ${money(totalOf(last.in))} in, ${money(totalOf(last.out))} out (${lastNet >= 0 ? '+' : '−'}${money(Math.abs(lastNet))})` : 'This is your first season: the books start here.')); body.append(foot);
   } else if (officeTab === 'sponsors') {
-    const col = el('div', 'mf-col'), d = o.deal;
-    if (d) {
-      const S = SPONSORS[d.id], w = dealWorth(c, d.id), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
-      hd.append(ico('star'), el('b', '', S.name), el('span', 'mf-stars', S.tag));
-      const pips = el('div', 'mf-pips'); for (let i = 0; i < DEAL.MATCHES; i++) pips.append(ico('ball', i < d.played ? 'on' : ''));
-      card.append(hd, pips, el('p', 'sheetnote', `${d.played} of ${DEAL.MATCHES} matches played · ${money(d.paid)} paid so far`));
-      if (S.goal) {
-        const have = S.goal.kind === 'wins' ? d.wins : d.sixes, bar = el('div', 'mf-bar green'), f = el('i'); f.style.width = `${Math.min(100, Math.round(have / S.goal.n * 100))}%`; bar.append(f);
-        card.append(el('div', 'mf-row', `${S.goal.text}: ${have} so far`), bar, el('p', 'sheetnote', `Bonus ${money(w.bonus)} if you do.`));
+    const col = el('div', 'mf-col'), SLOT = { shirt: ['jersey', 'Shirt'], ground: ['users', 'Ground'], kit: ['box', 'Kit'] }, opens = ['', 5, 10];
+    for (const [i, slot] of OFFICE.SLOTS.entries()) {
+      const d = o.deals[slot], [ic, label] = SLOT[slot], card = el('div', 'mf-card'), info = el('div', 'mf-info');
+      if (i >= officeSlots(c)) {
+        card.classList.add('empty'); info.append(el('b', '', `${label} sponsor`), el('small', '', `Opens at office level ${opens[i]}`));
+        card.append(ico('warn'), info);
+      } else if (d) {
+        const S = SPONSORS[d.id], pips = el('div', 'mf-pips');
+        for (let k = 0; k < DEAL.MATCHES; k++) pips.append(ico('ball', k < d.played ? 'on' : ''));
+        const goal = S.goal ? `${S.goal.kind === 'wins' ? d.wins : d.sixes}/${S.goal.n} ${S.goal.kind}` : 'no goal';
+        info.append(el('b', '', `${label}: ${S.name}`), pips, el('small', '', `${money(d.paid)} paid · ${goal}`));
+        card.append(ico(ic), info);
+      } else {
+        info.append(el('b', '', `${label} sponsor`), el('small', '', 'Free: pick a deal'));
+        const go = mfBtn('chipbtn', [el('span', '', 'Sign')], () => { officeSheet = { type: 'sign', slot }; sfx.click(); paintOffice(c); });
+        card.append(ico(ic), info, go);
       }
       col.append(card);
-    } else {
-      col.append(Object.assign(el('div', 'mf-card'), {}));
-      col.lastChild.append(ico('warn'), el('span', 'mf-row', `Pick one deal. It runs for ${DEAL.MATCHES} of your league matches, and you can only have one at a time.`));
-      for (const [id, S] of Object.entries(SPONSORS)) {
-        const w = dealWorth(c, id), card = el('div', 'mf-card'), info = el('div', 'mf-info');
-        info.append(el('b', '', `${S.name} · ${S.tag}`), el('small', '', S.about), el('div', 'mf-row', `up to ${money(Math.round(w.top * 100) / 100)}`));
-        const go = mfBtn('chipbtn', [el('span', '', 'Sign')], () => done(signSponsor(c, id)));
-        card.append(ico('star'), info, go);
-        col.append(card);
-      }
     }
-    if (o.log?.length) { const e = o.log[o.log.length - 1], card = el('div', 'mf-card'); card.append(ico(e.got ? 'check' : 'cross'), el('span', 'mf-row', `Last deal: ${SPONSORS[e.id].name}, ${money(e.paid)} paid${e.got ? '' : ', bonus missed'}`)); col.append(card); }
+    const note = el('div', 'mf-card'); note.append(ico('clock'), el('span', 'mf-row', `Each deal runs for ${DEAL.MATCHES} of your league matches. A sponsor can be in one slot at a time.`)); col.append(note);
     body.append(col);
   } else if (officeTab === 'board') {
     const col = el('div', 'mf-col'), ob = objectiveOf(c), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
@@ -1881,19 +1882,89 @@ function paintOffice(c) {
     col.append(card);
     for (const b of [...(o.board || [])].reverse().slice(0, 3)) { const r = el('div', 'mf-card'); r.append(ico(b.met ? 'check' : 'cross'), el('span', 'mf-row', `Season ${b.season}: wanted top ${b.target}, finished ${b.pos}${b.met ? ` · +${money(b.reward)}` : ''}`)); col.append(r); }
     body.append(col);
-  } else {
+  } else if (officeTab === 'contracts') {
     const list = contractList(c).slice(0, 6), grid = el('div', 'mf-grid');
     for (const p of list) {
-      const card = el('div', 'mf-card stack'), stock = c.merch?.live?.[p.id] || 0, r = el('div', 'mf-row');
+      const card = el('button', 'mf-card stack'), stock = c.merch?.live?.[p.id] || 0, r = el('div', 'mf-row');
       r.append(ico('clock'), el('span', '', p.contract <= 1 ? 'last season' : `${p.contract} seasons`), ico('jersey'), el('span', '', String(stock)));
       card.append(frameOf(playerFace(p, 72)), el('b', '', lastName(p.name)), r);
-      if (p.contract <= 1) card.classList.add('pick');
+      if (p.contract <= 1) { card.classList.add('pick'); card.addEventListener('click', () => { officeSheet = { type: 'extend', pid: p.id }; sfx.click(); paintOffice(c); }); }
       grid.append(card);
     }
     body.append(grid);
-    const foot = el('div', 'mf-card'); foot.append(ico('warn'), el('span', 'mf-row', 'When a contract ends, the player goes to the auction. His jerseys in the factory turn into cheap vintage stock.')); body.append(foot);
+    const foot = el('div', 'mf-card'); foot.append(ico('warn'), el('span', 'mf-row', extensionsLeft(c) ? `Tap a player in his last season: your agent can keep him (${extensionsLeft(c)} left this season). Otherwise he goes to the auction.` : 'When a contract ends, the player goes to the auction. An agent can keep a player in his last season. His jerseys in the factory turn into cheap vintage stock.')); body.append(foot);
+  } else {
+    const col = el('div', 'mf-col'), places = officePlaces(c), grid = el('div', 'mf-grid three');
+    const OIC = { accountant: 'coin', agent: 'users' };
+    for (const st of o.staff) {
+      const card = el('button', 'mf-card stack'), r = el('div', 'mf-row'); r.append(ico(OIC[st.role]), el('span', 'mf-stars', '★'.repeat(st.lvl)));
+      card.append(frameOf(staffFace(st, club, 64)), el('b', '', st.name.split(' ')[1]), el('small', '', OFFICERS[st.role].name), r);
+      card.addEventListener('click', () => { officeSheet = { type: 'officer', id: st.id }; sfx.click(); paintOffice(c); });
+      grid.append(card);
+    }
+    for (let i = o.staff.length; i < places; i++) {
+      const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Hire'));
+      card.addEventListener('click', () => { officeSheet = { type: 'hire' }; sfx.click(); paintOffice(c); });
+      grid.append(card);
+    }
+    col.append(grid);
+    const card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head'), row = officeRow(c);
+    hd.append(ico('factory'), el('b', '', `Office level ${o.level}`), el('span', 'mf-stars', '★'.repeat(PC.lookOf(o.level))));
+    card.append(hd);
+    const r1 = el('div', 'mf-row'); r1.append(ico('coin'), el('span', '', `Sponsors pay ×${row.pay.toFixed(2)} · board bonus ×${row.reward.toFixed(1)} · ${officeSlots(c)} sponsor slot${officeSlots(c) > 1 ? 's' : ''}`));
+    const r2 = el('div', 'mf-row'); r2.append(ico('users'), el('span', '', `${o.staff.length} of ${places} staff · ${kfmt(officeWagePerDay(c))} a day${o.unpaidMs > 0 ? ' · UNPAID: they stopped working' : ''}`));
+    card.append(r1, r2, ...buildBlock(c, 'office', () => paintOffice(c)));
+    col.append(card);
+    body.append(col);
   }
-  const sh = $('officeSheet'); sh.hidden = true;
+  const sh = $('officeSheet');
+  sh.hidden = !officeSheet;
+  if (!officeSheet) return;
+  sh.onclick = e => { if (e.target === sh) { officeSheet = null; paintOffice(c); } };
+  const card = el('div', 'mf-sheet-card');
+  const close = mfBtn('mf-x', [ico('cross')], () => { officeSheet = null; sfx.click(); paintOffice(c); });
+  if (officeSheet.type === 'sign') {
+    const slot = officeSheet.slot, hd = el('div', 'mf-sheet-head'); hd.append(ico('star'), el('b', '', `${slot[0].toUpperCase()}${slot.slice(1)} sponsor`), close);
+    card.append(hd);
+    for (const [id, S] of Object.entries(SPONSORS)) {
+      if (Object.values(o.deals).some(d => d.id === id)) continue;
+      const w = dealWorth(c, id, slot), b = el('div', 'mf-card'), info = el('div', 'mf-info');
+      info.append(el('b', '', `${S.name} · ${S.tag}`), el('small', '', S.about), el('div', 'mf-row', `up to ${money(Math.round(w.top * 100) / 100)}`));
+      b.append(ico('star'), info, mfBtn('chipbtn', [el('span', '', 'Sign')], () => done(signSponsor(c, id, slot), true)));
+      card.append(b);
+    }
+  } else if (officeSheet.type === 'hire') {
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('plus'), el('b', '', 'Hire an officer'), close);
+    const roles = el('div', 'mf-roles');
+    for (const [role, R] of Object.entries(OFFICERS)) {
+      const b = el('button', 'mf-role'), x = el('div'); x.append(el('b', '', R.name), el('small', '', `${R.about} ${kfmt(OFFICE.WAGE[role])} a day.`));
+      b.append(ico(role === 'agent' ? 'users' : 'coin'), x);
+      b.disabled = o.staff.some(st => st.role === role);
+      b.addEventListener('click', () => done(hireOfficer(c, role), true));
+      roles.append(b);
+    }
+    card.append(hd, roles);
+  } else if (officeSheet.type === 'officer') {
+    const st = o.staff.find(x => x.id === officeSheet.id);
+    if (!st) { officeSheet = null; sh.hidden = true; return; }
+    const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(staffFace(st, club, 96), true), el('b', '', `${st.name} · ${OFFICERS[st.role].name}`), close);
+    const info = el('div', 'mf-row'); info.append(el('span', 'mf-stars', '★'.repeat(st.lvl)), ico('coin'), el('span', '', `${kfmt(officerWage(st))} a day`));
+    const maxed = st.lvl >= officerMax(c);
+    const tr = mfBtn('mf-big alt', [ico('up'), el('span', '', maxed ? 'Best for now' : `Train · ${money(officerTrainCost(st))}`)], () => done(trainOfficer(c, st.id)));
+    tr.disabled = maxed;
+    card.append(hd, info, el('p', 'sheetnote', st.role === 'accountant' ? `Sponsor deals pay ${Math.round(st.lvl * 10)}% more.` : `Keeps ${st.lvl} player${st.lvl > 1 ? 's' : ''} a season, for ${Math.round((1 - 0.1 * (st.lvl - 1)) * 100)}% of the usual fee.`), tr, mfBtn('mf-big red', [ico('cross'), el('span', '', 'Let go')], () => done(fireOfficer(c, st.id), true)));
+  } else if (officeSheet.type === 'extend') {
+    const p = c.players[officeSheet.pid];
+    if (!p || p.team !== c.club) { officeSheet = null; sh.hidden = true; return; }
+    const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(p, 96), true), el('b', '', p.name), close);
+    const fee = extendFee(c, p), r = el('div', 'mf-row'); r.append(ico('clock'), el('span', '', `Last season · +${OFFICE.EXTEND} seasons for ${money(fee)}`));
+    const go = mfBtn('mf-big', [ico('check'), el('span', '', `Extend · ${money(fee)}`)], () => done(extendContract(c, p.id), true));
+    go.disabled = extensionsLeft(c) < 1 || c.money < fee;
+    card.append(hd, r, go);
+    if (!office(c).staff.some(x => x.role === 'agent')) card.append(el('p', 'sheetnote', 'You need an agent: hire one in the Office tab.'));
+    else if (extensionsLeft(c) < 1) card.append(el('p', 'sheetnote', 'Your agent has done all he can this season.'));
+  } else { officeSheet = null; sh.hidden = true; return; }
+  sh.replaceChildren(card);
 }
 $('setOffice').addEventListener('click', () => { unlockAudio(); sfx.click(); renderOffice(true); });
 

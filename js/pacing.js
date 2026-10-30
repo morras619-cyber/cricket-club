@@ -44,7 +44,7 @@ export const MAX_LEVEL = 10;
 export const XP_AT = [0, 0, 150, 400, 800, 1400, 2200, 3200, 4400, 5600, 7000];    // the XP that makes level n (index n)
 export const XP = { MATCH: 8, WIN: 8, DRAW: 3, DRILL: 3, PROMOTED: 150, CHAMPION: 300 };
 export const BUILD = { COST: 1.0, GROWTH: 1.38, HOURS: [0, 0, 2, 2, 3, 4, 4, 5, 6, 8, 12], MULT: { stadium: 1.5, merch: 1, training: 1, academy: 1, medical: 0.8 }, BUILDER2: 100 };   // $M to reach level 2 and the rise for each level after; hours to reach level n
-export const IDS = ['stadium', 'training', 'academy', 'medical', 'merch'];
+export const IDS = ['stadium', 'training', 'academy', 'medical', 'merch', 'office'];
 export const lookOf = level => (level >= MAX_LEVEL ? 3 : level >= 5 ? 2 : 1);
 export const costOf = (id, to) => Math.round(BUILD.COST * (BUILD.MULT[id] ?? 1) * BUILD.GROWTH ** (to - 2) * 20) / 20;   // $M to reach level `to`
 export const hoursOf = to => BUILD.HOURS[to];
