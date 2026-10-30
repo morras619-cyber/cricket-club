@@ -81,7 +81,11 @@ GROUNDS.pakistan = { ...GROUNDS.cyclones, name: 'Crescent Park', time: 'night', 
 // (your own club plays at the ground it took over, under the name you gave it)
 // (your own club plays at the ground it took over, rebuilt as its own: a night ground under its name)
 const OWN_SKY = { time: 'night', sky: ['#03061f', '#0f2363', '#2d4fb3'], skyline: '#0b1640', windows: ['#ffd23f', '#9fd8ff'] };
-export const groundOf = teamId => (myClub()?.id === teamId ? { ...GROUNDS[teamId], ...OWN_SKY, name: myClub().ground } : GROUNDS[teamId] || GROUNDS.thunder);
+// every kind of pitch there is, by id (a club building its ground picks one)
+export const PITCH_TYPES = {};
+for (const G of Object.values(GROUNDS)) if (G.pitch && !PITCH_TYPES[G.pitch.id]) PITCH_TYPES[G.pitch.id] = G.pitch;
+// (your own club: the pitch it chose when it was founded)
+export const groundOf = teamId => (myClub()?.id === teamId ? { ...GROUNDS[teamId], ...OWN_SKY, name: myClub().ground, pitch: PITCH_TYPES[myClub().pitch] || GROUNDS[teamId]?.pitch } : GROUNDS[teamId] || GROUNDS.thunder);
 export const PITCH_DEFAULT = { swing: 1, seam: 1, turn: 1, kmh: 1, bat: 1, ai: 1, field: 1, dew: false, bounce: 1, skid: 1, uneven: 0, carry: 1, roll: 1 };
 export const pitchOf = teamId => ({ ...PITCH_DEFAULT, ...groundOf(teamId).pitch });
 

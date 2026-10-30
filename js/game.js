@@ -4,7 +4,7 @@ import { makeRng } from './rng.js';
 import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
-import { teamById, rivalTeam, teamLook, logoSrc } from './teams.js';
+import { teamById, rivalTeam, teamLook, logoSrc, myClub } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
@@ -269,7 +269,7 @@ export class Game {
     this.oppStyle = this.oppTeam.style || {};
     // the home ground: its look, and how its pitch plays
     this.home = opts.home || homeFromSeed(this.seed, this.myTeam.id, this.oppTeam.id);
-    crowdSong(this.home);   // (the home crowd sings its own club's song)
+    crowdSong(myClub()?.id === this.home ? (myClub().chant || 'default') : this.home);   // (the home crowd sings its own club's song: your club's is the chant you chose)
     this.ground = groundOf(this.home);
     // a big, buzzing club's home crowd lifts its batters a little (js/chirp.js): wider timing windows, at home, in a career
     this.crowdLift = opts.crowd && this.home === this.myTeam.id ? CROWD_TIMING * opts.crowd : 0;

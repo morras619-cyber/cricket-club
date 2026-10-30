@@ -75,7 +75,7 @@ const LOGOS = new Map(); // crests painted in the game, by club id
 export function setMyClub(m) {
   if (MINE) LOGOS.delete(MINE.id);
   const base = m?.base && LEAGUE_CLUBS.find(t => t.id === m.base);
-  MINE = base ? { ...base, name: m.name, short: m.short, suit: m.suit, trim: m.trim, emblem: m.emblem, ground: m.ground || base.ground,
+  MINE = base ? { ...base, name: m.name, short: m.short, suit: m.suit, trim: m.trim, emblem: m.emblem, ground: m.ground || base.ground, chant: m.chant || 'default', pitch: m.pitch || 'flat',
     custom: true, stadium: m.stadium || 1, style: { ...base.style, tag: 'Your club', desc: 'Built from nothing. Every run is yours.' } } : null;
   if (MINE && m.crest) LOGOS.set(MINE.id, m.crest);
 }

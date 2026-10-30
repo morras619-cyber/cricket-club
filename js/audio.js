@@ -236,6 +236,8 @@ function loadMood() {
 // whole file is let go once they are cut out.
 const SONG_SLOTS = ['default', 'cyclones', 'vipers', 'eagles', 'phoenix', 'titans', 'storm', 'royals'], SONG_SLOT = 10.5, SONG_LEN = 10;
 let song = null, songTeam = null, defaultSong = null, songFor = null, songsLoading = null;
+// the songs a new club can choose as its own chant (the ids are the clubs whose crowds first sang them; 'default' is the Thunder Strikers')
+export const CHANTS = SONG_SLOTS;
 function cutSong(all, slot) {
   const sr = all.sampleRate, from = Math.round(slot * SONG_SLOT * sr), n = Math.min(Math.round(SONG_LEN * sr), all.length - from);
   const out = ac.createBuffer(all.numberOfChannels, n, sr);
@@ -301,6 +303,16 @@ export function crowdSong(teamId) {
     if (!defaultSong) defaultSong = cutSong(all, 0);
     if (songFor === teamId && slot > 0) { song = cutSong(all, slot); songTeam = teamId; }
   }).catch(() => { /* no singing this time */ }).finally(() => { songsLoading = null; });
+}
+// a chant heard once, for choosing it (in the club builder): the song is fetched if it has not been, then sung for a few seconds
+export async function previewChant(id) {
+  if (!ready()) return false;
+  singDuck(0.15);
+  crowdSong(id);
+  for (let i = 0; i < 60 && !(id === 'default' || !SONG_SLOTS.includes(id) ? defaultSong : song && songTeam === id); i++) await new Promise(r => setTimeout(r, 100));
+  const ok = id === 'default' || !SONG_SLOTS.includes(id) ? !!defaultSong : !!(song && songTeam === id);
+  if (ok) crowdSing(0, 7, 0.7);
+  return ok;
 }
 // sing for `sec` seconds starting `delay` seconds from now, at volume `vol`
 export function crowdSing(delay = 0, sec = 5, vol = 0.5) {

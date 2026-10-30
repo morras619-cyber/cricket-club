@@ -8,7 +8,7 @@ import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUn
 import { flag, nationName } from './nations.js';
 import { faceEl } from './looks.js';
 import { futCard, portraitFace } from './futcard.js';
-import { groundOf, pitchOf, homeFromSeed, GROUNDS } from './grounds.js';
+import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds.js';
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
@@ -24,7 +24,7 @@ import { preMatch } from './rivals.js';
 import { ensureChirp, faceOfPress, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
-import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute } from './audio.js';
+import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute, CHANTS, previewChant } from './audio.js';
 import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './units.js';
@@ -1286,26 +1286,15 @@ $('rgBack').addEventListener('click', () => renderHome());
 $('rgBack2').addEventListener('click', () => renderHome());
 $('rgGo').addEventListener('click', () => { if (!REGIONS.find(r => r.id === regionSel)?.open) return; const c = career(); c.region = regionSel; sfx.dhol(); saveProfile(profile); careerView = 'hub'; renderCareer(); });
 
-// pick (or keep) a club for the season
-function careerPick(c, body) {
-  // every career starts in Division 3
-  const order = c.divisions.d3.map(teamById).sort((a, b) => a.name.localeCompare(b.name));
-  renderPickTeam({
-    teams: order, start: order[0].id, go: 'To the auction', coach: 'leagueTeam',
-    squads: Object.fromEntries(order.map(t => [t.id, clubPool(c, t.id)])),
-    note: 'Every career starts in Division 3. Win it to go up, win Division 2 to reach the Asian Super League.',
-    onBack: () => (c.season === 1 && !c.club ? renderRegion() : renderHome()),
-    onGo: id => { if (chooseClub(c, id)) { sfx.dhol(); saveProfile(profile); renderCareer(); } },
-    make: () => renderMakeClub(c),
-  });
-}
+// a career begins with your own club: there is nobody else's to pick
+function careerPick(c) { renderMakeClub(c); }
 
 // ---------- Create your own club: name, colours, crest; it takes a Division 3 place ----------
 const KIT_COLOURS = ['#1f5fd6', '#123a7a', '#5fb4e8', '#0f8a8a', '#1e7a32', '#9bd12a', '#ffcf1a', '#ff8a1c',
   '#e8262b', '#8b1c24', '#ec2f9a', '#6a22c4', '#1f1f26', '#8f9296', '#ffffff', '#c8913a'];
 let mk = null;
 function renderMakeClub(c) {
-  mk = mk?.c === c ? mk : { c, name: '', short: '', ground: '', groundSet: false, suit: '#e8262b', trim: '#ffcf1a', emblem: 'bolt', n: 0 };
+  mk = mk?.c === c ? mk : { c, name: '', short: '', ground: '', groundSet: false, suit: '#e8262b', trim: '#ffcf1a', emblem: 'bolt', chant: 'default', pitch: 'flat', n: 0 };
   ui.show('makeclub');
   $('mkNameIn').value = mk.name; $('mkShortIn').value = mk.short; $('mkGroundIn').value = mk.ground;
   $('mkNameIn').placeholder = 'e.g. Mumbai Meteors'; $('mkShortIn').placeholder = 'MUM'; $('mkGroundIn').placeholder = 'e.g. Meteor Park';
@@ -1325,6 +1314,24 @@ function renderMakeClub(c) {
     b.addEventListener('click', () => { mk.emblem = id; sfx.click(); mkUpdate(); });
     em.append(b);
   }
+  // the fan chant: a song each, heard when it is tapped
+  const ch = $('mkChants'); ch.innerHTML = '';
+  for (const id of CHANTS) {
+    const b = el('button'); b.dataset.k = id; b.append(el('i', '', '▶'), el('span', '', id === 'default' ? 'Thunder Strikers' : (teamById(id)?.name || id)));
+    b.addEventListener('click', async () => {
+      mk.chant = id; sfx.click(); unlockAudio(); mkUpdate();
+      b.classList.add('playing'); await previewChant(id); setTimeout(() => b.classList.remove('playing'), 7000);
+    });
+    ch.append(b);
+  }
+  // the pitch: how it plays (its report is under the buttons)
+  const pt = $('mkPitches'); pt.innerHTML = '';
+  for (const id of GUIDE_ORDER) {
+    const P = PITCH_TYPES[id]; if (!P) continue;
+    const b = el('button'); b.dataset.p = id; b.append(el('span', '', P.name));
+    b.addEventListener('click', () => { mk.pitch = id; sfx.click(); mkUpdate(); });
+    pt.append(b);
+  }
   loadKitSprites();
   loadCrestMasks().then(() => mkUpdate());
   mkUpdate();
@@ -1342,6 +1349,9 @@ function mkUpdate() {
   show.style.setProperty('--suit', mk.suit); show.style.setProperty('--trim', mk.trim);
   $('mkName').textContent = mk.name.trim() || 'Your Club';
   $('mkGround').textContent = `${mkShort() || '???'} · ${mkGroundName()}`;
+  for (const b of $('mkChants').children) b.classList.toggle('on', b.dataset.k === mk.chant);
+  for (const b of $('mkPitches').children) b.classList.toggle('on', b.dataset.p === mk.pitch);
+  $('mkPitchNote').textContent = PITCH_TYPES[mk.pitch]?.report || '';
   const crest = paintCrest(mk.emblem, mk.suit, mk.trim);
   for (const b of $('mkEmblems').children) {
     b.classList.toggle('on', b.dataset.e === mk.emblem);
@@ -1372,7 +1382,7 @@ $('mkNameIn').addEventListener('input', e => { mk.name = e.target.value; mkUpdat
 $('mkShortIn').addEventListener('input', e => { mk.short = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase(); e.target.value = mk.short; mkUpdate(); });
 $('mkGroundIn').addEventListener('input', e => { mk.ground = e.target.value; mkUpdate(); });
 $('mkCoach').addEventListener('click', () => coachSay(DEV.makeClub));
-const mkBack = () => { renderCareer(); };
+const mkBack = () => { if (mk?.c?.club) renderCareer(); else if (mk?.c?.season === 1) renderRegion(); else renderHome(); };
 $('mkBack').addEventListener('click', mkBack);
 $('mkBack2').addEventListener('click', mkBack);
 $('mkGo').addEventListener('click', () => {
@@ -1380,7 +1390,7 @@ $('mkGo').addEventListener('click', () => {
   if (name.length < 3) { ui.toast('Give your club a name first'); $('mkNameIn').focus(); return; }
   if (!mk.crest) return;
   const c = mk.c;
-  if (createClub(c, { name, short: mkShort(), suit: mk.suit, trim: mk.trim, emblem: mk.emblem, ground: mkGroundName(), crest: mk.crest }, { trials: true })) {
+  if (createClub(c, { name, short: mkShort(), suit: mk.suit, trim: mk.trim, emblem: mk.emblem, ground: mkGroundName(), crest: mk.crest, chant: mk.chant, pitch: mk.pitch }, { trials: true })) {
     setLogo(mk.pid, null); mk = null;
     sfx.dhol(); saveProfile(profile);
     careerNotes = [`🏟️ ${name} are born! They take the place of ${c.custom.gone} in Division 3.`];
