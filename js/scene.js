@@ -1,8 +1,7 @@
-import { CFG } from './config.js';
+import { CFG, makeEffectLevel } from './config.js';
 import { INK, FONT_DISPLAY, FONT_BODY, halftonePattern } from './fx.js';
 import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
-import { makeEffectLevel } from './effectlevel.js';
 import { groundOf } from './grounds.js';
 import { stadiumTest, teamById, logoSrc, myClub, groundCondition } from './teams.js';
 import { paintGround } from './ownground.js';

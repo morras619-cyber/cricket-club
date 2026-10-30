@@ -75,3 +75,22 @@ export function phaseFor(ballNo) {
 export const units = { speed: 'kmh' };
 export const speedText = kmh => units.speed === 'mph' ? `${Math.round(kmh / 1.609)} MPH` : `${Math.round(kmh)} KM/H`;
 export const speedRange = ([a, b]) => units.speed === 'mph' ? `${Math.round(a / 1.609)}-${Math.round(b / 1.609)} mph` : `${a}-${b} km/h`;
+
+// Watches the frame rate and steps the optional ground effects (the Foundry's smoke) down on a device
+// that can't keep up: 0 full, 1 lighter, 2 off. It only ever steps down in a session, so it can't flap.
+const FX_SLOW = 26, FX_OK = 22, FX_HOLD = 3000, FX_GAP = 250;   // ms per frame (under ~38 fps is slow), ms of slowness, a pause
+export function makeEffectLevel() {
+  let last = null, avg = 16.7, slow = 0, level = 0;
+  return t => {
+    if (last !== null) {
+      const dt = t - last;
+      if (dt > 0 && dt < FX_GAP) {                       // (a pause or a hidden tab isn't slowness)
+        avg += (dt - avg) * 0.1;
+        slow = avg > FX_SLOW ? slow + dt : avg < FX_OK ? 0 : slow;
+        if (slow > FX_HOLD && level < 2) { level++; slow = 0; avg = 16.7; }
+      }
+    }
+    last = t;
+    return level;
+  };
+}

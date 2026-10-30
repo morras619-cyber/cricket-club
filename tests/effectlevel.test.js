@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeEffectLevel } from '../js/effectlevel.js';
+import { makeEffectLevel } from '../js/config.js';
 
 const run = (lv, from, frames, dt) => { let t = from, l = 0; for (let i = 0; i < frames; i++) { t += dt; l = lv(t); } return [t, l]; };
 
