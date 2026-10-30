@@ -436,6 +436,7 @@ function sheetMasks(key, p, w, h) {
 // img/mask-<sheet>.png (red = skin, green = hair), so a phone never has to compute them.
 // If a mask file can't load, it's computed here as a fallback.
 const pre = new Map(); // mask name -> { img, ready, failed }
+const MASK_FILE = { 'spin-back': 'spin-back-thunder' };   // (the same picture twice, so the copy is not published)
 export function loadPeopleMask(name) {
   if (pre.has(name)) return pre.get(name).done;
   const P = { img: new Image(), ready: false, failed: false };
@@ -443,7 +444,7 @@ export function loadPeopleMask(name) {
     P.img.onload = () => { P.ready = true; res(); };
     P.img.onerror = () => { P.failed = true; res(); };
   });
-  P.img.src = `img/mask-${name}.png`;
+  P.img.src = `img/mask-${MASK_FILE[name] || name}.png`;
   pre.set(name, P);
   return P.done;
 }

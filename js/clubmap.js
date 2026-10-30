@@ -41,7 +41,6 @@ const SITES = {
     merch:    { x: 0.748, y: 0.744, w: 0.310 },
   },
 };
-const orderOf = lv => Object.keys(SITES[lv]).sort((a, b) => SITES[lv][a].y - SITES[lv][b].y);   // far to near, the near ones painted over the far
 // where each building is in img/map/buildings[2|3].webp, by level: [row, height], all 1100 wide, and its tint (R the main colour, G the trim) H rows lower (tools/build_map.py)
 const ATLAS = {
   1: {"stadium": [0, 647], "training": [647, 645], "office": [1292, 688], "apartment": [1980, 764], "medical": [2744, 651], "academy": [3395, 659], "clubhouse": [4054, 601], "shop": [4655, 709], "merch": [5364, 675], "H": 6039},
@@ -77,7 +76,7 @@ function paint(sheet, id, club, lv) {
 
 export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
   const g = canvas.getContext('2d');
-  let base = null, sheets = null, club = null, level = 1, ORDER = orderOf(1), info = {}, selected = null, shown = false, dirty = false, session = 0;
+  let base = null, club = null, levels = {}, ORDER = Object.keys(SITES[1]), info = {}, selected = null, shown = false, dirty = false, session = 0;
   const art = {};              // id -> { canvas, solid ... }
   const cache = new Map();     // 'suit|trim' -> art (the last club painted stays)
   let vw = 1, vh = 1, dpr = 1, scale = 1, minScale = 0, maxScale = 3, ox = 0, oy = 0;   // the camera: map px * scale + offset = css px
@@ -92,7 +91,7 @@ export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
   };
   const redraw = () => { if (!dirty) { dirty = true; requestAnimationFrame(draw); } };
   const toMap = (px, py) => [(px - ox) / scale, (py - oy) / scale];
-  const rectOf = id => { const S = SITES[level][id], a = art[id]; if (!a) return null; const w = S.w * MAP_W, h = w * a.h / a.w; return { x: S.x * MAP_W - w / 2, y: S.y * MAP_H - h / 2, w, h }; };
+  const rectOf = id => { const S = SITES[levels[id] || 1][id], a = art[id]; if (!a) return null; const w = S.w * MAP_W, h = w * a.h / a.w; return { x: S.x * MAP_W - w / 2, y: S.y * MAP_H - h / 2, w, h }; };
 
   function fit() {
     const r = canvas.getBoundingClientRect();
@@ -213,24 +212,29 @@ export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
     reset() { scale = minScale; clamp(); redraw(); },
     get ready() { return ORDER.every(id => art[id]); },
     // the map for a club (its colours); the base shows at once, the buildings as each is painted
+    // lv: one level for every building, or { id: level } (the ones not named are level 1)
     async open(c, lv = 1) {
       shown = true; club = c; selected = null; const mine = ++session;
-      if (lv !== level) { level = lv; ORDER = orderOf(lv); for (const k of Object.keys(art)) delete art[k]; sheets = null; }
+      const next = Object.fromEntries(Object.keys(SITES[1]).map(id => [id, typeof lv === 'number' ? lv : lv[id] || 1]));
+      const key = `${c.suit}|${c.trim}|${JSON.stringify(next)}`;
+      levels = next;
+      ORDER = Object.keys(SITES[1]).sort((a, b) => SITES[levels[a]][a].y - SITES[levels[b]][b].y);
+      for (const k of Object.keys(art)) delete art[k];
       fit(); redraw();
       if (!base) { base = await load('img/map/base.webp').catch(() => null); redraw(); }
-      const key = `${c.suit}|${c.trim}|${lv}`;
       if (cache.has(key)) { for (const id of ORDER) art[id] = cache.get(key)[id]; redraw(); onFirstDraw?.(); return; }
       const set = {};
-      for (const k of Object.keys(art)) delete art[k];
-      const sfx = lv === 1 ? '' : String(lv);
-      sheets ||= await load(`img/map/buildings${sfx}.webp`);
-      if (mine !== session) return;
-      for (const id of [...ORDER].sort((a, b) => (a === 'stadium' ? -1 : b === 'stadium' ? 1 : 0))) {
-        set[id] = art[id] = paint(sheets, id, club, lv); redraw(); await frame();
+      // one big picture a level (it is let go once its buildings are painted); the stadium first
+      const first = [...ORDER].sort((a, b) => (a === 'stadium' ? -1 : b === 'stadium' ? 1 : 0));
+      for (const L of [...new Set(first.map(id => levels[id]))]) {
+        const sheet = await load(`img/map/buildings${L === 1 ? '' : L}.webp`);
         if (mine !== session) return;
+        for (const id of first.filter(x => levels[x] === L)) {
+          set[id] = art[id] = paint(sheet, id, club, L); redraw(); await frame();
+          if (mine !== session) return;
+        }
       }
       cache.clear(); cache.set(key, set);
-      sheets = null;   // (the buildings are painted: the big picture is let go)
       onFirstDraw?.();
     },
     close() { shown = false; session++; },

@@ -17,6 +17,7 @@ import { ensureRivals, nemesisOf, say, afterMatch, messageNote, rivalKind } from
 import { ensureChirp, afterMatchPopularity, seasonPopularity, storyOf, sponsorBonus, compact } from './chirp.js';
 import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
 import { memOf } from './chirpfacts.js';
+import { fameAfter, startFame } from './merch.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -820,20 +821,32 @@ function checkStar(c, p) {
 export function recordPlayerMatch(c, summary) {
   const before = new Map(clubPlayers(c, c.club).map(p => [p.id, ovr(p)]));
   const newsAt = c.news.length;
-  const ids = [];
+  const ids = [], perf = new Map();
   for (const inn of summary.innings) {
     const bat = new Map(), bowl = new Map();
     for (const st of inn.battingCard()) if (st.id) bat.set(st.id, { runs: st.runs, balls: st.balls, fours: st.fours, sixes: st.sixes, out: st.out });
     for (const f of inn.bowlingCard()) bowl.set(f.id, { balls: f.balls, runs: f.runs, wkts: f.wkts });
-    for (const [id, s] of bat) recordBat(c, id, s);
-    for (const [id, f] of bowl) recordBowl(c, id, f);
+    for (const [id, s] of bat) { recordBat(c, id, s); perf.set(id, { ...perf.get(id), bat: s }); }
+    for (const [id, f] of bowl) { recordBowl(c, id, f); perf.set(id, { ...perf.get(id), bowl: f }); }
     for (const id of new Set([...bat.keys(), ...bowl.keys()])) formFrom(c, c.players[id], bat.get(id), bowl.get(id));
     ids.push(...bat.keys(), ...bowl.keys());
   }
   played(c, ids);
+  for (const p of clubPlayers(c, c.club)) p.fame = fameAfter(fameOf(p), perf.get(p.id), summary.result.outcome === 'win');   // the fans' love, for the jerseys (js/merch.js)
   if (summary.result.outcome === 'win') c.money = round2(c.money + WIN_BONUS);
   const ups = clubPlayers(c, c.club).filter(p => ovr(p) > (before.get(p.id) ?? 99)).map(p => `⬆ ${p.name} ${before.get(p.id)} → ${ovr(p)}`);
   return [...ups, ...c.news.slice(newsAt)];
+}
+// ---------- the merchandise factory's view of the club (js/merch.js) ----------
+export const fameOf = p => p.fame ?? startFame(ovr(p));
+// the players under contract: id -> { fame, name }
+export const merchRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { fame: fameOf(p), name: p.name }]));
+// the jerseys a day the fans want, in all: your ground's size and your followers on Chirp
+export const merchDemand = c => 150 + (+String(STADIUMS[Math.max(1, stadiumLevel(c))]?.fans || '4000').replace(/\D/g, '')) / 40 + (c.chirp?.fans || 0) / 30;
+// the league matches left in a player's contract (the season he is in, and the full seasons after it)
+export function matchesLeft(c, p) {
+  const per = c.league?.rounds?.length || 14, now = c.league && c.league.stage === 'group' ? Math.max(0, per - c.league.round) : 0;
+  return now + Math.max(0, (p.contract || 1) - 1) * per;
 }
 // After your league match: play the rest of the round, and close the season when it's over.
 export function afterLeagueMatch(c, summary) {

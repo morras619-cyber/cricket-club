@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, merchRoster, merchDemand, matchesLeft, fameOf } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -30,6 +30,7 @@ import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader
 import { units } from './units.js';
 import { teamStars } from './teamrating.js';
 import { createClubMap } from './clubmap.js';
+import * as MF from './merch.js';
 import { initCoach, coachOnce, coachSay, DEV, QUICK_TIPS } from './coach.js';
 import { taunt } from './story.js';
 import { playComic, preloadComic, titleCard, NIGHT, EXIT } from './comic.js';
@@ -749,6 +750,7 @@ function showMatchError(e, loopErr) {
 }
 // opts.mode: 'quick' | 'challenge' | 'tutorial' | 'league' | 'cup' | 'daily'
 async function startMatch(opts) {
+  const matchStart = performance.now();
   unlockAudio();
   game.matchActive = false;
   ui.show(null);
@@ -831,6 +833,7 @@ async function startMatch(opts) {
   if (opts.opening || opts.trial) { game.quit(); return summary; }   // (the story's final: no result screen, the story goes on)
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
+  if (mode === 'career' && profile.career?.merch) MF.notePace(profile.career.merch, performance.now() - matchStart);   // (how fast you play: the factory warns when a contract would end first)
   showResult(summary);
   if (summary.result?.outcome === 'win' && summary.home && summary.home === summary.myTeam?.id) crowdSing(0.4, 10, 0.5); // a win at home: the crowd sings
   if (mode === 'tutorial' && tutTips && !window.__SIXCHARGE_BOT) coachSay(opts.story ? DEV.storyDone : DEV.tutDone);
@@ -1196,7 +1199,7 @@ const BUILDINGS = {
   apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
   medical: { name: 'Medical centre', desc: 'Coming soon', soon: true },
   clubhouse: { name: 'Clubhouse', desc: 'Coming soon', soon: true },
-  merch: { name: 'Merchandise factory', desc: 'Coming soon', soon: true },
+  merch: { name: 'Merchandise factory', desc: 'Make jerseys the fans want', open: () => renderMerch() },
 };
 let mapPick = null;
 const clubMap = createClubMap($('mapCanvas'), {
@@ -1213,6 +1216,7 @@ const clubMap = createClubMap($('mapCanvas'), {
 // which level of the buildings the map shows: 0 follows your stadium's level, 1-3 shows that level (the settings' Club map level, to look at them)
 const mapLevelText = () => (mapLevel.v ? `Club map level: ${mapLevel.v}` : 'Club map level: follows your stadium');
 const mapLevel = { v: (() => { try { return +localStorage.getItem('sixcharge.mapLevel') || 0; } catch { return 0; } })() };
+const mapLevels = c => (mapLevel.v ? mapLevel.v : { ...Object.fromEntries(Object.keys(BUILDINGS).map(id => [id, levelOfMap(c)])), merch: c.merch?.level || 1 });
 const levelOfMap = c => mapLevel.v || (c.club ? Math.min(3, Math.max(1, stadiumLevel(c))) : 1);
 let mapTest = false;   // the map opened from the settings to look at it: your club's colours (or a stand-in club), nothing opens, nothing is changed
 function renderClubMap(test = false) {
@@ -1223,14 +1227,158 @@ function renderClubMap(test = false) {
   $('mapSheet').hidden = true; mapPick = null;
   $('mapClub').textContent = club.name;
   $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
-  const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' };
-  clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
-  clubMap.open(club, levelOfMap(c));
+  const info = () => {
+    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts', merch: (c.merch?.till || 0) >= 100 };   // (a red dot: something to do there)
+    clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
+  };
+  info();
+  if (!test && c.merch) syncClock().then(() => { if (merchTick(c)) info(); });   // (the factory has been working while you were away)
+  clubMap.open(club, mapLevels(c));
   if (!test) coachOnce('clubMap', DEV.clubMap);
 }
 $('mapBack').addEventListener('click', () => { sfx.click(); clubMap.close(); if (mapTest) renderSettings(); else renderHome(); });
 $('mapCoach').addEventListener('click', () => coachSay(DEV.clubMap));
 $('mapOpen').addEventListener('click', () => { const b = BUILDINGS[mapPick]; if (!b || b.soon) return; if (mapTest) return ui.toast(`${b.name}: test view only`); sfx.click(); clubMap.close(); fromMap = true; b.open(); });
+
+// ---------- the merchandise factory (js/merch.js): a real business, on the server's time, also while you are away ----------
+// The time is the server's (the Date of a request to this page), never the phone's clock: changing the clock gets you nothing. With no
+// answer from the server the factory waits; a server that does not send a Date makes the phone's clock count, but for an hour at most.
+const clock = { base: Date.now(), perf: performance.now(), state: 'none' };   // state: 'ok', 'local', 'offline' (or 'none' before the first answer)
+async function syncClock() {
+  try {
+    let r = await fetch(location.pathname || '/', { method: 'HEAD', cache: 'no-store' });
+    if (!r.ok) r = await fetch(location.pathname || '/', { cache: 'no-store' });
+    const d = Date.parse(r.headers.get('date') || '');
+    clock.base = Number.isFinite(d) ? d : Date.now(); clock.perf = performance.now();
+    clock.state = Number.isFinite(d) ? 'ok' : 'local';
+  } catch { clock.state = 'offline'; }
+  return clock.state;
+}
+const serverNow = () => clock.base + (performance.now() - clock.perf);
+// the club's money, in $50k steps ($k in, $k out)
+const merchBank = c => ({
+  spend(k) { const need = Math.ceil(k / 50 - 1e-9) * 0.05; if (c.money + 1e-9 < need) return 0; c.money = Math.round((c.money - need) * 20) / 20; return Math.round(need * 1000); },
+  give(k) { const g = Math.floor(k / 50) * 0.05; c.money = Math.round((c.money + g) * 20) / 20; return Math.round(g * 1000); },
+});
+const merchCtx = c => ({ now: serverNow(), trusted: clock.state === 'ok', squad: merchRoster(c), demand: merchDemand(c), bank: merchBank(c) });
+function merchTick(c) {
+  if (!c.merch || clock.state === 'none' || clock.state === 'offline') return null;
+  const r = MF.tick(c.merch, merchCtx(c));
+  saveProfile(profile);
+  return r;
+}
+const kfmt = k => (Math.abs(k) >= 1000 ? `$${(k / 1000).toFixed(2)}M` : `$${Math.round(k * 10) / 10}k`);
+const durfmt = ms => (!Number.isFinite(ms) ? 'never' : ms < 90 * 1000 ? 'a minute' : ms < 90 * 60000 ? `${Math.round(ms / 60000)} min` : ms < 36 * 3600000 ? `${(ms / 3600000).toFixed(1)} h` : `${Math.round(ms / 86400000)} days`);
+let merchSel = null, merchQty = 20, merchTimer = 0, merchReport = null;
+async function renderMerch() {
+  const c = career();
+  ui.show('merch');
+  $('merchBack').onclick = () => { clearInterval(merchTimer); merchTimer = 0; sfx.click(); if (fromMap) renderClubMap(); else renderCareer(); };
+  $('merchBody').replaceChildren(el('p', 'sheetnote', 'Checking the time with the server…'));
+  await syncClock();
+  if (clock.state === 'offline') {
+    $('merchBody').replaceChildren(el('div', 'panel paper statcard', 'Cannot reach the server. The factory waits until it can check the time: that is what stops clock tricks. Try again when you are online.'));
+    $('merchLede').textContent = '';
+    return;
+  }
+  if (!c.merch) c.merch = MF.freshMerch(serverNow());
+  merchReport = merchTick(c);
+  coachOnce('merch', DEV.merch);
+  paintMerch(c);
+  clearInterval(merchTimer);
+  merchTimer = setInterval(() => { if ($('merch').hidden) { clearInterval(merchTimer); merchTimer = 0; return; } merchReport = merchTick(c) || merchReport; paintMerch(c); }, 15000);
+}
+function paintMerch(c) {
+  const m = c.merch, body = $('merchBody'), roster = merchRoster(c), dmap = MF.demandMap(m, merchCtx(c));
+  const ctx = () => merchCtx(c);
+  const done = r => { if (r && r.ok === false) ui.toast(r.why); else sfx.click(); saveProfile(profile); merchTick(c); paintMerch(c); };
+  $('merchLede').textContent = `Level ${m.level} · till ${kfmt(m.till)} · club ${money(c.money)}`;
+  body.replaceChildren();
+  // the till, and what happened while you were away
+  const top = el('div', 'panel paper statcard');
+  const row = el('div', 'scoutrow');
+  const t = el('div'); t.append(el('b', '', `Till ${kfmt(m.till)}`), el('small', '', `Wages and machines: ${kfmt(MF.wagePerDay(m))} a day · jerseys sold so far ${m.sold}`));
+  const col = el('button', 'chipbtn', 'Collect'); col.disabled = m.till < 50;
+  col.addEventListener('click', () => { const r = MF.collect(m, ctx()); done(r); if (r.ok) ui.toast(`${kfmt(r.k)} to the club`); });
+  row.append(t, col); top.append(row);
+  if (merchReport && merchReport.away > 2 * 60000) top.append(el('p', 'sheetnote', `While you were away${merchReport.capped ? ' (only the first ten hours count)' : ''}: ${merchReport.sold} jerseys sold, ${merchReport.till >= 0 ? '+' : ''}${kfmt(merchReport.till)} in the till.`));
+  if (merchReport?.tampered) top.append(el('p', 'sheetnote', 'The books did not add up, so the till was emptied.'));
+  if (clock.state === 'local') top.append(el('p', 'sheetnote', 'The server did not give a time: only the first hour away counts.'));
+  if (m.unpaidMs > 0) top.append(el('p', 'sheetnote', `⚠ The wages cannot be paid: the work has stopped${m.unpaidMs > 24 * 3600000 ? ` and the staff will leave in ${durfmt(MF.MERCH.QUIT - m.unpaidMs)}` : ''}.`));
+  body.append(top);
+  // what the fans want
+  const fans = el('div', 'panel paper statcard');
+  fans.append(el('h3', '', 'What the fans want'));
+  fans.append(el('p', 'sheetnote', 'Fans want jerseys of players they love. A player is loved for how he plays. A jersey needs a design first.'));
+  const list = [...roster].sort((a, b) => (dmap.get(b[0]) || 0) - (dmap.get(a[0]) || 0));
+  for (const [pid, info] of list.slice(0, 8)) {
+    const p = c.players[pid], r = el('div', 'scoutrow');
+    const tx = el('div');
+    const stock = m.live[pid] || 0, queued = m.queue.filter(o => o.pid === pid).reduce((a, o) => a + o.left, 0);
+    tx.append(el('b', '', info.name), el('small', '', `${Math.round(dmap.get(pid) || 0)} fans a day want his jersey · fame ${Math.round(info.fame)} · ${m.designs[pid] ? `designed (${'★'.repeat(m.designs[pid])})` : 'no design yet'} · in stock ${stock}${queued > 0.5 ? ` · making ${Math.ceil(queued)}` : ''}${m.vint[pid] ? ` · vintage ${m.vint[pid].n}` : ''} · ${p.contract >= 50 ? 'signed for good' : `${matchesLeft(c, p)} matches left on his deal`}`));
+    const b = el('button', 'chipbtn', merchSel === pid ? 'Chosen' : 'Make');
+    b.addEventListener('click', () => { merchSel = pid; sfx.click(); paintMerch(c); });
+    r.append(tx, b); fans.append(r);
+  }
+  for (const [pid, v] of Object.entries(m.vint)) if (!roster.has(pid)) fans.append(el('p', 'sheetnote', `${c.players[pid]?.name || pid}: ${v.n} vintage jerseys left (sold cheaply, fading)`));
+  for (const [pid, l] of Object.entries(m.left)) fans.append(el('p', 'sheetnote', `${c.players[pid]?.name || pid} has left: his ${m.live[pid] || 0} jerseys sell at full price a little longer`));
+  body.append(fans);
+  // an order
+  if (merchSel && roster.has(merchSel)) {
+    const o = el('div', 'panel paper statcard'), p = c.players[merchSel], max = MF.maxOrder(m);
+    merchQty = Math.max(1, Math.min(merchQty, max));
+    o.append(el('h3', '', `Jerseys for ${p.name}`));
+    const qrow = el('div', 'scoutrow');
+    const sel = el('select');
+    for (const q of [...new Set([5, 10, 20, 50, 100, max].filter(x => x <= max))].sort((a, b) => a - b)) { const op = el('option', '', `${q} jerseys`); op.value = q; if (q === merchQty) op.selected = true; sel.append(op); }
+    sel.addEventListener('change', () => { merchQty = +sel.value; paintMerch(c); });
+    const go = el('button', 'chipbtn', `Make · cloth ${kfmt(merchQty * MF.MERCH.MATERIAL)}`);
+    go.addEventListener('click', () => done(MF.order(m, merchSel, merchQty, ctx())));
+    qrow.append(sel, go); o.append(qrow);
+    const ms = MF.forecast(m, merchSel, merchQty), left = p.contract >= 50 ? Infinity : matchesLeft(c, p) * m.pace;
+    o.append(el('p', 'sheetnote', `Ready in about ${durfmt(ms)}${MF.staffOf(m, 'printer').length ? '' : ' (you need a printer)'}. About ${Math.round(MF.wasteRate(m) * 100)}% are spoiled on the way.`));
+    if (Number.isFinite(ms) && ms > left) o.append(el('p', 'sheetnote', `⚠ At your pace (${durfmt(m.pace)} a match) ${p.name}'s contract ends in about ${durfmt(left)}. This batch will not all be ready: what is unmade is cancelled, and what is made sells as cheap vintage stock after two days.`));
+    body.append(o);
+  }
+  // the queue
+  if (m.queue.length) {
+    const q = el('div', 'panel paper statcard'); q.append(el('h3', '', 'Being made'));
+    m.queue.forEach((o, i) => {
+      const r = el('div', 'scoutrow'), tx = el('div');
+      tx.append(el('b', '', `${c.players[o.pid]?.name || o.pid}: ${Math.ceil(o.left)} to go`), el('small', '', m.designs[o.pid] ? 'printing' : 'being designed'));
+      const b = el('button', 'chipbtn', 'Cancel'); b.addEventListener('click', () => done(MF.cancel(m, i)));
+      r.append(tx, b); q.append(r);
+    });
+    body.append(q);
+  }
+  // the staff and the machines
+  const st = el('div', 'panel paper statcard');
+  st.append(el('h3', '', `Staff ${m.staff.length}/${MF.MERCH.LEVELS[m.level].staff}`));
+  for (const s of m.staff) {
+    const r = el('div', 'scoutrow'), tx = el('div');
+    tx.append(el('b', '', `${s.name} · ${MF.ROLES[s.role].name} ${'★'.repeat(s.lvl)}`), el('small', '', `wage ${kfmt(MF.ROLES[s.role].wage * (1 + 0.25 * (s.lvl - 1)))} a day`));
+    const tr = el('button', 'chipbtn', s.lvl >= MF.staffMax(m) ? 'Best for now' : `Train · ${kfmt(MF.trainCost(s))}`); tr.disabled = s.lvl >= MF.staffMax(m);
+    tr.addEventListener('click', () => done(MF.train(m, s.id, ctx())));
+    const fi = el('button', 'chipbtn', 'Let go'); fi.addEventListener('click', () => done(MF.fire(m, s.id)));
+    r.append(tx, tr, fi); st.append(r);
+  }
+  const hire = el('div', 'scoutrow');
+  for (const [role, R] of Object.entries(MF.ROLES)) { const b = el('button', 'chipbtn', `Hire ${R.name.toLowerCase()} · ${kfmt(R.wage)}/day`); b.title = R.about; b.addEventListener('click', () => done(MF.hire(m, role))); hire.append(b); }
+  st.append(hire);
+  st.append(el('p', 'sheetnote', 'Designer: draws each jersey first. Printer: makes them. Packer: fewer are spoiled.'));
+  const L = MF.MERCH.LEVELS[m.level], mr = el('div', 'scoutrow'), mt = el('div');
+  mt.append(el('b', '', `Machines ${m.machines}/${L.machines}`), el('small', '', 'A machine makes one printer twice as fast'));
+  const mb = el('button', 'chipbtn', `Buy · ${kfmt(MF.MERCH.MACHINE_COST)}`); mb.disabled = m.machines >= L.machines; mb.addEventListener('click', () => done(MF.buyMachine(m, ctx())));
+  mr.append(mt, mb); st.append(mr);
+  body.append(st);
+  // the building
+  const up = MF.nextUpgrade(m), bd = el('div', 'panel paper statcard');
+  bd.append(el('h3', '', `The factory: level ${m.level}`), el('p', 'sheetnote', `Room for ${L.staff} staff and ${L.machines} machines · ${L.batch} jerseys a printer at a time · ${L.stock} of each player's jersey in the warehouse`));
+  if (up) { const ub = el('button', 'bigbtn primary', `Upgrade · ${money(up.up)}`); ub.disabled = c.money < up.up; ub.addEventListener('click', () => done(MF.upgrade(m, ctx()))); bd.append(ub); }
+  body.append(bd);
+  if (m.log.length) { const lg = el('div', 'panel paper statcard'); lg.append(el('h3', '', 'News')); for (const e of m.log.slice(-5).reverse()) lg.append(el('p', 'sheetnote', e.text)); body.append(lg); }
+}
+addEventListener('visibilitychange', () => { if (!document.hidden && !$('merch').hidden) renderMerch(); });
 
 function renderCareer(notes = careerNotes) {
   const c = career();

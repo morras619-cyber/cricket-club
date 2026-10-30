@@ -136,6 +136,9 @@ export const DEV = {
   clubMap: [
     "Your club, beta. Drag to look around. Tap a building to open it.",
   ],
+  merch: [
+    "Your factory, beta. Hire a designer and a printer, then pick a player the fans love.",
+  ],
   stadium: [
     "Your ground. Home matches bring ticket money. Save up to build it bigger.",
   ],
