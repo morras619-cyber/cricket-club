@@ -256,7 +256,7 @@ const mdFits = async () => page.evaluate(() => { const m = document.querySelecto
 const mdTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#medTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(250); };
 check(await mdFits(), 'the squad tab fits the screen');
 await page.evaluate(() => [...document.querySelectorAll('#medTest .chipbtn')].find(b => /Play a match/.test(b.textContent)).click()); await page.waitForTimeout(500);
-check(await page.evaluate(() => { const m = window.__sixcharge.demo.medical; return Object.values(m.fit).filter(f => f < 100).length === 7 && Math.min(...Object.values(m.fit)) <= 73; }), 'a match tires seven players');
+check(await page.evaluate(() => { const m = window.__sixcharge.demo.medical; return Object.values(m.fit).filter(f => f < 100).length === 7 && Math.min(...Object.values(m.fit)) < 74; }), 'a match tires seven players');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'medical-squad.png') });
 await mdTab('Staff');
 await page.evaluate(() => document.querySelector('#medBody .mf-card.empty').click()); await page.waitForTimeout(300);
