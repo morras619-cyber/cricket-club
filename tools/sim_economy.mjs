@@ -3,7 +3,7 @@
 // on a simulated clock, by a diligent and sensible player who opens every building at every check-in. Three kinds of player:
 //   casual   one check-in a day (19:00)          regular  four check-ins (8, 13, 18, 22)          binge  a check-in every two hours from 8:00 to 22:00
 // Your own matches are played by the computer (the same simulator as the other clubs'), so a result here is "an average player's", not yours.
-// usage: node tools/sim_economy.mjs [days=120] [seeds=3]
+// usage: node tools/sim_economy.mjs [days=120] [seeds=3] [profile]      (one player type alone: casual, regular or binge; all three by default)
 import { makeRng } from '../js/rng.js';
 import * as C from '../js/career.js';
 import * as MF from '../js/merch.js';
@@ -15,7 +15,7 @@ import { nextFixture } from '../js/tournament.js';
 import { teamById } from '../js/teams.js';
 import { ovr } from '../js/squads.js';
 
-const DAYS = +process.argv[2] || 120, SEEDS = +process.argv[3] || 3;
+const DAYS = +process.argv[2] || 120, SEEDS = +process.argv[3] || 3, ONLY = process.argv[4] || null;
 const HOUR = 3600000, DAY = 24 * HOUR, T0 = 1.7e12;
 const SNAPS = [7, 30, 60, 90, 120, 180, 365].filter(d => d <= DAYS);
 const PROFILES = {
