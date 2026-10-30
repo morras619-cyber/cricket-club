@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -1679,6 +1679,7 @@ function renderOffice(test = false) {
   const c = test ? demoCareer() : career();
   ui.show('office');
   $('officeBack').onclick = () => { officeSheet = null; sfx.click(); if (officeTest) renderSettings(); else if (fromMap) renderClubMap(); else renderCareer(); };
+  if (test && !c.league) startSeason(c);   // (the practice club plays a season, so the board has a target)
   if (!c.office?.deal && !c.office) office(c);
   objectiveOf(c);
   paintOffice(c);
