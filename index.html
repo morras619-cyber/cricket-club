@@ -177,6 +177,7 @@ vs a random team</small></button>
       <button class="bigbtn" id="setAcademy">Test the youth academy</button>
       <button class="bigbtn" id="setOffice">Test the club office</button>
       <button class="bigbtn" id="setClubhouse">Test the clubhouse</button>
+      <button class="bigbtn" id="setShop">Test the club shop</button>
       <button class="bigbtn" id="setTraining">Test the training ground</button>
       <button class="bigbtn" id="setMerch">Test the merch factory</button>
       <button class="bigbtn" id="setClubMap">Test the club map</button>
@@ -187,14 +188,17 @@ vs a random team</small></button>
   </section>
 
   <section id="shop" class="screen" hidden>
-    <div class="screen-inner">
-      <h2 class="title">Shop</h2>
-      <div class="shopwallet"><span><img src="img/menu/coin.webp" alt=""><b id="shopCoins">0</b> coins</span><span><img src="img/menu/gem.webp" alt=""><b id="shopGems">0</b> gems</span></div>
-      <div class="panel paper shopcard" id="shopDaily"></div>
-      <h3 class="shophead">Gems for coins</h3>
-      <div class="shopdeals" id="shopDeals"></div>
-      <p class="fineprint">Win matches to earn gems (1 a win).</p>
-      <button class="bigbtn ghost" id="shopBack">Home</button>
+    <div class="mf">
+      <header class="mf-head">
+        <button class="pt-back" id="shopBack" aria-label="Back">‹</button>
+        <div class="mf-title"><b>Club shop</b><small id="shopLede"></small></div>
+        <div class="mf-lvl" id="shopLvl"></div>
+      </header>
+      <div class="mf-stats" id="shopStats"></div>
+      <div class="mf-test" id="shopTest" hidden></div>
+      <nav class="mf-tabs" id="shopTabs"></nav>
+      <div class="mf-body" id="shopBody"></div>
+      <div class="mf-sheet" id="shopSheet" hidden></div>
     </div>
   </section>
 

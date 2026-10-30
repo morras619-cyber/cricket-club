@@ -21,7 +21,7 @@ import { fameAfter, startFame } from './merch.js';
 import { seasonGain } from './training.js';
 import { tierOf, pickTier, POT_RANGE, ACAD } from './academy.js';
 import { freshMedical, medAfterMatch, fitOf } from './stamina.js';
-import { addXp, XP, levelRow, lookOf } from './pacing.js';
+import { addXp, XP, levelRow, lookOf, buildOf, addDiamonds } from './pacing.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -832,6 +832,7 @@ export function recordPlayerMatch(c, summary) {
   }
   played(c, ids);
   chemAfterMatch(c, ids);
+  gearAfterMatch(c, ids);
   // the medical centre: each of my players who played loses fitness by the stamina he used (he started the match on his fitness)
   const used = new Map();
   for (const inn of summary.innings) for (const [id, e] of Object.entries(inn.energy || {})) if (c.players[id]?.team === c.club) used.set(id, (used.get(id) || 0) + Math.max(0, fitnessOf(c, id) - e));
@@ -1051,6 +1052,107 @@ export function settleEvents(c, ctx) {
   }
   return done;
 }
+// ---------- the club shop: gear for your players (club cash), looks for the ground and the ball (diamonds), a few deals each day ----------
+// Gear gives one player a little rating (a bat for the batting, grips for the bowling, shoes for both); it wears out after SHOP.USES of your matches the
+// player took part in. A player carries one thing; the armoury holds so many (the shop's level). Three of the nine are on offer each day (the server's UTC
+// day), cheaper the bigger the shop. Looks (the colour of the lights when a six is hit at home, the ball's trail) are bought with diamonds and cost nothing in strength.
+// c.shop = { level, gear: [{ id, item, uses, on }], nextId, owned: { lights: {}, trail: {} }, look: { lights, trail }, deals: { day, ids, taken } }. Money is in $M.
+export const SHOP = {
+  ROWS: [null, { slots: 3, off: 0.2 }, { slots: 6, off: 0.3 }, { slots: 9, off: 0.4 }],   // the rows for level 1, 5 and 10 (levelRow fills in between): places in the armoury, and the deals' discount
+  USES: 20, DEALS: 3, DAY: 86400000,
+  GEAR: {
+    blaster: { name: 'Willow Blaster', kind: 'bat', bat: 2, cost: 0.5 }, edge: { name: 'Gold Edge Bat', kind: 'bat', bat: 3, cost: 1.5 }, thunder: { name: 'Thunder Willow', kind: 'bat', bat: 4, cost: 4 },
+    grips: { name: 'Seam Grips', kind: 'grip', bowl: 2, cost: 0.5 }, wrap: { name: 'Swing Wrap', kind: 'grip', bowl: 3, cost: 1.5 }, rocket: { name: 'Rocket Bands', kind: 'grip', bowl: 4, cost: 4 },
+    sprint: { name: 'Sprint Spikes', kind: 'shoes', bat: 1, bowl: 1, cost: 0.5 }, pro: { name: 'Pro Spikes', kind: 'shoes', bat: 1, bowl: 1, cost: 1.5 }, elite: { name: 'Elite Spikes', kind: 'shoes', bat: 2, bowl: 2, cost: 4 },
+  },
+  LOOKS: {
+    lights: { gold: { name: 'Gold lights', colour: '#ffd23f', cost: 40 }, neon: { name: 'Neon lights', colour: '#ff4ad8', cost: 40 }, sky: { name: 'Sky lights', colour: '#3ec6ff', cost: 40 }, lime: { name: 'Lime lights', colour: '#8cff4a', cost: 40 } },
+    trail: { comet: { name: 'Comet trail', colour: '#ffd23f', cost: 40 }, frost: { name: 'Frost trail', colour: '#9be8ff', cost: 40 }, flame: { name: 'Flame trail', colour: '#ff6a2b', cost: 40 }, toxic: { name: 'Toxic trail', colour: '#8cff4a', cost: 40 } },
+  },
+  PACKS: [{ diamonds: 100, price: '$0.99' }, { diamonds: 550, price: '$4.99' }, { diamonds: 1200, price: '$9.99' }],   // (shown only: paying needs the server)
+};
+export const shopOf = c => {
+  const h = (c.shop ||= { level: 1, gear: [], nextId: 1, owned: { lights: {}, trail: {} }, look: { lights: null, trail: null }, deals: { day: -1, ids: [], taken: {} } });
+  h.level ||= 1; h.gear ||= []; h.nextId ||= 1; h.owned ||= { lights: {}, trail: {} }; h.look ||= { lights: null, trail: null }; h.deals ||= { day: -1, ids: [], taken: {} };
+  return h;
+};
+export const shopRow = c => levelRow(SHOP.ROWS, shopOf(c).level);
+export const armourySlots = c => shopRow(c).slots;
+const no2 = why => ({ ok: false, why });
+// today's deals (the same for the whole day, from the club's seed)
+export function dealsToday(c, now) {
+  const h = shopOf(c), day = Math.floor(now / SHOP.DAY);
+  if (h.deals.day !== day) {
+    const rng = makeRng(hashStr(`${c.seed}-deals-${day}`)), pool = Object.keys(SHOP.GEAR), ids = [];
+    while (ids.length < SHOP.DEALS) { const id = rng.pick(pool); if (!ids.includes(id)) ids.push(id); }
+    h.deals = { day, ids, taken: {} };
+  }
+  return h.deals;
+}
+export const gearPrice = (c, id, onDeal = false) => Math.round(SHOP.GEAR[id].cost * (onDeal ? 1 - shopRow(c).off : 1) * 100) / 100;
+// ctx: { now, trusted }; a deal is only for a confirmed time
+export function buyGear(c, id, ctx) {
+  const h = shopOf(c), G = SHOP.GEAR[id];
+  if (!G) return no2('No such item');
+  if (h.gear.length >= armourySlots(c)) return no2('The armoury is full: let something go, or build the shop bigger');
+  const d = ctx.trusted ? dealsToday(c, ctx.now) : null, onDeal = !!d && d.ids.includes(id) && !d.taken[id], price = gearPrice(c, id, onDeal);
+  if (c.money + 1e-9 < price) return no2('Not enough money in the club');
+  c.money = round2(c.money - price); book(c, 'out', 'buildings', price);
+  if (onDeal) d.taken[id] = true;
+  h.gear.push({ id: `g${h.nextId++}`, item: id, uses: SHOP.USES, on: null });
+  return { ok: true, price, onDeal };
+}
+// a player carries one item: what he had goes back in the armoury
+export function equipGear(c, gid, pid) {
+  const h = shopOf(c), g = h.gear.find(x => x.id === gid), p = c.players[pid];
+  if (!g) return no2('Not in the armoury');
+  if (!p || p.team !== c.club) return no2('He is not in your squad');
+  const kind = SHOP.GEAR[g.item].kind;
+  if (kind === 'grip' && !p.bowl) return no2('He does not bowl');
+  for (const x of h.gear) if (x.on === pid) x.on = null;
+  g.on = pid;
+  return { ok: true };
+}
+export function unequipGear(c, gid) { const g = shopOf(c).gear.find(x => x.id === gid); if (!g) return no2('Not in the armoury'); g.on = null; return { ok: true }; }
+export function discardGear(c, gid) { const h = shopOf(c), i = h.gear.findIndex(x => x.id === gid); if (i < 0) return no2('Not in the armoury'); h.gear.splice(i, 1); return { ok: true }; }
+// a match is over: what the players who took part carried wears down; at nothing it is gone
+export function gearAfterMatch(c, ids) {
+  if (!c.club || !c.shop) return;
+  const took = new Set(ids);
+  for (const g of c.shop.gear) if (g.on && took.has(g.on) && c.players[g.on]?.team === c.club) g.uses--;
+  c.shop.gear = c.shop.gear.filter(g => g.uses > 0);
+}
+// the rating points each of your players gets from what he carries: { bat, bowl }
+export function gearBonus(c) {
+  const out = new Map();
+  for (const g of c.shop?.gear || []) {
+    const p = g.on && c.players[g.on], G = SHOP.GEAR[g.item];
+    if (!p || p.team !== c.club || g.uses <= 0) continue;
+    const b = out.get(g.on) || { bat: 0, bowl: 0 };
+    b.bat += G.bat || 0; b.bowl += G.bowl || 0; out.set(g.on, b);
+  }
+  return out;
+}
+// the match's copies of your players, with chemistry and gear
+export function matchPool(c, pool) {
+  const gear = gearBonus(c);
+  return chemPool(c, pool).map(p => { const b = gear.get(p.id); return b ? { ...p, bat: Math.min(99, p.bat + b.bat), bowlSkill: p.bowl ? Math.min(99, p.bowlSkill + b.bowl) : p.bowlSkill } : p; });
+}
+// looks, in diamonds
+export function buyLook(c, kind, id) {
+  const L = SHOP.LOOKS[kind]?.[id], h = shopOf(c);
+  if (!L) return no2('No such look');
+  if (h.owned[kind][id]) return no2('You have it already');
+  if (buildOf(c).diamonds < L.cost) return no2(`Not enough diamonds: ${L.cost} needed`);
+  addDiamonds(c, -L.cost); h.owned[kind][id] = true; h.look[kind] = id;
+  return { ok: true };
+}
+export function setLook(c, kind, id) {
+  const h = shopOf(c);
+  if (id && !h.owned[kind]?.[id]) return no2('You do not have it');
+  h.look[kind] = id || null; return { ok: true };
+}
+export const lookColour = (c, kind) => { const id = c.shop?.look?.[kind]; return (id && SHOP.LOOKS[kind][id]?.colour) || null; };
 // who is on a short contract (seasons left; the soonest to go first)
 export const contractList = c => clubPlayers(c, c.club).filter(p => p.contract < 50).sort((a, b) => a.contract - b.contract || ovr(b) - ovr(a));
 // ---------- the officers: wages by the day from the club's money (time is the server's, as for the other buildings) ----------

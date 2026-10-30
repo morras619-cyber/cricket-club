@@ -272,6 +272,31 @@ await clubTab('Clubhouse');
 check(await page.evaluate(() => /Clubhouse level 1/.test(document.getElementById('clubhouseBody').textContent) && /Build level 2/.test(document.getElementById('clubhouseBody').textContent)) && await clubFits(), 'the Clubhouse tab shows the level and the Build button, fitting the screen');
 await page.evaluate(() => document.getElementById('clubhouseBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the clubhouse is the settings');
+// the club shop: from the settings (a practice club): gear with today's deals, the armoury, looks, the diamond packs, the level; no scrolling
+await page.evaluate(() => document.getElementById('setShop').click()); await page.waitForTimeout(1500);
+const shopTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#shopTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(300); };
+const shopFits = async () => page.evaluate(() => { const m = document.querySelector('#shop .mf'), b = document.getElementById('shopBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
+check(await page.evaluate(() => !document.getElementById('shop').hidden && document.querySelectorAll('#shopTabs .mf-tab').length === 5 && document.querySelectorAll('#shopBody .mf-grid .mf-card').length === 9 && document.querySelectorAll('#shopBody .mf-card .mf-badge').length === 3) && await shopFits(), 'the settings open the club shop: five tabs, nine items of gear, three of them on sale, fitting the screen');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'shop-gear.png') });
+await page.evaluate(() => [...document.querySelectorAll('#shopBody .mf-grid .mf-card')][0].click()); await page.waitForTimeout(300);
+await page.evaluate(() => [...document.querySelectorAll('#shopSheet button')].find(b => /Buy/.test(b.textContent)).click()); await page.waitForTimeout(400);
+check(await page.evaluate(() => window.__sixcharge.demo.shop.gear.length === 1 && window.__sixcharge.demo.shop.gear[0].item === 'blaster'), 'a Willow Blaster is bought with club cash and goes in the armoury');
+await shopTab('Armoury');
+check(await page.evaluate(() => document.querySelectorAll('#shopBody button.mf-card').length === 1 && document.querySelectorAll('#shopBody .mf-card.empty').length === 2) && await shopFits(), 'the armoury shows it with its matches left, and two empty places');
+await page.evaluate(() => document.querySelector('#shopBody button.mf-card').click()); await page.waitForTimeout(300);
+await page.evaluate(() => document.querySelector('#shopSheet .mf-grid .mf-card').click()); await page.waitForTimeout(400);
+check(await page.evaluate(() => !!window.__sixcharge.demo.shop.gear[0].on && document.querySelectorAll('#shopBody button.mf-card .mf-frame canvas').length === 1), 'the gear is given to a player, whose portrait shows on it');
+await shopTab('Style');
+check(await page.evaluate(() => document.querySelectorAll('#shopBody .mf-swatch').length === 8) && await shopFits(), 'eight looks: four six lights and four ball trails, fitting the screen');
+await page.evaluate(() => document.querySelector('#shopBody .mf-grid.four .mf-card').click()); await page.waitForTimeout(300);
+await page.evaluate(() => [...document.querySelectorAll('#shopSheet button')].find(b => /Buy/.test(b.textContent)).click()); await page.waitForTimeout(400);
+check(await page.evaluate(() => { const d = window.__sixcharge.demo; return d.shop.look.lights === 'gold' && d.build.diamonds === 460; }), 'a look is bought with 40 diamonds and switched on');
+await shopTab('Diamonds');
+check(await page.evaluate(() => [...document.querySelectorAll('#shopBody .chipbtn')].length === 3 && [...document.querySelectorAll('#shopBody .chipbtn')].every(b => b.disabled)) && await shopFits(), 'the diamond packs are shown but cannot be bought yet');
+await shopTab('Shop');
+check(await page.evaluate(() => /Club shop level 1/.test(document.getElementById('shopBody').textContent) && /Build level 2/.test(document.getElementById('shopBody').textContent)) && await shopFits(), 'the Shop tab shows the level and the Build button');
+await page.evaluate(() => document.getElementById('shopBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the shop is the settings');
 // an AI power answered by a club with no hero of its own (a stand-in captain): the answer cards must draw, not throw (this froze matches)
 await page.evaluate(() => document.getElementById('mapBack')?.click?.());
 const cardOk = await page.evaluate(() => {

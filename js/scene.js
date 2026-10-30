@@ -3,7 +3,7 @@ import { INK, FONT_DISPLAY, FONT_BODY, halftonePattern } from './fx.js';
 import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
 import { groundOf } from './grounds.js';
-import { stadiumTest, teamById, logoSrc, myClub, groundCondition } from './teams.js';
+import { stadiumTest, teamById, logoSrc, myClub, groundCondition, cosmetics } from './teams.js';
 import { paintGround } from './ownground.js';
 import { GROUND_ART } from './groundart.js';
 
@@ -1104,7 +1104,7 @@ export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false
   const r = Math.max(3.4, BALL_R * s.k);
   if (sh) { ctx.fillStyle = 'rgba(10,8,20,0.35)'; ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); }
   if (trail.length > 1) {
-    ctx.strokeStyle = glow || 'rgba(255,244,218,0.5)'; ctx.lineCap = 'round';
+    ctx.strokeStyle = glow || cosmetics.trail || 'rgba(255,244,218,0.5)'; ctx.lineCap = 'round';
     for (let i = 1; i < trail.length; i++) {
       const a = cam.project(trail[i - 1].x, trail[i - 1].y, trail[i - 1].z), b = cam.project(trail[i].x, trail[i].y, trail[i].z);
       if (!a || !b) continue;

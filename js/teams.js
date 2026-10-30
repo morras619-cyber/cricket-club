@@ -84,6 +84,8 @@ export const myClub = () => MINE;
 export const groundCondition = () => (MINE ? MINE.cond ?? 1 : 1);
 // (a testing aid: the ground of your own club shown at this level whatever it has built, 0 = its real level; kept apart from the saved profile)
 export const stadiumTest = { level: (() => { try { return +localStorage.getItem('sixcharge.stadiumTest') || 0; } catch { return 0; } })() };
+// (the shop's looks for a career match: the colour of the six lights and of the ball trail; null = the default)
+export const cosmetics = { lights: null, trail: null };
 export const setLogo = (id, src) => (src ? LOGOS.set(id, src) : LOGOS.delete(id));
 export const logoSrc = id => LOGOS.get(id) || CLUB_LOGOS[id] || `img/logo-${id}.webp`;
 export const teamById = id => (MINE && id === MINE.id ? MINE : null) || TEAMS.find(t => t.id === id) || LEAGUE_CLUBS.find(t => t.id === id) || NATIONAL.find(t => t.id === id) || TEAMS[0];

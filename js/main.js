@@ -1,7 +1,7 @@
 import { UI } from './ui.js';
 import { Game } from './game.js';
 import { HEROES, heroById, heroesFor, BAT_TYPES, POWERS, batTypeOf, bowlPowerOf } from './heroes.js';
-import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero, logoSrc, setMyClub, setLogo, stadiumTest } from './teams.js';
+import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero, logoSrc, setMyClub, setLogo, stadiumTest, cosmetics } from './teams.js';
 import { loadBowlSprites, spriteStatus } from './bowlsprite.js';
 import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, officeRow, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, officeRow, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
 import * as MD from './stamina.js';
@@ -278,7 +278,7 @@ function renderHub() {
   $('badgeName').textContent = t.name;
   $('badgeStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
   // the shop's dot: today's login reward waiting
-  $('shopDot').hidden = !dailyAvailable(profile);
+  $('shopDot').hidden = true;   // (the old daily coin calendar is gone with the old shop)
   const ps = passState(profile);
   $('passSeason').textContent = `Season ${ps.season}`;
   $('passCount').textContent = `${ps.tier} / ${PASS_TIERS}`;
@@ -367,40 +367,139 @@ $('setUnits').addEventListener('click', () => {
   profile.settings.units = units.speed; saveProfile(profile); renderSettings();
 });
 
-// ---------- shop: the daily login reward, and gems for coins ----------
-function renderShop() {
+// ---------- the club shop: gear for your players, looks for the ground and the ball, a few deals a day ----------
+let shopTab = 'gear', shopSheet = null, shopTest = false, shopDay = 0;
+const GEAR_ICON = { bat: 'star', grip: 'ball', shoes: 'up' };
+const gearText = G => [G.bat ? `+${G.bat} batting` : '', G.bowl ? `+${G.bowl} bowling` : ''].filter(Boolean).join(' · ');
+async function renderShop(test = false) {
+  shopTest = test;
+  const c = test ? demoCareer() : career();
   ui.show('shop');
-  $('shopCoins').textContent = profile.coins;
-  $('shopGems').textContent = profile.gems || 0;
-  const d = $('shopDaily');
-  d.innerHTML = '';
-  const next = profile.daily.day % 7;
-  const cal = el('div', 'dailycal');
-  DAILY.forEach((n, i) => cal.append(el('span', i < next ? 'got' : i === next && dailyAvailable(profile) ? 'now' : '', `D${i + 1}\n${n}`)));
-  d.append(el('h3', '', 'Daily reward'), cal);
-  const claim = el('button', 'bigbtn primary', dailyAvailable(profile) ? `Claim +${DAILY[next]} coins` : 'Come back tomorrow');
-  claim.disabled = !dailyAvailable(profile);
-  claim.addEventListener('click', () => {
-    const r = claimDaily(profile);
-    if (r) { saveProfile(profile); ui.toast(`Day ${r.day}: +${r.coins} coins`); sfx.dhol(); }
-    renderShop();
-  });
-  d.append(claim);
-  const deals = $('shopDeals');
-  deals.innerHTML = '';
-  GEM_DEALS.forEach((g, i) => {
-    const b = el('button', 'dealcard');
-    b.append(el('b', '', `${g.coins}`), el('small', '', 'coins'), el('span', '', `${g.gems} 💎`));
-    b.disabled = (profile.gems || 0) < g.gems;
-    b.addEventListener('click', () => {
-      if (buyCoins(profile, i)) { saveProfile(profile); ui.toast(`+${g.coins} coins`); sfx.dhol(); }
-      renderShop();
-    });
-    deals.append(b);
-  });
+  shopSheet = null; $('shopSheet').hidden = true;
+  $('shopBack').onclick = () => { shopSheet = null; sfx.click(); const f = shopFrom; shopFrom = null; if (shopTest) renderSettings(); else if (f) f(); else if (fromMap) renderClubMap(); else renderHome(); };
+  if (!c.club) { $('shopTabs').replaceChildren(); $('shopStats').replaceChildren(); $('shopLede').textContent = ''; $('shopLvl').replaceChildren(); $('shopBody').replaceChildren(el('p', 'mf-empty', 'Build your club first: the shop opens when you have one.')); return; }
+  $('shopBody').replaceChildren(el('p', 'mf-empty', 'Checking the time with the server…'));
+  await syncClock();
+  shopOf(c);
+  paintShop(c);
 }
+function paintShop(c) {
+  buildTick(c);
+  const h = shopOf(c), trusted = clock.state === 'ok', now = serverNow() + shopDay * 86400000, row = shopRow(c), dm = PC.buildOf(c).diamonds;
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) shopSheet = null; } saveProfile(profile); paintShop(c); };
+  $('shopLede').textContent = shopTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
+  $('shopLvl').replaceChildren(ico('factory'), el('span', '', `LV ${h.level}`));
+  const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
+  $('shopStats').replaceChildren(stat('coin', 'gold', money(c.money), 'club cash'), stat('star', 'blue', `${dm} 💎`, 'diamonds'), stat('box', 'red', `${h.gear.length}/${armourySlots(c)}`, 'in the armoury'));
+  const tb = $('shopTest'); tb.hidden = !shopTest;
+  if (shopTest) {
+    const chip = (label, fn) => mfBtn('chipbtn', [el('span', '', label)], () => { fn(); sfx.click(); saveProfile(profile); paintShop(c); });
+    tb.replaceChildren(el('b', '', 'TEST'), chip('+$5M', () => { c.money += 5; }), chip('+100 💎', () => { PC.addDiamonds(c, 100); }), chip('Next day', () => { shopDay++; }));
+  }
+  const tabs = [['gear', 'star', 'Gear', trusted ? '!' : 0], ['armoury', 'box', 'Armoury', 0], ['style', 'pencil', 'Style', 0], ['diamonds', 'coin', 'Diamonds', 0], ['house', 'factory', 'Shop', canBuild(c, 'shop') ? '!' : 0]];
+  $('shopTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${shopTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { shopTab = id; shopSheet = null; sfx.click(); paintShop(c); }); if (n && id !== 'gear') b.append(el('i', 'mf-badge', String(n))); return b; }));
+  const body = $('shopBody');
+  body.replaceChildren();
+  const info = (icon, text) => { const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
+  const deals = trusted ? dealsToday(c, now) : null;
+  if (shopTab === 'gear') {
+    body.append(info('clock', deals ? `Today's deals: ${Math.round(row.off * 100)}% off, one of each. New ones at midnight (UTC).` : 'The deals need the server clock: try again when you are online.'));
+    const grid = el('div', 'mf-grid three');
+    for (const [id, G] of Object.entries(SHOP.GEAR)) {
+      const sale = !!deals && deals.ids.includes(id) && !deals.taken[id], card = el('button', `mf-card stack${sale ? ' pick' : ''}`), r = el('div', 'mf-row');
+      r.append(ico(GEAR_ICON[G.kind]), el('span', '', gearText(G)));
+      card.append(el('b', '', G.name), r, el('small', '', sale ? `${money(gearPrice(c, id, true))} (was ${money(G.cost)})` : money(G.cost)));
+      if (sale) card.append(el('i', 'mf-badge', 'SALE'));
+      card.addEventListener('click', () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); });
+      grid.append(card);
+    }
+    body.append(grid);
+  } else if (shopTab === 'armoury') {
+    const grid = el('div', 'mf-grid three');
+    for (let i = 0; i < armourySlots(c); i++) {
+      const g = h.gear[i];
+      if (!g) { const card = el('div', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Empty')); grid.append(card); continue; }
+      const G = SHOP.GEAR[g.item], card = el('button', 'mf-card stack'), bar = el('div', 'mf-bar green'), f = el('i'); f.style.width = `${Math.max(4, Math.round(g.uses / SHOP.USES * 100))}%`; bar.append(f);
+      const who = g.on && c.players[g.on];
+      card.append(who ? frameOf(playerFace(who, 44)) : ico(GEAR_ICON[G.kind]), el('b', '', G.name), bar, el('small', '', who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`));
+      card.addEventListener('click', () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); });
+      grid.append(card);
+    }
+    body.append(grid);
+    body.append(info('warn', `A player carries one thing. It wears out after ${SHOP.USES} of your matches that he plays in. The armoury holds ${armourySlots(c)}.`));
+  } else if (shopTab === 'style') {
+    for (const [kind, title] of [['lights', 'Six lights (at home)'], ['trail', 'Ball trail']]) {
+      const hd = el('div', 'mf-sheet-head'); hd.append(el('b', '', title)); body.append(hd);
+      const grid = el('div', 'mf-grid four');
+      for (const [id, L] of Object.entries(SHOP.LOOKS[kind])) {
+        const owned = !!h.owned[kind][id], on = h.look[kind] === id, card = el('button', `mf-card stack${on ? ' pick' : ''}`), sw = el('span', 'mf-swatch'); sw.style.background = L.colour;
+        card.append(sw, el('b', '', L.name.split(' ')[0]), el('small', '', on ? 'On' : owned ? 'Owned' : `${L.cost} 💎`));
+        card.addEventListener('click', () => { if (owned) done(setLook(c, kind, on ? null : id)); else { shopSheet = { type: 'look', kind, id }; sfx.click(); paintShop(c); } });
+        grid.append(card);
+      }
+      body.append(grid);
+    }
+    body.append(info('star', 'Looks change how the game looks, never how it plays.'));
+  } else if (shopTab === 'diamonds') {
+    const col = el('div', 'mf-col'), big = el('div', 'mf-card col');
+    big.append(el('b', '', `You have ${dm} 💎`), el('p', 'sheetnote', 'Diamonds buy looks and a second builder.'));
+    col.append(big);
+    for (const pk of SHOP.PACKS) { const card = el('div', 'mf-card'), inf = el('div', 'mf-info'); inf.append(el('b', '', `${pk.diamonds} 💎`), el('small', '', pk.price)); const b = mfBtn('chipbtn', [el('span', '', 'Soon')], () => {}); b.disabled = true; card.append(ico('coin'), inf, b); col.append(card); }
+    col.append(info('warn', 'Buying diamonds needs the server, which is not ready yet. For now diamonds come from the Settings test button.'));
+    body.append(col);
+  } else {
+    const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
+    hd.append(ico('factory'), el('b', '', `Club shop level ${h.level}`), el('span', 'mf-stars', '★'.repeat(PC.lookOf(h.level))));
+    card.append(hd);
+    const r1 = el('div', 'mf-row'); r1.append(ico('box'), el('span', '', `${armourySlots(c)} places in the armoury`));
+    const r2 = el('div', 'mf-row'); r2.append(ico('star'), el('span', '', `Daily deals ${Math.round(row.off * 100)}% off`));
+    card.append(r1, r2, ...buildBlock(c, 'shop', () => paintShop(c)));
+    col.append(card);
+    body.append(col);
+  }
+  const sh = $('shopSheet');
+  sh.hidden = !shopSheet;
+  if (!shopSheet) return;
+  sh.onclick = e => { if (e.target === sh) { shopSheet = null; paintShop(c); } };
+  const card = el('div', 'mf-sheet-card'), close = mfBtn('mf-x', [ico('cross')], () => { shopSheet = null; sfx.click(); paintShop(c); });
+  if (shopSheet.type === 'buy') {
+    const G = SHOP.GEAR[shopSheet.id], sale = !!deals && deals.ids.includes(shopSheet.id) && !deals.taken[shopSheet.id], price = gearPrice(c, shopSheet.id, sale);
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico(GEAR_ICON[G.kind]), el('b', '', G.name), close);
+    const r = el('div', 'mf-row'); r.append(ico('up'), el('span', '', `${gearText(G)} for one player · lasts ${SHOP.USES} matches`));
+    const go = mfBtn('mf-big', [ico('coin'), el('span', '', `Buy · ${money(price)}${sale ? ' (sale)' : ''}`)], () => { const res = buyGear(c, shopSheet.id, { now, trusted }); if (res.ok) sfx.dhol(); done(res, true); });
+    go.disabled = c.money < price || h.gear.length >= armourySlots(c);
+    card.append(hd, r, go);
+    if (h.gear.length >= armourySlots(c)) card.append(el('p', 'sheetnote', 'The armoury is full: let something go, or build the shop bigger.'));
+    else if (c.money < price) card.append(el('p', 'sheetnote', 'Not enough money in the club.'));
+  } else if (shopSheet.type === 'gear') {
+    const g = h.gear.find(x => x.id === shopSheet.gid);
+    if (!g) { shopSheet = null; sh.hidden = true; return; }
+    const G = SHOP.GEAR[g.item], hd = el('div', 'mf-sheet-head'); hd.append(ico(GEAR_ICON[G.kind]), el('b', '', G.name), close);
+    card.append(hd, el('p', 'sheetnote', `${gearText(G)} · ${g.uses} of ${SHOP.USES} matches left`));
+    const grid = el('div', 'mf-grid'); grid.style.cssText = 'grid-auto-rows: auto';
+    const squad = clubPlayers(c, c.club).filter(p => (G.kind === 'grip' ? !!p.bowl : true)).sort((a, b) => (G.bat && !G.bowl ? b.bat - a.bat : G.bowl && !G.bat ? b.bowlSkill - a.bowlSkill : ovr(b) - ovr(a))).slice(0, 4);
+    for (const p of squad) {
+      const b = el('button', 'mf-card'), inf = el('div', 'mf-info'), carries = h.gear.find(x => x.on === p.id);
+      inf.append(el('b', '', lastName(p.name)), el('small', '', g.on === p.id ? 'Carries this' : carries ? `Has ${SHOP.GEAR[carries.item].name}` : 'Free hands'));
+      b.append(frameOf(playerFace(p, 48)), inf);
+      b.addEventListener('click', () => done(equipGear(c, g.id, p.id), true));
+      grid.append(b);
+    }
+    card.append(grid);
+    if (g.on) card.append(mfBtn('mf-big alt', [ico('cross'), el('span', '', 'Put back')], () => done(unequipGear(c, g.id), true)));
+    card.append(mfBtn('mf-big red', [ico('cross'), el('span', '', 'Let it go')], () => done(discardGear(c, g.id), true)));
+  } else if (shopSheet.type === 'look') {
+    const L = SHOP.LOOKS[shopSheet.kind][shopSheet.id], hd = el('div', 'mf-sheet-head'), sw = el('span', 'mf-swatch'); sw.style.background = L.colour;
+    hd.append(sw, el('b', '', L.name), close);
+    const go = mfBtn('mf-big', [ico('star'), el('span', '', `Buy · ${L.cost} 💎`)], () => { const res = buyLook(c, shopSheet.kind, shopSheet.id); if (res.ok) sfx.dhol(); done(res, true); });
+    go.disabled = dm < L.cost;
+    card.append(hd, go);
+    if (dm < L.cost) card.append(el('p', 'sheetnote', `Not enough diamonds: ${L.cost} needed.`));
+  } else { shopSheet = null; sh.hidden = true; return; }
+  sh.replaceChildren(card);
+}
+$('setShop').addEventListener('click', () => { unlockAudio(); sfx.click(); renderShop(true); });
 for (const id of ['btnShop', 'coinPill', 'gemPill']) $(id).addEventListener('click', () => { unlockAudio(); shopFrom = null; renderShop(); });
-$('shopBack').addEventListener('click', () => { const f = shopFrom; shopFrom = null; if (f) f(); else if (fromMap) renderClubMap(); else renderHome(); });
 
 // ---------- season pass ----------
 function renderPass() {
@@ -813,7 +912,7 @@ async function startMatch(opts) {
       const c = profile.career;
       const f = c.phase === 'playoff' ? c.playoff : nextFixture(c.league);
       team = c.club; opp = f.opp; home = f.home;
-      pools = { mine: chemPool(c, clubPool(c, team)), opp: clubPool(c, opp) };   // (the clubhouse: players linked by chemistry get a little extra rating)
+      pools = { mine: matchPool(c, clubPool(c, team)), opp: clubPool(c, opp) };   // (the clubhouse's chemistry and the shop's gear: a little extra rating for some of your players)
       lineup = c.lineup;
     }
     if (mode === 'challenge') {
@@ -834,6 +933,7 @@ async function startMatch(opts) {
   crowdMute.on = !!opts.trial;   // (the nets have no crowd)
   startAmbience();
   let summary;
+  cosmetics.lights = mode === 'career' ? lookColour(profile.career, 'lights') : null; cosmetics.trail = mode === 'career' ? lookColour(profile.career, 'trail') : null;   // (the shop's looks)
   setStartEnergy(mode === 'career' && profile.career.medical ? startEnergies(profile.career) : {});   // (the medical centre: your players start the match on their fitness)
   try {
     summary = await game.runMatch({
@@ -846,7 +946,7 @@ async function startMatch(opts) {
     showMatchError(e, game.loopError);
     return;
   } finally {
-    setStartEnergy({});
+    setStartEnergy({}); cosmetics.lights = null; cosmetics.trail = null;
     game.matchActive = false;
     stopAmbience(); crowdStop(); game.crowdLive = false;
     crowdMute.on = false;
@@ -1266,7 +1366,7 @@ const BUILDINGS = {
   training: { name: 'Training ground', desc: 'Coaches train your players', open: () => renderTraining(false) },
   office: { name: 'Club office', desc: 'The books, sponsors and the board', open: () => renderOffice(false) },
   academy: { name: 'Youth academy', desc: 'Scouts and young prospects', open: () => renderAcademy(false) },
-  shop: { name: 'Club shop', desc: 'Kits and extras', open: () => { shopFrom = null; renderShop(); } },
+  shop: { name: 'Club shop', desc: 'Gear, looks and daily deals', open: () => { shopFrom = null; renderShop(); } },
   apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
   medical: { name: 'Medical centre', desc: 'Fitness, beds and physios', open: () => renderMedical(false) },
   clubhouse: { name: 'Clubhouse', desc: 'Chemistry, rivals and supporter events', open: () => renderClubhouse(false) },
@@ -1347,12 +1447,13 @@ async function syncClock() {
 const serverNow = () => clock.base + (performance.now() - clock.perf);
 // the club's money, in $50k steps ($k in, $k out)
 // ---------- the builders (js/pacing.js): club XP and level, and upgrades that take builder time ----------
-const BUILD_NAME = { clubhouse: 'Clubhouse', office: 'Club office', stadium: 'Stadium', training: 'Training ground', academy: 'Youth academy', medical: 'Medical centre', merch: 'Merchandise factory' };
-const levelOfBuilding = (c, id) => (id === 'stadium' ? stadiumLvl(c) : id === 'office' ? c.office?.level || 1 : id === 'clubhouse' ? c.clubhouse?.level || 1 : c[id]?.level || 0);
+const BUILD_NAME = { shop: 'Club shop', clubhouse: 'Clubhouse', office: 'Club office', stadium: 'Stadium', training: 'Training ground', academy: 'Youth academy', medical: 'Medical centre', merch: 'Merchandise factory' };
+const levelOfBuilding = (c, id) => (id === 'stadium' ? stadiumLvl(c) : id === 'office' ? c.office?.level || 1 : id === 'clubhouse' ? c.clubhouse?.level || 1 : id === 'shop' ? c.shop?.level || 1 : c[id]?.level || 0);
 const applyBuilding = (c, id, lv) => {
   if (id === 'stadium') setStadiumLevel(c, lv);
   else if (id === 'office') office(c).level = lv;
   else if (id === 'clubhouse') clubhouse(c).level = lv;
+  else if (id === 'shop') shopOf(c).level = lv;
   else if (id === 'training') TG.setLevel(c.training, lv);
   else if (id === 'academy') AC.setLevel(c.academy, lv);
   else if (id === 'medical') MD.medSetLevel(c.medical, lv);

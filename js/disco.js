@@ -17,6 +17,9 @@ export function discoColors(team) {
   return [bright[0], bright[0], bright[1]];
 }
 
+// the lights in one colour picked in the shop (#rrggbb): the same shape as a club's own
+export const lightColors = hex => { const c = rgb(hex); return [c, c, mixWhite(c, 0.6)]; };
+
 // t: ms since the lights came on
 export function drawDisco(ctx, W, H, t, colors, high = true) {
   if (t < 0 || t > DISCO_MS) return;

@@ -4,7 +4,7 @@ import { makeRng } from './rng.js';
 import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
-import { teamById, rivalTeam, teamLook, logoSrc, myClub } from './teams.js';
+import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
@@ -27,7 +27,7 @@ import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGrou
 import { netBall } from './nets.js';
 import { adaptScale, NO_DIALS, dialsFor } from './adapt.js';
 import { CROWD_TIMING } from './chirp.js';
-import { DISCO_MS, DISCO_LEAD_MS, discoColors, drawDisco } from './disco.js';
+import { DISCO_MS, DISCO_LEAD_MS, discoColors, lightColors, drawDisco } from './disco.js';
 import { quality } from './quality.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
 import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdSong, crowdRuns, sixMusic, crowdBoo, crowdClap, ambienceMood } from './audio.js';
@@ -1652,7 +1652,7 @@ export class Game {
       let tClear = end;
       if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
       cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
-      if (six) this.disco = { at: this.realTime + tClear / ballK / 1.6 * 1000 - DISCO_LEAD_MS, colors: discoColors(teamById(this.home)) };   // (disco lights in the club's colours, as the ball clears the rope)
+      if (six) this.disco = { at: this.realTime + tClear / ballK / 1.6 * 1000 - DISCO_LEAD_MS, colors: cosmetics.lights && this.myTeam.id === this.home ? lightColors(cosmetics.lights) : discoColors(teamById(this.home)) };   // (disco lights in the club's colours, as the ball clears the rope)
       if (six) { const sec = tClear / ballK / 1.6; this.sing(sec + (sixMusic(sec) || 2.2), 4.5, 0.45); } // (the celebration music as the ball clears the rope, then directly after it the crowd sings a few seconds)
     } else if ((runs === 2 || runs === 3) && !o.caught && (o.side === 'ai' ? this.myTeam : this.oppTeam).id === this.home) {
       crowdRuns(0.1); this.runsCheered = true;   // (two or three for the home side: its own cheer, with the applause riding it)
