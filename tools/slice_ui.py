@@ -30,4 +30,8 @@ for cy, names, xs in ROWS:
         m = lab == ids[np.argmax(counts)]; ys, xs_ = np.where(m); box = (xs_.min(), ys.min(), xs_.max() + 1, ys.max() + 1)
         sub = a[box[1]:box[3], box[0]:box[2]].copy(); sub[~m[box[1]:box[3], box[0]:box[2]], 3] = 0
         Image.fromarray(sub).save(os.path.join(D, 'ic-' + n + '.png'))
+# the hammer is taken from the second icon sheet (a flatter head)
+b2 = np.array(sheet('icons-b')); lab2, _ = ndi.label(ndi.binary_dilation(b2[:, :, 3] > 20, iterations=2)); cell = lab2[65:225, 680:800]; ids, counts = np.unique(cell[cell > 0], return_counts=True)
+m = lab2 == ids[np.argmax(counts)]; ys, xs_ = np.where(m); box = (xs_.min(), ys.min(), xs_.max() + 1, ys.max() + 1); sub = b2[box[1]:box[3], box[0]:box[2]].copy(); sub[~m[box[1]:box[3], box[0]:box[2]], 3] = 0
+Image.fromarray(sub).save(os.path.join(D, 'ic-hammer.png'))
 print('icons done')
