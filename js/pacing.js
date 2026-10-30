@@ -1,8 +1,8 @@
-// How fast a season can go: a league match costs a token. A token comes every two real hours, up to three are kept (they never run out),
-// and you start with three. It is a recharging meter, and waiting costs you nothing: only time you could not have used is lost.
+// How fast a season can go: a league match costs a token. A token comes every four real hours, up to four are kept (they never run out),
+// and you start with four. It is a recharging meter, and waiting costs you nothing: only time you could not have used is lost.
 // The time is the server's (main.js), never the phone's clock. Pure data and functions (career.pace is the state).
 export const HOUR = 3600000;
-export const PACE = { EVERY: 2 * HOUR, BANK: 3 };
+export const PACE = { EVERY: 4 * HOUR, BANK: 4 };
 
 function mark(p) {
   let h = 2166136261;

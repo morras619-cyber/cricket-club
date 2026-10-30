@@ -1022,8 +1022,9 @@ export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id
 export const fameOf = p => p.fame ?? startFame(ovr(p));
 // the players under contract: id -> { fame, name }
 export const merchRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { fame: fameOf(p), name: p.name }]));
-// the jerseys a day the fans want, in all: your ground's size and your followers on Chirp
-export const merchDemand = c => 150 + (+String(STADIUMS[Math.max(1, stadiumLevel(c))]?.fans || '4000').replace(/\D/g, '')) / 40 + (c.chirp?.fans || 0) / 30;
+// the jerseys a day the fans want, in all: the crowd your ground holds, how far the factory's name reaches, and a little for your followers on Chirp
+export const MERCH_CROWD = [0, 80, 200, 350], MERCH_REACH = [0, 0.5, 0.75, 1];
+export const merchDemand = c => MERCH_CROWD[Math.min(3, Math.max(1, stadiumLevel(c)))] * MERCH_REACH[Math.min(3, c.merch?.level || 1)] * (1 + Math.min(0.15, (c.chirp?.fans || 0) / 100000 * 0.15));
 // the league matches left in a player's contract (the season he is in, and the full seasons after it)
 export function matchesLeft(c, p) {
   const per = c.league?.rounds?.length || 14, now = c.league && c.league.stage === 'group' ? Math.max(0, per - c.league.round) : 0;

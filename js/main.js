@@ -325,7 +325,7 @@ function renderSettings() {
   state('setField', { key: 'Key moments', all: 'Every chance', off: 'Auto' }[game.settings.fielding], game.settings.fielding !== 'off');
   state('setUnits', units.speed === 'mph' ? 'mph' : 'km/h', true);
   $('setMapLevel').textContent = mapLevelText();
-  $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 2 hours)' : 'Match limit: OFF (play freely)';
+  $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 4 hours)' : 'Match limit: OFF (play freely)';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });

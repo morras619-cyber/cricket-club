@@ -186,7 +186,13 @@ test('the factory sees the players under contract, what the fans want, and the m
   const c = club();
   const roster = C.merchRoster(c);
   assert.ok(roster.size >= 10);
-  assert.ok(C.merchDemand(c) >= 150);
+  assert.ok(C.merchDemand(c) > 0);
+  const d = (stadium, level, fans = 0) => { c.custom = { ...(c.custom || {}), stadium }; c.merch = { level }; c.chirp = { fans }; return C.merchDemand(c); };
+  assert.ok(d(1, 1) < 60, 'a small ground and a small factory: a trickle');
+  assert.ok(d(3, 3) <= 400 * 1.16 && d(3, 3) >= 350, 'the biggest of both: about four hundred jerseys a day');
+  assert.ok(d(1, 3) < d(2, 3) && d(2, 3) < d(3, 3), 'a bigger ground means more fans');
+  assert.ok(d(3, 1) < d(3, 3), 'a bigger factory reaches more of them');
+  assert.ok(d(3, 3, 1e7) <= d(3, 3, 0) * 1.151, 'followers add a little, never a lot');
   const p = C.clubPlayers(c, c.club)[0];
   p.contract = 3;
   assert.ok(C.matchesLeft(c, p) >= 2 * 14);
