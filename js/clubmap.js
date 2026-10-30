@@ -42,11 +42,11 @@ const SITES = {
   },
 };
 const orderOf = lv => Object.keys(SITES[lv]).sort((a, b) => SITES[lv][a].y - SITES[lv][b].y);   // far to near, the near ones painted over the far
-// where each building is in img/map/buildings[2|3].webp (and its tint in buildings[2|3]-tint.webp), by level: [row, height], all 1100 wide (tools/build_map.py)
+// where each building is in img/map/buildings[2|3].webp, by level: [row, height], all 1100 wide, and its tint (R the main colour, G the trim) H rows lower (tools/build_map.py)
 const ATLAS = {
-  1: {"stadium": [0, 647], "training": [647, 645], "office": [1292, 688], "apartment": [1980, 764], "medical": [2744, 651], "academy": [3395, 659], "clubhouse": [4054, 601], "shop": [4655, 709], "merch": [5364, 675]},
-  2: {"stadium": [0, 681], "training": [681, 666], "office": [1347, 704], "apartment": [2051, 729], "medical": [2780, 660], "academy": [3440, 642], "clubhouse": [4082, 714], "shop": [4796, 648], "merch": [5444, 722]},
-  3: {"stadium": [0, 755], "training": [755, 714], "office": [1469, 745], "apartment": [2214, 737], "medical": [2951, 745], "academy": [3696, 743], "clubhouse": [4439, 712], "shop": [5151, 656], "merch": [5807, 725]},
+  1: {"stadium": [0, 647], "training": [647, 645], "office": [1292, 688], "apartment": [1980, 764], "medical": [2744, 651], "academy": [3395, 659], "clubhouse": [4054, 601], "shop": [4655, 709], "merch": [5364, 675], "H": 6039},
+  2: {"stadium": [0, 681], "training": [681, 666], "office": [1347, 704], "apartment": [2051, 729], "medical": [2780, 660], "academy": [3440, 642], "clubhouse": [4082, 714], "shop": [4796, 648], "merch": [5444, 722], "H": 6166},
+  3: {"stadium": [0, 755], "training": [755, 714], "office": [1469, 745], "apartment": [2214, 737], "medical": [2951, 745], "academy": [3696, 743], "clubhouse": [4439, 712], "shop": [5151, 656], "merch": [5807, 725], "H": 6532},
 };
 const AW = 1100;
 const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -54,13 +54,13 @@ const load = src => new Promise((res, rej) => { const im = new Image(); im.onloa
 const frame = () => new Promise(r => setTimeout(r, 0));
 
 // one building painted in the club's colours: a canvas, and where it is solid (a coarse alpha grid, for taps)
-function paint(base, tint, id, club, lv) {
+function paint(sheet, id, club, lv) {
   const [row, h] = ATLAS[lv][id], w = AW;
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true });
-  g.drawImage(base, 0, row, w, h, 0, 0, w, h);
+  g.drawImage(sheet, 0, row, w, h, 0, 0, w, h);
   const B = g.getImageData(0, 0, w, h), o = B.data;
-  g.clearRect(0, 0, w, h); g.drawImage(tint, 0, row, w, h, 0, 0, w, h);
+  g.clearRect(0, 0, w, h); g.drawImage(sheet, 0, ATLAS[lv].H + row, w, h, 0, 0, w, h);
   const T = g.getImageData(0, 0, w, h).data;
   const su = rgbOf(club.suit).map(v => v / (255 * GREY)), tr = rgbOf(club.trim).map(v => v / (255 * GREY));
   for (let i = 0; i < o.length; i += 4) {
@@ -223,13 +223,14 @@ export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
       const set = {};
       for (const k of Object.keys(art)) delete art[k];
       const sfx = lv === 1 ? '' : String(lv);
-      sheets ||= await Promise.all([load(`img/map/buildings${sfx}.webp`), load(`img/map/buildings${sfx}-tint.webp`)]);
+      sheets ||= await load(`img/map/buildings${sfx}.webp`);
       if (mine !== session) return;
       for (const id of [...ORDER].sort((a, b) => (a === 'stadium' ? -1 : b === 'stadium' ? 1 : 0))) {
-        set[id] = art[id] = paint(sheets[0], sheets[1], id, club, lv); redraw(); await frame();
+        set[id] = art[id] = paint(sheets, id, club, lv); redraw(); await frame();
         if (mine !== session) return;
       }
       cache.clear(); cache.set(key, set);
+      sheets = null;   // (the buildings are painted: the big picture is let go)
       onFirstDraw?.();
     },
     close() { shown = false; session++; },
