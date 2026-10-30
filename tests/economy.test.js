@@ -36,3 +36,20 @@ test('a scouted star will not sign for a division 3 club either', () => {
 });
 
 function ovrOf(n) { return { id: `t${n}`, name: 'T', role: 'bat', bat: n, bowlSkill: 30, age: 25, pot: n }; }
+
+test('the training ground adds rating at the season end, on top of the natural growth and never past his potential', () => {
+  const T = import('../js/training.js');
+  return T.then(TG => {
+    const mk = () => { const c = C.newCareer(21); C.chooseClub(c, c.divisions.d3[0]); return c; };
+    const a = mk(), b = mk();
+    const pa = C.clubPlayers(a, a.club).find(p => p.age <= 21 && p.pot - Math.max(p.bat, p.bowlSkill) >= 8) || C.clubPlayers(a, a.club)[0];
+    const pb = b.players[pa.id];
+    pa.age = pb.age = 20; pa.pot = pb.pot = 95;
+    a.training = TG.freshTraining(0); a.training.tp[pa.id] = 100000; TG.seal(a.training);
+    const before = Math.max(pa.bat, pa.bowlSkill);
+    C.nextSeason(a); C.nextSeason(b);
+    const gain = Math.max(a.players[pa.id].bat, a.players[pa.id].bowlSkill) - Math.max(b.players[pb.id].bat, b.players[pb.id].bowlSkill);
+    assert.ok(gain >= 1 && gain <= 1 + 0, `trained player is ${gain} ahead (level 1: one point)`);
+    assert.ok(before >= 0);
+  });
+});

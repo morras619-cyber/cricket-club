@@ -18,6 +18,7 @@ import { ensureChirp, afterMatchPopularity, seasonPopularity, storyOf, sponsorBo
 import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
 import { memOf } from './chirpfacts.js';
 import { fameAfter, startFame } from './merch.js';
+import { seasonGain } from './training.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -848,6 +849,16 @@ export function repBlock(c, p) {
   return ovr(p) > cap ? `Players rated ${cap + 1} or more will not sign for a ${divisionName(divisionOf(c, c.club))} club` : null;
 }
 
+// ---------- the training ground's view of the club (js/training.js) ----------
+// the coaches a player can learn from: batters from a batting coach, bowlers from a pace or a spin coach, all-rounders from either
+function coachKinds(p) {
+  const k = [];
+  if (p.role === 'bat' || p.role === 'wk' || p.role === 'all') k.push('bat');
+  if (p.role === 'bowl' || p.role === 'all') k.push(bowlType(p.bowl).spin ? 'spin' : 'pace');
+  return k;
+}
+export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { name: p.name, ovr: ovr(p), age: p.age, pot: p.pot, kinds: coachKinds(p) }]));
+
 // ---------- the merchandise factory's view of the club (js/merch.js) ----------
 export const fameOf = p => p.fame ?? startFame(ovr(p));
 // the players under contract: id -> { fame, name }
@@ -1000,6 +1011,11 @@ export function nextSeason(c) {
     if (p.age < PEAK_AGE) grow(c, p, p.age <= 23 ? rng.int(1, 4) : p.age <= 28 ? rng.int(0, 2) : rng.int(0, 1));
     else if (p.age >= 34 && !p.heroId) for (const k of primary(p)) p[k] = Math.max(30, p[k] - rng.int(0, 2));
     const mine = p.team === c.club;
+    // the training ground: the points his coach earned him this season become rating (on top of the natural growth, up to his potential)
+    if (mine && c.training) {
+      const n = seasonGain(c.training, p.id, { ovr: ovr(p), age: p.age, pot: p.pot });
+      if (n && grow(c, p, n)) c.news.push(`💪 ${p.name} trained hard: +${n} rating`);
+    }
     if (!p.heroId && p.age >= 36 && rng.chance(0.35 + (p.age - 36) * 0.3)) {
       if (mine) chirpLeft(c, p, 'retired');
       p.retired = true; p.team = null; p.retiredIn = c.season;

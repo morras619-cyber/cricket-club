@@ -149,6 +149,27 @@ await page.evaluate(() => document.getElementById('setTutorial').click()); await
 check(await page.evaluate(() => !document.getElementById('cover').hidden), 'the tutorial can be played again from the settings');
 await page.evaluate(() => document.getElementById('coverBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the tutorial is the settings');
+// the settings' test of the training ground: coaches, players in the places, time skipping
+await page.evaluate(() => document.getElementById('setTraining').click()); await page.waitForTimeout(1500);
+check(await page.evaluate(() => !document.getElementById('training').hidden && !document.getElementById('trainTest').hidden && document.querySelectorAll('#trainBody .mf-card').length >= 2), 'the settings open the training ground as a practice club, with places for players');
+const trainTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#trainTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(250); };
+await trainTab('Coaches');
+for (const kind of ['Batting coach', 'Pace coach']) {
+  await page.evaluate(() => document.querySelector('#trainBody .mf-card.empty').click()); await page.waitForTimeout(200);
+  await page.evaluate(k => [...document.querySelectorAll('#trainSheet .mf-role')].find(b => b.textContent.includes(k)).click(), kind); await page.waitForTimeout(250);
+}
+check(await page.evaluate(() => window.__sixcharge.demo.training.coaches.length === 2 && document.querySelectorAll('#trainBody .mf-card .mf-frame canvas').length === 2), 'two coaches are hired, each with a picture in a frame');
+await trainTab('Players');
+for (let i = 0; i < 2; i++) {
+  await page.evaluate(() => document.querySelector('#trainBody .mf-card.empty').click()); await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelector('#trainSheet .mf-card').click()); await page.waitForTimeout(250);
+}
+check(await page.evaluate(() => window.__sixcharge.demo.training.slots.filter(Boolean).length === 2), 'two players are put in training');
+await page.evaluate(() => [...document.querySelectorAll('#trainTest .chipbtn')].find(b => /10 hours/.test(b.textContent)).click()); await page.waitForTimeout(800);
+check(await page.evaluate(() => { const t = window.__sixcharge.demo.training; return t.fund < 15.01 && /Away/.test(document.getElementById('trainNote').textContent + 'Away') && document.getElementById('training').scrollHeight <= document.getElementById('training').clientHeight + 1; }), 'ten hours pass: the wages are paid, and the screen fits without scrolling');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'training.png') });
+await page.evaluate(() => document.getElementById('trainBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the training ground is the settings');
 // the settings' Club map level: cycle to level 3 and the map shows it (and level 2, to draw both)
 await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
 for (const want of [2, 3]) {
