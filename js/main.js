@@ -1699,7 +1699,7 @@ function paintOffice(c) {
       chip('Board met', () => { if (!objectiveOf(c)) return ['No target right now']; return settleObjective(c, 2); }), chip('+$1M', () => { c.money += 1; }));
   }
   const canSign = !o.deal;
-  const tabs = [['money', 'coin', 'Money', 0], ['sponsors', 'star', 'Sponsors', canSign ? '!' : 0], ['board', 'trophy', 'Board', 0], ['contracts', 'users', 'Contracts', 0]];
+  const tabs = [['money', 'chart', 'Money', 0], ['sponsors', 'star', 'Sponsors', canSign ? '!' : 0], ['board', 'trophy', 'Board', 0], ['contracts', 'users', 'Contracts', 0]];
   $('officeTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${officeTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { officeTab = id; officeSheet = null; sfx.click(); paintOffice(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
   const body = $('officeBody');
   body.replaceChildren();
