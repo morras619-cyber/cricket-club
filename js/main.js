@@ -319,6 +319,7 @@ function renderSettings() {
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); renderSettings(); });
 $('settingsBack').addEventListener('click', () => renderHome());
+$('setClubMap').addEventListener('click', () => { unlockAudio(); sfx.click(); renderClubMap(true); });
 $('setStory').addEventListener('click', () => { unlockAudio(); careerOpening().then(renderSettings); });   // (the career's opening story again; it plays by itself only the first time)
 $('setStadiumTest').addEventListener('click', () => {   // (testing only: shows your own club's ground at level 1, 2 or 3 in your next match; the saved game is not touched)
   stadiumTest.level = (stadiumTest.level + 1) % 4;
@@ -1202,21 +1203,23 @@ const clubMap = createClubMap($('mapCanvas'), {
     sfx.click();
   },
 });
-function renderClubMap() {
-  const c = career(), club = teamById(c.club);
+let mapTest = false;   // the map opened from the settings to look at it: your club's colours (or a stand-in club), nothing opens, nothing is changed
+function renderClubMap(test = false) {
+  mapTest = test;
+  const c = career(), club = c.club ? teamById(c.club) : { ...teamById('thunder'), name: 'Test Club' };
   careerView = 'hub'; fromMap = false;
   ui.show('clubmap');
   $('mapSheet').hidden = true; mapPick = null;
   $('mapClub').textContent = club.name;
-  $('mapSub').textContent = `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
-  const act = { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' };
+  $('mapSub').textContent = test ? 'Test view · nothing opens' : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
+  const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' };
   clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
   clubMap.open(club);
-  coachOnce('clubMap', DEV.clubMap);
+  if (!test) coachOnce('clubMap', DEV.clubMap);
 }
-$('mapBack').addEventListener('click', () => { sfx.click(); clubMap.close(); renderHome(); });
+$('mapBack').addEventListener('click', () => { sfx.click(); clubMap.close(); if (mapTest) renderSettings(); else renderHome(); });
 $('mapCoach').addEventListener('click', () => coachSay(DEV.clubMap));
-$('mapOpen').addEventListener('click', () => { const b = BUILDINGS[mapPick]; if (!b || b.soon) return; sfx.click(); clubMap.close(); fromMap = true; b.open(); });
+$('mapOpen').addEventListener('click', () => { const b = BUILDINGS[mapPick]; if (!b || b.soon) return; if (mapTest) return ui.toast(`${b.name}: test view only`); sfx.click(); clubMap.close(); fromMap = true; b.open(); });
 
 function renderCareer(notes = careerNotes) {
   const c = career();

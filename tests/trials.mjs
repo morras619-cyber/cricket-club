@@ -72,6 +72,8 @@ check(await page.evaluate(() => /Ground & caretaker/.test(document.querySelector
 await page.evaluate(() => [...document.querySelectorAll('.groundpanel button')].find(b => /Hire caretaker/.test(b.textContent)).click());
 await page.waitForTimeout(700);
 check(await page.evaluate(() => /on the job/.test(document.querySelector('.groundpanel')?.textContent || '')), 'the caretaker is hired and on the job');
+await page.evaluate(() => document.getElementById('setClubMap').click()); await page.waitForTimeout(1500);
+check(await page.evaluate(() => !document.getElementById('clubmap').hidden && /Test view/.test(document.getElementById('mapSub').textContent)), 'the settings open the club map as a test view');
 check(errors.length === 0, `no page errors${errors.length ? ': ' + errors[0] : ''}`);
 await browser.close(); server.close();
 process.exit(fails.length ? 1 : 0);
