@@ -33,7 +33,7 @@ const POSE_BAT = Object.fromEntries(['ready', 'leave1', 'leave2', 'backlift', 'd
   'bowled', 'celebrate', 'rsweep1', 'rsweep2', 'rsweep3', 'straight1', 'straight2', 'ondrive1', 'ondrive2', 'cover1'].map((n, i) => [n, i]));
 const PAINT_STAND_IN = { bowled: 'def1' };
 // poses only the painted sheet has: the old sheet's nearest
-const OLD_STAND_IN = { cover0: 'drive2', cover2: 'drive2', cover3: 'drive3', cutflat: 'cut2', loft1: 'drive3', straight3: 'straight2' };
+const OLD_STAND_IN = { cover0: 'drive1', cover2: 'cover1', cover3: 'cover1', cutflat: 'cut2', loft1: 'straight2', straight3: 'straight2' };   // (the old sheet has a cover drive of its own, cover1: bat out to the off side)
 const BAT_HEIGHT_M = 1.72; // the ready stance, helmet to feet
 // the fielders (22 poses, tools/kit/compose_fielder.py): crouched ready from the front, side and back;
 // running away, across (facing right), toward the camera, turning; reaching up; the dive (to the right);

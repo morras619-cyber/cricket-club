@@ -195,7 +195,7 @@ export const BAT_FRONT = {
 };
 // shot frames the drawn front view lacks: the nearest it has
 for (const [n, to] of Object.entries({ cut4: 'cut3', rsweep1: 'cut1', rsweep2: 'cut2', rsweep3: 'cut3', cover1: 'drive2', straight1: 'drive2', straight2: 'drive3', ondrive1: 'drive2', ondrive2: 'drive3',
-  cover0: 'drive2', cover2: 'drive2', cover3: 'drive3', cutflat: 'cut2', loft1: 'drive3', straight3: 'drive3' })) BAT_FRONT[n] = BAT_FRONT[to];
+  cover0: 'drive1', cover2: 'cover1', cover3: 'cover1', cutflat: 'cut2', loft1: 'drive3', straight3: 'drive3' })) BAT_FRONT[n] = BAT_FRONT[to];
 // wicket-keeper (tools/build_keeper_sprites.py): back view for keeper mode, front view seen
 // from the bowling camera. name: [x, y, w, h, anchorX, anchorY, helmet width px]
 const KEEPER_BACK = {
