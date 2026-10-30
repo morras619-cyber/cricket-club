@@ -51,7 +51,15 @@ def clear(a):
             tex[y:y + h, x:x + ww] = t[:h, :ww]
     lawn = np.clip(base + tex, 0, 255)
     soft = ndi.gaussian_filter(pad.astype(float), 4)[..., None]
-    return np.clip(a * (1 - soft) + lawn * soft, 0, 255)
+    out = np.clip(a * (1 - soft) + lawn * soft, 0, 255)
+    # the round plot in the middle (the stadium's) becomes paving, so what the stadium does not cover reads as its forecourt, not as grass
+    H, W = a.shape[:2]
+    lab, _ = ndi.label(ndi.binary_opening((g > r * 1.25) & (g > b * 1.5) & (g > 90) & (g < 190), iterations=6))
+    mid = lab == lab[int(.465 * H), int(.505 * W)]
+    mid = ndi.binary_dilation(ndi.binary_fill_holes(mid), iterations=3)
+    paving = np.clip(np.array([122, 108, 90]) + tex * 0.8 + ndi.gaussian_filter(rng.normal(0, 5, a.shape[:2]), 2)[..., None], 0, 255)
+    soft = ndi.gaussian_filter(mid.astype(float), 2)[..., None]
+    return np.clip(out * (1 - soft) + paving * soft, 0, 255)
 
 
 if __name__ == '__main__':

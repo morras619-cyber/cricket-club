@@ -19,7 +19,7 @@ lab,n=ndi.label(ndi.binary_closing(dirt,iterations=6))
 plots=[]
 for i,sl in enumerate(ndi.find_objects(lab),1):
     if (lab[sl]==i).sum()>25000:
-        ys,xs=np.where(lab==i); plots.append(dict(cx=xs.mean(),cy=ys.mean(),x0=xs.min(),x1=xs.max()))
+        ys,xs=np.where(lab==i); plots.append(dict(cx=(xs.min()+xs.max())/2,cy=(ys.min()+ys.max())/2,x0=xs.min(),x1=xs.max()))
 ATLAS={"stadium":[0,681],"training":[681,714],"office":[1395,704],"apartment":[2099,732],"medical":[2831,660],"academy":[3491,743],"clubhouse":[4234,702],"shop":[4936,709]}
 atlas=Image.open(R+'img/map/buildings.webp').convert('RGBA'); al=np.array(atlas)[...,3]
 plots.append(dict(cx=0.505*W,cy=0.465*H,x0=0.33*W,x1=0.68*W))
@@ -30,7 +30,8 @@ for n,(fx,fy) in assign.items():
     p=pick(fx,fy); row,h=ATLAS[n]; m=al[row:row+h]>60
     ys,xs=np.where(m); sy0,sy1=ys.min(),ys.max()
     lo=m.copy(); lo[:int(sy1-0.45*(sy1-sy0))]=False
-    lys,lxs=np.where(lo); lw=lxs.max()-lxs.min(); pcx,pcy=lxs.mean(),lys.mean()
+    lys,lxs=np.where(lo); lw=lxs.max()-lxs.min()    # the base's width
+    cys,cxs=np.where(m); pcx,pcy=cxs.mean(),cys.mean()   # the middle of the whole building's picture (its weight), which is what the eye centres
     s=(p['x1']-p['x0'])*K/lw
     left=p['cx']-pcx*s; top=p['cy']-pcy*s
     out[n]=dict(x=round((left+550*s)/W,3),y=round((top+h*s/2)/H,3),w=round(1100*s/W,3))
