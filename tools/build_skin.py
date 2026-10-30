@@ -27,10 +27,10 @@ SC = '.mf'
 def build():
     out = [A]
     ic, rows = atlas()
-    out.append(f"SC .ico[data-n] {{ background: {ic} no-repeat; background-size: {COLS * 100}% {rows * 100}%; }} SC .ico[data-n] svg {{ display: none; }}")
+    out.append(f".ico[data-n] {{ background: {ic} no-repeat; background-size: {COLS * 100}% {rows * 100}%; }} .ico[data-n] svg {{ display: none; }}")
     m = {'coin': 'coin', 'users': 'users', 'clock': 'clock', 'warn': 'warn', 'plus': 'plus', 'heart': 'heart', 'up': 'up', 'check': 'check', 'trophy': 'trophy', 'chart': 'chart', 'star': 'star-on', 'ball': 'ball', 'search': 'search', 'cross': 'cross', 'jersey': 'jersey', 'box': 'box', 'gear': 'gear', 'factory': 'hammer', 'pencil': 'pencil', 'printer': 'printer'}
     for name, key in m.items():
-        i = ICONS.index(key); out.append(f"SC .ico[data-n={name}] {{ background-position: {(i % COLS) / (COLS - 1) * 100:.3f}% {(i // COLS) / (rows - 1) * 100:.3f}%; }}")
+        i = ICONS.index(key); out.append(f".ico[data-n={name}] {{ background-position: {(i % COLS) / (COLS - 1) * 100:.3f}% {(i // COLS) / (rows - 1) * 100:.3f}%; }}")
     def nine(sel, name, slice_, bw, width=None, extra=''):
         u, size = uri(name, width); k = size[0] / Image.open(os.path.join(D, name + '.png')).width; sl = round(slice_ * k)
         out.append(f"{sel} {{ border: {bw}px solid transparent; border-image: {u} {sl} fill / {bw}px stretch; background: none; box-shadow: none; border-radius: 0; {extra} }}")
@@ -59,7 +59,7 @@ def build():
     out.append(f"SC .pt-back {{ width: 50px; height: 50px; background: {bk} center / 100% 100% no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }}")
     dot, _ = uri('dot-red', 80)
     out.append(f"SC .mf-badge {{ background: {dot} center / 100% 100% no-repeat; border: 0; color: #fff; text-shadow: 0 1px 0 #7a0010; min-width: 22px; height: 22px; line-height: 22px; top: -8px; right: -5px; }}")
-    out.append("SC .mf-pips .ico[data-n] { filter: grayscale(1) brightness(.55); opacity: .5; } SC .mf-pips .ico.on[data-n] { filter: none; opacity: 1; }")
+    out.append(".mf-pips .ico[data-n], .pace .ico[data-n] { filter: grayscale(1) brightness(.55); opacity: .5; } .mf-pips .ico.on[data-n], .pace .ico.on[data-n] { filter: none; opacity: 1; }")
     nine('SC .mf-fin', 'card-cream', 80, 12, 480)
     nine('SC .mf-role', 'card-cream', 80, 12, 480)
     nine('SC .mf-collect', 'btn-yellow', 46, 12, 440, 'color: #14102a;')
@@ -67,6 +67,30 @@ def build():
     nine('SC .mf-qty button.on', 'btn-yellow', 46, 9, 440, 'color: #14102a;')
     out.append("SC .mf-fin, SC .mf-role { padding: 0 2px; } SC .mf-collect { min-height: 40px; } SC .mf-qty button { min-height: 38px; padding: 0 2px; }")
     out.append("SC .mf-card .mf-badge { background: linear-gradient(#ff7a85, #d6283c); border: 2px solid #fff; border-radius: 9px; min-width: 0; padding: 0 5px; height: 17px; line-height: 13px; font-size: 9px; top: 4px; right: 4px; text-shadow: none; }")
+    # ---- the common components of every other screen (the hub, squad, records, settings, auction, results ...) ----
+    def gnine(sel, name, slice_, bw, width, extra=''):
+        u, size = uri(name, width); k = size[0] / Image.open(os.path.join(D, name + '.png')).width; sl = round(slice_ * k)
+        out.append(f"{sel} {{ border: {bw}px solid transparent; border-image: {u} {sl} fill / {bw}px stretch; background: none; box-shadow: none; border-radius: 0; {extra} }}")
+    gnine('.bigbtn', 'btn-blue', 46, 14, 440, 'color: #fff; padding: 2px 8px; min-height: 58px; text-shadow: 2px 2px 0 #14102a;')
+    gnine('.bigbtn.primary', 'btn-yellow', 46, 14, 440, 'color: #14102a; text-shadow: none;')
+    gnine('.bigbtn.ghost', 'panel-dark', 80, 12, 440, 'color: #fff; text-shadow: 2px 2px 0 #14102a;')
+    gp2, _ = uri('btn-grey', 440)
+    out.append(".bigbtn:disabled { border-image-source: %s; opacity: 1; color: #5b5f70; text-shadow: none; } .bigbtn:active { box-shadow: none; transform: translateY(2px); filter: brightness(1.08); } .bigbtn.whatsapp { background: #25d366; border-image: none; border: 3px solid #14102a; border-radius: 16px; min-height: 0; padding: 13px 16px; }" % gp2)
+    gnine('.panel.paper', 'card-cream', 80, 12, 480, 'margin: 3px;')
+    gnine('.panel:not(.paper)', 'panel-dark', 80, 12, 440)
+    gnine('.tab', 'btn-blue', 46, 10, 440, 'color: #fff;')
+    gnine('.tab.on', 'btn-yellow', 46, 10, 440, 'color: #14102a;')
+    gnine('.map-tab', 'btn-blue', 46, 10, 440, 'color: #fff;')
+    gnine('.map-tab:active', 'btn-yellow', 46, 10, 440, 'color: #14102a;')
+    gnine('.chipbtn', 'btn-yellow', 46, 9, 440, 'color: #14102a; min-height: 32px; padding: 0 4px;')
+    gnine('.hb-pill', 'panel-dark', 80, 8, 440, 'color: #fff;')
+    gnine('.coach-bubble', 'card-cream', 80, 12, 480, 'padding: 0 4px;')
+    gnine('.coach-btns button', 'btn-grey', 46, 9, 440, 'color: #14102a; min-width: 74px; height: auto; min-height: 38px; padding: 0 4px;')
+    gnine('.coach-btns button.go', 'btn-yellow', 46, 9, 440, 'color: #14102a;')
+    gnine('.coachbtn', 'panel-dark', 80, 8, 440, 'color: #fff; height: auto; min-height: 38px;')
+    out.append(".tab { padding: 2px 4px; min-height: 40px; } .map-tab { min-height: 56px; padding: 0 2px; }")
+    bk2, _ = uri('back-blue', 200)
+    out.append(f".pt-back {{ width: 50px; height: 50px; background: {bk2} center / 100% 100% no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }}")
     out.append(B)
     return '\n'.join(out).replace('SC ', SC + ' ')
 css = open(CSS).read()
