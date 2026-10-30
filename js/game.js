@@ -22,7 +22,7 @@ import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor
 import { resolveLineup, overPlan, bowlType, runUp, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
-import { speedText, speedRange } from './units.js';
+import { speedText, speedRange } from './config.js';
 import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { netBall } from './nets.js';
 import { adaptScale, NO_DIALS, dialsFor } from './adapt.js';

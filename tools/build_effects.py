@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Cut a sheet of glowing effects (5 rows of 5, transparent or black background) into an atlas
-for the game's electric effects: img/fx/<name>.webp and js/fxatlas.js.
+for the game's electric effects: img/fx/<name>.webp and the FX_ATLAS line of js/fx.js.
 
 usage: python3 tools/build_effects.py SHEET.png electric
 
@@ -64,7 +64,7 @@ def main():
         fx, fy, w, h = meta[name]
         atlas[fy:fy + h, fx:fx + w] = blk
     Image.fromarray(np.clip(atlas, 0, 255).astype(np.uint8), 'RGBA').save(f'img/fx/{set_name}.webp', 'WEBP', quality=86, method=6)
-    path = 'js/fxatlas.js'
+    path = 'js/fx.js'
     sets = {}
     try:
         m = re.search(r'FX_ATLAS = (\{.*\});', open(path).read(), re.S)
@@ -72,9 +72,10 @@ def main():
     except FileNotFoundError:
         pass
     sets[set_name] = meta
-    with open(path, 'w') as f:
-        f.write('// Glowing effect pieces in img/fx/<set>.webp: [x, y, w, h]. Made by tools/build_effects.py.\n')
-        f.write('export const FX_ATLAS = ' + json.dumps(sets, separators=(',', ':')) + ';\n')
+    # (the atlas is one line of js/fx.js: only that line is rewritten)
+    src = open(path).read()
+    line = 'export const FX_ATLAS = ' + json.dumps(sets, separators=(',', ':')) + ';'
+    open(path, 'w').write(re.sub(r'export const FX_ATLAS = \{.*\};', lambda _: line, src, count=1))
     print(set_name, len(meta), 'pieces,', AW, 'x', y + rowh)
 
 

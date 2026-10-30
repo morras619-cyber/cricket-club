@@ -27,7 +27,7 @@ import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewar
 import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute, CHANTS, previewChant } from './audio.js';
 import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
-import { units } from './units.js';
+import { units } from './config.js';
 import { teamStars } from './teamrating.js';
 import { createClubMap } from './clubmap.js';
 import * as MF from './merch.js';

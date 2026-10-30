@@ -1,5 +1,7 @@
 // Comic-book effects: onomatopoeia, speech bubbles, impact frames, flashes, shake, particles.
-import { FX_ATLAS } from './fxatlas.js';
+
+// Glowing effect pieces in img/fx/<set>.webp: [x, y, w, h]. Made by tools/build_effects.py (it rewrites the FX_ATLAS line below).
+export const FX_ATLAS = {"electric":{"bolt1":[0,0,164,216],"bolt2":[166,0,119,199],"bolt3":[287,0,108,223],"bolt4":[397,0,119,176],"bolt5":[518,0,123,194],"burst1":[643,0,158,156],"burst2":[803,0,150,179],"burst3":[0,225,132,144],"burst4":[134,225,155,172],"burst5":[291,225,142,190],"ring1":[435,225,149,176],"ring2":[586,225,142,177],"ring3":[730,225,124,199],"ring4":[856,225,155,153],"ring5":[0,426,147,158],"arc":[149,426,145,172],"fork":[296,426,82,197],"zigzag":[380,426,159,115],"shards":[541,426,128,142],"spray":[671,426,134,148],"comet1":[807,426,146,140],"comet2":[0,625,135,155],"streak":[137,625,161,157],"vortex":[300,625,139,176],"speed":[441,625,157,131]}};
 
 export const INK = '#141018';
 export const FONT_DISPLAY = '"Bangers", "Impact", "Arial Black", sans-serif';
