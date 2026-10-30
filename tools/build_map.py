@@ -40,7 +40,16 @@ def cutout(im):
     """RGB float 0..1 and alpha, the magenta taken out (a picture that already has alpha keeps it)."""
     a = np.array(im.convert('RGBA')).astype(float) / 255
     rgb, al = a[..., :3], a[..., 3]
-    if im.mode != 'RGBA':
+    if im.mode != 'RGBA' and rgb[:12, :12].mean() > 0.93:
+        # a white background (a picture without magenta): the white joined to the picture's edge goes, with its light halo; the picture's edges are cropped a little (stray marks)
+        white = rgb.min(-1) > 0.89
+        lab, _ = ndi.label(white)
+        edge = (set(lab[0]) | set(lab[-1]) | set(lab[:, 0]) | set(lab[:, -1])) - {0}
+        bg = np.isin(lab, list(edge))
+        halo = ndi.binary_dilation(bg, iterations=6) & ~bg & (rgb.min(-1) > 0.75) & ((rgb.max(-1) - rgb.min(-1)) < 0.1)
+        al = 1 - ndi.gaussian_filter((bg | halo).astype(float), 0.8)
+        k = round(al.shape[1] * 0.012); al[:, -k:] = 0; al[:, :k] = 0; al[:k] = 0; al[-k:] = 0
+    elif im.mode != 'RGBA':
         mag = np.minimum(rgb[..., 0], rgb[..., 2]) - rgb[..., 1]           # magenta: red and blue high, green low
         al = 1 - ramp(mag, 0.30, 0.62)
         # the edge: the magenta taken out of the colour
