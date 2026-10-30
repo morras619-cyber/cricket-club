@@ -109,6 +109,18 @@ await page.waitForTimeout(700);
 check(await page.evaluate(() => /on the job/.test(document.querySelector('.groundpanel')?.textContent || '')), 'the caretaker is hired and on the job');
 await page.evaluate(() => document.getElementById('setClubMap').click()); await page.waitForTimeout(1500);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden && /Test view/.test(document.getElementById('mapSub').textContent)), 'the settings open the club map as a test view');
+// the settings' test of the merch factory: a practice club, time skipping, and back to the settings
+await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
+await page.evaluate(() => document.getElementById('setMerch').click()); await page.waitForTimeout(1500);
+check(await page.evaluate(() => !document.getElementById('merch').hidden && !document.getElementById('merchTest').hidden && /Practice club/.test(document.getElementById('merchLede').textContent)), 'the settings open the merch factory as a practice club with test buttons');
+await tab('Staff'); await hire('Designer'); await hire('Printer'); await tab('Fans');
+await page.evaluate(() => document.querySelector('#merchBody .mf-card').click()); await page.waitForTimeout(250);
+await page.evaluate(() => document.querySelector('#merchSheet .mf-big').click()); await page.waitForTimeout(300);
+await page.evaluate(() => [...document.querySelectorAll('#merchTest .chipbtn')].find(b => /10 hours/.test(b.textContent)).click()); await page.waitForTimeout(800);
+check(await page.evaluate(async () => { const t = document.getElementById('merchStats').textContent; return /\d+/.test(t) && /Away/.test(document.getElementById('merchNote').textContent); }), 'skipping ten hours makes and sells jerseys in the practice factory');
+check(await page.evaluate(() => !window.__sixcharge.profile.career.merch || window.__sixcharge.profile.career.merch.staff.length === 2), 'the practice factory does not touch the saved career');
+await page.evaluate(() => document.getElementById('merchBack').click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the practice factory is the settings');
 // the settings' Club map level: cycle to level 3 and the map shows it (and level 2, to draw both)
 await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
 for (const want of [2, 3]) {

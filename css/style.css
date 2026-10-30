@@ -1574,3 +1574,7 @@ button.mf-card:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 va
 .mf-card.empty .ico { width: 40px; height: 40px; color: #fff; }
 @media (max-height: 720px) { .mf-card.stack .mf-frame { --fs: 46px; } .mf-card.stack b { font-size: 13px; } .mf-grid.three { grid-auto-rows: minmax(0, 110px); } }
 .mf-col { display: flex; flex-direction: column; gap: 8px; }
+.mf-test { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 10px; background: rgba(255, 90, 90, .25); border: 2px dashed #ff7a85; }
+.mf-test[hidden] { display: none; }
+.mf-test b { color: #ff9aa4; font-size: 12px; letter-spacing: 1px; }
+.mf-test .chipbtn { font-size: 12px; padding: 4px 9px; }

@@ -1199,7 +1199,7 @@ const BUILDINGS = {
   apartment: { name: 'Your apartment', desc: 'Coming soon', soon: true },
   medical: { name: 'Medical centre', desc: 'Coming soon', soon: true },
   clubhouse: { name: 'Clubhouse', desc: 'Coming soon', soon: true },
-  merch: { name: 'Merchandise factory', desc: 'Make jerseys the fans want', open: () => renderMerch() },
+  merch: { name: 'Merchandise factory', desc: 'Make jerseys the fans want', open: () => renderMerch(false) },
 };
 let mapPick = null;
 const clubMap = createClubMap($('mapCanvas'), {
@@ -1270,6 +1270,9 @@ function merchTick(c) {
 const kfmt = k => (Math.abs(k) >= 1000 ? `$${(k / 1000).toFixed(2)}M` : `$${Math.round(k * 10) / 10}k`);
 const durfmt = ms => (!Number.isFinite(ms) ? 'never' : ms < 90 * 1000 ? 'a minute' : ms < 90 * 60000 ? `${Math.round(ms / 60000)} min` : ms < 36 * 3600000 ? `${(ms / 3600000).toFixed(1)} h` : `${Math.round(ms / 86400000)} days`);
 let merchTab = 'fans', merchSheet = null, merchQty = 20, merchTimer = 0, merchReport = null;
+// the settings' test of the factory: a practice club (it is not saved), and buttons to skip time and add money
+let merchTest = false, merchDemo = null;
+const demoCareer = () => { if (!merchDemo) { merchDemo = newCareer(Date.now() >>> 0); chooseClub(merchDemo, merchDemo.divisions.d3[0]); merchDemo.money = 2; } return merchDemo; };
 // the icons (24 x 24, drawn with the game's thick dark outline)
 const ICON = {
   jersey: '<path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3c-1 2-7 2-8 0z"/>',
@@ -1295,10 +1298,11 @@ const frameOf = (node, big = false) => { const f = el('span', `mf-frame${big ? '
 const playerFace = (p, size = 64) => (p.heroId ? portrait(heroById(p.heroId), size, 'celebrate') : portraitFace(p, p.team ? teamById(p.team) : null, size) || faceEl(p, kitOf(p), size));
 const staffFace = (s, club, size = 64) => faceEl({ id: `staff-${s.id}`, name: s.name, nation: 'IN' }, club, size);
 const lastName = n => n.split(' ').slice(-1)[0];
-async function renderMerch() {
-  const c = career();
+async function renderMerch(test = false) {
+  merchTest = test;
+  const c = test ? demoCareer() : career();
   ui.show('merch');
-  $('merchBack').onclick = () => { clearInterval(merchTimer); merchTimer = 0; merchSheet = null; sfx.click(); if (fromMap) renderClubMap(); else renderCareer(); };
+  $('merchBack').onclick = () => { clearInterval(merchTimer); merchTimer = 0; merchSheet = null; sfx.click(); if (merchTest) renderSettings(); else if (fromMap) renderClubMap(); else renderCareer(); };
   $('merchBody').replaceChildren(el('p', 'mf-empty', 'Checking the time with the server…'));
   $('merchSheet').hidden = true;
   await syncClock();
@@ -1309,7 +1313,7 @@ async function renderMerch() {
   }
   if (!c.merch) c.merch = MF.freshMerch(serverNow());
   merchReport = merchTick(c);
-  coachOnce('merch', DEV.merch);
+  if (!test) coachOnce('merch', DEV.merch);
   paintMerch(c);
   clearInterval(merchTimer);
   merchTimer = setInterval(() => { if ($('merch').hidden) { clearInterval(merchTimer); merchTimer = 0; return; } merchReport = merchTick(c) || merchReport; paintMerch(c); }, 15000);
@@ -1319,12 +1323,17 @@ function paintMerch(c) {
   const ctx = () => merchCtx(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) merchSheet = null; } saveProfile(profile); merchTick(c); paintMerch(c); };
   // the top: the till, what it earns and costs, and the button to collect
-  $('merchLede').textContent = `${club.name} · club ${money(c.money)}`;
+  $('merchLede').textContent = merchTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   const lv = $('merchLvl'); lv.replaceChildren(ico('factory'), el('span', '', `LV ${m.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const t = el('div'); t.append(el('span', '', big), el('small', '', small)); d.append(ico(name), t); return d; };
   const col = mfBtn('mf-collect', [ico('coin'), el('span', '', 'Collect')], () => { const r = MF.collect(m, ctx()); done(r); if (r.ok) ui.toast(`${kfmt(r.k)} to the club`); });
   col.disabled = m.till < 50;
   $('merchStats').replaceChildren(stat('coin', 'gold', kfmt(m.till), 'in the till'), stat('jersey', 'blue', String(m.sold), 'sold'), stat('clock', 'red', kfmt(MF.wagePerDay(m)), 'a day costs'), col);
+  const tb = $('merchTest'); tb.hidden = !merchTest;
+  if (merchTest) {
+    const chip = (label, fn) => mfBtn('chipbtn', [el('span', '', label)], () => { fn(); sfx.click(); saveProfile(profile); merchReport = merchTick(c) || merchReport; paintMerch(c); });
+    tb.replaceChildren(el('b', '', 'TEST'), chip('+1 hour', () => { m.last -= 3600000; MF.seal(m); }), chip('+10 hours', () => { m.last -= 10 * 3600000; MF.seal(m); }), chip('+$1M', () => { c.money += 1; }));
+  }
   const note = $('merchNote'), bad = m.unpaidMs > 0 || merchReport?.tampered;
   const msg = m.unpaidMs > 0 ? `The wages cannot be paid: the work has stopped${m.unpaidMs > 24 * 3600000 ? `, and staff leave in ${durfmt(MF.MERCH.QUIT - m.unpaidMs)}` : ''}.`
     : merchReport?.tampered ? 'The books did not add up, so the till was emptied.'
@@ -1440,7 +1449,8 @@ function paintMerch(c) {
   } else { merchSheet = null; sh.hidden = true; return; }
   sh.replaceChildren(card);
 }
-addEventListener('visibilitychange', () => { if (!document.hidden && !$('merch').hidden) renderMerch(); });
+addEventListener('visibilitychange', () => { if (!document.hidden && !$('merch').hidden) renderMerch(merchTest); });
+$('setMerch').addEventListener('click', () => { unlockAudio(); sfx.click(); renderMerch(true); });
 
 function renderCareer(notes = careerNotes) {
   const c = career();
