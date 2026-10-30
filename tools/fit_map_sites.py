@@ -11,6 +11,7 @@ import numpy as np, json, sys
 from scipy import ndimage as ndi
 R=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..')+os.sep
 K=float(sys.argv[1]) if len(sys.argv)>1 else 1.2
+MARGIN=float(sys.argv[3]) if len(sys.argv)>3 else 30
 base=Image.open(R+'img/map/base.webp').convert('RGB').resize((1536,2304),Image.LANCZOS); W,H=base.size   # (the original: the pads are found by their bare ground)
 a=np.array(base).astype(float); r,g,b=a[...,0],a[...,1],a[...,2]
 dirt=(g>r*1.25)&(g>b*1.6)&(g>95)&(g<185)
@@ -19,7 +20,7 @@ lab,n=ndi.label(ndi.binary_closing(dirt,iterations=6))
 plots=[]
 for i,sl in enumerate(ndi.find_objects(lab),1):
     if (lab[sl]==i).sum()>40000:
-        ys,xs=np.where(lab==i); plots.append(dict(cx=(xs.min()+xs.max())/2,cy=(ys.min()+ys.max())/2,x0=xs.min(),x1=xs.max()))
+        ys,xs=np.where(lab==i); plots.append(dict(cx=(xs.min()+xs.max())/2,cy=(ys.min()+ys.max())/2,x0=xs.min(),x1=xs.max(),y1=ys.max()))
 ATLAS={"stadium":[0,681],"training":[681,714],"office":[1395,704],"apartment":[2099,732],"medical":[2831,660],"academy":[3491,743],"clubhouse":[4234,702],"shop":[4936,709]}
 atlas=Image.open(R+'img/map/buildings.webp').convert('RGBA'); al=np.array(atlas)[...,3]
 def pick(fx,fy): return min(plots,key=lambda p:(p['cx']/W-fx)**2+(p['cy']/H-fy)**2)
@@ -32,7 +33,8 @@ for n,(fx,fy) in assign.items():
     lys,lxs=np.where(lo); lw=lxs.max()-lxs.min()    # the base's width
     cys,cxs=np.where(m); pcx,pcy=cxs.mean(),cys.mean()   # the middle of the whole building's picture (its weight), which is what the eye centres
     s=(p['x1']-p['x0'])*K/lw
-    left=p['cx']-pcx*s; top=p['cy']-pcy*s
+    # across: the base's middle on the lawn's middle; down: the lowest corner of the whole building (its stone base) a little inside the lawn's front edge, so nothing hangs over the road
+    left=p['cx']-pcx*s; top=p['y1']-MARGIN-sy1*s
     out[n]=dict(x=round((left+550*s)/W,3),y=round((top+h*s/2)/H,3),w=round(1100*s/W,3))
     spr=atlas.crop((0,row,1100,row+h)).resize((round(1100*s),round(h*s)),Image.LANCZOS)
     canvas.alpha_composite(spr,(round(left),round(top)))
