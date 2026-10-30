@@ -1225,7 +1225,7 @@ $('careerSquad').addEventListener('click', () => { careerView = careerView === '
 $('careerRecords').addEventListener('click', () => renderRecords());
 $('careerCoach').addEventListener('click', () => {
   const c = career();
-  coachSay(c.phase === 'season' ? [...DEV.season, ...DEV.scoutTip] : DEV[{ pick: 'leagueTeam', scouts: 'scoutSign', auction: 'auction', playoff: 'playoff', done: 'seasonEnd' }[c.phase]]);
+  coachSay(c.phase === 'season' ? [...DEV.season, ...DEV.scoutTip] : DEV[{ pick: 'makeClub', scouts: 'scoutSign', auction: 'auction', playoff: 'playoff', done: 'seasonEnd' }[c.phase]]);
 });
 // start the Super League again from season 1: a fresh league, a fresh auction (nothing else is touched)
 confirmTap($('careerRestart'), 'Tap again to restart from season 1', () => {

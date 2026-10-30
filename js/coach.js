@@ -119,74 +119,46 @@ export const DEV = {
     "Each club plays differently: big hitters, swing bowlers, spinners. Choose one that suits how you like to play.",
   ],
   region: [
-    "So, the Super League! Every region of the world will have its own league. Asia's is the first one open.",
-    "Asia has three divisions. At the top, the Asian Super League: the Thunder Strikers, the Green Cyclones, the Volt Vipers and the rest. Tap Asia and let's go.",
-  ],
-  leagueTeam: [
-    "Every great story starts at the bottom, beta. Your career begins in Division 3.",
-    "Win Division 3 and you go up to Division 2. Win that, and you're in the Asian Super League with the big names.",
-    "It's a grind. Pick the club you believe in: you'll be with them all the way up.",
+    "Asia is open first. Three divisions, and you start at the bottom. Tap Asia.",
   ],
   makeClub: [
-    "Your own club? Now that's the spirit, beta! Give it a name the crowd can sing.",
-    "Pick two colours that look good together: a bold main colour and a bright trim. Then choose a crest.",
-    "You'll start in Division 3. We have a ground, a name and not one player yet. We'll fix that in the nets.",
+    "Name it, pick your colours and crest, a chant and a pitch. Your club, your rules!",
   ],
   trials: [
-    "Good news, beta. I found you a wicketkeeper who'll play for nothing. He's yours, and so are you: you're on the team sheet too.",
-    "The rest we pick in the nets. Six batters, six bowlers. None of them is any good yet, so don't expect miracles.",
-    "Face four balls from each batter, and bowl four with each bowler. Watch how they play, then choose four batters and five bowlers.",
-    "Think about what a side needs: openers, power hitters, someone who stays in. Fast bowlers, swing, spin. A good eleven needs a bit of everything.",
+    "Nets time! Face each batter, bowl with each bowler. Then pick four batters and five bowlers.",
   ],
   trialsPick: [
-    "That's all of them. Now the hard part: you can only sign four batters and five bowlers.",
-    "Look at what they did in the nets, but look at their age and potential too. A raw boy can grow into a star.",
+    "Pick four batters and five bowlers. Young players with high potential grow.",
   ],
   trialsDone: [
-    "Eleven players. A name. A ground with weeds. That's a club, beta!",
-    "We have no money for this year's auction, so we just watch. See how the big clubs buy: you'll learn who pays what.",
-  ],
-  madeClub: [
-    "Welcome to the league! Every big club started like this: a few kids, a small ground and a dream.",
-    "Your players are young, so their potential matters more than their rating. Keep them and they'll get better every season.",
+    "That's a club, beta! No money for the auction yet, so just watch the big clubs buy.",
   ],
   stadium: [
-    "This is your ground, beta. Small for now, but every home match brings in ticket money.",
-    "Save up and you can build it bigger: a Club Stadium, then one day an Arena. More fans, more money, more noise!",
+    "Your ground. Home matches bring ticket money. Save up to build it bigger.",
   ],
   stadiumCan: [
-    "You have enough in the bank to build the next level of your ground. More seats means more ticket money every home match.",
-    "But think about it: that money could also buy a player at the auction. Your call, captain.",
+    "You can afford the next ground level. Or save the money for a player. Your call.",
   ],
   stadiumBuilt: [
     "Look at it! The fans will remember this day. Now give them something to cheer about.",
   ],
   auction: [
-    "Auction day! Every player goes under the hammer. Bid against the other clubs, or pass if the price runs too high.",
-    "Watch your money. You need at least 10 players, so don't spend it all on the first star you see.",
-    "Rating is now, potential is later. A young player with high potential gets better every season you keep him.",
+    "Auction day! Bid on players, or pass if the price is too high. You need 10 players.",
   ],
   auctionLow: [
-    "Careful, beta, the money is running low and your squad is still short.",
-    "Look for the bargains now. Solid players that nobody else is bidding on win you plenty of matches.",
+    "Money is low and your squad is short. Hunt for bargains.",
   ],
   season: [
-    "The season starts here. Play your fixtures, climb the table, and the top four go through to the semi-finals.",
-    "Before each match, check the opposition card. It tells you who their danger man is.",
-    "And set your line-up in the squad screen. Your best batters near the top, your best bowlers in the attack.",
+    "Play your fixtures. The top four reach the semi-finals. Set your line-up in Squad.",
   ],
   scoutTip: [
-    "One more thing, beta. The best clubs don't only shop at the auction. They send scouts around the world.",
-    "Send a scout to a region and he'll find you players there: raw talent in Africa, accurate bowlers in Europe, big hitters in North America, mavericks in South America, quicks in Oceania.",
-    "Next season you can sign his finds at a set price, before the auction even starts. No bidding war!",
+    "Tip: send scouts to other regions. They find players you can sign before the auction.",
   ],
   scoutFound: [
-    "Your scout has sent his first report! Have a look under Travelling scouts.",
-    "He'll keep searching all season. When the new season begins, his players are yours to sign first.",
+    "Your scout sent a report! Check Travelling scouts.",
   ],
   scoutSign: [
-    "Your scouts are home, beta, and look what they've brought back!",
-    "These players are yours to sign at a set price, before the other clubs even see them. Anyone you leave goes into the auction.",
+    "Your scouts are back! Sign their finds first, before other clubs see them.",
   ],
   slump: [
     "Two defeats in a row. It happens to every team, beta.",

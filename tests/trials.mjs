@@ -27,6 +27,7 @@ await page.waitForTimeout(600);
 await page.evaluate(() => document.getElementById('btnLeague').click()); await page.waitForTimeout(600);
 await page.evaluate(() => document.getElementById('rgGo').click()); await page.waitForTimeout(600);
 check(await page.evaluate(() => !document.getElementById('makeclub').hidden), 'a new career goes straight to building your own club: no other club to pick');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'builder-coach.png') });
 check(await page.evaluate(() => document.querySelectorAll('#mkChants button').length === 8 && document.querySelectorAll('#mkPitches button').length === 8), 'eight chants and eight pitches to choose from');
 await page.evaluate(() => { document.querySelector('#mkChants button[data-k="vipers"]').click(); document.querySelector('#mkPitches button[data-p="turner"]').click(); }); await page.waitForTimeout(300);
 await page.fill('#mkNameIn', 'Harbour Kings'); await page.waitForTimeout(300);
