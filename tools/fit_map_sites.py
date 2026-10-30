@@ -11,20 +11,19 @@ import numpy as np, json, sys
 from scipy import ndimage as ndi
 R=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..')+os.sep
 K=float(sys.argv[1]) if len(sys.argv)>1 else 1.2
-base=Image.open(R+'tools/map/base.png').convert('RGB').resize((1536,2304),Image.LANCZOS); W,H=base.size   # (the original: the pads are found by their bare ground)
+base=Image.open(R+'img/map/base.webp').convert('RGB').resize((1536,2304),Image.LANCZOS); W,H=base.size   # (the original: the pads are found by their bare ground)
 a=np.array(base).astype(float); r,g,b=a[...,0],a[...,1],a[...,2]
-dirt=(r>g*0.95)&(r>90)&(r-b>35)&(g>60)&(r<230)
-dirt=ndi.binary_opening(dirt,iterations=3)
+dirt=(g>r*1.25)&(g>b*1.6)&(g>95)&(g<185)
+dirt=ndi.binary_opening(dirt,iterations=8)
 lab,n=ndi.label(ndi.binary_closing(dirt,iterations=6))
 plots=[]
 for i,sl in enumerate(ndi.find_objects(lab),1):
-    if (lab[sl]==i).sum()>25000:
+    if (lab[sl]==i).sum()>40000:
         ys,xs=np.where(lab==i); plots.append(dict(cx=(xs.min()+xs.max())/2,cy=(ys.min()+ys.max())/2,x0=xs.min(),x1=xs.max()))
 ATLAS={"stadium":[0,681],"training":[681,714],"office":[1395,704],"apartment":[2099,732],"medical":[2831,660],"academy":[3491,743],"clubhouse":[4234,702],"shop":[4936,709]}
 atlas=Image.open(R+'img/map/buildings.webp').convert('RGBA'); al=np.array(atlas)[...,3]
-plots.append(dict(cx=0.505*W,cy=0.465*H,x0=0.33*W,x1=0.68*W))
 def pick(fx,fy): return min(plots,key=lambda p:(p['cx']/W-fx)**2+(p['cy']/H-fy)**2)
-assign={'stadium':(.505,.465),'training':(.32,.20),'apartment':(.72,.24),'office':(.23,.34),'academy':(.79,.37),'medical':(.21,.58),'clubhouse':(.80,.60),'shop':(.24,.74)}
+assign={'stadium':(.503,.444),'training':(.34,.195),'apartment':(.735,.245),'office':(.224,.334),'academy':(.812,.382),'medical':(.24,.584),'clubhouse':(.766,.594),'shop':(.239,.739)}
 out={}; canvas=Image.open(R+'img/map/base.webp').convert('RGBA').resize((W,H))
 for n,(fx,fy) in assign.items():
     p=pick(fx,fy); row,h=ATLAS[n]; m=al[row:row+h]>60

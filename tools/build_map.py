@@ -5,7 +5,7 @@ usage: python3 tools/build_map.py [name ...]      (all of them when none is name
 
 SOURCE (tools/map): base.png (the empty estate, 2048 x 3072) and one picture per building at level 1 (stadium, training, office, apartment, medical,
 academy, clubhouse, shop), each on flat magenta (or already transparent). Roofs, awnings and seats are one royal blue; trim is one golden yellow.
-OUT (img/map): base.webp (the estate with the empty pads painted over as lawn), buildings.webp (the eight cut-outs one under the other, the blue and yellow turned into a grey ramp, so the club's colour
+OUT (img/map): base.webp (the empty estate: plain lawns, roads well clear of them), buildings.webp (the eight cut-outs one under the other, the blue and yellow turned into a grey ramp, so the club's colour
 multiplied on gives the club's colour at the painted brightness) and buildings-tint.webp (R the main colour's weight, G the trim's); where each
 building is in them is printed (ATLAS, in js/clubmap.js), and where it stands on the map is SITES there.
 Needs numpy, Pillow and scipy.
@@ -87,12 +87,7 @@ def build(name):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    # the estate with its empty pads painted over (tools/clear_pads.py): the buildings bring their own ground
-    import cv2
-    sys.path.insert(0, HERE)
-    from clear_pads import clear
-    a = cv2.imread(os.path.join(SRC, 'base.png'))[..., ::-1].astype(np.float32)
-    Image.fromarray(clear(a).astype(np.uint8)).resize((1536, 2304), Image.LANCZOS).save(os.path.join(OUT, 'base.webp'), quality=84, method=6)
+    Image.open(os.path.join(SRC, 'base.png')).convert('RGB').resize((1536, 2304), Image.LANCZOS).save(os.path.join(OUT, 'base.webp'), quality=84, method=6)
     parts = {n: build(n) for n in (sys.argv[1:] or NAMES)}
     # all the buildings in one picture (and their tints in another), one under the other: the map is published with a limit on its files
     H = sum(b.size[1] for b, _ in parts.values())
