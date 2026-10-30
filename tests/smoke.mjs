@@ -19,7 +19,7 @@ const server = createServer(async (req, res) => {
   try { res.writeHead(200, { 'content-type': types[extname(path)] || 'application/octet-stream' }); res.end(await readFile(path)); }
   catch { res.writeHead(404); res.end(); }
 }).listen(0);
-const url = `http://localhost:${server.address().port}/`;
+const url = `http://localhost:${server.address().port}/?modes=all`;   // (quick match, the cup and friend challenges are off in the game: ?modes=all brings them back for this test)
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });

@@ -62,7 +62,10 @@ export const CFG = {
 };
 
 // Features switched off for now (the code and the saved data stay, so they can come back): the Weekend War and the Season Pass.
-export const FEATURES = { war: false, pass: false };
+// quick match, the knockout cup and friend challenges are off: the game is the Super League (and the daily challenge inside it).
+// (?modes=all brings them back, for the tests)
+const ALL_MODES = typeof location !== 'undefined' && new URLSearchParams(location.search).get('modes') === 'all';
+export const FEATURES = { war: false, pass: false, quick: ALL_MODES, cup: ALL_MODES, challenge: ALL_MODES };
 
 export function phaseFor(ballNo) {
   return CFG.phases.find(p => ballNo >= p.from && ballNo <= p.to) || CFG.phases[2];

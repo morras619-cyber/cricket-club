@@ -256,6 +256,8 @@ $('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); if (!pr
 function renderHome() {
   ui.show('home');
   $('btnWar').hidden = !FEATURES.war; $('btnPass').hidden = !FEATURES.pass;
+  $('btnQuick').hidden = !FEATURES.quick; $('btnCup').hidden = !FEATURES.cup;
+  document.querySelector('.hubgrid').classList.toggle('solo', !FEATURES.quick && !FEATURES.cup);   // (the Super League alone: one big tile)
   if (FEATURES.war) { warWatch(); warBanner(); }
   const { lv, progress } = level(profile.xp);
   $('lvl').textContent = `Lv ${lv}`;
@@ -291,13 +293,10 @@ function renderHome() {
       : c.phase === 'auction' ? lines(`Season ${c.season} · ${club}`, 'Auction', `${money(c.money)} to spend`)
         : c.phase === 'done' ? lines(`Season ${c.season} over · ${club}`, `${money(c.money)} in the bank`)
           : lines(`Season ${c.season} · ${club}`, (f => f && `${f.label} v ${teamById(f.opp).name}`)(nextFixture(c.league)), `${money(c.money)} in the bank`);
-  $('cupSub').textContent = status('cup')?.replace(' · ', '\n') || 'Quarter, semi, final:\n3 wins for the cup';
-  const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key;
-  $('dailySub').textContent = done ? `Done today ${profile.dailyChallenge.won ? '✅' : '❌'}\n${profile.dailyChallenge.line}` : `#${sc.no}\n${sc.title}`;
-  $('btnDaily').classList.toggle('done', done);
+  if ($('cupSub')) $('cupSub').textContent = status('cup')?.replace(' · ', '\n') || 'Quarter, semi, final:\n3 wins for the cup';
   $('trophyCount').textContent = `${Object.keys(profile.achievements || {}).length}/${ACHIEVEMENTS.length}`;
   const card = $('challengeCard');
-  if (challenge) {
+  if (challenge && FEATURES.challenge) {
     card.hidden = false;
     card.innerHTML = '';
     const h = document.createElement('h3'); h.textContent = `${challenge.name} challenged you!`;
@@ -424,7 +423,6 @@ $('btnQuick').addEventListener('click', () => {
 });
 $('btnChallengeMode').addEventListener('click', () => { unlockAudio(); pending = { mode: 'challenge', challenge }; squadOpen = false; renderSquad(); });
 $('btnCup').addEventListener('click', () => { unlockAudio(); openTournament('cup'); });
-$('btnDaily').addEventListener('click', () => { unlockAudio(); renderDaily(); });
 $('btnTeam').addEventListener('click', () => { unlockAudio(); pending = null; squadOpen = false; renderSquad(); });
 $('teamBadge').addEventListener('click', () => { unlockAudio(); pending = null; squadOpen = false; renderSquad(); });
 $('btnTrophies').addEventListener('click', () => { unlockAudio(); renderTrophies(); });
@@ -1225,6 +1223,7 @@ function renderClubMap(test = false) {
   careerView = 'hub'; fromMap = false;
   ui.show('clubmap');
   $('mapSheet').hidden = true; mapPick = null;
+  $('mapDailyDot').hidden = test || dailyDone(); $('mapDaily').hidden = test;
   $('mapClub').textContent = club.name;
   $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
   const info = () => {
@@ -1238,6 +1237,7 @@ function renderClubMap(test = false) {
 }
 $('mapBack').addEventListener('click', () => { sfx.click(); clubMap.close(); if (mapTest) renderSettings(); else renderHome(); });
 $('mapCoach').addEventListener('click', () => coachSay(DEV.clubMap));
+$('mapDaily').addEventListener('click', () => { unlockAudio(); sfx.click(); clubMap.close(); dailyFrom = 'map'; renderDaily(); });
 $('mapOpen').addEventListener('click', () => { const b = BUILDINGS[mapPick]; if (!b || b.soon) return; if (mapTest) return ui.toast(`${b.name}: test view only`); sfx.click(); clubMap.close(); fromMap = true; b.open(); });
 
 // ---------- the merchandise factory (js/merch.js): a real business, on the server's time, also while you are away ----------
@@ -1872,6 +1872,16 @@ function careerAuction(c, body) {
 }
 
 // the season: the next fixture, the table and the bracket
+// the daily challenge, inside the career: the same scenario for everyone today, one attempt
+function dailyPanel() {
+  const sc = dailyScenario(), done = dailyDone(), box = el('div', 'panel paper statcard dailypanel');
+  const row = el('div', 'scoutrow'), tx = el('div');
+  tx.append(el('b', '', `🎯 Daily challenge #${sc.no}`), el('small', '', done ? `Done today ${profile.dailyChallenge.won ? '✅' : '❌'} ${profile.dailyChallenge.line}` : sc.title));
+  const go = el('button', 'chipbtn', done ? 'Result' : 'Play');
+  go.addEventListener('click', () => { unlockAudio(); sfx.click(); dailyFrom = 'career'; renderDaily(); });
+  row.append(tx, go); box.append(row);
+  return box;
+}
 function careerSeason(c, body) {
   const f = nextFixture(c.league);
   const me = teamById(c.club);
@@ -1891,6 +1901,7 @@ function careerSeason(c, body) {
     body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
       () => startMatch({ mode: 'career' }), preMatch(c, o.id)));
   }
+  body.append(dailyPanel());
   body.append(chirpPanel(c));
   if (c.custom) body.append(stadiumPanel(c), groundPanel(c));
   body.append(scoutsPanel(c));
@@ -2259,7 +2270,9 @@ function renderDaily() {
   $('dailyGo').hidden = !!done;
 }
 const dailyShareText = (sc, d) => `Sixcharge Daily #${sc.no}: ${sc.title} ${d.won ? '✅' : '❌'}\n${d.line}\n${d.balls}\n${shareBase()}`;
-$('dailyBack').addEventListener('click', renderHome);
+let dailyFrom = 'career';   // where the daily challenge was opened from: 'map' or 'career' (the career's pages)
+const dailyDone = () => profile.dailyChallenge?.key === dailyScenario().key;
+$('dailyBack').addEventListener('click', () => { const c = career(); if (c.club && dailyFrom === 'map' && mapReady(c)) renderClubMap(); else if (c.club) renderCareer(); else renderHome(); });
 $('dailyGo').addEventListener('click', () => {
   const sc = dailyScenario();
   if (profile.dailyChallenge?.key === sc.key) return renderDaily();
@@ -2497,7 +2510,7 @@ function showResult(summary) {
   if (sc.children.length) pages.push(['Scorecard', sc]);
   pages.push(['Share', [$('shareFig'), $('shareBox')]]);
   pager($('resPages'), pages);
-  $('resAgain').textContent = { tutorial: 'Play Quick Match', league: 'Back to the league', cup: 'Back to the cup', daily: 'Daily results', career: 'Back to the season', war: 'Back to the war', warmup: 'Back to the war' }[mode] || 'Play again';
+  $('resAgain').textContent = { tutorial: 'To the Super League', league: 'Back to the league', cup: 'Back to the cup', daily: 'Daily results', career: 'Back to the season', war: 'Back to the war', warmup: 'Back to the war' }[mode] || 'Play again';
 }
 
 $('copyLink').addEventListener('click', async () => {
@@ -2513,6 +2526,7 @@ $('resAgain').addEventListener('click', () => {
   else if (m === 'war' || m === 'warmup') renderWar();
   else if (m === 'daily') renderDaily();
   else if (m === 'career') { careerView = 'hub'; renderCareer(); }
+  else if (m === 'tutorial' && !FEATURES.quick) $('btnLeague').click();   // (the tutorial leads to the Super League)
   else { pending = { mode: 'quick' }; squadOpen = false; renderSquad(); }
 });
 

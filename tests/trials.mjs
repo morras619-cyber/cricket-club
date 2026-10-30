@@ -96,6 +96,14 @@ await page.waitForTimeout(1500);
 check(await page.evaluate(() => window.__sixcharge.profile.career.merch.till < 1000 && /did not add up/.test(document.getElementById('merchNote').textContent)), 'a number changed in the till is noticed');
 await page.evaluate(() => document.getElementById('merchBack').click()); await page.waitForTimeout(1200);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'back from the factory is the map');
+// the daily challenge lives in the career: a button on the map, a card on the season page, and not on the hub
+await page.evaluate(() => document.getElementById('mapDaily').click()); await page.waitForTimeout(600);
+check(await page.evaluate(() => !document.getElementById('daily').hidden), 'the daily challenge opens from the club map');
+await page.evaluate(() => document.getElementById('dailyBack').click()); await page.waitForTimeout(1200);
+check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'back from the daily challenge is the map');
+await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(700);
+check(await page.evaluate(() => ['btnQuick', 'btnCup'].every(id => document.getElementById(id).offsetParent === null) && !document.getElementById('btnDaily') && document.getElementById('btnLeague').offsetParent !== null), 'the hub has only the Super League: no quick match, no cup, no daily tile');
+await page.evaluate(() => document.getElementById('btnLeague').click()); await page.waitForTimeout(1500);
 await tapAt(0.504, 0.446);
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'club-map-stadium.png') });
 await page.mouse.move(195, 420); for (let i = 0; i < 8; i++) await page.mouse.wheel(0, -200); await page.waitForTimeout(400);

@@ -1578,3 +1578,10 @@ button.mf-card:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 va
 .mf-test[hidden] { display: none; }
 .mf-test b { color: #ff9aa4; font-size: 12px; letter-spacing: 1px; }
 .mf-test .chipbtn { font-size: 12px; padding: 4px 9px; }
+
+/* the Super League alone on the hub, and the daily challenge inside the career */
+.tile[hidden] { display: none; }
+.hubgrid.solo { grid-template-columns: 1fr; }
+.map-daily { position: relative; display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border-radius: 19px; border: 2.5px solid var(--ink); background: linear-gradient(#ffe45c, #ffb800); color: #14102a; font-weight: 900; font-size: 14px; box-shadow: 2px 2px 0 var(--ink); }
+.map-daily i { position: absolute; top: -5px; right: -3px; width: 14px; height: 14px; border-radius: 50%; background: #ff4d5e; border: 2px solid #fff; }
+.map-daily i[hidden] { display: none; }

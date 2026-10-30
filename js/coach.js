@@ -112,7 +112,7 @@ export const DEV = {
   ],
   tutDone: [
     "What did I tell you? A natural!",
-    "Quick Game is for a single match. When you're ready for a whole career, come and find me in the Super League.",
+    "Now the real thing, beta: build your own club in the Super League. Tap the button below.",
   ],
   quickTeam: [
     "Pick your side, beta. Swipe through the clubs and check their ratings underneath.",
