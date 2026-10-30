@@ -834,7 +834,7 @@ async function startMatch(opts) {
   setStartEnergy(mode === 'career' && profile.career.medical ? startEnergies(profile.career) : {});   // (the medical centre: your players start the match on their fitness)
   try {
     summary = await game.runMatch({
-      mode, story: !!opts.story, opening: !!opts.opening, trial: opts.trial ? { bats: opts.trial.bats.map(id => profile.career.players[id]).map(enginePlayer), bowls: opts.trial.bowls.map(id => profile.career.players[id]).map(enginePlayer) } : null, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+      mode, story: !!opts.story, opening: !!opts.opening, trial: opts.trial ? { balls: opts.trial.balls, bats: opts.trial.bats.map(id => profile.career.players[id]).map(enginePlayer), bowls: opts.trial.bowls.map(id => profile.career.players[id]).map(enginePlayer) } : null, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
       records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill), crowd: mode === 'career' && profile.career?.chirp ? crowdOf(profile.career) : 0,
     });
   } catch (e) {
@@ -1279,7 +1279,7 @@ function renderClubMap(test = false) {
   clearInterval(mapPaceTimer); mapPaceTimer = setInterval(() => { if ($('clubmap').hidden) { clearInterval(mapPaceTimer); return; } fillPace($('mapPace'), c); }, 30000);
   $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
   const info = () => {
-    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE), medical: !!c.medical && (Object.keys(c.medical.knocked).length > 0 || Object.values(c.medical.fit).some(f => f < 50)), merch: (c.merch?.till || 0) >= 100 };   // (a red dot: something to do there)
+    const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE), medical: !!c.medical && (Object.keys(c.medical.knocked).length > 0 || Object.values(c.medical.fit).some(f => f < 50)), merch: (c.merch?.till || 0) >= 100, training: clock.state === 'ok' && TG.drillsLeft(c.training || {}, serverNow()) > 0 };   // (a red dot: something to do there)
     clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
   };
   info();
@@ -1551,6 +1551,20 @@ async function renderTraining(test = false) {
   clearInterval(trainTimer);
   trainTimer = setInterval(() => { if ($('training').hidden) { clearInterval(trainTimer); trainTimer = 0; return; } trainReport = trainTick(c) || trainReport; paintTraining(c); }, 15000);
 }
+// a net drill: the player faces the balls himself (the net trial code in game.js); only a finished drill earns the points
+async function runDrill(c, pid) {
+  const t = c.training;
+  if (trainTick(c) === null || TG.drillsLeft(t, serverNow()) < 1) return;
+  trainSheet = null; clearInterval(trainTimer); trainTimer = 0;
+  const sum = await startMatch({ mode: 'tutorial', trial: { bats: [pid], bowls: [], balls: TG.TRAIN.DRILL_BALLS } });
+  const r = sum?.trial?.bats?.[pid];
+  await syncClock();
+  const res = r ? TG.finishDrill(t, pid, r, serverNow(), trainCtx(c)) : null;
+  saveProfile(profile);
+  await renderTraining();
+  if (res?.ok) { trainSheet = { type: 'drilled', pid, runs: r.runs, pts: res.pts }; paintTraining(c); }
+  else if (res) ui.toast(res.why);
+}
 const KIND_ICON = { bat: 'star', pace: 'ball', spin: 'gear' };
 function paintTraining(c) {
   const t = c.training, club = teamById(c.club), roster = trainingRoster(c), L = TG.TRAIN.LEVELS[t.level];
@@ -1572,7 +1586,8 @@ function paintTraining(c) {
     : trainReport?.tampered ? 'The books did not add up, so the fund was emptied.' : gainedTxt;
   note.hidden = !msg; note.className = `mf-note${bad ? ' bad' : ''}`; note.replaceChildren(...(msg ? [ico(bad ? 'warn' : 'up'), el('span', '', msg)] : []));
   const canUp = TG.nextUpgrade(t) && c.money >= TG.nextUpgrade(t).up;
-  const tabs = [['players', 'users', 'Players', 0], ['coaches', 'star', 'Coaches', 0], ['ground', 'factory', 'Ground', canUp ? '!' : 0]];
+  const left = TG.drillsLeft(t, serverNow());
+  const tabs = [['players', 'users', 'Players', 0], ['nets', 'ball', 'Nets', left], ['coaches', 'star', 'Coaches', 0], ['ground', 'factory', 'Ground', canUp ? '!' : 0]];
   $('trainTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${trainTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { trainTab = id; trainSheet = null; sfx.click(); paintTraining(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
   const body = $('trainBody');
   body.replaceChildren();
@@ -1597,6 +1612,23 @@ function paintTraining(c) {
     body.append(grid);
     body.append(Object.assign(el('div', 'mf-card'), {}));
     body.lastChild.append(ico('clock'), el('span', 'mf-row', `Each point of rating takes about ${durfmt(TG.tpCost(60, 20) / TG.TRAIN.TP_HOUR * 3600000)} of coaching for a young player, more for a better or older one. At most ${L.cap} a season.`));
+  } else if (trainTab === 'nets') {
+    const pips = el('div', 'mf-pips');
+    for (let i = 0; i < TG.TRAIN.DRILLS_DAY; i++) pips.append(ico('ball', i < left ? 'on' : ''));
+    const hd = el('div', 'mf-card'); hd.append(ico('ball'), el('span', 'mf-row', `Face ${TG.TRAIN.DRILL_BALLS} balls in the nets yourself: a good drill earns the player up to ${TG.TRAIN.DRILL_MAX} training points.`), pips);
+    body.append(hd);
+    const grid = el('div', 'mf-grid');
+    grid.style.cssText = 'grid-auto-rows: auto';
+    const list = [...roster].filter(([, p]) => TG.canLearn(p)).sort((a, b) => (b[1].pot - b[1].ovr) - (a[1].pot - a[1].ovr)).slice(0, 6);
+    for (const [pid, p] of list) {
+      const b = el('button', 'mf-card'), info = el('div', 'mf-info'), r = el('div', 'mf-row'); r.append(el('span', '', `${p.ovr}`), ico('up'), el('span', '', `${p.pot}`));
+      info.append(el('b', '', lastName(p.name)), r);
+      b.append(frameOf(playerFace(c.players[pid], 64)), info);
+      b.addEventListener('click', () => { trainSheet = { type: 'drill', pid }; sfx.click(); paintTraining(c); });
+      grid.append(b);
+    }
+    body.append(grid);
+    if (!list.length) body.append(el('p', 'sheetnote', 'Nobody in your squad can learn more right now.'));
   } else if (trainTab === 'coaches') {
     const grid = el('div', 'mf-grid three');
     for (const k of t.coaches) {
@@ -1648,6 +1680,21 @@ function paintTraining(c) {
     }
     card.append(hd, grid);
     if (!list.length) card.append(el('p', 'sheetnote', 'Nobody in your squad can learn more right now.'));
+  } else if (trainSheet.type === 'drill') {
+    const pid = trainSheet.pid, info = roster.get(pid), p = c.players[pid], left = TG.drillsLeft(t, serverNow());
+    if (!info) { trainSheet = null; sh.hidden = true; return; }
+    const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(p, 96), true), el('b', '', info.name), close);
+    const r = el('div', 'mf-row'); r.append(ico('ball'), el('span', '', `${TG.TRAIN.DRILL_BALLS} balls · about a minute · ${left} drill${left === 1 ? '' : 's'} left today`));
+    const go = mfBtn('mf-big', [ico('ball'), el('span', '', 'Pad up')], () => runDrill(c, pid));
+    go.disabled = trainTest || left < 1 || clock.state !== 'ok';
+    card.append(hd, r, go);
+    if (trainTest) card.append(el('p', 'sheetnote', 'The nets are for your real club, not the practice one.'));
+    else if (clock.state !== 'ok') card.append(el('p', 'sheetnote', 'The nets need the server clock: try again when you are online.'));
+    else if (left < 1) card.append(el('p', 'sheetnote', 'The nets are closed for today. They open again at midnight (UTC).'));
+  } else if (trainSheet.type === 'drilled') {
+    const d = trainSheet, hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(c.players[d.pid], 96), true), el('b', '', `${d.runs} off ${TG.TRAIN.DRILL_BALLS}`), close);
+    const r = el('div', 'mf-row'); r.append(ico('up'), el('span', '', `+${d.pts} training points for ${lastName(c.players[d.pid].name)}`));
+    card.append(hd, r);
   } else if (trainSheet.type === 'slot') {
     const pid = t.slots[trainSheet.index], info = roster.get(pid), p = c.players[pid];
     if (!info) { trainSheet = null; sh.hidden = true; return; }

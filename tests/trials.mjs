@@ -92,14 +92,32 @@ if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_
 await tab('Factory');
 check(await noScroll(), 'the factory tab fits the screen');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'merch-factory.png') });
-await page.evaluate(async () => { const M = await import('/js/merch.js'); const m = window.__sixcharge.profile.career.merch; m.last -= 3 * 3600e3; M.seal(m); window.dispatchEvent(new Event('visibilitychange')); });
+await page.evaluate(async () => { const M = await import('/js/merch.js'); const m = window.__sixcharge.profile.career.merch; m.last -= 10 * 3600e3; M.seal(m); window.dispatchEvent(new Event('visibilitychange')); });
 await page.waitForTimeout(1500);
-check(await page.evaluate(() => window.__sixcharge.profile.career.merch.sold > 0 && /Away/.test(document.getElementById('merchNote').textContent)), 'three hours away: jerseys were made and sold, and the note says so');
+check(await page.evaluate(() => window.__sixcharge.profile.career.merch.sold > 0 && /Away/.test(document.getElementById('merchNote').textContent)), 'ten hours away: jerseys were made and sold (a trickle at level 1), and the note says so');
 await page.evaluate(() => { window.__sixcharge.profile.career.merch.till = 99999999; window.dispatchEvent(new Event('visibilitychange')); });
 await page.waitForTimeout(1500);
 check(await page.evaluate(() => window.__sixcharge.profile.career.merch.till < 1000 && /did not add up/.test(document.getElementById('merchNote').textContent)), 'a number changed in the till is noticed');
 await page.evaluate(() => document.getElementById('merchBack').click()); await page.waitForTimeout(1200);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'back from the factory is the map');
+// the training ground's nets: from the map, a drill with the real batting (played by the bot), points for the player, three a day, and the red dot
+await tapAt(0.344, 0.165); await page.waitForTimeout(300);
+check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Training ground'), 'the training ground is tapped on the map');
+await page.evaluate(() => document.getElementById('mapOpen').click()); await page.waitForTimeout(1200);
+await page.evaluate(() => [...document.querySelectorAll('#trainTabs .mf-tab')].find(t => t.textContent.includes('Nets')).click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => /3/.test(document.querySelector('#trainTabs .mf-tab .mf-badge')?.textContent || '') && document.querySelectorAll('#trainBody .mf-card .mf-frame canvas').length >= 1), 'the Nets tab shows three drills left and the players who can learn');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'training-nets.png') });
+await page.evaluate(() => document.querySelector('#trainBody .mf-grid .mf-card').click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => { const b = [...document.querySelectorAll('#trainSheet button')].find(x => /Pad up/.test(x.textContent)); return !!b && !b.disabled; }), 'a player opens a sheet with the Pad up button');
+await page.evaluate(() => [...document.querySelectorAll('#trainSheet button')].find(x => /Pad up/.test(x.textContent)).click());
+await page.waitForFunction(() => !document.getElementById('training').hidden, null, { timeout: 90000 }).catch(() => {}); await page.waitForTimeout(1500);
+check(await page.evaluate(() => { const t = window.__sixcharge.profile.career.training; return Object.values(t.tp).some(v => v >= 10) && t.drills.n === 1; }), 'the drill gave the player training points and used one of the three');
+check(await page.evaluate(() => /training points for/.test(document.getElementById('trainSheet').textContent)), 'the result sheet says what the player earned');
+await page.evaluate(() => document.querySelector('#trainSheet .mf-x').click()); await page.waitForTimeout(300);
+await page.evaluate(async () => { const T = await import('/js/training.js'); const t = window.__sixcharge.profile.career.training; t.drills = { day: T.drillDay(Date.now()), n: 3 }; t.drills.seal = undefined; });
+check(await page.evaluate(async () => { const T = await import('/js/training.js'); return T.drillsLeft(window.__sixcharge.profile.career.training, Date.now()) === 0; }), 'a count edited by hand closes the nets');
+await page.evaluate(() => document.getElementById('trainBack').click()); await page.waitForTimeout(1000);
+check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'back from the training ground is the map');
 // the daily challenge is a tab of the career (on the map and on the season page), and Play from the title goes straight to the map
 const mapTab = async name => page.evaluate(n => [...document.querySelectorAll('#mapTabs .map-tab')].find(b => b.textContent.includes(n)).click(), name);
 check(await page.evaluate(() => [...document.querySelectorAll('#mapTabs .map-tab')].map(b => b.textContent.replace('!', '')).join() === 'Season,Squad,Records,Daily'), 'the map has the tabs Season, Squad, Records and Daily');
@@ -133,7 +151,7 @@ check(await page.evaluate(() => /on the job/.test(document.querySelector('.groun
 // the match meter: four matches banked at the start; with none left, Play does not start a match and the wait is shown
 await page.waitForTimeout(800);
 check(await page.evaluate(() => /ready/i.test(document.querySelector('.pacepanel')?.textContent || '') && !!window.__sixcharge.profile.career.pace), 'the season page shows the match meter, full at the start');
-await page.evaluate(async () => { const P = await import('/js/pacing.js'); const c = window.__sixcharge.profile.career; for (let i = 0; i < 3; i++) P.spend(c.pace, Date.now()); });
+await page.evaluate(async () => { const P = await import('/js/pacing.js'); const c = window.__sixcharge.profile.career; for (let i = 0; i < P.PACE.BANK; i++) P.spend(c.pace, Date.now()); });
 await page.evaluate(() => document.querySelector('.playbtn').click()); await page.waitForTimeout(1500);
 check(await page.evaluate(() => document.getElementById('hud').hidden && /No match yet/.test(document.querySelector('.pacepanel')?.textContent || '')), 'with no match banked, Play does not start one and the meter shows the wait');
 // the testing switch: in the settings it turns the match limit off, and the same Play then starts a match

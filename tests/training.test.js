@@ -91,3 +91,33 @@ test('upgrading costs money and opens places; a player who leaves loses his plac
   assert.equal(t.slots[0], null, 'a went');
   assert.equal(t.tp.a, undefined);
 });
+
+test('net drills: a few a day, points by the runs, a new day opens the nets again', () => {
+  const t = T.freshTraining(0), ctx = n => mkCtx(n * HOUR);
+  const good = { balls: TRAIN.DRILL_BALLS, runs: 30, outs: 0 }, poor = { balls: TRAIN.DRILL_BALLS, runs: 2, outs: 3 };
+  assert.equal(T.drillsLeft(t, 0), TRAIN.DRILLS_DAY);
+  assert.equal(T.drillPoints(good), TRAIN.DRILL_MAX, 'a big drill is capped');
+  assert.equal(T.drillPoints(poor), TRAIN.DRILL_MIN, 'a poor one still earns a little');
+  for (let i = 0; i < TRAIN.DRILLS_DAY; i++) assert.ok(T.finishDrill(t, 'a', good, i * HOUR, ctx(i)).ok);
+  assert.equal(t.tp.a, TRAIN.DRILLS_DAY * TRAIN.DRILL_MAX);
+  assert.equal(T.finishDrill(t, 'a', good, 5 * HOUR, ctx(5)).ok, false, 'the nets close for the day');
+  assert.equal(T.drillsLeft(t, 5 * HOUR), 0);
+  assert.equal(T.drillsLeft(t, DAY + HOUR), TRAIN.DRILLS_DAY, 'the next day they open again');
+  assert.ok(T.sealed(t), 'the books still add up');
+});
+test('net drills: unfinished, a player who cannot learn, and edited numbers earn nothing', () => {
+  const t = T.freshTraining(0), ctx = mkCtx(0, { squad: squadOf({ a: {}, old: { age: 36 } }) });
+  assert.equal(T.finishDrill(t, 'a', { balls: 4, runs: 20, outs: 0 }, 0, ctx).ok, false, 'quit half way');
+  assert.equal(T.finishDrill(t, 'old', { balls: TRAIN.DRILL_BALLS, runs: 20, outs: 0 }, 0, ctx).ok, false);
+  assert.equal(T.finishDrill(t, 'nobody', { balls: TRAIN.DRILL_BALLS, runs: 20, outs: 0 }, 0, ctx).ok, false);
+  assert.ok(T.finishDrill(t, 'a', { balls: TRAIN.DRILL_BALLS, runs: 20, outs: 0 }, 0, ctx).ok);
+  t.drills.n = 0;   // somebody rewinds the count
+  assert.equal(T.drillsLeft(t, 0), 0, 'edited: closed for today');
+  const u = T.freshTraining(0); u.tp.a = 99999;
+  assert.equal(T.finishDrill(u, 'a', { balls: TRAIN.DRILL_BALLS, runs: 20, outs: 0 }, 0, ctx).ok, false, 'edited points: refused');
+});
+test('net drills: a save from before the drills still works', () => {
+  const t = T.freshTraining(0); delete t.drills;
+  assert.ok(T.finishDrill(t, 'a', { balls: TRAIN.DRILL_BALLS, runs: 10, outs: 0 }, 0, mkCtx(0)).ok);
+  assert.ok(T.sealed(t));
+});

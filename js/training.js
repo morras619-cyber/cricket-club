@@ -14,6 +14,7 @@ export const TRAIN = {
   CAP: 10 * HOUR, CAP_UNVERIFIED: HOUR, QUIT: 72 * HOUR,
   START_FUND: 15,                    // $k the club puts in
   PEAK_AGE: 33,
+  DRILL_BALLS: 10, DRILLS_DAY: 3, DRILL_MIN: 10, DRILL_MAX: 45,   // net drills: balls faced, a day, and the training points a drill earns (a few hours of coaching at most)
 };
 export const KINDS = {
   bat: { name: 'Batting coach', about: 'Trains batters, wicketkeepers and all-rounders\' batting.' },
@@ -108,6 +109,32 @@ export function seasonGain(t, pid, p) {
   t.tp[pid] = tp;
   seal(t);
   return n;
+}
+
+// ---------- net drills ----------
+// You pad up in the nets and face DRILL_BALLS balls yourself; the runs earn the player training points, a few times a day. The day is the server's
+// (UTC), kept with its own small seal so that the main books (mark above) stay as they are. Points go in t.tp like any coach's.
+const dmark = d => { let h = 2166136261; const s = `${d.day}|${d.n}|dr2`; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+export const drillDay = now => Math.floor(now / DAY);
+export function drillsLeft(t, now) {
+  const d = t.drills;
+  if (!d) return TRAIN.DRILLS_DAY;                        // (a save from before the drills)
+  if (d.seal !== dmark(d)) return 0;                      // edited: no more drills today
+  return d.day === drillDay(now) ? Math.max(0, TRAIN.DRILLS_DAY - d.n) : TRAIN.DRILLS_DAY;
+}
+export const drillPoints = r => Math.max(TRAIN.DRILL_MIN, Math.min(TRAIN.DRILL_MAX, Math.round(15 + 3 * r.runs - 5 * r.outs)));
+// a played drill: r is what the player did ({ balls, runs, outs }); returns the points given
+export function finishDrill(t, pid, r, now, ctx) {
+  const p = ctx.squad.get(pid);
+  if (!sealed(t)) return no('The books do not add up');
+  if (!p || !canLearn(p)) return no('He cannot learn more right now');
+  if (!r || r.balls < TRAIN.DRILL_BALLS) return no('The drill was not finished');
+  if (drillsLeft(t, now) < 1) return no('The nets are closed for today');
+  const day = drillDay(now), used = t.drills && t.drills.day === day ? t.drills.n : 0;
+  t.drills = { day, n: used + 1 }; t.drills.seal = dmark(t.drills);
+  const pts = drillPoints(r);
+  t.tp[pid] = (t.tp[pid] || 0) + pts;
+  seal(t); return { ok: true, pts };
 }
 
 // ---------- what you do ----------

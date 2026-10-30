@@ -2990,8 +2990,8 @@ export class Game {
   // ---------- Issue #1: the tutorial over ----------
   // the net trials (career.js TRIAL_*): every candidate faces CFG.trialBalls balls (a batter, with a net bowler) or bowls as many (a bowler, at a net batter), played for
   // real as him: his rating and type decide the timing windows and how the ball does. A wicket costs nothing (it is only the nets). Returns what each did.
-  async runTrial({ bats = [], bowls = [] }) {
-    const out = { bats: {}, bowls: {} }, N = CFG.trialBalls;
+  async runTrial({ bats = [], bowls = [], balls }) {
+    const out = { bats: {}, bowls: {} }, N = balls || CFG.trialBalls;   // (balls: a net drill from the training ground faces more)
     const net = this.oppSide.attack[0], netBat = this.oppSide.order[0], netMate = this.oppSide.order[1] || netBat;
     this.fieldState.setting = 'off';   // (the nets: no fielding mini-games)
     this.charge.value = 40; this.ui.charge(40);
