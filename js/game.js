@@ -1136,9 +1136,10 @@ export class Game {
       if (pick) this.charge.spend(COUNTERS[pick].cost, 0, COUNTERS[pick].name);
       return pick;
     }
-    const batting = this.phase === 'bat', hero = this.heroFor(batting ? 'bat' : 'bowl'), pose = batting ? 'bat' : 'bowl';
+    const batting = this.phase === 'bat', pose = batting ? 'bat' : 'bowl', inn = this.innings[this.innings.length - 1];
+    const me = inn && (batting ? this.batterOf(inn) : this.bowlerOf(inn)), hero = this.asHero(me, this.myTeam, pose);   // (the man at the crease or the bowler: his face, as on the power cards)
     let pick = null;
-    const card = (id, name, cost) => ({ key: `cnt-${id}`, name, cost, hero, pose, team: this.myTeam, state: !cost || this.charge.value >= cost ? 'ready' : 'off', sub: cost ? null : '', onTap: () => { pick = id; sfx.click(); } });
+    const card = (id, name, cost) => ({ key: `cnt-${id}`, name, cost, player: me, hero, pose, team: this.myTeam, state: !cost || this.charge.value >= cost ? 'ready' : 'off', sub: cost ? null : '', onTap: () => { pick = id; sfx.click(); } });
     this.ui.powers([card('brace', COUNTERS.brace.name, COUNTERS.brace.cost), card('steady', COUNTERS.steady.name, COUNTERS.steady.cost), card('none', 'Take it', null)]);
     this.ui.hint(ids.length ? 'ANSWER THE POWER?' : 'NOT ENOUGH CHARGE TO ANSWER');
     this.ui.counterBar(true);

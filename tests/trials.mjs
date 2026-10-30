@@ -206,6 +206,19 @@ check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card.
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-contracts.png') });
 await page.evaluate(() => document.getElementById('officeBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the club office is the settings');
+// an AI power answered by a club with no hero of its own (a stand-in captain): the answer cards must draw, not throw (this froze matches)
+await page.evaluate(() => document.getElementById('mapBack')?.click?.());
+const cardOk = await page.evaluate(() => {
+  const { ui } = window.__sixcharge;
+  const look = { skin: '#9c6546', hair: '#222', suit: '#c0262c', trim: '#ffffff', emblem: null };
+  const captain = { id: 'captain-harbour-kings', name: 'Harbour Kings captain', quote: 'Come on, lads!', look, emblem: null };
+  try {
+    ui.powers([{ key: 'cnt-brace', name: 'Brace', cost: 20, hero: captain, pose: 'bat', team: { id: 'harbour-kings', suit: '#c0262c', trim: '#ffffff' }, state: 'ready', sub: null, onTap() {} },
+               { key: 'cnt-none', name: 'Take it', cost: null, hero: captain, pose: 'bat', team: { id: 'harbour-kings', suit: '#c0262c', trim: '#ffffff' }, state: 'ready', sub: '', onTap() {} }]);
+    return document.querySelectorAll('#powers .power').length === 2;
+  } catch (e) { return String(e); }
+});
+check(cardOk === true, `the answer cards for a stand-in captain draw without an error (${cardOk})`);
 // the settings' Club map level: cycle to level 3 and the map shows it (and level 2, to draw both)
 await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(500);
 for (const want of [2, 3]) {

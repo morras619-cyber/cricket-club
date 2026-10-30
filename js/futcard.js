@@ -15,7 +15,8 @@ import { PORTRAIT_FACES } from './portrait-faces.js';
 // Painted in Thunder's blue and yellow; on a player at another club the shirt is recoloured to that
 // club's kit (blue to its main colour, yellow to its trim), skin, hair and face untouched.
 const HAS_PORTRAIT = new Set(PORTRAIT_KEYS);
-const keyOf = p => (p.heroId ? heroById(p.heroId).name : p.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// (a stand-in club captain, or a hero not in the list, has no name here: so no painted portrait, and the drawn figure is used)
+const keyOf = p => ((p.heroId && heroById(p.heroId)?.name) || p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const srcs = new Map(), kits = new Map();
 // the last batches of portraits are a few pictures (PORTRAIT_FILES); each is cut out of its picture onto a canvas that stands in
 // for its own image (the same size and 'load' as an image has)
