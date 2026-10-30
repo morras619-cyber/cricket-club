@@ -1485,7 +1485,7 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .map-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.1; }
 .map-title b { font-family: Bangers, Impact, sans-serif; font-size: 24px; letter-spacing: 1px; color: #ffe94d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 rgba(0, 0, 0, .6); }
 .map-title small { color: #cfd6ff; font-size: 12px; }
-.map-sheet { position: absolute; left: 12px; right: 12px; bottom: calc(14px + var(--safe-b)); display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: rgba(10, 14, 44, .94); border: 2.5px solid #ffd23f; box-shadow: 0 0 0 2.5px #070b24, 0 6px 0 rgba(0, 0, 0, .45); max-width: 440px; margin: 0 auto; }
+.map-sheet { position: absolute; left: 12px; right: 12px; bottom: calc(78px + var(--safe-b)); display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: rgba(10, 14, 44, .94); border: 2.5px solid #ffd23f; box-shadow: 0 0 0 2.5px #070b24, 0 6px 0 rgba(0, 0, 0, .45); max-width: 440px; margin: 0 auto; }
 .map-sheet-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .map-sheet-txt b { font-family: Bangers, Impact, sans-serif; font-size: 22px; letter-spacing: 1px; color: #fff; }
 .map-sheet-txt small { color: #cfd6ff; font-size: 13px; }
@@ -1495,8 +1495,8 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 #merch { overflow: hidden; touch-action: manipulation; }
 .mf { --fs: 54px; height: 100%; max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; padding: calc(10px + var(--safe-t)) 12px calc(10px + var(--safe-b)); position: relative; }
 @media (max-height: 720px) { .mf { --fs: 42px; gap: 6px; } }
-.mf .ico { display: inline-flex; flex: none; width: 22px; height: 22px; }
-.mf .ico svg { width: 100%; height: 100%; fill: var(--ic, currentColor); stroke: #14102a; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; overflow: visible; }
+.mf .ico, .map-tabs .ico { display: inline-flex; flex: none; width: 22px; height: 22px; }
+.mf .ico svg, .map-tabs .ico svg { width: 100%; height: 100%; fill: var(--ic, currentColor); stroke: #14102a; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; overflow: visible; }
 .mf-head { display: flex; align-items: center; gap: 10px; }
 .mf-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.05; }
 .mf-title b { font-family: Bangers, Impact, sans-serif; font-size: 28px; letter-spacing: 1px; color: #ffe94d; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); }
@@ -1582,6 +1582,13 @@ button.mf-card:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 va
 /* the Super League alone on the hub, and the daily challenge inside the career */
 .tile[hidden] { display: none; }
 .hubgrid.solo { grid-template-columns: 1fr; }
-.map-daily { position: relative; display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border-radius: 19px; border: 2.5px solid var(--ink); background: linear-gradient(#ffe45c, #ffb800); color: #14102a; font-weight: 900; font-size: 14px; box-shadow: 2px 2px 0 var(--ink); }
-.map-daily i { position: absolute; top: -5px; right: -3px; width: 14px; height: 14px; border-radius: 50%; background: #ff4d5e; border: 2px solid #fff; }
-.map-daily i[hidden] { display: none; }
+
+/* the map's bottom tabs and settings button */
+.map-gear { flex: none; width: 38px; height: 38px; padding: 6px; border-radius: 12px; border: 2.5px solid var(--ink); background: var(--paper); box-shadow: 2px 2px 0 var(--ink); }
+.map-gear img { width: 100%; height: 100%; display: block; }
+.map-tabs { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 6px; padding: 18px max(12px, env(safe-area-inset-right, 0px)) calc(10px + var(--safe-b)) max(12px, env(safe-area-inset-left, 0px)); background: linear-gradient(rgba(6, 8, 28, 0), rgba(6, 8, 28, .92) 40%); max-width: 440px; margin: 0 auto; }
+.map-tabs[hidden] { display: none; }
+.map-tab { flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px 3px; border-radius: 14px; border: 2.5px solid var(--ink); background: linear-gradient(#16246e, #0a1240); color: #cfd6ff; font-weight: 800; font-size: 11px; box-shadow: 2px 2px 0 var(--ink); }
+.map-tab .ico { width: 26px; height: 26px; }
+.map-tab .ico svg { fill: var(--ic, currentColor); }
+.map-tab:active { background: linear-gradient(#ffe45c, #ffb800); color: #14102a; }

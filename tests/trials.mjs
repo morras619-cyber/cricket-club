@@ -20,12 +20,12 @@ const page = await browser.newPage({ viewport: { width: vw, height: vh } });
 const errors = [], fails = [];
 page.on('pageerror', e => errors.push(String(e.stack || e)));
 page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
-await page.addInitScript(() => { window.__SIXCHARGE_BOT = true; window.__SIXCHARGE_SPEED = 4; });
+await page.addInitScript(() => { window.__SIXCHARGE_BOT = true; window.__SIXCHARGE_SPEED = 4; try { if (!localStorage.getItem('sixcharge.profile.v1')) localStorage.setItem('sixcharge.profile.v1', JSON.stringify({ tutorialDone: true, coachSeen: { welcome: 1 } })); } catch {} });   // (a player who has done the tutorial: Play goes straight to the career)
 const check = (ok, what) => { console.log(ok ? 'ok  ' : 'FAIL', what); if (!ok) fails.push(what); };
 await page.goto(`http://localhost:${server.address().port}/`); await page.waitForTimeout(900);
-await page.evaluate(() => { document.getElementById('tPlay').click(); });
-await page.waitForTimeout(600);
-await page.evaluate(() => document.getElementById('btnLeague').click()); await page.waitForTimeout(600);
+await page.evaluate(() => { document.getElementById('tPlay').click(); });   // (Play goes straight into the career: a new one starts with its region)
+await page.waitForTimeout(1200);
+check(await page.evaluate(() => !document.getElementById('region').hidden), 'Play goes straight into the career');
 await page.evaluate(() => document.getElementById('rgGo').click()); await page.waitForTimeout(600);
 check(await page.evaluate(() => !document.getElementById('makeclub').hidden), 'a new career goes straight to building your own club: no other club to pick');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'builder-coach.png') });
@@ -96,14 +96,20 @@ await page.waitForTimeout(1500);
 check(await page.evaluate(() => window.__sixcharge.profile.career.merch.till < 1000 && /did not add up/.test(document.getElementById('merchNote').textContent)), 'a number changed in the till is noticed');
 await page.evaluate(() => document.getElementById('merchBack').click()); await page.waitForTimeout(1200);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'back from the factory is the map');
-// the daily challenge lives in the career: a button on the map, a card on the season page, and not on the hub
-await page.evaluate(() => document.getElementById('mapDaily').click()); await page.waitForTimeout(600);
-check(await page.evaluate(() => !document.getElementById('daily').hidden), 'the daily challenge opens from the club map');
+// the daily challenge is a tab of the career (on the map and on the season page), and Play from the title goes straight to the map
+const mapTab = async name => page.evaluate(n => [...document.querySelectorAll('#mapTabs .map-tab')].find(b => b.textContent.includes(n)).click(), name);
+check(await page.evaluate(() => [...document.querySelectorAll('#mapTabs .map-tab')].map(b => b.textContent.replace('!', '')).join() === 'Season,Squad,Records,Daily'), 'the map has the tabs Season, Squad, Records and Daily');
+await mapTab('Daily'); await page.waitForTimeout(600);
+check(await page.evaluate(() => !document.getElementById('daily').hidden), 'the Daily tab opens the daily challenge');
 await page.evaluate(() => document.getElementById('dailyBack').click()); await page.waitForTimeout(1200);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'back from the daily challenge is the map');
+await mapTab('Squad'); await page.waitForTimeout(700);
+await page.evaluate(() => document.getElementById('careerHome').click()); await page.waitForTimeout(1200);
+check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'the career pages lead back to the map');
 await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(700);
-check(await page.evaluate(() => ['btnQuick', 'btnCup'].every(id => document.getElementById(id).offsetParent === null) && !document.getElementById('btnDaily') && document.getElementById('btnLeague').offsetParent !== null), 'the hub has only the Super League: no quick match, no cup, no daily tile');
-await page.evaluate(() => document.getElementById('btnLeague').click()); await page.waitForTimeout(1500);
+check(await page.evaluate(() => !document.getElementById('title').hidden), 'back from the map is the title');
+await page.evaluate(() => document.getElementById('tPlay').click()); await page.waitForTimeout(2500);
+check(await page.evaluate(() => !document.getElementById('clubmap').hidden && ['btnQuick', 'btnCup'].every(id => document.getElementById(id).offsetParent === null)), 'Play from the title goes straight to the club map: no hub, no quick match, no cup');
 await tapAt(0.504, 0.446);
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'club-map-stadium.png') });
 await page.mouse.move(195, 420); for (let i = 0; i < 8; i++) await page.mouse.wheel(0, -200); await page.waitForTimeout(400);

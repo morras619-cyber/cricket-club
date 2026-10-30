@@ -164,6 +164,9 @@ vs a random team</small></button>
         <button class="setcard" id="setUnits"><img src="img/menu/icon-fielding.webp" alt=""><b>Ball speed</b><span>km/h</span></button>
       </div>
       <div class="panel paper profile"><label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label></div>
+      <button class="bigbtn" id="setTrophies">Trophies</button>
+      <button class="bigbtn" id="setStats">Stats</button>
+      <button class="bigbtn" id="setTutorial">Tutorial</button>
       <button class="bigbtn" id="setPitches">Pitch guide</button>
       <button class="bigbtn" id="setStory">Watch the story</button>
       <button class="bigbtn" id="setMapLevel">Club map level</button>
@@ -234,6 +237,7 @@ vs a random team</small></button>
         <button class="bigbtn ghost" id="careerHome">Home</button>
         <button class="bigbtn" id="careerSquad">Squad</button>
         <button class="bigbtn" id="careerRecords">Records</button>
+        <button class="bigbtn" id="careerDaily">Daily</button>
       </div>
       <button class="chipbtn ghostchip" id="careerRestart">Restart career</button>
     </div>
@@ -244,9 +248,10 @@ vs a random team</small></button>
     <div class="map-top">
       <button class="pt-back" id="mapBack" aria-label="Back">‹</button>
       <div class="map-title"><b id="mapClub"></b><small id="mapSub"></small></div>
-      <button class="map-daily" id="mapDaily" aria-label="Daily challenge"><b>Daily</b><i id="mapDailyDot"></i></button>
+      <button class="map-gear" id="mapSettings" aria-label="Settings"><img src="img/menu/gear.webp" alt=""></button>
       <button class="coachbtn" id="mapCoach" aria-label="Ask Uncle Dev"><img src="img/menu/coach-dev.webp" alt=""></button>
     </div>
+    <nav class="map-tabs" id="mapTabs"></nav>
     <div class="map-sheet" id="mapSheet" hidden>
       <div class="map-sheet-txt"><b id="mapName"></b><small id="mapDesc"></small></div>
       <button class="bigbtn primary" id="mapOpen">Open</button>

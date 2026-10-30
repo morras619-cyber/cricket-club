@@ -23,8 +23,7 @@ page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/
 await page.addInitScript(() => { try { if (!localStorage.getItem('sixcharge.profile.v1')) localStorage.setItem('sixcharge.profile.v1', JSON.stringify({ tutorialDone: true, coachSeen: { welcome: 1 } })); } catch {} });
 const check = (ok, what) => { console.log(ok ? 'ok  ' : 'FAIL', what); if (!ok) fails.push(what); };
 await page.goto(`http://localhost:${server.address().port}/`); await page.waitForTimeout(900);
-await page.evaluate(() => document.getElementById('tPlay').click()); await page.waitForTimeout(900);
-await page.evaluate(() => document.getElementById('btnLeague').click()); await page.waitForTimeout(900);
+await page.evaluate(() => document.getElementById('tPlay').click()); await page.waitForTimeout(1800);   // (Play goes straight into the career: its opening story)
 for (let i = 0; i < 7; i++) { await page.click('.cm-next'); await page.waitForTimeout(300); }
 await page.waitForSelector('.cm-card', { timeout: 4000 }); check(/16 HOURS LATER/i.test(await page.textContent('.cm-card')), 'the black card says 16 hours later');
 await page.waitForSelector('.cm-chirp.up', { timeout: 8000 });
