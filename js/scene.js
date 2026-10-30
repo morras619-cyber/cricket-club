@@ -4,7 +4,7 @@ import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
 import { makeEffectLevel } from './effectlevel.js';
 import { groundOf } from './grounds.js';
-import { stadiumTest, teamById, logoSrc } from './teams.js';
+import { stadiumTest, teamById, logoSrc, myClub, groundCondition } from './teams.js';
 import { paintGround } from './ownground.js';
 import { GROUND_ART } from './groundart.js';
 
@@ -48,6 +48,52 @@ export class Cam3D {
 }
 
 function seeded(n) { let s = n; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+
+// ---------- a ground that has been let go: dull, dry, patchy grass and a cracked, scuffed pitch ----------
+// w: how worn it is, 0 (as kept) to 1 (bare). Only your own club's ground is ever worn (js/career.js CARE): the grass loses its green, goes khaki and pale,
+// bare earth shows through in patches, and the pitch gets cracks and scuffs at the creases. The patches come from a fixed seed, so a ground looks the same each time.
+const wearOf = () => (myClub() && HOME === myClub().id ? Math.max(0, Math.min(1, 1 - groundCondition())) : 0);
+function wornDraw(g, y0, x0, x1, y1, w, patches) {
+  g.save();
+  g.beginPath(); g.rect(x0, y0, x1 - x0, y1 - y0); g.clip();
+  g.globalCompositeOperation = 'saturation'; g.fillStyle = `rgba(128,128,128,${0.74 * w})`; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+  g.globalCompositeOperation = 'multiply'; g.fillStyle = `rgba(222,196,128,${0.6 * w})`; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+  g.globalCompositeOperation = 'source-over';
+  patches(g);
+  g.restore();
+}
+// a soft-edged patch of bare earth or scuffed grass (hard-edged ovals read as spots)
+function softPatch(g, x, y, rx, ry, rgb, a) {
+  g.save(); g.translate(x, y); g.scale(1, ry / rx);
+  const gr = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+  gr.addColorStop(0, `rgba(${rgb},${a})`); gr.addColorStop(0.55, `rgba(${rgb},${a * 0.55})`); gr.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.fill(); g.restore();
+}
+const wornRng = seed => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+// the match views: patches in rows down the picture (bigger nearer), cracks and scuffs on the pitch in the camera's own perspective
+function wornView(g, cam, W, H, hy, w, dpr) {
+  if (w <= 0.01) return;
+  wornDraw(g, hy, 0, W, H, w, gg => {
+    const r = wornRng(7919 + cam.kind.length * 31);
+    for (let i = 0; i < Math.round(170 * w); i++) {
+      const f = r() ** 1.5, y = hy + (H - hy) * (0.03 + 0.97 * f), rx = (5 + 90 * f) * (0.5 + r()), x = r() * W, bare = r() < 0.7;
+      softPatch(gg, x, y, rx * 1.3, rx * 0.26, bare ? '168,136,84' : '78,64,36', (bare ? 0.3 + 0.35 * r() : 0.14 + 0.2 * r()) * w);
+    }
+  });
+  // the pitch: a worn patch at each set of stumps, and cracks along it
+  const r = wornRng(104729), seg = (x0, z0, x1, z1, col, lw) => {
+    const a = cam.project(x0, 0, z0), b = cam.project(x1, 0, z1); if (!a || !b) return;
+    g.strokeStyle = col; g.lineWidth = Math.max(0.6, lw * Math.min(a.k, b.k)); g.lineCap = 'round'; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+  };
+  g.save();
+  for (const z of [0.4, 19.6]) for (let i = 0; i < 5; i++) { const p = cam.project((r() - 0.5) * 2.2, 0, z + (r() - 0.5) * 2.4); if (!p) continue; softPatch(g, p.x, p.y, 0.7 * p.k, 0.17 * p.k, '120,92,52', 0.5 * w); }
+  for (let i = 0; i < Math.round(26 * w); i++) {
+    const x = (r() - 0.5) * 2.6, z = 1.5 + r() * 17, dx = (r() - 0.5) * 0.9, dz = (r() - 0.5) * 1.2;
+    seg(x, z, x + dx, z + dz, `rgba(52,36,22,${0.5 * w})`, 0.012);
+    if (r() < 0.5) seg(x + dx, z + dz, x + dx * 1.6, z + dz * 1.7 + 0.2, `rgba(52,36,22,${0.4 * w})`, 0.009);
+  }
+  g.restore();
+}
 
 // ---------- the home ground ----------
 // The match is played at the home side's ground: its sky, crowd, colours, landmark and pitch.
@@ -411,6 +457,7 @@ function renderBuilt(cam, art, v, im) {
   // a ground with a strip of its own: it is laid over the rendered one, row by row, in this camera's perspective
   const sa = stripFor(art);
   if (sa) layStrip(g, cam, sa, W, hy, H, dpr);   // (it is laid over the rendered pitch: the creases are drawn again on it)
+  wornView(g, cam, W, H, hy, wearOf(), dpr);   // (your own ground, if it has been let go)
   if (dy > 0) {
     const gr = g.createLinearGradient(0, dy, 0, dy + dh * 0.06);
     gr.addColorStop(0, v.top); gr.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1158,6 +1205,20 @@ export class OutfieldView {
       const o = this.to(-2.5, 0);
       for (let x = o.x - Math.ceil(o.x / tw) * tw; x < W; x += tw) for (let y = o.y - Math.ceil(o.y / th) * th; y < H; y += th) ctx.drawImage(tex, x, y, tw + 0.5, th + 0.5);
       ctx.restore();
+      // (your own ground, if it has been let go: the same dull, patchy grass seen from above)
+      const wt = wearOf();
+      if (wt > 0.01) {
+        ctx.save();
+        ctx.beginPath(); ctx.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2); ctx.clip();
+        wornDraw(ctx, c.y - gr * k, c.x - gr * k, c.x + gr * k, c.y + gr * k, wt, gg => {
+          const r = wornRng(7919);
+          for (let i = 0; i < Math.round(150 * wt); i++) {
+            const a = r() * Math.PI * 2, d = Math.sqrt(r()) * R * 1.05, p = this.to(Math.cos(a) * d, CY + Math.sin(a) * d), rx = (1.5 + 6 * r()) * k;
+            softPatch(gg, p.x, p.y, rx * 1.4, rx * 1.1, r() < 0.7 ? '168,136,84' : '78,64,36', (0.28 + 0.3 * r()) * wt);
+          }
+        });
+        ctx.restore();
+      }
       // the boundary rope in the home side's colour
       const rw = Math.max(5, 0.5 * k);
       // a four that crosses it sets the rope wobbling: a bulge that rings out and settles

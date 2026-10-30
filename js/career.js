@@ -317,6 +317,43 @@ export function chooseClub(c, teamId, { hold = false } = {}) {
   return true;
 }
 
+// ---------- the caretaker: your ground starts rough (a club from nothing) and he brings it up ----------
+// The grass and the pitch of a new club are worn and dry. A caretaker costs a fee to hire and a wage every week (a week is each of your league matches), and
+// as long as he is paid the ground gets better week by week; if he goes, or is never hired, it slowly goes back. A club saved before this has a ground in full condition.
+export const CARE = { START: 0.08, FLOOR: 0.05, HIRE: 0.1, WAGE: 0.05, GAIN: 0.11, DECAY: 0.025 };
+export const groundCond = c => c.custom?.cond ?? 1;
+export const hasCaretaker = c => !!c.custom?.caretaker;
+export function hireCaretaker(c) {
+  if (!c.custom || c.custom.caretaker || c.money < CARE.HIRE) return false;
+  c.money = round2(c.money - CARE.HIRE);
+  c.custom.caretaker = true; c.custom.careWeeks = 0;
+  setMyClub(c.custom);
+  return true;
+}
+export function dismissCaretaker(c) {
+  if (!c.custom?.caretaker) return false;
+  c.custom.caretaker = false; setMyClub(c.custom);
+  return true;
+}
+// after each of your league matches: a week goes by on the ground
+export function groundWeek(c) {
+  const m = c.custom, notes = [];
+  if (!m || m.cond === undefined) return notes;
+  if (m.caretaker) {
+    if (c.money >= CARE.WAGE) {
+      c.money = round2(c.money - CARE.WAGE);
+      const before = m.cond; m.cond = Math.min(1, round3(m.cond + CARE.GAIN)); m.careWeeks = (m.careWeeks || 0) + 1;
+      notes.push(`🌱 Your caretaker worked on ${m.ground} (wage ${money(CARE.WAGE)})${m.cond >= 1 ? ': it is in perfect order' : m.cond - before > 0 && m.careWeeks === 2 ? ': the grass is greening up' : ''}`);
+    } else {
+      m.caretaker = false;
+      notes.push(`🌱 Your caretaker has left: you could not pay him. ${m.ground} will go back to seed`);
+    }
+  } else if (m.cond > CARE.FLOOR) m.cond = Math.max(CARE.FLOOR, round3(m.cond - CARE.DECAY));
+  setMyClub(m);
+  return notes;
+}
+const round3 = x => Math.round(x * 1000) / 1000;
+
 // Your own club: it takes the place of the weakest Division 3 club (its budget and ground), and
 // that club's regulars become a squad of young unknowns: rough now, with room to grow.
 // spec: { name, short, suit, trim, emblem, ground, crest (an image URL) }
@@ -327,7 +364,7 @@ export function createClub(c, spec, { trials = false } = {}) {
   if (trials) {
     // the story's way: the club starts with nobody. The regulars of the club it replaces go back on the market, and the squad is chosen in the nets (trialists, below)
     for (const p of clubPlayers(c, base)) { p.team = null; p.contract = 0; }
-    c.custom = { ...spec, base, gone: teamById(base).name, stadium: 1 };
+    c.custom = { ...spec, base, gone: teamById(base).name, stadium: 1, cond: CARE.START, caretaker: false };
     setMyClub(c.custom);
     if (!chooseClub(c, base, { hold: true })) return false;
     makeTrialists(c);
@@ -339,7 +376,7 @@ export function createClub(c, spec, { trials = false } = {}) {
     p.pot = Math.min(90, main + rng.int(12, 22));
     p.contract = 3;
   }
-  c.custom = { ...spec, base, gone: teamById(base).name, stadium: 1 };
+  c.custom = { ...spec, base, gone: teamById(base).name, stadium: 1, cond: CARE.START, caretaker: false };
   setMyClub(c.custom);
   return chooseClub(c, base);
 }
@@ -805,6 +842,7 @@ export function afterLeagueMatch(c, summary) {
   // your own ground's gate money
   if (home) { const tk = STADIUMS[home].ticket; c.money = round2(c.money + tk); notes.push(`🎟️ ${STADIUMS[home].fans} fans at ${c.custom.ground}: +${money(tk)} in ticket money`); }
   notes.push(...scoutReports(c));
+  notes.push(...groundWeek(c));
   const result = playerResult(c.league, summary);
   notes.push(...advance(c.league, result, (a, b, rng) => simCareerMatch(c, a, b, rng)));
   // the rivals have their say (a rival who beat you, or whom you beat; your nemesis, watching)

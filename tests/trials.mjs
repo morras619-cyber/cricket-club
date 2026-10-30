@@ -49,6 +49,13 @@ await page.evaluate(() => [...document.querySelectorAll('#careerBody button')].f
 await page.waitForTimeout(800);
 const squad = await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('sixcharge.profile.v1')).career; return { club: Object.values(c.players).filter(p => p.team === c.club).length, money: c.money, phase: c.phase }; });
 check(squad.club === 11 && squad.money === 0 && squad.phase === 'auction', `eleven signed, no money, on to the auction (${JSON.stringify(squad)})`);
+// the ground and its caretaker, on the season's hub
+await page.evaluate(async () => { const C = await import('/js/career.js'); const c = window.__sixcharge.profile.career; C.finishAuction(c); c.money = 1; document.getElementById('btnLeague').click(); });
+await page.waitForTimeout(900);
+check(await page.evaluate(() => /Ground & caretaker/.test(document.querySelector('.groundpanel')?.textContent || '') && /Bare, dry and cracked|bare, dry and cracked/.test(document.querySelector('.groundpanel')?.textContent || '')), 'the hub shows the ground as bare, dry and cracked, with the caretaker to hire');
+await page.evaluate(() => [...document.querySelectorAll('.groundpanel button')].find(b => /Hire caretaker/.test(b.textContent)).click());
+await page.waitForTimeout(700);
+check(await page.evaluate(() => /on the job/.test(document.querySelector('.groundpanel')?.textContent || '')), 'the caretaker is hired and on the job');
 check(errors.length === 0, `no page errors${errors.length ? ': ' + errors[0] : ''}`);
 await browser.close(); server.close();
 process.exit(fails.length ? 1 : 0);

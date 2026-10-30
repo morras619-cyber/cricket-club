@@ -75,11 +75,13 @@ const LOGOS = new Map(); // crests painted in the game, by club id
 export function setMyClub(m) {
   if (MINE) LOGOS.delete(MINE.id);
   const base = m?.base && LEAGUE_CLUBS.find(t => t.id === m.base);
-  MINE = base ? { ...base, name: m.name, short: m.short, suit: m.suit, trim: m.trim, emblem: m.emblem, ground: m.ground || base.ground, chant: m.chant || 'default', pitch: m.pitch || 'flat',
+  MINE = base ? { ...base, name: m.name, short: m.short, suit: m.suit, trim: m.trim, emblem: m.emblem, ground: m.ground || base.ground, chant: m.chant || 'default', pitch: m.pitch || 'flat', cond: m.cond ?? 1,
     custom: true, stadium: m.stadium || 1, style: { ...base.style, tag: 'Your club', desc: 'Built from nothing. Every run is yours.' } } : null;
   if (MINE && m.crest) LOGOS.set(MINE.id, m.crest);
 }
 export const myClub = () => MINE;
+// how well kept your ground is: 0 (bare, dry and cracked) to 1 (lush); a club saved before the caretaker existed has a ground in full condition
+export const groundCondition = () => (MINE ? MINE.cond ?? 1 : 1);
 // (a testing aid: the ground of your own club shown at this level whatever it has built, 0 = its real level; kept apart from the saved profile)
 export const stadiumTest = { level: (() => { try { return +localStorage.getItem('sixcharge.stadiumTest') || 0; } catch { return 0; } })() };
 export const setLogo = (id, src) => (src ? LOGOS.set(id, src) : LOGOS.delete(id));

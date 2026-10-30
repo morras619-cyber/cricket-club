@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, upgradeBlock, upgradeStadium, releasePlayer } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { checkAchievements, ACHIEVEMENTS } from './progress.js';
 import { portrait } from './figure.js';
@@ -1618,7 +1618,7 @@ function careerSeason(c, body) {
       () => startMatch({ mode: 'career' }), preMatch(c, o.id)));
   }
   body.append(chirpPanel(c));
-  if (c.custom) body.append(stadiumPanel(c));
+  if (c.custom) body.append(stadiumPanel(c), groundPanel(c));
   body.append(scoutsPanel(c));
   body.append(...leaguePanels(c.league));
 }
@@ -1751,6 +1751,21 @@ function stadiumPanel(c) {
   return box;
 }
 
+// ---------- the ground: how well kept it is, and the caretaker who looks after it ----------
+const condWords = x => (x < 0.2 ? 'Bare, dry and cracked' : x < 0.4 ? 'Patchy and dusty' : x < 0.6 ? 'Getting greener' : x < 0.8 ? 'Mostly green' : x < 0.97 ? 'Lush' : 'In perfect order');
+function groundPanel(c) {
+  const box = el('div', 'panel paper groundpanel'), x = groundCond(c), has = hasCaretaker(c);
+  box.append(el('h3', '', '🌱 Ground & caretaker'));
+  const bar = el('div', 'condbar'), fill = el('i'); fill.style.width = `${Math.round(x * 100)}%`; bar.append(fill);
+  box.append(el('p', 'sheetnote', `${c.custom.ground}: ${condWords(x).toLowerCase()}. ${has ? `Your caretaker is on the job (${money(CARE.WAGE)} a week, taken after each league match): it gets better week by week.` : x >= 0.97 ? 'Nothing left to do.' : `Hire a caretaker for the grass and the pitch: ${money(CARE.HIRE)} to hire him and ${money(CARE.WAGE)} every week (each league match). Within a couple of weeks you will see it greening up. Without him it slowly goes back.`}`), bar);
+  const btn = el('button', 'chipbtn', has ? 'Let him go' : `Hire caretaker · ${money(CARE.HIRE)}`);
+  btn.disabled = !has && (c.money < CARE.HIRE || x >= 0.97);
+  btn.addEventListener('click', () => {
+    if (has ? dismissCaretaker(c) : hireCaretaker(c)) { sfx.full(); ui.toast(has ? 'The caretaker has gone' : 'Your caretaker starts on Monday'); saveProfile(profile); renderCareer(); }
+  });
+  box.append(btn);
+  return box;
+}
 // ---------- travelling scouts ----------
 function scoutsPanel(c) {
   const box = el('div', 'panel paper scoutpanel');
