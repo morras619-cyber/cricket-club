@@ -1637,3 +1637,4 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mb-bar { width: 64px; height: 7px; border-radius: 4px; background: rgba(255, 255, 255, .25); overflow: hidden; } .mb-bar i { display: block; height: 100%; background: #ffd23f; }
 .mb-txt { display: inline-flex; align-items: center; gap: 3px; }
 .map-build .chipbtn { padding: 2px 8px; font-size: 11px; }
+.map-title .map-build b { font-family: inherit; font-size: 13px; letter-spacing: 0; color: #fff; text-shadow: none; overflow: visible; }

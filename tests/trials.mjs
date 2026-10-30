@@ -133,8 +133,9 @@ if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_
 await page.evaluate(() => [...document.querySelectorAll('#trainBody button')].find(x => /Build level 2/.test(x.textContent)).click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => window.__sixcharge.profile.career.build.jobs.length === 1 && /Building level 2/.test(document.getElementById('trainBody').textContent)), 'the build starts: the builder is busy and the screen shows the time left');
 await page.evaluate(async () => { const P = await import('/js/pacing.js'); P.skipBuild(window.__sixcharge.profile.career, 3 * 3600e3); });
+await page.evaluate(() => [...document.querySelectorAll('#trainTabs .mf-tab')].find(t => t.textContent.includes('Players')).click());
 await page.evaluate(() => document.getElementById('trainBack').click()); await page.waitForTimeout(1500);
-check(await page.evaluate(() => { const c = window.__sixcharge.profile.career; return c.training.level === 2 && c.build.jobs.length === 0 && c.training.slots.length === 2; }), 'after the hours the ground is level 2');
+check(await page.evaluate(() => { const c = window.__sixcharge.profile.career; return c.training.level === 2 && c.build.jobs.length === 0 && c.training.slots.length === 3; }), 'after the hours the ground is level 2, with a third place (the levels between fill in)');
 await page.evaluate(async () => { const T = await import('/js/training.js'); const c = window.__sixcharge.profile.career; delete c.build; c.training.level = 2; T.seal(c.training); });
 await page.evaluate(() => document.getElementById('setDiamonds').click()); await page.waitForTimeout(300);
 check(await page.evaluate(async () => { const T = await import('/js/training.js'); const c = window.__sixcharge.profile.career; return c.training.level === 5 && c.training.slots.length === 4 && T.sealed(c.training) && c.build.xp >= 1400 && c.build.diamonds === 100; }), 'a career from before the ten levels: its old level 2 becomes 5, the places follow, and nothing is lost');
