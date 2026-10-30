@@ -185,7 +185,7 @@ function run(profile, seed) {
 const f = (x, n = 2) => (+x).toFixed(n);
 const mean = (xs, g) => xs.reduce((a, x) => a + g(x), 0) / xs.length;
 const out = [];
-for (const profile of Object.keys(PROFILES)) {
+for (const profile of Object.keys(PROFILES).filter(p => !ONLY || p === ONLY)) {
   const runs = Array.from({ length: SEEDS }, (_, i) => run(profile, 101 + i * 13));
   out.push(`\n=== ${profile.toUpperCase()} (${PROFILES[profile].length} check-in${PROFILES[profile].length > 1 ? 's' : ''} a day, ${SEEDS} careers averaged) ===`);
   out.push('day | matches seasons division |  money | income (period): prizes wins tickets sponsor merch sold | out: players buildings | squad: rating best top11 70+ 80+ | levels');
