@@ -306,16 +306,27 @@ test('your own club takes the weakest Division 3 place with a young squad', () =
   assert.notEqual(teamById(c.club).name, 'Mumbai Meteors');
 });
 
-test('your own ground: three levels, the Arena only out of Division 3, ticket money at home', () => {
+test('your own ground: ten levels, the Arena only out of Division 3, ticket money at home', () => {
   const c = C.newCareer(11);
   C.createClub(c, { name: 'Harbour Heroes', short: 'HH', suit: '#123a7a', trim: '#ffffff', emblem: 'anchor', ground: 'Dock Park', crest: 'data:y' });
-  assert.equal(C.stadiumLevel(c), 1);
-  c.money = 1; assert.equal(C.upgradeBlock(c), 'money'); assert.equal(C.upgradeStadium(c), false);
-  c.money = 10; assert.ok(C.upgradeStadium(c)); assert.equal(C.stadiumLevel(c), 2); assert.equal(c.money, 7.5);
-  assert.equal(teamById(c.club).stadium, 2);
-  assert.equal(C.upgradeBlock(c), 'division');
+  assert.equal(C.stadiumLevel(c), 1, 'the look');
+  assert.equal(C.stadiumLvl(c), 1, 'the level');
+  assert.equal(C.ticketOf(c), 0.1);
+  C.setStadiumLevel(c, 3);
+  assert.equal(C.stadiumLvl(c), 3); assert.equal(C.stadiumLevel(c), 1, 'still the first look');
+  assert.ok(C.ticketOf(c) > 0.1 && C.ticketOf(c) < 0.2, 'the levels between fill in');
+  C.setStadiumLevel(c, 5);
+  assert.equal(C.stadiumLevel(c), 2); assert.equal(teamById(c.club).stadium, 2); assert.equal(C.ticketOf(c), 0.2);
+  assert.equal(C.stadiumBlocked(c, 6), null);
+  assert.equal(C.stadiumBlocked(c, 10), 'The Arena is for clubs out of Division 3');
   c.divisions.d3 = c.divisions.d3.filter(x => x !== c.club); c.divisions.d2.push(c.club);
-  assert.ok(C.upgradeStadium(c)); assert.equal(C.stadiumLevel(c), 3); assert.equal(C.upgradeBlock(c), 'top');
+  assert.equal(C.stadiumBlocked(c, 10), null);
+  C.setStadiumLevel(c, 10);
+  assert.equal(C.stadiumLevel(c), 3); assert.equal(C.ticketOf(c), 0.4);
+  // a career from before the ten levels has only the look, which stands for level 1, 5 or 10
+  delete c.custom.stadiumLvl; c.custom.stadium = 2;
+  assert.equal(C.stadiumLvl(c), 5);
+  c.custom.stadium = 3; assert.equal(C.stadiumLvl(c), 10);
   setMyClub(null);
 });
 

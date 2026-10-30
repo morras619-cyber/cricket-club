@@ -4,12 +4,13 @@
 // The time comes in as `now` (ms) from the server, never from the phone's clock (main.js), and away time is capped, so playing with the
 // clock gets you nothing. A jersey belongs to a live contract: when the player goes, what is not yet printed is cancelled (and refunded),
 // what is printed sells at full demand for two days, then as vintage stock (cheap, fading over a week), and a re-signed player brings it back.
+import { levelRow, lookOf } from './pacing.js';
 export const MIN = 60000, HOUR = 3600000, DAY = 86400000;
 export const MERCH = {
   LEVELS: [null,
-    { staff: 2, machines: 0, batch: 20, stock: 60, up: 0 },      // up: $M to reach the level
-    { staff: 5, machines: 2, batch: 50, stock: 200, up: 0.8 },
-    { staff: 9, machines: 4, batch: 100, stock: 600, up: 2.5 }],
+    { staff: 2, machines: 0, batch: 20, stock: 60 },      // the rows for level 1, 5 and 10 (pacing.js levelRow fills in the levels between)
+    { staff: 5, machines: 2, batch: 50, stock: 200 },
+    { staff: 9, machines: 4, batch: 100, stock: 600 }],
   JERSEY_MIN: 3,       // minutes a jersey takes a level 1 printer, by hand
   DESIGN_MIN: 15,      // minutes a level 1 designer takes to design one player's jersey
   PRICE: 1.2, MATERIAL: 0.2,        // $k a jersey sells for, and costs to make
@@ -29,7 +30,7 @@ export const ROLES = {
 const NAMES = ['Imran', 'Dilshan', 'Noor', 'Chaman', 'Rahul', 'Meera', 'Sana', 'Tariq', 'Anwar', 'Lakshmi', 'Farah', 'Hari', 'Zoya', 'Kabir', 'Nisha', 'Omar', 'Ravi', 'Salma', 'Tanvir', 'Uma'];
 const speedOf = s => 1 + 0.25 * (s.lvl - 1);
 const wageOf = s => ROLES[s.role].wage * speedOf(s);
-const cap = m => MERCH.LEVELS[m.level];
+const cap = m => levelRow(MERCH.LEVELS, m.level);
 const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
 
 export function freshMerch(now) {
@@ -214,7 +215,7 @@ export function hire(m, role) {
 }
 export function fire(m, id) { const i = m.staff.findIndex(s => s.id === id); if (i < 0) return no('Not on the staff'); m.staff.splice(i, 1); seal(m); return ok; }
 export const trainCost = s => MERCH.TRAIN * s.lvl;
-export const staffMax = m => Math.min(MERCH.STAFF_LVL_MAX, m.level + 1);
+export const staffMax = m => Math.min(MERCH.STAFF_LVL_MAX, lookOf(m.level) + 1);
 export function train(m, id, ctx) {
   const s = m.staff.find(x => x.id === id);
   if (!s) return no('Not on the staff');
@@ -227,13 +228,8 @@ export function buyMachine(m, ctx) {
   if (!payFrom(m, MERCH.MACHINE_COST, ctx)) return no('Not enough money');
   m.machines++; seal(m); return ok;
 }
-export const nextUpgrade = m => (m.level < 3 ? MERCH.LEVELS[m.level + 1] : null);
-export function upgrade(m, ctx) {
-  const n = nextUpgrade(m);
-  if (!n) return no('The factory is as big as it gets');
-  if (!ctx.bank.spend(n.up * 1000)) return no('Not enough money in the club');
-  m.level++; seal(m); return ok;
-}
+// a finished building (pacing.js): the factory is one level bigger
+export function setLevel(m, level) { m.level = level; seal(m); }
 // an order: qty jerseys of one player (he must be under contract)
 export const maxOrder = m => cap(m).batch * Math.max(1, staffOf(m, 'printer').length);
 export function order(m, pid, qty, ctx) {

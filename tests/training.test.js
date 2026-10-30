@@ -65,8 +65,8 @@ test('points become rating at the season end: at most the cap, never past his po
   const t = T.freshTraining(0); t.tp.a = 5000; T.seal(t);
   assert.equal(T.seasonGain(t, 'a', { ovr: 60, age: 20, pot: 85 }), 1, 'level 1: one point');
   assert.ok(t.tp.a > 4000, 'the rest is kept');
-  t.level = 2; T.seal(t);
-  assert.equal(T.seasonGain(t, 'a', { ovr: 60, age: 20, pot: 85 }), 2, 'level 2: two');
+  t.level = 5; T.seal(t);
+  assert.equal(T.seasonGain(t, 'a', { ovr: 60, age: 20, pot: 85 }), 2, 'level 5: two');
   t.tp.a = 5000; T.seal(t);
   assert.equal(T.seasonGain(t, 'a', { ovr: 84, age: 20, pot: 85 }), 1, 'only one point of room');
   assert.equal(T.seasonGain(t, 'a', { ovr: 85, age: 20, pot: 85 }), 0, 'at his potential');
@@ -81,12 +81,11 @@ test('training takes real time: a prospect needs about a day and a half of coach
   const hours = T.tpCost(60, 20) / TRAIN.TP_HOUR;
   assert.ok(hours > 20 && hours < 60, `${hours} hours`);
 });
-test('upgrading costs money and opens places; a player who leaves loses his place', () => {
+test('a bigger ground opens places; a player who leaves loses his place', () => {
   const t = ready();
-  assert.equal(T.upgrade(t, mkCtx(0, { money: 0 })).ok, false);
-  const c = mkCtx(0, { money: 2000 });
-  assert.ok(T.upgrade(t, c).ok);
-  assert.equal(t.level, 2); assert.equal(t.slots.length, 4);
+  T.setLevel(t, 5);
+  assert.equal(t.level, 5); assert.equal(t.slots.length, 4);
+  assert.ok(T.sealed(t), 'the books still add up');
   T.tick(t, mkCtx(HOUR, { squad: squadOf({ b: { kinds: ['pace'] } }) }));
   assert.equal(t.slots[0], null, 'a went');
   assert.equal(t.tp.a, undefined);

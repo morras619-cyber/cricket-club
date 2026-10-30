@@ -2,12 +2,13 @@
 // training points (TP); at the end of the season the points turn into rating (never past a player's potential, never for a player of 33 or more,
 // and at most a few points a season), on top of the natural growth. TP only comes from real time, so playing faster does not train anyone faster.
 // Pure data and functions (no screen): the state is career.training, and money is in $k. The time is the server's (main.js).
+import { levelRow, lookOf } from './pacing.js';
 export const MIN = 60000, HOUR = 3600000, DAY = 86400000;
 export const TRAIN = {
   LEVELS: [null,
-    { slots: 2, coaches: 2, cap: 1, up: 0 },      // cap: the most rating points a player gains from training in a season; up: $M to reach the level
-    { slots: 4, coaches: 3, cap: 2, up: 1.2 },
-    { slots: 6, coaches: 4, cap: 2, up: 3.5 }],
+    { slots: 2, coaches: 2, cap: 1 },      // the rows for level 1, 5 and 10 (pacing.js levelRow fills in the levels between); cap: the most rating points a player gains from training in a season
+    { slots: 4, coaches: 3, cap: 2 },
+    { slots: 6, coaches: 4, cap: 2 }],
   TP_HOUR: 12, PER_COACH: 2,         // training points an hour at a level 1 coach, and the players one coach can teach at once
   WAGE: 12, COACH_TRAIN: 20,         // $k a day for a level 1 coach (+25% a level); training him costs $k x his level
   COACH_MAX: 3,
@@ -24,7 +25,7 @@ export const KINDS = {
 const NAMES = ['Coach Rao', 'Coach Imtiaz', 'Coach Perera', 'Coach Khan', 'Coach Das', 'Coach Akram', 'Coach Fernando', 'Coach Sethi', 'Coach Malik', 'Coach Joshi'];
 const speedOf = c => 1 + 0.25 * (c.lvl - 1);
 const wageOf = c => TRAIN.WAGE * speedOf(c);
-const cap = t => TRAIN.LEVELS[t.level];
+const cap = t => levelRow(TRAIN.LEVELS, t.level);
 const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
 
 export function freshTraining(now) {
@@ -154,7 +155,7 @@ export function hire(t, kind) {
 }
 export function fire(t, id) { const i = t.coaches.findIndex(c => c.id === id); if (i < 0) return no('Not on the staff'); t.coaches.splice(i, 1); seal(t); return ok; }
 export const coachTrainCost = c => TRAIN.COACH_TRAIN * c.lvl;
-export const coachMax = t => Math.min(TRAIN.COACH_MAX, t.level + 1);
+export const coachMax = t => Math.min(TRAIN.COACH_MAX, lookOf(t.level) + 1);
 export function trainCoach(t, id, ctx) {
   const c = t.coaches.find(x => x.id === id);
   if (!c) return no('Not on the staff');
@@ -162,14 +163,8 @@ export function trainCoach(t, id, ctx) {
   if (!payFrom(t, coachTrainCost(c), ctx)) return no('Not enough money');
   c.lvl++; seal(t); return ok;
 }
-export const nextUpgrade = t => (t.level < 3 ? TRAIN.LEVELS[t.level + 1] : null);
-export function upgrade(t, ctx) {
-  const n = nextUpgrade(t);
-  if (!n) return no('The training ground is as big as it gets');
-  if (!ctx.bank.spend(n.up * 1000)) return no('Not enough money in the club');
-  t.level++; while (t.slots.length < n.slots) t.slots.push(null);
-  seal(t); return ok;
-}
+// a finished building (pacing.js): the ground is one level bigger, with the places for it
+export function setLevel(t, level) { t.level = level; while (t.slots.length < cap(t).slots) t.slots.push(null); seal(t); }
 export function assign(t, index, pid, ctx) {
   const p = ctx.squad.get(pid);
   if (!p) return no('He is not in your squad');

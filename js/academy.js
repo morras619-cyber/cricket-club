@@ -2,15 +2,16 @@
 // he cannot play until he is 18, so he is raised over several seasons, then promoted to the squad or sold. Prospects live outside the squad limit.
 // Pure data and functions (no screen): the state is career.academy, money in $k. The time is the server's (main.js), as for the other buildings:
 // a trip or a drill takes its hours whenever you look; the upkeep counts away time for ten hours at most. The players are made by career.js (ctx.make).
+import { levelRow } from './pacing.js';
 export const MIN = 60000, HOUR = 3600000, DAY = 86400000;
 export const TIERS = ['Common', 'Rare', 'Epic', 'Superhero'];
 export const tierOf = pot => (pot >= 90 ? 3 : pot >= 80 ? 2 : pot >= 70 ? 1 : 0);
 export const POT_RANGE = [[58, 69], [70, 79], [80, 89], [90, 96]];
 export const ACAD = {
   LEVELS: [null,
-    { slots: 2, trips: 1, up: 0 },       // slots: prospects held (a trip out holds a place); trips: scouts away at once; up: $M to reach the level
-    { slots: 4, trips: 2, up: 1.0 },
-    { slots: 6, trips: 3, up: 3.0 }],
+    { slots: 2, trips: 1 },       // the rows for level 1, 5 and 10 (pacing.js levelRow fills in the levels between); slots: prospects held (a trip out holds a place); trips: scouts away at once
+    { slots: 4, trips: 2 },
+    { slots: 6, trips: 3 }],
   TRIPS: { 12: { cost: 100, odds: [70, 22, 6, 2] }, 24: { cost: 200, odds: [55, 30, 10, 5] }, 48: { cost: 350, odds: [35, 35, 20, 10] } },   // $k, and the odds (%) of Common, Rare, Epic, Superhero
   DRILL_H: 6, UPKEEP: 4,                 // hours a trial drill takes; $k a day for each prospect
   PLAY_AGE: 18, MENTOR_AGE: 30,
@@ -31,7 +32,7 @@ function mark(a) {
 }
 export const seal = a => { a.seal = mark(a); return a; };
 export const sealed = a => a.seal === mark(a);
-const cap = a => ACAD.LEVELS[a.level];
+const cap = a => levelRow(ACAD.LEVELS, a.level);
 export const placesUsed = a => a.prospects.length + a.trips.length;
 export const upkeepPerDay = a => a.prospects.length * ACAD.UPKEEP;
 
@@ -112,13 +113,8 @@ export function setMentor(a, pid, vetId) {
   if (vetId) a.mentors[pid] = vetId; else delete a.mentors[pid];
   seal(a); return ok;
 }
-export const nextUpgrade = a => (a.level < 3 ? ACAD.LEVELS[a.level + 1] : null);
-export function upgrade(a, ctx) {
-  const n = nextUpgrade(a);
-  if (!n) return no('The academy is as big as it gets');
-  if (!ctx.bank.spend(n.up * 1000)) return no('Not enough money in the club');
-  a.level++; seal(a); return ok;
-}
+// a finished building (pacing.js): the academy is one level bigger
+export function setLevel(a, level) { a.level = level; seal(a); }
 // (testing only) the clock jumps forward: trips and drills come nearer
 export function skipTime(a, ms) {
   a.last -= ms;

@@ -129,11 +129,11 @@ test('the clock going back changes nothing, and an edited fund is noticed', () =
   assert.equal(c.academy.fund, 0);
 });
 
-test('upgrading costs money and opens places and scouts', () => {
+test('a bigger academy opens places and scouts', () => {
   const c = club();
-  assert.equal(A.upgrade(c.academy, ctxOf(c, 0, { money: 0 })).ok, false);
-  assert.ok(A.upgrade(c.academy, ctxOf(c, 0)).ok);
-  assert.equal(c.academy.level, 2);
+  A.setLevel(c.academy, 5);
+  assert.equal(c.academy.level, 5);
+  assert.ok(A.sealed(c.academy), 'the books still add up');
   assert.ok(A.startTrip(c.academy, 'europe', 12, ctxOf(c, 0)).ok && A.startTrip(c.academy, 'africa', 12, ctxOf(c, 0)).ok);
 });
 

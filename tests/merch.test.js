@@ -139,14 +139,13 @@ test('an order is limited by the printers, the warehouse and the money', () => {
   assert.equal(M.order(poor, 'a', 20, mkCtx(0, { money: 0 })).ok, false);
 });
 
-test('upgrading costs money and opens the places', () => {
+test('a bigger factory opens the places', () => {
   const m = staffed(0);
-  assert.equal(M.upgrade(m, mkCtx(0, { money: 0 })).ok, false);
-  const ctx = mkCtx(0, { money: 1000 });   // ($k)
-  assert.ok(M.upgrade(m, ctx).ok);
-  assert.equal(m.level, 2);
-  assert.equal(ctx.bank.money, 200, 'the $0.8M left the club');
+  assert.equal(M.hire(m, 'packer').ok, false, 'two places at level 1');
+  M.setLevel(m, 5);
+  assert.equal(m.level, 5);
   assert.equal(M.hire(m, 'packer').ok, true);
+  assert.ok(M.sealed(m), 'the books still add up');
 });
 
 test('fame moves with how a player plays', () => {
@@ -189,10 +188,10 @@ test('the factory sees the players under contract, what the fans want, and the m
   assert.ok(C.merchDemand(c) > 0);
   const d = (stadium, level, fans = 0) => { c.custom = { ...(c.custom || {}), stadium }; c.merch = { level }; c.chirp = { fans }; return C.merchDemand(c); };
   assert.ok(d(1, 1) < 60, 'a small ground and a small factory: a trickle');
-  assert.ok(d(3, 3) <= 400 * 1.16 && d(3, 3) >= 350, 'the biggest of both: about four hundred jerseys a day');
-  assert.ok(d(1, 3) < d(2, 3) && d(2, 3) < d(3, 3), 'a bigger ground means more fans');
-  assert.ok(d(3, 1) < d(3, 3), 'a bigger factory reaches more of them');
-  assert.ok(d(3, 3, 1e7) <= d(3, 3, 0) * 1.151, 'followers add a little, never a lot');
+  assert.ok(d(3, 10) <= 400 * 1.16 && d(3, 10) >= 350, 'the biggest of both: about four hundred jerseys a day');
+  assert.ok(d(1, 10) < d(2, 10) && d(2, 10) < d(3, 10), 'a bigger ground means more fans');
+  assert.ok(d(3, 1) < d(3, 10), 'a bigger factory reaches more of them');
+  assert.ok(d(3, 10, 1e7) <= d(3, 10, 0) * 1.151, 'followers add a little, never a lot');
   const p = C.clubPlayers(c, c.club)[0];
   p.contract = 3;
   assert.ok(C.matchesLeft(c, p) >= 2 * 14);

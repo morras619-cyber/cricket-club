@@ -118,6 +118,26 @@ await page.evaluate(async () => { const T = await import('/js/training.js'); con
 check(await page.evaluate(async () => { const T = await import('/js/training.js'); return T.drillsLeft(window.__sixcharge.profile.career.training, Date.now()) === 0; }), 'a count edited by hand closes the nets');
 await page.evaluate(() => document.getElementById('trainBack').click()); await page.waitForTimeout(1000);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'back from the training ground is the map');
+// the builders: the club's level and the builder under the map's title; a level needs XP, money and builder time; and a career from before the ten levels moves up
+check(await page.evaluate(() => /Club LV 1/.test(document.getElementById('mapBuild').textContent) && /Builder free/.test(document.getElementById('mapBuild').textContent) && /2nd builder/.test(document.getElementById('mapBuild').textContent)), 'the map shows the club level, a free builder and the second builder to buy');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'map-builders.png') });
+await tapAt(0.344, 0.165); await page.waitForTimeout(300);
+await page.evaluate(() => document.getElementById('mapOpen').click()); await page.waitForTimeout(1200);
+const groundTab = async () => { await page.evaluate(() => [...document.querySelectorAll('#trainTabs .mf-tab')].find(t => t.textContent.includes('Ground')).click()); await page.waitForTimeout(300); };
+await groundTab();
+check(await page.evaluate(() => { const b = [...document.querySelectorAll('#trainBody button')].find(x => /Build level 2/.test(x.textContent)); return !!b && b.disabled && /Needs club level 2/.test(document.getElementById('trainBody').textContent); }), 'a new club cannot build yet: the Ground tab says it needs club level 2');
+await page.evaluate(async () => { const P = await import('/js/pacing.js'); const c = window.__sixcharge.profile.career; P.addXp(c, 150); c.money += 20; });
+await groundTab();
+check(await page.evaluate(() => { const b = [...document.querySelectorAll('#trainBody button')].find(x => /Build level 2/.test(x.textContent)); return !!b && !b.disabled && /h to build/.test(document.getElementById('trainBody').textContent); }), 'with the club level and the money, the Build button shows the price and the hours');
+if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'training-ground-build.png') });
+await page.evaluate(() => [...document.querySelectorAll('#trainBody button')].find(x => /Build level 2/.test(x.textContent)).click()); await page.waitForTimeout(500);
+check(await page.evaluate(() => window.__sixcharge.profile.career.build.jobs.length === 1 && /Building level 2/.test(document.getElementById('trainBody').textContent)), 'the build starts: the builder is busy and the screen shows the time left');
+await page.evaluate(async () => { const P = await import('/js/pacing.js'); P.skipBuild(window.__sixcharge.profile.career, 3 * 3600e3); });
+await page.evaluate(() => document.getElementById('trainBack').click()); await page.waitForTimeout(1500);
+check(await page.evaluate(() => { const c = window.__sixcharge.profile.career; return c.training.level === 2 && c.build.jobs.length === 0 && c.training.slots.length === 2; }), 'after the hours the ground is level 2');
+await page.evaluate(async () => { const T = await import('/js/training.js'); const c = window.__sixcharge.profile.career; delete c.build; c.training.level = 2; T.seal(c.training); });
+await page.evaluate(() => document.getElementById('setDiamonds').click()); await page.waitForTimeout(300);
+check(await page.evaluate(async () => { const T = await import('/js/training.js'); const c = window.__sixcharge.profile.career; return c.training.level === 5 && c.training.slots.length === 4 && T.sealed(c.training) && c.build.xp >= 1400 && c.build.diamonds === 100; }), 'a career from before the ten levels: its old level 2 becomes 5, the places follow, and nothing is lost');
 // the daily challenge is a tab of the career (on the map and on the season page), and Play from the title goes straight to the map
 const mapTab = async name => page.evaluate(n => [...document.querySelectorAll('#mapTabs .map-tab')].find(b => b.textContent.includes(n)).click(), name);
 check(await page.evaluate(() => [...document.querySelectorAll('#mapTabs .map-tab')].map(b => b.textContent.replace('!', '')).join() === 'Season,Squad,Records,Daily'), 'the map has the tabs Season, Squad, Records and Daily');

@@ -21,6 +21,7 @@ import { fameAfter, startFame } from './merch.js';
 import { seasonGain } from './training.js';
 import { tierOf, pickTier, POT_RANGE, ACAD } from './academy.js';
 import { freshMedical, medAfterMatch, fitOf } from './stamina.js';
+import { addXp, XP, levelRow, lookOf } from './pacing.js';
 
 export const PEAK_AGE = 33;           // no growth from this age
 export const MIN_SQUAD = 10, MAX_SQUAD = 14;
@@ -440,30 +441,21 @@ export function signTrialists(c, batIds, bowlIds) {
 // the auction's pool must not include the trialists still being judged
 const inTrial = p => !!p.trial;
 
-// Your club's ground, in three levels: bigger crowds pay more at every home match. The Arena
-// is for clubs out of Division 3.
+// Your club's ground: ten levels, and its picture and name change at level 5 and level 10 (three looks): bigger crowds pay more at every home match.
+// The Arena (level 10) is for clubs out of Division 3. c.custom.stadiumLvl is the level (1-10); c.custom.stadium is the look (1-3), which the match scene reads.
+// A career from before the ten levels has only the look: it stands for level 1, 5 or 10.
 export const STADIUMS = [null,
   { name: 'Community Ground', fans: '4,000', ticket: 0.1 },
-  { name: 'Club Stadium', fans: '18,000', ticket: 0.2, cost: 2.5 },
-  { name: 'Arena', fans: '45,000', ticket: 0.4, cost: 6, needs: 'd2' },
+  { name: 'Club Stadium', fans: '18,000', ticket: 0.2 },
+  { name: 'Arena', fans: '45,000', ticket: 0.4, needs: 'd2' },
 ];
-export const stadiumLevel = c => (c.custom ? c.custom.stadium || 1 : 0);
-// what stops the next level (null: it can be built)
-export function upgradeBlock(c) {
-  const lv = stadiumLevel(c), next = STADIUMS[lv + 1];
-  if (!lv || !next) return 'top';
-  if (next.needs && divisionOf(c, c.club) === 'd3') return 'division';
-  if (c.money < next.cost) return 'money';
-  return null;
-}
-export function upgradeStadium(c) {
-  if (upgradeBlock(c)) return false;
-  const next = STADIUMS[stadiumLevel(c) + 1];
-  c.money = round2(c.money - next.cost); book(c, 'out', 'buildings', next.cost);
-  c.custom.stadium = stadiumLevel(c) + 1;
-  setMyClub(c.custom);
-  return true;
-}
+const STADIUM_ROWS = [null, { ticket: 0.1 }, { ticket: 0.2 }, { ticket: 0.4 }];
+export const stadiumLevel = c => (c.custom ? c.custom.stadium || 1 : 0);   // the look (1-3)
+export const stadiumLvl = c => (c.custom ? c.custom.stadiumLvl || [1, 1, 5, 10][c.custom.stadium || 1] : 0);   // the level (1-10)
+export const ticketOf = c => Math.round(levelRow(STADIUM_ROWS, stadiumLvl(c)).ticket * 100) / 100;
+export function setStadiumLevel(c, level) { c.custom.stadiumLvl = level; c.custom.stadium = lookOf(level); setMyClub(c.custom); }
+// what stops the ground reaching a level, besides the money, the builder and the club level (pacing.js whyNot)
+export const stadiumBlocked = (c, to) => (to >= 10 && divisionOf(c, c.club) === 'd3' ? 'The Arena is for clubs out of Division 3' : null);
 
 // ---------- the auction ----------
 const inc = price => (price < 1 ? 0.1 : price < 3 ? 0.25 : 0.5);
@@ -1023,8 +1015,8 @@ export const fameOf = p => p.fame ?? startFame(ovr(p));
 // the players under contract: id -> { fame, name }
 export const merchRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { fame: fameOf(p), name: p.name }]));
 // the jerseys a day the fans want, in all: the crowd your ground holds, how far the factory's name reaches, and a little for your followers on Chirp
-export const MERCH_CROWD = [0, 80, 200, 350], MERCH_REACH = [0, 0.5, 0.75, 1];
-export const merchDemand = c => MERCH_CROWD[Math.min(3, Math.max(1, stadiumLevel(c)))] * MERCH_REACH[Math.min(3, c.merch?.level || 1)] * (1 + Math.min(0.15, (c.chirp?.fans || 0) / 100000 * 0.15));
+const CROWD_ROWS = [null, { n: 80 }, { n: 200 }, { n: 350 }], REACH_ROWS = [null, { n: 0.5 }, { n: 0.75 }, { n: 1 }];
+export const merchDemand = c => levelRow(CROWD_ROWS, Math.max(1, stadiumLvl(c))).n * levelRow(REACH_ROWS, c.merch?.level || 1).n * (1 + Math.min(0.15, (c.chirp?.fans || 0) / 100000 * 0.15));
 // the league matches left in a player's contract (the season he is in, and the full seasons after it)
 export function matchesLeft(c, p) {
   const per = c.league?.rounds?.length || 14, now = c.league && c.league.stage === 'group' ? Math.max(0, per - c.league.round) : 0;
@@ -1035,10 +1027,12 @@ export function afterLeagueMatch(c, summary) {
   const f = nextFixture(c.league), home = f && f.home === c.club && stadiumLevel(c);
   const notes = recordPlayerMatch(c, summary);
   // your own ground's gate money
-  if (home) { const tk = STADIUMS[home].ticket; c.money = round2(c.money + tk); book(c, 'in', 'tickets', tk); notes.push(`🎟️ ${STADIUMS[home].fans} fans at ${c.custom.ground}: +${money(tk)} in ticket money`); }
+  if (home) { const tk = ticketOf(c); c.money = round2(c.money + tk); book(c, 'in', 'tickets', tk); notes.push(`🎟️ ${STADIUMS[home].fans} fans at ${c.custom.ground}: +${money(tk)} in ticket money`); }
   notes.push(...scoutReports(c));
   notes.push(...groundWeek(c));
   const result = playerResult(c.league, summary);
+  const lvUp = addXp(c, XP.MATCH + (result.winner === c.club ? XP.WIN : 0));
+  if (lvUp) notes.push(`⭐ Club level ${lvUp}: your buildings can grow bigger`);
   notes.push(...advance(c.league, result, (a, b, rng) => simCareerMatch(c, a, b, rng)));
   // the rivals have their say (a rival who beat you, or whom you beat; your nemesis, watching)
   const top = table(c.league)[0]?.id === c.club ? 1 : 0;
@@ -1130,6 +1124,8 @@ function applyMoves(c, notes) {
   move(M.d3up, 'd3', 'd2'); move(M.d2down, 'd2', 'd3');
   move(M.d2up, 'd2', 'asl'); move(M.aslDown, 'asl', 'd2');
   const h = c.history.at(-1);
+  if (h.pos === 1) addXp(c, XP.CHAMPION);
+  if (M.d3up === c.club || M.d2up === c.club) addXp(c, XP.PROMOTED);
   if (M.d3up === c.club || M.d2up === c.club) { h.promoted = divisionOf(c, c.club); notes.push(`⬆️ PROMOTED! Next season ${teamById(c.club).name} play in ${divisionName(h.promoted)}.`); }
   if (M.d2down === c.club || M.aslDown === c.club) { h.relegated = divisionOf(c, c.club); notes.push(`⬇️ Relegated. Next season ${teamById(c.club).name} play in ${divisionName(h.relegated)}.`); }
   // your nemesis has a word on where you are going

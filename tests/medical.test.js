@@ -60,7 +60,7 @@ test('a player who starts a match unfit risks a knock, and a better centre lower
   assert.equal(S.knockChance(80, 1), 0);
   assert.ok(Math.abs(S.knockChance(0, 1) - 0.4) < 1e-9);
   assert.ok(Math.abs(S.knockChance(20, 1) - 0.2) < 1e-9);
-  assert.ok(Math.abs(S.knockChance(0, 3) - 0.2) < 1e-9);
+  assert.ok(Math.abs(S.knockChance(0, 10) - 0.2) < 1e-9);
   const m = fresh();
   const hurt = S.medAfterMatch(m, [{ id: 'a', start: 10, drain: 20 }], () => 0.01);
   assert.deepEqual(hurt, ['a']);
@@ -118,13 +118,17 @@ test('the clock going back changes nothing, and an edited fund is noticed', () =
   assert.equal(S.medTick(m, ctxOf(6 * HOUR)).tampered, true);
 });
 
-test('upgrading costs money and opens beds and physios', () => {
+test('a bigger centre opens beds and physios, a level at a time', () => {
   const m = fresh();
-  assert.equal(S.medUpgrade(m, ctxOf(0, { money: 0 })).ok, false);
-  assert.ok(S.medUpgrade(m, ctxOf(0)).ok);
+  assert.equal(m.beds.length, 2);
+  S.medSetLevel(m, 5);
   assert.equal(m.beds.length, 4);
   assert.ok(S.hirePhysio(m).ok && S.hirePhysio(m).ok);
-  assert.equal(S.hirePhysio(m).ok, false);
+  assert.equal(S.hirePhysio(m).ok, false, 'two physios at level 5');
+  S.medSetLevel(m, 10);
+  assert.equal(m.beds.length, 6);
+  assert.ok(S.medSealed(m), 'the books still add up');
+  assert.ok(S.knockChance(0, 3) < S.knockChance(0, 1) && S.knockChance(0, 3) > S.knockChance(0, 10), 'the levels between fill in');
 });
 
 test('a player starts the match on his fitness, and is not full of energy', () => {

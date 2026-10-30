@@ -44,12 +44,13 @@ export const paceTired = e => 1 - S.effect.bowlPace * tiredness(e);
 // physio brings it back fast. A player who plays while unfit may pick up a knock: until it is treated his fitness stops at 50. Fitness is the energy
 // he starts the next match with (match.js), so the rules above are all the match needs. Pure data and functions: the state is career.medical, money in $k.
 // The time is the server's (main.js), as for the other buildings.
+import { levelRow, lookOf } from './pacing.js';
 export const MIN = 60000, HOUR = 3600000, DAY = 86400000;
 export const MED = {
   LEVELS: [null,
-    { beds: 2, physios: 1, up: 0, prevent: 1 },       // beds; physios (each looks after two beds); up: $M to reach the level; prevent: the share of the knock chance that is left
-    { beds: 4, physios: 2, up: 1.0, prevent: 0.7 },
-    { beds: 6, physios: 3, up: 3.0, prevent: 0.5 }],
+    { beds: 2, physios: 1, prevent: 1 },       // the rows for level 1, 5 and 10 (pacing.js levelRow fills in the levels between); beds; physios (each looks after two beds); prevent: the share of the knock chance that is left
+    { beds: 4, physios: 2, prevent: 0.7 },
+    { beds: 6, physios: 3, prevent: 0.5 }],
   REST: 3, BED: 12,                    // fitness points an hour: resting, and in a bed with a level 1 physio
   LOSS: 0.6,                           // the share of the stamina a player used in a match that he loses in fitness
   RISK_BELOW: 40, RISK_MAX: 0.4,       // a player who starts a match under 40 fitness risks a knock: 40% at 0, none at 40
@@ -58,7 +59,7 @@ export const MED = {
   CAP: 10 * HOUR, CAP_UNVERIFIED: HOUR, START_FUND: 10,
 };
 const physioSpeed = p => 1 + 0.25 * (p.lvl - 1);
-const mcap = m => MED.LEVELS[m.level];
+const mcap = m => levelRow(MED.LEVELS, m.level);
 const msum = o => Object.values(o).reduce((a, b) => a + b, 0);
 const PHYSIOS = ['Dr Nair', 'Dr Silva', 'Dr Okafor', 'Dr Hussain', 'Dr Perera', 'Dr Banerjee', 'Dr Khan', 'Dr Fernando'];
 
@@ -78,7 +79,7 @@ export const isKnocked = (m, id) => !!m && id in m.knocked;
 export const fitCap = (m, id) => (isKnocked(m, id) ? MED.KNOCK_CAP : 100);
 export const medWagePerDay = m => m.physios.reduce((a, p) => a + MED.WAGE * physioSpeed(p), 0);
 // the chance that a player who starts a match on this fitness comes away with a knock
-export const knockChance = (fit, level) => (fit >= MED.RISK_BELOW ? 0 : MED.RISK_MAX * (1 - fit / MED.RISK_BELOW) * MED.LEVELS[level].prevent);
+export const knockChance = (fit, level) => (fit >= MED.RISK_BELOW ? 0 : MED.RISK_MAX * (1 - fit / MED.RISK_BELOW) * levelRow(MED.LEVELS, level).prevent);
 // the beds that are working: the occupied ones, as many as the physios can look after
 export function workingBeds(m) {
   const cap = m.physios.length * 2, out = [];
@@ -170,7 +171,7 @@ export function hirePhysio(m) {
 }
 export function firePhysio(m, id) { const i = m.physios.findIndex(p => p.id === id); if (i < 0) return mno('Not on the staff'); m.physios.splice(i, 1); medSeal(m); return mok; }
 export const physioTrainCost = p => MED.PHYSIO_TRAIN * p.lvl;
-export const physioMax = m => Math.min(MED.PHYSIO_MAX, m.level + 1);
+export const physioMax = m => Math.min(MED.PHYSIO_MAX, lookOf(m.level) + 1);
 export function trainPhysio(m, id, ctx) {
   const p = m.physios.find(x => x.id === id);
   if (!p) return mno('Not on the staff');
@@ -178,14 +179,8 @@ export function trainPhysio(m, id, ctx) {
   if (!medPay(m, physioTrainCost(p), ctx)) return mno('Not enough money');
   p.lvl++; medSeal(m); return mok;
 }
-export const medNextUpgrade = m => (m.level < 3 ? MED.LEVELS[m.level + 1] : null);
-export function medUpgrade(m, ctx) {
-  const n = medNextUpgrade(m);
-  if (!n) return mno('The medical centre is as big as it gets');
-  if (!ctx.bank.spend(n.up * 1000)) return mno('Not enough money in the club');
-  m.level++; while (m.beds.length < n.beds) m.beds.push(null);
-  medSeal(m); return mok;
-}
+// a finished building (pacing.js): the centre is one level bigger, with the beds for it
+export function medSetLevel(m, level) { m.level = level; while (m.beds.length < mcap(m).beds) m.beds.push(null); medSeal(m); }
 export function putInBed(m, index, id, ctx) {
   if (!ctx.has(id)) return mno('He is not in your squad');
   if (index < 0 || index >= m.beds.length) return mno('No such bed');

@@ -83,9 +83,9 @@ function manage(c, now, rng) {
   const afford = cost => c.money - cost >= reserve();
   // the factory
   c.merch ||= MF.freshMerch(now);
-  const m = c.merch, want = { 1: ['designer', 'printer'], 2: ['designer', 'printer', 'printer', 'printer', 'packer'], 3: ['designer', 'designer', 'printer', 'printer', 'printer', 'printer', 'printer', 'packer', 'packer'] }[m.level];
+  const m = c.merch, want = { 1: ['designer', 'printer'], 2: ['designer', 'printer', 'printer', 'printer', 'packer'], 3: ['designer', 'designer', 'printer', 'printer', 'printer', 'printer', 'printer', 'packer', 'packer'] }[PC.lookOf(m.level)];
   for (const role of want) { const have = MF.staffOf(m, role).length, need = want.filter(x => x === role).length; if (have < need) MF.hire(m, role); }
-  if (m.level >= 2 && m.machines < MF.MERCH.LEVELS[m.level].machines && afford(0.3)) MF.buyMachine(m, mctx(c, now));
+  if (m.level >= 2 && m.machines < PC.levelRow(MF.MERCH.LEVELS, m.level).machines && afford(0.3)) MF.buyMachine(m, mctx(c, now));
   if (MF.staffOf(m, 'printer').length && MF.staffOf(m, 'designer').length) {
     const dm = MF.demandMap(m, mctx(c, now)), top = [...dm].sort((x, y) => y[1] - x[1]).slice(0, 3).map(x => x[0]);
     for (const pid of top) { if (m.queue.length >= 4) break; for (let q = MF.maxOrder(m); q >= 5; q = Math.floor(q / 2)) if (MF.order(m, pid, q, mctx(c, now)).ok) break; }
@@ -94,7 +94,7 @@ function manage(c, now, rng) {
   const o = C.office(c); if (!o.deal) C.signSponsor(c, 'steady');
   // training
   c.training ||= TG.freshTraining(now);
-  const t = c.training, kinds = { 1: ['bat', 'pace'], 2: ['bat', 'pace', 'spin'], 3: ['bat', 'pace', 'spin', 'bat'] }[t.level];
+  const t = c.training, kinds = { 1: ['bat', 'pace'], 2: ['bat', 'pace', 'spin'], 3: ['bat', 'pace', 'spin', 'bat'] }[PC.lookOf(t.level)];
   kinds.forEach((k, i) => { if (t.coaches.filter(x => x.kind === k).length < kinds.slice(0, i + 1).filter(x => x === k).length) TG.hire(t, k); });
   const roster = C.trainingRoster(c);
   for (let i = 0; i < t.slots.length; i++) if (!t.slots[i]) {
@@ -111,28 +111,22 @@ function manage(c, now, rng) {
       if (keepHim && C.clubPlayers(c, c.club).length < C.MAX_SQUAD) C.promoteProspect(c, p.id); else C.sellProspect(c, p.id);
     }
   }
-  if (afford(0.2) && AC.placesUsed(a) < AC.ACAD.LEVELS[a.level].slots) AC.startTrip(a, rng.pick(['africa', 'europe', 'namerica', 'samerica', 'oceania']), 24, actx(c, now));
+  if (afford(0.2) && AC.placesUsed(a) < PC.levelRow(AC.ACAD.LEVELS, a.level).slots) AC.startTrip(a, rng.pick(['africa', 'europe', 'namerica', 'samerica', 'oceania']), 24, actx(c, now));
   // the medical centre
   c.medical ||= MD.freshMedical();
   const md = c.medical;
-  while (md.physios.length < MD.MED.LEVELS[md.level].physios) if (!MD.hirePhysio(md).ok) break;
+  while (md.physios.length < PC.levelRow(MD.MED.LEVELS, md.level).physios) if (!MD.hirePhysio(md).ok) break;
   for (const p of C.clubPlayers(c, c.club).sort((x, y) => MD.fitOf(md, x.id) - MD.fitOf(md, y.id))) {
     const free = md.beds.findIndex(x => !x);
     if (free < 0) break;
     if (MD.fitOf(md, p.id) < 85 || MD.isKnocked(md, p.id)) MD.putInBed(md, free, p.id, dctx(c, now));
   }
-  // upgrades, cheapest useful first, keeping a reserve
-  const ups = [['merch', 2, () => MF.upgrade(m, mctx(c, now)), MF.nextUpgrade(m)?.up, () => m.level === 1],
-    ['medical', 2, () => MD.medUpgrade(md, dctx(c, now)), MD.medNextUpgrade(md)?.up, () => md.level === 1],
-    ['academy', 2, () => AC.upgrade(a, actx(c, now)), AC.nextUpgrade(a)?.up, () => a.level === 1],
-    ['training', 2, () => TG.upgrade(t, tctx(c, now)), TG.nextUpgrade(t)?.up, () => t.level === 1],
-    ['stadium', 2, () => C.upgradeStadium(c), C.STADIUMS[C.stadiumLevel(c) + 1]?.cost, () => C.stadiumLevel(c) === 1 && !C.upgradeBlock(c)],
-    ['merch', 3, () => MF.upgrade(m, mctx(c, now)), MF.nextUpgrade(m)?.up, () => m.level === 2],
-    ['training', 3, () => TG.upgrade(t, tctx(c, now)), TG.nextUpgrade(t)?.up, () => t.level === 2],
-    ['academy', 3, () => AC.upgrade(a, actx(c, now)), AC.nextUpgrade(a)?.up, () => a.level === 2],
-    ['medical', 3, () => MD.medUpgrade(md, dctx(c, now)), MD.medNextUpgrade(md)?.up, () => md.level === 2],
-    ['stadium', 3, () => C.upgradeStadium(c), C.STADIUMS[C.stadiumLevel(c) + 1]?.cost, () => C.stadiumLevel(c) === 2 && !C.upgradeBlock(c)]];
-  for (const [name, lv, go, cost, due] of ups) { if (cost != null && due() && afford(cost)) { go(); c.upLog = [...(c.upLog || []), `${name}${lv}@${Math.round((now - T0) / DAY)}`]; break; } }
+  // upgrades: the finished ones are settled, then the cheapest level any building can have goes up, keeping a reserve (one builder; a second is never bought here)
+  const bctx = { now, trusted: true, bank: bankOf(c), level: id => (id === 'stadium' ? C.stadiumLvl(c) : c[id]?.level || 0), blocked: (id, to) => (id === 'stadium' ? C.stadiumBlocked(c, to) : null),
+    apply: (id, lv) => { if (id === 'stadium') C.setStadiumLevel(c, lv); else if (id === 'merch') MF.setLevel(m, lv); else if (id === 'training') TG.setLevel(t, lv); else if (id === 'academy') AC.setLevel(a, lv); else MD.medSetLevel(md, lv); } };
+  for (const j of PC.settleBuilds(c, bctx)) c.upLog = [...(c.upLog || []), `${j.id}${j.to}@${Math.round((now - T0) / DAY)}`];
+  const options = PC.IDS.filter(id => !PC.whyNot(c, id, bctx)).map(id => [id, PC.costOf(id, bctx.level(id) + 1)]).sort((x, y) => x[1] - y[1]);
+  for (const [id, cost] of options) if (afford(cost)) { PC.startBuild(c, id, bctx); break; }
 }
 
 const tot = c => { const t = { in: {}, out: {} }; for (const l of Object.values(C.office(c).led)) for (const d of ['in', 'out']) for (const [k, v] of Object.entries(l[d])) t[d][k] = (t[d][k] || 0) + v; return t; };
@@ -140,7 +134,7 @@ const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
 
 function run(profile, seed) {
   const c = newClub(seed), rng = makeRng(seed * 31 + 7), hours = PROFILES[profile];
-  let now = T0; c.pace = PC.freshPace(now);
+  let now = T0; c.pace = PC.freshPace(now); c.build = PC.freshBuild();
   const snaps = {}, hist = [];
   let matches = 0, last = tot(c);
   for (let day = 1; day <= DAYS; day++) {
@@ -174,7 +168,7 @@ function run(profile, seed) {
       snaps[day] = {
         money: c.money, matches, season: c.season, div: C.divisionOf(c, c.club), rating: C.clubRating(c, c.club),
         best: squad[0] ? ovr(squad[0]) : 0, avg11: top11.length ? top11.reduce((a, p) => a + ovr(p), 0) / top11.length : 0, n70: squad.filter(p => ovr(p) >= 70).length, n80: squad.filter(p => ovr(p) >= 80).length,
-        inc: d.in, out: d.out, levels: `F${c.merch.level} T${c.training.level} A${c.academy.level} M${c.medical.level} S${C.stadiumLevel(c)}`, titles: c.history.filter(h => h.pos === 1).length,
+        inc: d.in, out: d.out, levels: `F${c.merch.level} T${c.training.level} A${c.academy.level} M${c.medical.level} S${C.stadiumLvl(c)} club${PC.clubLevel(PC.buildOf(c).xp)}`, titles: c.history.filter(h => h.pos === 1).length,
         merchSold: c.merch.sold, prospects: C.prospectsOf(c).length, promoted: c.history.filter(h => h.promoted).length,
       };
     }
