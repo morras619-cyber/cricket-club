@@ -1598,14 +1598,14 @@ function candidateRow(kind, opts) {
   const list = candidatesOf(kind).slice().sort((a, b) => a.rating - b.rating);
   for (const x of list) {
     const need = HIRE_AT[x.rating], locked = opts.level < need, mine = opts.hired.has(x.id), [country, flag] = FLAGS[x.c];
-    const card = el('div', `mf-card cand${locked ? ' locked' : ''}${mine ? ' mine' : ''}`), top = el('div', 'cand-top'), inf = el('div', 'cand-info');
+    const card = el('div', `mf-card cand${locked ? ' locked' : ''}${mine ? ' mine' : ''}`), top = el('div', 'cand-top');
     const art = el('div', 'cand-art'); art.append(el('span', `stf stf-${x.id}`));
-    inf.append(el('b', '', x.name), el('small', '', `${flag} ${country} · ${x.age}`), el('span', 'mf-stars cand-stars', '★'.repeat(x.rating) + '☆'.repeat(3 - x.rating)), el('span', 'cand-job', CAND_JOB[x.role]));
-    top.append(inf);
+    top.append(el('b', 'cand-name', x.name), el('span', 'cand-flag', flag), el('span', 'cand-job', CAND_JOB[x.role]));
+    const mid = el('div', 'cand-mid'); mid.append(art, el('p', 'cand-about', x.about));
     const foot = el('div', 'cand-foot'), btn = mfBtn('mf-big cand-hire', [ico(locked ? 'lock' : 'plus'), el('span', '', mine ? 'Hired' : locked ? `Level ${need}` : opts.full ? 'No free place' : 'Hire')], () => opts.onHire(x));
     btn.disabled = locked || mine || opts.full;
     foot.append(el('span', 'cand-wage', `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`), btn);
-    card.append(art, top, el('p', 'cand-about', x.about), foot);
+    card.append(top, mid, el('span', 'mf-stars cand-stars', '★'.repeat(x.rating) + '☆'.repeat(3 - x.rating)), foot);
     if (locked) art.append(el('div', 'cand-lock', `Joins at level ${need}`));
     row.append(card); dots.append(el('i'));
   }
