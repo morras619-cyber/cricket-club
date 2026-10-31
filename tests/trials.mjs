@@ -119,7 +119,7 @@ check(await page.evaluate(async () => { const T = await import('/js/training.js'
 await page.evaluate(() => document.getElementById('trainBack').click()); await page.waitForTimeout(1000);
 check(await page.evaluate(() => !document.getElementById('clubmap').hidden), 'back from the training ground is the map');
 // the builders: the club's level and the builder under the map's title; a level needs XP, money and builder time; and a career from before the ten levels moves up
-check(await page.evaluate(() => /Club LV 1/.test(document.getElementById('mapBuild').textContent) && /Builder free/.test(document.getElementById('mapBuild').textContent) && /2nd builder/.test(document.getElementById('mapBuild').textContent)), 'the map shows the club level, a free builder and the second builder to buy');
+check(await page.evaluate(() => document.querySelector('#mapTop .tb-shield')?.textContent === '1' && /Builder free/.test(document.getElementById('mapBuild').textContent) && /2nd builder/.test(document.getElementById('mapBuild').textContent)), 'the map shows the club level in the top bar, a free builder and the second builder to buy');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'map-builders.png') });
 await tapAt(0.344, 0.165); await page.waitForTimeout(300);
 await page.evaluate(() => document.getElementById('mapOpen').click()); await page.waitForTimeout(1200);
