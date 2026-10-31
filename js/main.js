@@ -1590,17 +1590,20 @@ function staffFace(s, club, size = 64) {
 }
 const ROLE_NAME = { bat: 'Batter', bowl: 'Bowler', all: 'All-rounder', wk: 'Keeper' };
 const staffShort = (s, old) => (s.cand ? lastName(s.name.replace(/^Dr /, '')) : old);
+const CAND_ICON = { designer: 'pencil', printer: 'printer', packer: 'box', bat: 'ball', pace: 'ball', spin: 'ball', physio: 'heart', accountant: 'coin', agent: 'users' };
 const CAND_JOB = { designer: 'Designer', printer: 'Printer', packer: 'Packer', bat: 'Batting coach', pace: 'Pace coach', spin: 'Spin coach', physio: 'Physio', accountant: 'Accountant', agent: 'Agent' };
 // one person on a big card, used for the shortlist and for the people already hired: name, flag and job on top; his whole picture beside a few words;
 // stars and wage; and the button. f: { name, flag, job, face (an element), about, stars, wage, btn, cls }
 function personCard(f) {
-  const card = el('div', `mf-card cand ${f.cls || ''}`.trim()), top = el('div', 'cand-top'), mid = el('div', 'cand-mid'), art = el('div', 'cand-art'), foot = el('div', 'cand-foot'), tl = el('div', 'cand-tl');
-  art.append(f.face);
-  top.append(el('b', 'cand-name', f.name), el('span', 'cand-flag', f.flag || ''), el('span', 'cand-job', f.job));
-  mid.append(art, el('p', 'cand-about', f.about));
-  tl.append(el('span', 'mf-stars cand-stars', '★'.repeat(f.stars) + '☆'.repeat(3 - f.stars)), el('span', 'cand-wage', f.wage));
-  foot.append(tl, f.btn);
-  card.append(top, mid, foot);
+  const card = el('div', `mf-card cand ${f.cls || ''}`.trim()), top = el('div', 'cand-top'), body = el('div', 'cand-body'), art = el('div', 'cand-art'), job = el('span', 'cand-job');
+  art.append(f.face, el('span', 'mf-stars cand-stars', '★'.repeat(f.stars) + '☆'.repeat(3 - f.stars)));
+  job.append(ico(CAND_ICON[f.key] || 'star'), el('span', '', f.job));
+  top.append(el('b', 'cand-name', f.name), el('span', 'cand-flag', f.flag || ''), job);
+  const about = el('div', 'cand-aboutbox'); about.append(el('i', 'cand-tab', 'About'), el('p', 'cand-about', f.about));
+  const chip = el('div', 'cand-chip'); chip.append(ico('coin'), el('span', 'cand-wage', f.wage));
+  if (f.age) chip.append(ico('users'), el('span', 'cand-age', `Age ${f.age}`));
+  body.append(art, about, chip, f.btn);
+  card.append(top, body);
   return { card, art };
 }
 // cards in a row you swipe along, with dots under it (the next card peeks in)
@@ -1619,7 +1622,7 @@ function candidateRow(kind, opts) {
     const need = HIRE_AT[x.rating], locked = opts.level < need, mine = opts.hired.has(x.id), [, flag] = FLAGS[x.c];
     const btn = mfBtn('mf-big cand-hire', [ico(locked ? 'lock' : 'plus'), el('span', '', mine ? 'Hired' : locked ? `Level ${need}` : opts.full ? 'No free place' : 'Hire')], () => opts.onHire(x));
     btn.disabled = locked || mine || opts.full;
-    const { card, art } = personCard({ name: x.name, flag, job: CAND_JOB[x.role], face: el('span', `stf stf-${x.id}`), about: x.about, stars: x.rating, wage: `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`, btn, cls: `${locked ? 'locked' : ''} ${mine ? 'mine' : ''}` });
+    const { card, art } = personCard({ name: x.name, flag, key: x.role, age: x.age, job: CAND_JOB[x.role], face: el('span', `stf stf-${x.id}`), about: x.about, stars: x.rating, wage: `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`, btn, cls: `${locked ? 'locked' : ''} ${mine ? 'mine' : ''}` });
     if (locked) art.append(el('div', 'cand-lock', `Joins at level ${need}`));
     cards.push(card);
   }
@@ -1630,8 +1633,8 @@ function candidateRow(kind, opts) {
 function staffRow(people, free, onFree, freeLabel = 'Hire') {
   const cards = [];
   for (const q of people) {
-    const x = q.s.cand ? candidateById(q.s.cand) : null, btn = mfBtn('mf-big alt cand-hire', [ico('gear'), el('span', '', 'Open')], q.onOpen);
-    const { card } = personCard({ name: q.s.name, flag: x ? FLAGS[x.c][1] : '', job: CAND_JOB[q.job], face: q.face, about: x ? x.about : 'One of your first hires.', stars: q.s.lvl, wage: `${kfmt(wageText(q.base, q.s.lvl))} a day`, btn });
+    const x = q.s.cand ? candidateById(q.s.cand) : null, btn = mfBtn('mf-big cand-hire', [ico('plus'), el('span', '', 'Hire')], q.onOpen);
+    const { card } = personCard({ name: q.s.name, flag: x ? FLAGS[x.c][1] : '', key: q.job, age: x?.age, job: CAND_JOB[q.job], face: q.face, about: x ? x.about : 'One of your first hires.', stars: q.s.lvl, wage: `${kfmt(wageText(q.base, q.s.lvl))} a day`, btn });
     card.addEventListener('click', e => { if (!e.target.closest('button')) q.onOpen(); }); cards.push(card);
   }
   for (let i = 0; i < free; i++) {
