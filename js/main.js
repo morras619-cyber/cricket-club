@@ -7,7 +7,7 @@ import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
 import { flag, nationName } from './nations.js';
 import { faceEl } from './looks.js';
-import { futCard, portraitFace } from './futcard.js';
+import { futCard, portraitFace, paintedPortrait } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds.js';
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
@@ -1639,14 +1639,16 @@ function paintMerch(c) {
   body.replaceChildren();
   if (merchTab === 'fans') {
     // the fans: the six players they want most
-    const grid = el('div', 'mf-grid three');
+    const grid = el('div', 'mf-grid fc-grid');
     for (const [pid, info] of [...roster].sort((a, b) => (dmap.get(b[0]) || 0) - (dmap.get(a[0]) || 0)).slice(0, 6)) {
       const p = c.players[pid], stock = m.live[pid] || 0, forever = p.contract >= 50;
-      const card = el('button', `mf-card stack${merchSheet?.pid === pid ? ' pick' : ''}`);
+      const card = el('button', `mf-card fc${merchSheet?.pid === pid ? ' pick' : ''}`);
+      // the card is his painted bust (in his kit) with the numbers beside it; a player without one gets his drawn face
+      const art = el('span', 'fc-art'); art.append(paintedPortrait(p, p.team ? teamById(p.team) : null) || playerFace(p, 120));
       const bar = el('div', 'mf-bar'); const fill = el('i'); fill.style.width = `${Math.max(4, info.fame)}%`; bar.append(fill);
-      const r1 = el('div', 'mf-row'); r1.append(ico('heart'), el('span', '', String(Math.round(dmap.get(pid) || 0))), ico('jersey'), el('span', '', String(stock)));
-      const r2 = el('div', `mf-row ${m.designs[pid] ? 'ok' : 'no'}`); r2.append(ico(m.designs[pid] ? 'check' : 'pencil'), ico('clock'), el('span', '', forever ? '∞' : String(matchesLeft(c, p)))); r2.title = m.designs[pid] ? 'Jersey designed' : 'No jersey design yet';
-      card.append(frameOf(playerFace(p, 72)), el('b', '', lastName(info.name)), bar, r1, r2);
+      const row = (icon, text, dim = false) => { const r = el('div', `fc-row${dim ? ' dim' : ''}`); r.append(ico(icon), el('span', '', text)); return r; };
+      const inf = el('div', 'fc-info'); inf.append(el('b', '', lastName(info.name)), bar, row('heart', String(Math.round(dmap.get(pid) || 0))), row('jersey', String(stock)), row('pencil', m.designs[pid] ? '✓' : '–', !m.designs[pid]), row('clock', forever ? '∞' : String(matchesLeft(c, p))));
+      card.append(art, inf);
       card.addEventListener('click', () => { merchSheet = { type: 'order', pid }; sfx.click(); paintMerch(c); });
       grid.append(card);
     }
