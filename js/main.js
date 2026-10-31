@@ -241,23 +241,14 @@ $('setPitches').addEventListener('click', () => { sfx.click(); openPitchGuide(pi
 const myTeam = () => teamById(profile.team || 'thunder');
 function renderTitle() {
   ui.show('title');
-  const { lv, progress } = level(profile.xp);
-  $('tLvl').textContent = `Lv ${lv}`;
-  $('tXp').style.width = `${Math.round(progress * 100)}%`;
-  $('tCoins').textContent = profile.coins;
-  $('tGems').textContent = profile.gems || 0;
-  const t = myTeam();
-  $('tLogo').src = logoSrc(t.id);
-  $('tName').textContent = t.name;
-  $('tStyle').textContent = `${t.style.tag} · ★ ${heroById(t.star).name}`;
+  const c = profile.career, host = $('titleTop');
+  if (c?.club) fillTopbar(host, c, () => renderTitle());   // (the club's level, cash and diamonds, as on every other screen)
+  else host.replaceChildren(mfBtn('tb-gear', [ico('gear')], () => { sfx.click(); settingsFrom = renderTitle; renderSettings(); }));   // (a new player has no club yet: only the settings)
 }
 // (a player who has not done the tutorial goes to it first: the same one as the Tutorial button)
 $('tPlay').addEventListener('click', () => { unlockAudio(); sfx.click(); renderHome(); });   // (a new player sees the story first, then builds a club; Uncle Dev offers the tutorial after that)
 // where the settings, the shop, the trophies, the stats and the tutorial go back to (there is no hub): the title, the club map, or the settings
 let settingsFrom = null, shopFrom = null, moreFrom = null;
-$('tSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = renderTitle; renderSettings(); });
-for (const id of ['tCoinPill', 'tGemPill']) $(id).addEventListener('click', () => { unlockAudio(); shopFrom = renderTitle; renderShop(); });
-$('tTeam').addEventListener('click', () => { unlockAudio(); sfx.click(); renderHome(); });
 
 // ---------- home: the hub ----------
 // There is no hub screen: Play goes into the Super League. (?modes=all brings the old hub back, for the tests.)
