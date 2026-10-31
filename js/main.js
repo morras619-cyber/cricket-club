@@ -1596,13 +1596,14 @@ const CAND_JOB = { designer: 'Designer', printer: 'Printer', packer: 'Packer', b
 // stars and wage; and the button. f: { name, flag, job, face (an element), about, stars, wage, btn, cls }
 function personCard(f) {
   const card = el('div', `mf-card cand ${f.cls || ''}`.trim()), top = el('div', 'cand-top'), body = el('div', 'cand-body'), art = el('div', 'cand-art'), job = el('span', 'cand-job');
-  art.append(f.face, el('span', 'mf-stars cand-stars', '★'.repeat(f.stars) + '☆'.repeat(3 - f.stars)));
+  art.append(f.face);
+  const stars = el('span', 'mf-stars cand-stars', '★'.repeat(f.stars) + '☆'.repeat(3 - f.stars));
   job.append(ico(CAND_ICON[f.key] || 'star'), el('span', '', f.job));
-  top.append(el('b', 'cand-name', f.name), el('span', 'cand-flag', f.flag || ''), job);
-  const about = el('div', 'cand-aboutbox'); about.append(el('i', 'cand-tab', 'About'), el('p', 'cand-about', f.about));
-  const chip = el('div', 'cand-chip'); chip.append(ico('coin'), el('span', 'cand-wage', f.wage));
-  if (f.age) chip.append(ico('users'), el('span', 'cand-age', `Age ${f.age}`));
-  body.append(art, about, chip, f.btn);
+  top.append(el('b', `cand-name${f.name.length > 15 ? ' long' : ''}`, f.name), el('span', 'cand-flag', f.flag || ''), job);
+  const about = el('div', `cand-aboutbox ab-${f.panel}`); about.append(el('p', 'cand-about', f.about));
+  const chip = el('div', 'cand-chip'), ct = el('div', 'cand-ct'); ct.append(el('span', 'cand-wage', f.wage)); if (f.age) ct.append(el('span', 'cand-age', `Age ${f.age}`));
+  chip.append(ico('coin'), ct);
+  body.append(art, stars, about, chip, f.btn);
   card.append(top, body);
   return { card, art };
 }
@@ -1616,13 +1617,14 @@ function swipeRow(cards) {
 }
 // the people you can hire in a building, as cards you swipe along (or why not: already hired, no free place, or the building level he joins at).
 // opts: { level, hired: Set of ids, full, wage(role) -> $k a day, onHire(candidate) }
+const PANEL = { merch: 'factory', training: 'coach', medical: 'med', office: 'fin' };
 function candidateRow(kind, opts) {
   const list = candidatesOf(kind).slice().sort((a, b) => a.rating - b.rating), cards = [];
   for (const x of list) {
     const need = HIRE_AT[x.rating], locked = opts.level < need, mine = opts.hired.has(x.id), [, flag] = FLAGS[x.c];
     const btn = mfBtn('mf-big cand-hire', [ico(locked ? 'lock' : 'plus'), el('span', '', mine ? 'Hired' : locked ? `Level ${need}` : opts.full ? 'No free place' : 'Hire')], () => opts.onHire(x));
     btn.disabled = locked || mine || opts.full;
-    const { card, art } = personCard({ name: x.name, flag, key: x.role, age: x.age, job: CAND_JOB[x.role], face: el('span', `stf stf-${x.id}`), about: x.about, stars: x.rating, wage: `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`, btn, cls: `${locked ? 'locked' : ''} ${mine ? 'mine' : ''}` });
+    const { card, art } = personCard({ panel: PANEL[kind], name: x.name, flag, key: x.role, age: x.age, job: CAND_JOB[x.role], face: el('span', `stf stf-${x.id}`), about: x.about, stars: x.rating, wage: `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`, btn, cls: `${locked ? 'locked' : ''} ${mine ? 'mine' : ''}` });
     if (locked) art.append(el('div', 'cand-lock', `Joins at level ${need}`));
     cards.push(card);
   }
@@ -1630,11 +1632,11 @@ function candidateRow(kind, opts) {
 }
 // the people already hired, on the same big cards (tap to open), then one card for each free place.
 // people: [{ s (the staff entry), face (element), job (key of CAND_JOB), base ($k a day), onOpen }]; free: how many places are empty; onFree opens the shortlist
-function staffRow(people, free, onFree, freeLabel = 'Hire') {
+function staffRow(kind, people, free, onFree, freeLabel = 'Hire') {
   const cards = [];
   for (const q of people) {
     const x = q.s.cand ? candidateById(q.s.cand) : null, btn = mfBtn('mf-big cand-hire', [ico('plus'), el('span', '', 'Hire')], q.onOpen);
-    const { card } = personCard({ name: q.s.name, flag: x ? FLAGS[x.c][1] : '', key: q.job, age: x?.age, job: CAND_JOB[q.job], face: q.face, about: x ? x.about : 'One of your first hires.', stars: q.s.lvl, wage: `${kfmt(wageText(q.base, q.s.lvl))} a day`, btn });
+    const { card } = personCard({ panel: PANEL[kind], name: q.s.name, flag: x ? FLAGS[x.c][1] : '', key: q.job, age: x?.age, job: CAND_JOB[q.job], face: q.face, about: x ? x.about : 'One of your first hires.', stars: q.s.lvl, wage: `${kfmt(wageText(q.base, q.s.lvl))} a day`, btn });
     card.addEventListener('click', e => { if (!e.target.closest('button')) q.onOpen(); }); cards.push(card);
   }
   for (let i = 0; i < free; i++) {
@@ -1739,7 +1741,7 @@ function paintMerch(c) {
       body.append(grid);
     }
   } else if (merchTab === 'staff') {
-    const grid = staffRow(m.staff.map(q => ({ s: q, face: staffFace(q, club, 120), job: q.role, base: MF.ROLES[q.role].wage, onOpen: () => { merchSheet = { type: 'staff', id: q.id }; sfx.click(); paintMerch(c); } })), L.staff - m.staff.length, () => { merchSheet = { type: 'hire' }; sfx.click(); paintMerch(c); });
+    const grid = staffRow('merch', m.staff.map(q => ({ s: q, face: staffFace(q, club, 120), job: q.role, base: MF.ROLES[q.role].wage, onOpen: () => { merchSheet = { type: 'staff', id: q.id }; sfx.click(); paintMerch(c); } })), L.staff - m.staff.length, () => { merchSheet = { type: 'hire' }; sfx.click(); paintMerch(c); });
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${m.staff.length} of ${L.staff} places used · ${kfmt(MF.wagePerDay(m))} a day${m.level < PC.MAX_LEVEL ? ' · upgrade the factory for more places' : ''}`)); body.append(foot);
   } else {
@@ -1901,7 +1903,7 @@ function paintTraining(c) {
     body.append(grid);
     if (!list.length) body.append(el('p', 'sheetnote', 'Nobody in your squad can learn more right now.'));
   } else if (trainTab === 'coaches') {
-    const grid = staffRow(t.coaches.map(k => ({ s: k, face: staffFace(k, club, 120), job: k.kind, base: TG.TRAIN.WAGE, onOpen: () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); } })), L.coaches - t.coaches.length, () => { trainSheet = { type: 'hire' }; sfx.click(); paintTraining(c); });
+    const grid = staffRow('training', t.coaches.map(k => ({ s: k, face: staffFace(k, club, 120), job: k.kind, base: TG.TRAIN.WAGE, onOpen: () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); } })), L.coaches - t.coaches.length, () => { trainSheet = { type: 'hire' }; sfx.click(); paintTraining(c); });
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${t.coaches.length} of ${L.coaches} coaches · ${kfmt(TG.wagePerDay(t))} a day · each coach teaches two players at a time`)); body.append(foot);
   } else {
@@ -2079,7 +2081,7 @@ function paintOffice(c) {
     ag.append(Object.assign(el('span', 'stf stf-agent mf-agent-art'), {}), tx, ico('search'));
     body.append(ag);
   } else {
-    const col = el('div', 'mf-col'), places = officePlaces(c), grid = staffRow(o.staff.map(q => ({ s: q, face: staffFace(q, club, 120), job: q.role, base: OFFICE.WAGE[q.role], onOpen: () => { officeSheet = { type: 'officer', id: q.id }; sfx.click(); paintOffice(c); } })), places - o.staff.length, () => { officeSheet = { type: 'hire' }; sfx.click(); paintOffice(c); });
+    const col = el('div', 'mf-col'), places = officePlaces(c), grid = staffRow('office', o.staff.map(q => ({ s: q, face: staffFace(q, club, 120), job: q.role, base: OFFICE.WAGE[q.role], onOpen: () => { officeSheet = { type: 'officer', id: q.id }; sfx.click(); paintOffice(c); } })), places - o.staff.length, () => { officeSheet = { type: 'hire' }; sfx.click(); paintOffice(c); });
     col.append(grid);
     const card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head'), row = officeRow(c);
     hd.append(ico('factory'), el('b', '', `Office level ${o.level}`), el('span', 'mf-stars', '★'.repeat(PC.lookOf(o.level))));
@@ -2575,7 +2577,7 @@ function paintMedical(c) {
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${inBed} of ${m.beds.length} beds in use. Each physio looks after two beds, so ${m.physios.length} physio${m.physios.length === 1 ? '' : 's'} can treat ${m.physios.length * 2}. A bed heals 4 times as fast as resting.`)); body.append(foot);
   } else if (medTab === 'staff') {
-    const grid = staffRow(m.physios.map(ph => ({ s: ph, face: staffFace({ id: `phys-${ph.id}`, name: ph.name, cand: ph.cand }, club, 120), job: 'physio', base: MD.MED.WAGE, onOpen: () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); } })), L.physios - m.physios.length, () => { medSheet = { type: 'hire' }; sfx.click(); paintMedical(c); }, 'Hire a physio');
+    const grid = staffRow('medical', m.physios.map(ph => ({ s: ph, face: staffFace({ id: `phys-${ph.id}`, name: ph.name, cand: ph.cand }, club, 120), job: 'physio', base: MD.MED.WAGE, onOpen: () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); } })), L.physios - m.physios.length, () => { medSheet = { type: 'hire' }; sfx.click(); paintMedical(c); }, 'Hire a physio');
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${m.physios.length} of ${L.physios} physios · ${kfmt(MD.medWagePerDay(m))} a day. Without a physio the beds do nothing.`)); body.append(foot);
   } else {
