@@ -23,6 +23,9 @@ HAIR_FIX = {
     'bilal-noorzai': '#1c1410', 'jermaine-granger': '#141010', 'captain-comet': '#2a1a14', 'iron-wall-ian': '#2a1a14',
     # the black-background sheets: a red headband over dark hair, and golden curls the outline darkens
     'ahsan-gondal': '#2a1612', 'blake-ruawai': '#b5873f',
+    # the sky-background sheets: two turbans and four caps/hats hide the hair
+    'varun-grewal': '#141010', 'sahil-bhalla': '#141010', 'varun-menon': '#1e1612', 'nuwan-jayasena': '#1e1612',
+    'sajid-sikder': '#2a1c14', 'vihaan-mathur': '#2a1c14', 'talha-hashmi': '#241812',
 }
 
 
