@@ -346,8 +346,8 @@ await page.evaluate(() => document.querySelector('#acadSheet .mf-big').click());
 check(await page.evaluate(() => window.__sixcharge.demo.academy.trips.length === 1 && /back in/.test(document.getElementById('acadBody').textContent)) && await acFits(), 'a 12-hour trip is under way and shows its time left');
 await page.evaluate(() => [...document.querySelectorAll('#acadTest .chipbtn')].find(b => /12 hours/.test(b.textContent)).click()); await page.waitForTimeout(700);
 await acTab('Prospects');
-check(await page.evaluate(() => window.__sixcharge.demo.academy.prospects.length === 1 && document.querySelectorAll('#acadBody .mf-card.stack:not(.empty)').length === 1), 'twelve hours later the scout is back with a prospect');
-await page.evaluate(() => document.querySelector('#acadBody .mf-card.stack:not(.empty)').click()); await page.waitForTimeout(250);
+check(await page.evaluate(() => window.__sixcharge.demo.academy.prospects.length === 1 && document.querySelectorAll('#acadBody .mf-card.fc').length === 1), 'twelve hours later the scout is back with a prospect');
+await page.evaluate(() => document.querySelector('#acadBody .mf-card.fc').click()); await page.waitForTimeout(250);
 check(await page.evaluate(() => /not known yet/.test(document.getElementById('acadSheet').textContent) && /Trial drill/.test(document.getElementById('acadSheet').textContent)), 'the prospect sheet hides his ceiling until a trial drill');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'academy-prospect.png') });
 await page.evaluate(() => [...document.querySelectorAll('#acadSheet .mf-big')].find(b => /Trial drill/.test(b.textContent)).click()); await page.waitForTimeout(300);
@@ -364,7 +364,7 @@ await page.evaluate(() => document.getElementById('acadBack').click()); await pa
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the academy is the settings');
 // the medical centre: from the settings (a practice club): a match tires the squad, a physio and a bed bring a player back, no scrolling
 await page.evaluate(() => document.getElementById('setMedical').click()); await page.waitForTimeout(1200);
-check(await page.evaluate(() => !document.getElementById('medical').hidden && document.querySelectorAll('#medTabs .mf-tab').length === 4 && document.querySelectorAll('#medBody .mf-card.stack').length === 6), 'the settings open the medical centre: four tabs and the six most tired players');
+check(await page.evaluate(() => !document.getElementById('medical').hidden && document.querySelectorAll('#medTabs .mf-tab').length === 4 && document.querySelectorAll('#medBody .mf-card.fc').length === 6), 'the settings open the medical centre: four tabs and the six most tired players');
 const mdFits = async () => page.evaluate(() => { const m = document.querySelector('#medical .mf'), b = document.getElementById('medBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
 const mdTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#medTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(250); };
 check(await mdFits(), 'the squad tab fits the screen');
