@@ -387,7 +387,7 @@ function paintShop(c) {
   buildTick(c);
   const h = shopOf(c), trusted = clock.state === 'ok', now = serverNow() + shopDay * 86400000, row = shopRow(c), dm = PC.buildOf(c).diamonds;
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) shopSheet = null; } saveProfile(profile); paintShop(c); };
-  $('shopLede').textContent = shopTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
+  paintShell(c, 'shop', 'shop', shopTab === 'gear' || shopTab === 'style' ? 'small' : 'mid'); $('shopLede').textContent = shopTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
   $('shopLvl').replaceChildren(ico('factory'), el('span', '', `LV ${h.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   $('shopStats').replaceChildren(stat('coin', 'gold', money(c.money), 'club cash'), stat('star', 'blue', `${dm} 💎`, 'diamonds'), stat('box', 'red', `${h.gear.length}/${armourySlots(c)}`, 'in the armoury'));
@@ -1490,6 +1490,12 @@ function fillTopbar(host, c) {
     pill('diamond', String(b.diamonds), () => { sfx.click(); fromMap = true; shopTab = 'diamonds'; renderShop(); }),
     mfBtn('tb-gear', [ico('gear')], () => { sfx.click(); renderSettings(); }));
 }
+// the top bar and the hero of a building's screen: size is how tall the picture may be (dense tabs ask for a small one)
+function paintShell(c, prefix, id, size = 'mid') {
+  fillTopbar($(`${prefix}Top`), c);
+  const hero = $(`${prefix}Hero`); hero.dataset.size = size;
+  paintHero(hero, c, id);
+}
 // the building's own picture (the map's, painted in the club's colours) behind the screen's title
 async function paintHero(host, c, id) {
   const club = teamById(c.club), look = PC.lookOf(levelOfBuilding(c, id) || 1), key = `${id}|${club.suit}|${club.trim}|${look}`;
@@ -1514,8 +1520,8 @@ function buildBlock(c, id, after) {
   }
   if (lv >= PC.MAX_LEVEL) { out.push(el('p', 'sheetnote', `The best ${BUILD_NAME[id].toLowerCase()} there is.`)); return out; }
   const to = lv + 1, cost = PC.costOf(id, to), why = PC.whyNot(c, id, buildCtx(c));
-  const r = el('div', 'mf-row'); r.append(ico('up'), el('span', '', `Level ${to}${PC.lookOf(to) > PC.lookOf(lv) ? ' (a new look)' : ''} · ${money(cost)} · ${PC.hoursOf(to)} h to build`));
-  const btn = mfBtn('mf-big', [ico('up'), el('span', '', `Build level ${to}`)], () => { const res = PC.startBuild(c, id, buildCtx(c)); if (!res.ok) { ui.toast(res.why); return; } sfx.dhol(); saveProfile(profile); after(); });
+  const r = el('div', 'mf-row'); r.append(ico('upgrade'), el('span', '', `Level ${to}${PC.lookOf(to) > PC.lookOf(lv) ? ' (a new look)' : ''} · ${money(cost)} · ${PC.hoursOf(to)} h to build`));
+  const btn = mfBtn('mf-big', [ico('upgrade', 'big'), el('span', '', `Build level ${to}`)], () => { const res = PC.startBuild(c, id, buildCtx(c)); if (!res.ok) { ui.toast(res.why); return; } sfx.dhol(); saveProfile(profile); after(); });
   btn.disabled = !!why || c.money < cost;
   out.push(r, btn);
   if (why) out.push(el('p', 'sheetnote', why === `Needs club level ${to}` ? `Needs club level ${to}: ${Math.round(b.xp)} of ${PC.XP_AT[to]} XP` : why));
@@ -1542,6 +1548,7 @@ let merchTest = false, merchDemo = null;
 const demoCareer = () => { if (!merchDemo) { merchDemo = newCareer(Date.now() >>> 0); chooseClub(merchDemo, merchDemo.divisions.d3[0]); merchDemo.money = 2; merchDemo.build = PC.freshBuild(PC.XP_AT[10]); PC.addDiamonds(merchDemo, 500); if (window.__sixcharge) window.__sixcharge.demo = merchDemo; } return merchDemo; };
 // the icons (24 x 24, drawn with the game's thick dark outline)
 const ICON = {
+  upgrade: '<path d="M12 2l9 10h-5v10H8V12H3z"/>',
   diamond: '<path d="M7 3h10l5 6-10 12L2 9z"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none"/>',
   jersey: '<path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3c-1 2-7 2-8 0z"/>',
   coin: '<circle cx="12" cy="12" r="9"/><text x="12" y="16.6" text-anchor="middle" font-size="12" font-weight="900" fill="#14102a" stroke="none">$</text>',
@@ -1595,7 +1602,7 @@ function paintMerch(c) {
   const m = c.merch, club = teamById(c.club), roster = merchRoster(c), dmap = MF.demandMap(m, merchCtx(c)), L = PC.levelRow(MF.MERCH.LEVELS, m.level);
   const ctx = () => merchCtx(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) merchSheet = null; } saveProfile(profile); merchTick(c); paintMerch(c); };
-  fillTopbar($('merchTop'), c); paintHero($('merchHero'), c, 'merch');
+  paintShell(c, 'merch', 'merch', 'big');
   // the top: the till, what it earns and costs, and the button to collect
   $('merchLede').textContent = merchTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   const lv = $('merchLvl'); lv.replaceChildren(ico('factory'), el('span', '', `LV ${m.level}`));
@@ -1774,7 +1781,7 @@ function paintTraining(c) {
   const t = c.training, club = teamById(c.club), roster = trainingRoster(c), L = PC.levelRow(TG.TRAIN.LEVELS, t.level);
   const ctx = () => trainCtx(c), who = TG.assignments(t, ctx());
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) trainSheet = null; } saveProfile(profile); trainTick(c); paintTraining(c); };
-  $('trainLede').textContent = trainTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
+  paintShell(c, 'train', 'training'); $('trainLede').textContent = trainTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   $('trainLvl').replaceChildren(ico('factory'), el('span', '', `LV ${t.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   const busy = t.slots.filter(Boolean).length;
@@ -1944,7 +1951,7 @@ function paintOffice(c) {
   const club = teamById(c.club), o = office(c), books = seasonBooks(c), last = seasonBooks(c, c.season - 1);
   buildTick(c);
   const done = (r, close = false) => { if (r === false || r?.ok === false) ui.toast(r?.why || 'Not now'); else { sfx.click(); if (close) officeSheet = null; } saveProfile(profile); paintOffice(c); };
-  $('officeLede').textContent = officeTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · season ${c.season} · club ${money(c.money)}`;
+  paintShell(c, 'office', 'office', officeTab === 'money' ? 'tiny' : 'mid'); $('officeLede').textContent = officeTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · season ${c.season} · club ${money(c.money)}`;
   $('officeLvl').replaceChildren(ico('factory'), el('span', '', `LV ${o.level}`));
   const inn = totalOf(books.in), out = totalOf(books.out), net = Math.round((inn - out) * 100) / 100;
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
@@ -2119,7 +2126,7 @@ function paintClubhouse(c) {
   const h = clubhouse(c), club = teamById(c.club), now = serverNow(), trusted = clock.state === 'ok', P = ensureChirp(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) clubSheet = null; } saveProfile(profile); paintClubhouse(c); };
   const links = chemLinks(c), row = clubhouseRow(c);
-  $('clubhouseLede').textContent = clubTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
+  paintShell(c, 'clubhouse', 'clubhouse', clubTab === 'chem' ? 'small' : 'mid'); $('clubhouseLede').textContent = clubTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   $('clubhouseLvl').replaceChildren(ico('factory'), el('span', '', `LV ${h.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   $('clubhouseStats').replaceChildren(stat('heart', 'red', String(links.length), 'chemistry links'), stat('users', 'blue', compact(P.fans), 'followers'), stat('star', 'gold', buzzWord(P.buzz), 'buzz'));
@@ -2212,7 +2219,7 @@ function paintApartment(c) {
   buildTick(c);
   const a = apartment(c), row = aptRow(c), lvl = mgrLevel(c), trophies = trophiesOf(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) aptSheet = null; } saveProfile(profile); paintApartment(c); };
-  $('apartmentLede').textContent = aptTest ? `Practice club (nothing is saved) · salary ${money(salaryCash(c))}` : `${teamById(c.club).name} · salary ${money(salaryCash(c))}`;
+  paintShell(c, 'apartment', 'apartment', aptTab === 'decor' || aptTab === 'cabinet' ? 'small' : 'mid'); $('apartmentLede').textContent = aptTest ? `Practice club (nothing is saved) · salary ${money(salaryCash(c))}` : `${teamById(c.club).name} · salary ${money(salaryCash(c))}`;
   $('apartmentLvl').replaceChildren(ico('factory'), el('span', '', `LV ${a.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   $('apartmentStats').replaceChildren(stat('star', 'gold', `LV ${lvl}`, 'manager'), stat('coin', 'blue', money(salaryCash(c)), 'salary saved'), stat('trophy', 'red', String(trophies.reduce((n, t) => n + t.count, 0)), 'trophies'));
@@ -2323,7 +2330,7 @@ const TIER_CLS = ['common', 'rare', 'epic', 'super'];
 function paintAcademy(c) {
   const a = c.academy, L = PC.levelRow(AC.ACAD.LEVELS, a.level), now = serverNow(), ctx = () => acadCtx(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) acadSheet = null; } saveProfile(profile); acadTick(c); paintAcademy(c); };
-  $('acadLede').textContent = acadTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
+  paintShell(c, 'acad', 'academy', acadTab === 'seniors' || acadTab === 'trips' ? 'small' : 'mid'); $('acadLede').textContent = acadTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
   $('acadLvl').replaceChildren(ico('factory'), el('span', '', `LV ${a.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   $('acadStats').replaceChildren(stat('coin', 'gold', kfmt(a.fund), 'in the fund'), stat('users', 'blue', `${AC.placesUsed(a)}/${L.slots}`, 'places used'), stat('clock', 'red', kfmt(AC.upkeepPerDay(a)), 'upkeep a day'));
@@ -2491,7 +2498,7 @@ const fitColour = f => (f >= 70 ? 'green' : f >= 40 ? 'amber' : 'red');
 function paintMedical(c) {
   const m = c.medical, L = PC.levelRow(MD.MED.LEVELS, m.level), club = teamById(c.club), squad = clubPlayers(c, c.club), ctx = () => medCtx(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) medSheet = null; } saveProfile(profile); medTickC(c); paintMedical(c); };
-  $('medLede').textContent = medTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
+  paintShell(c, 'med', 'medical'); $('medLede').textContent = medTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   $('medLvl').replaceChildren(ico('factory'), el('span', '', `LV ${m.level}`));
   const avg = squad.length ? Math.round(squad.reduce((a, p) => a + MD.fitOf(m, p.id), 0) / squad.length) : 100, hurt = squad.filter(p => MD.isKnocked(m, p.id)).length;
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };

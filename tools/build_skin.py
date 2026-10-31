@@ -15,7 +15,7 @@ def window(name, inset):   # a frame with its middle cut out, so a portrait show
     for y in range(t, h - t):
         for x in range(t, w - t): px[x, y] = (0, 0, 0, 0)
     b = io.BytesIO(); im.resize((min(w, 260), round(h * min(w, 260) / w)), Image.LANCZOS).save(b, 'WEBP', quality=88, method=6); return f"url(data:image/webp;base64,{base64.b64encode(b.getvalue()).decode()})"
-ICONS = ['coin', 'diamond', 'xp', 'clock', 'hammer', 'trophy', 'ball', 'bat', 'shoes', 'grips', 'users', 'heart', 'chart', 'box', 'gear', 'plus', 'check', 'cross', 'up', 'warn', 'lock', 'jersey', 'search', 'star-on', 'pencil', 'printer']
+ICONS = ['coin', 'diamond', 'xp', 'clock', 'hammer', 'trophy', 'ball', 'bat', 'shoes', 'grips', 'users', 'heart', 'chart', 'box', 'gear', 'plus', 'check', 'cross', 'up', 'warn', 'lock', 'jersey', 'search', 'star-on', 'pencil', 'printer', 'upgrade']
 COLS, CELL = 6, 96
 def atlas():
     rows = -(-len(ICONS) // COLS); sheet = Image.new('RGBA', (COLS * CELL, rows * CELL), (0, 0, 0, 0))
@@ -33,7 +33,7 @@ def build():
     out = [A]
     ic, rows = atlas()
     out.append(f".ico[data-n] {{ background: {ic} no-repeat; background-size: {COLS * 100}% {rows * 100}%; }} .ico[data-n] svg {{ display: none; }}")
-    m = {'coin': 'coin', 'users': 'users', 'clock': 'clock', 'warn': 'warn', 'plus': 'plus', 'heart': 'heart', 'up': 'up', 'check': 'check', 'trophy': 'trophy', 'chart': 'chart', 'star': 'star-on', 'ball': 'ball', 'search': 'search', 'cross': 'cross', 'jersey': 'jersey', 'box': 'box', 'gear': 'gear', 'factory': 'hammer', 'pencil': 'pencil', 'printer': 'printer', 'diamond': 'diamond'}
+    m = {'coin': 'coin', 'users': 'users', 'clock': 'clock', 'warn': 'warn', 'plus': 'plus', 'heart': 'heart', 'up': 'up', 'check': 'check', 'trophy': 'trophy', 'chart': 'chart', 'star': 'star-on', 'ball': 'ball', 'search': 'search', 'cross': 'cross', 'jersey': 'jersey', 'box': 'box', 'gear': 'gear', 'factory': 'hammer', 'pencil': 'pencil', 'printer': 'printer', 'diamond': 'diamond', 'upgrade': 'upgrade'}
     for name, key in m.items():
         i = ICONS.index(key); out.append(f".ico[data-n={name}] {{ background-position: {(i % COLS) / (COLS - 1) * 100:.3f}% {(i // COLS) / (rows - 1) * 100:.3f}%; }}")
     def nine(sel, name, slice_, bw, width=None, extra=''):
@@ -70,6 +70,7 @@ def build():
     nine('SC .mf-collect', 'btn-green', 46, 12, 440, 'color: #fff; text-shadow: 0 2px 0 #14420f;')
     nine('SC .mf-qty button', 'btn-blue', 46, 9, 440, 'color: #fff;')
     nine('SC .mf-qty button.on', 'btn-yellow', 46, 9, 440, 'color: #14102a;')
+    out.append("SC .mf-fin { border-width: 7px; border-image-width: 7px; } SC .mf-fin .ico { width: 22px; height: 22px; } SC .mf-fin-t { gap: 1px; }")
     out.append("SC .mf-fin, SC .mf-role { padding: 0 2px; } SC .mf-collect { min-height: 40px; } SC .mf-qty button { min-height: 38px; padding: 0 2px; }")
     out.append("SC .mf-card .mf-badge { background: linear-gradient(#ff7a85, #d6283c); border: 2px solid #fff; border-radius: 9px; min-width: 0; padding: 0 5px; height: 17px; line-height: 13px; font-size: 9px; top: 4px; right: 4px; text-shadow: none; }")
     # ---- the common components of every other screen (the hub, squad, records, settings, auction, results ...) ----
@@ -115,8 +116,11 @@ def build():
     out.append(".tb-pill { flex: none; display: flex; align-items: center; gap: 3px; padding: 0 2px 0 6px; height: 32px; border-radius: 12px; background: linear-gradient(#10206a, #080f40); border: 2px solid #ffb800; box-shadow: 0 0 0 2px #14102a; color: #fff; font-weight: 900; font-size: 13px; } .tb-pill .ico { width: 22px; height: 22px; } .tb-plus { width: 26px; height: 26px; padding: 0; border: 0; background: none; } .tb-plus .ico { width: 26px; height: 26px; } .tb-gear { flex: none; width: 36px; height: 36px; padding: 0; border: 0; background: none; } .tb-gear .ico { width: 36px; height: 36px; }")
     out.append(f".bhero {{ position: relative; flex: none; height: clamp(0px, calc(100vh - 560px), 220px); display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }} .bhero::before {{ content: ''; position: absolute; left: -4%; right: -4%; bottom: -2%; height: 62%; background: radial-gradient(ellipse at 50% 72%, rgba(255, 214, 120, .38), rgba(255, 214, 120, 0) 66%); pointer-events: none; }} .bhero > * {{ position: relative; z-index: 2; }} .bhero .bhero-art {{ position: absolute; z-index: 1; left: 50%; bottom: 0; transform: translateX(-50%); height: 100%; width: auto; max-width: 118%; object-fit: contain; background: none; border-radius: 0; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .55)); pointer-events: none; }}")
     out.append(f".bhero .mf-title {{ position: absolute; left: 50%; top: 0; transform: translateX(-50%); flex: none; min-width: 170px; align-items: center; text-align: center; padding: 6px 26px 12px; background: {rb} center / 100% 100% no-repeat; z-index: 3; }} .bhero .mf-title b {{ font-size: 30px; }} .bhero .mf-title small {{ display: none; }}")
+    out.append(".bhero ~ .mf-body .mf-card.stack .mf-frame { --fs: 52px; }")
     out.append(".mf > * { flex-shrink: 0; } .mf > .mf-body { flex-shrink: 1; }")
-    out.append("@media (max-height: 720px) { .bhero { height: 52px; } .bhero .bhero-art, .bhero::before { display: none; } }")
+    out.append(".bhero[data-size=mid] { height: clamp(0px, calc(100vh - 640px), 170px); } .bhero[data-size=small] { height: clamp(0px, calc(100vh - 720px), 96px); } .bhero[data-size=tiny] { height: 52px; } .bhero[data-size=tiny] .bhero-art, .bhero[data-size=tiny]::before { display: none; } .mf-big .ico.big { width: 30px; height: 30px; }")
+    out.append("@media (max-height: 720px) { .mf .mf-card, .mf .mf-card.empty { border-width: 8px; border-image-width: 8px; } .mf .mf-fin { border-width: 5px; border-image-width: 5px; } .mf .mf-tab, .mf .mf-tab.on { min-height: 44px; border-width: 9px; border-image-width: 9px; } .mf .mf-tab .ico { width: 20px; height: 20px; } .topbar { min-height: 38px; } .tb-shield { height: 40px; width: 35px; } .mf { gap: 5px; } .mf-body { gap: 5px; } .mf-col { gap: 5px; } .mf .mf-test { padding: 1px 6px; } .mf .mf-test .chipbtn { min-height: 26px; } }")
+    out.append("@media (max-height: 720px) { .bhero, .bhero[data-size] { height: 52px; } .bhero .bhero-art, .bhero::before { display: none; } #office .mf-stats, #clubhouse .mf-stats, #apartment .mf-stats { display: none; } }")
     out.append(".mf-jersey { position: relative; flex: none; width: 56px; height: 56px; } .mf-jersey .ico.jer { width: 56px; height: 56px; } .mf-qty-badge { position: absolute; right: -4px; bottom: -2px; min-width: 22px; padding: 0 5px; height: 20px; line-height: 17px; border-radius: 10px; background: #14102a; color: #fff; border: 2px solid #ffd23f; font-style: normal; font-size: 11px; font-weight: 900; text-align: center; }")
     out.append("#merch .mf-grid.three .mf-card.stack .mf-frame { --fs: 54px; } #merch .mf-grid.three .mf-card.stack { gap: 2px; } #merch .mf-grid.three .mf-card.stack .mf-row { flex-wrap: nowrap; } @media (max-height: 720px) { #merch .mf-grid.three .mf-card.stack .mf-frame { --fs: 38px; } #merch .mf-grid.three { grid-auto-rows: minmax(0, 118px); } }")
     out.append(".tab { padding: 2px 4px; min-height: 40px; } .map-tab { min-height: 56px; padding: 0 2px; }")
