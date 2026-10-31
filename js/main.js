@@ -1645,9 +1645,11 @@ function paintMerch(c) {
       const card = el('button', `mf-card fc${merchSheet?.pid === pid ? ' pick' : ''}`);
       // the card is his painted bust (in his kit) with the numbers beside it; a player without one gets his drawn face
       const art = el('span', 'fc-art'); art.append(paintedPortrait(p, p.team ? teamById(p.team) : null) || playerFace(p, 120));
-      const bar = el('div', 'mf-bar'); const fill = el('i'); fill.style.width = `${Math.max(4, info.fame)}%`; bar.append(fill);
-      const row = (icon, text, dim = false) => { const r = el('div', `fc-row${dim ? ' dim' : ''}`); r.append(ico(icon), el('span', '', text)); return r; };
-      const inf = el('div', 'fc-info'); inf.append(el('b', '', lastName(info.name)), bar, row('heart', String(Math.round(dmap.get(pid) || 0))), row('jersey', String(stock)), row('pencil', m.designs[pid] ? '✓' : '–', !m.designs[pid]), row('clock', forever ? '∞' : String(matchesLeft(c, p))));
+      const bar = el('div', 'mf-bar fc-bar'); const fill = el('i'); fill.style.width = `${Math.max(4, info.fame)}%`; bar.append(fill); bar.title = 'Fame';
+      // the card's picture has the icons painted in: only the numbers go in its slots
+      const val = (n, text, title, dim = false) => { const v = el('span', `fc-v fc-v${n}${dim ? ' dim' : ''}`, text); v.title = title; return v; };
+      const inf = el('div', 'fc-info');
+      inf.append(el('b', 'fc-name', lastName(info.name)), bar, val(1, String(Math.round(dmap.get(pid) || 0)), 'How much the fans want his jersey'), val(2, String(stock), 'Jerseys in stock'), val(3, m.designs[pid] ? '✓' : '–', m.designs[pid] ? 'Jersey designed' : 'No jersey design yet', !m.designs[pid]), val(4, forever ? '∞' : String(matchesLeft(c, p)), 'League matches left on his contract'));
       card.append(art, inf);
       card.addEventListener('click', () => { merchSheet = { type: 'order', pid }; sfx.click(); paintMerch(c); });
       grid.append(card);
