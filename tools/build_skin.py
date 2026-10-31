@@ -31,15 +31,25 @@ def make_green():
 
 # the fan card with other icons: the painted ones are cleaned off (tools/ui/src/fan-card-clean.png) and four others are painted on in their place
 CARD_ICONS = {'train': ['xp', 'up', 'hammer', 'clock'], 'med': ['heart', 'medkit', 'warn', 'xp'], 'acad': ['xp', 'up', 'clock', 'trophy'], 'staff': ['xp', 'coin']}
+# the card is made taller: a plain strip of its yellow, just under the frame, is stretched to leave room for the player's name above the bar
+GROW = (0.13, 0.075, 0.10)   # extra height (share of the card), and where the stretched strip starts and ends (shares of the old height)
+def grow(im):
+    w, h = im.size; e, a, b = GROW; y0, y1, E = round(h * a), round(h * b), round(h * e)
+    out = Image.new('RGBA', (w, h + E))
+    out.paste(im.crop((0, 0, w, y0)), (0, 0))
+    out.paste(im.crop((0, y0, w, y1)).resize((w, y1 - y0 + E), Image.LANCZOS), (0, y0))
+    out.paste(im.crop((0, y1, w, h)), (0, y1 + E))
+    return out
 def icon_variants():
     base = Image.open(os.path.join(D, 'src', 'fan-card-clean.png')).convert('RGBA').crop((35, 36, 1501, 983))
+    base = grow(base); E = base.height - 947
     out = {}
     for name, icons in CARD_ICONS.items():
         card = base.copy()
         for k, ic in enumerate(icons):
             im = Image.open(os.path.join(D, 'ic-' + ic + '.png')).convert('RGBA'); s = 128 / max(im.size)
             im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
-            cy = (365, 513, 658, 801)[k]; card.alpha_composite(im, (1003 - 35 - im.width // 2, cy - 36 - im.height // 2))
+            cy = (365, 513, 658, 801)[k]; card.alpha_composite(im, (1003 - 35 - im.width // 2, cy - 36 + E - im.height // 2))
         buf = io.BytesIO(); card.resize((460, round(460 * card.height / card.width)), Image.LANCZOS).save(buf, 'WEBP', quality=86, method=6)
         out[name] = f"url(data:image/webp;base64,{base64.b64encode(buf.getvalue()).decode()})"
     return out
@@ -164,7 +174,12 @@ def build():
     out.append(".mf-card.mf-agent { position: relative; padding: 0 6px 0 92px; min-height: 70px; } .mf-agent .mf-agent-art { position: absolute; left: 2px; bottom: 0; width: 86px; height: 92px; background-color: transparent; background-size: contain; background-position: 50% 100%; } .mf-agent .mf-info b { font-size: 16px; } .mf-agent .mf-info small { font-size: 11px; font-weight: 700; opacity: .8; line-height: 1.2; } .mf-agent > .ico { width: 24px; height: 24px; flex: none; }")
     out.append(".title-topbar { width: 100%; justify-content: flex-end; } .title-topbar .tb-xp { min-width: 40px; }")
     # ---- the fan cards of the factory: the supplied gold card (its icons and slots painted in), the portrait on its left, the numbers in its slots ----
-    FC = json.load(open(os.path.join(D, 'fan-card.json'))); fu, _ = uri('fan-card', 460, 86); variants = icon_variants()
+    FC = json.load(open(os.path.join(D, 'fan-card.json'))); variants = icon_variants()
+    g = grow(Image.open(os.path.join(D, 'fan-card.png')).convert('RGBA')); g.save(os.path.join(D, 'fan-card-tall.png')); fu, _ = uri('fan-card-tall', 460, 86)
+    H0, H1 = 947, g.height; E = H1 - H0
+    for n in ('bar', 'r1', 'r2', 'r3', 'r4'): FC[n]['t'] = (FC[n]['t'] * H0 / 100 + E) / H1 * 100; FC[n]['h'] = FC[n]['h'] * H0 / H1
+    FC['art']['h'] = ((FC['art']['t'] + FC['art']['h']) * H0 / 100 + E) / H1 * 100 - FC['art']['t'] * H0 / H1; FC['art']['t'] = FC['art']['t'] * H0 / H1
+    FC['aspect'] = round(g.width / g.height, 4)
     def at(n): q = FC[n]; return f"left: {q['l']}%; top: {q['t']}%; width: {q['w']}%; height: {q['h']}%;"
     out.append(f".mf .fc {{ position: relative; display: block; width: 100%; aspect-ratio: {FC['aspect']}; min-height: 0; padding: 0; border: 0; border-radius: 0; background: {fu} center / 100% 100% no-repeat; box-shadow: none; overflow: hidden; text-align: left; border-image: none; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .4)); }}")
     out.append(".mf .fc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 6px; align-content: start; flex: 0 0 auto; }")
@@ -174,13 +189,13 @@ def build():
     for n in '1234':
         out.append(f".mf .fc-v{n} {{ position: absolute; {at('r' + n)} display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; line-height: 1; color: #14102a; }}")
     out.append(".mf .fc-v.dim { opacity: .55; }")
-    out.append(".mf .fc-name { position: absolute; left: 6%; bottom: 7%; max-width: 46%; font-size: 14px; line-height: 1; color: #fff; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 #14102a, 0 0 4px #14102a, 1px 1px 0 #14102a, -1px -1px 0 #14102a; }")
+    out.append(".mf .fc-name { position: absolute; left: 54%; top: 9%; width: 42%; max-width: none; font-size: 15px; line-height: 1.1; color: #14102a; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 0 rgba(255, 255, 255, .55); }")
     out.append(".mf .fc-staff .fc-name { left: 55%; top: 60%; bottom: auto; width: 39%; max-width: none; text-align: center; font-size: 17px; font-weight: 900; color: #14102a; text-shadow: none; } .mf .fc-staff .fc-art { overflow: visible; } .mf .fc-staff .fc-art .stf { position: absolute; inset: 0; background-color: transparent; background-size: contain; background-position: 50% 100%; } .mf .fc-staff .fc-v1 { color: #ffb800; text-shadow: 0 1px 0 #14102a; font-size: 14px; }")
     out.append(".mf .fc.pick { filter: brightness(1.07) saturate(1.15) drop-shadow(0 3px 3px rgba(0, 0, 0, .4)); }")
     out.append('.mf[data-tight="2"] .fc-grid, .mf[data-tight="3"] .fc-grid, .mf[data-tight="4"] .fc-grid { width: 88%; margin: 0 auto; } .mf[data-tight="3"] .fc-grid, .mf[data-tight="4"] .fc-grid { width: 78%; gap: 3px; } .mf[data-tight="3"] .fc-v, .mf[data-tight="4"] .fc-v { font-size: 10px; } .mf[data-tight="3"] .fc-name, .mf[data-tight="4"] .fc-name { font-size: 11px; }')
     for vname, vu in variants.items():
         out.append(f".mf .fc.fcv-{vname} {{ background-image: {vu}; }}")
-    out.append(".mf .fc-grid .mf-card.empty { aspect-ratio: 1.548; min-height: 0; border-width: 8px; border-image-width: 8px; }")
+    out.append(".mf .fc-grid .mf-card.empty { aspect-ratio: 1.3701; min-height: 0; border-width: 8px; border-image-width: 8px; }")
     # ---- the hire sheets and the staff lists: one big card. The stadium picture (with its gold frame) is the whole card; his picture stands on it, the header band, the About panel, a ribbon of stars, the wage chip and the button sit on top ----
     stad, _ = uri('stadium-card', 1020, 80)
     ab = {n: uri('about-' + n, 520, 84)[0] for n in ('med', 'factory', 'coach', 'fin')}
