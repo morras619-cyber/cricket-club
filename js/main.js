@@ -403,7 +403,7 @@ function paintShop(c) {
   const info = (icon, text) => { const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
   const deals = trusted ? dealsToday(c, now) : null;
   if (shopTab === 'gear') {
-    body.append(info('clock', deals ? `Today's deals: ${Math.round(row.off * 100)}% off, one of each. New ones at midnight (UTC).` : 'The deals need the server clock: try again when you are online.'));
+    { const bn = el('div', 'mf-card mf-agent'), tx = el('div', 'mf-info'); tx.append(el('b', '', 'Daily deals'), el('small', '', deals ? `${Math.round(row.off * 100)}% off, one of each. New ones at midnight (UTC).` : 'The deals need the server clock: try again when you are online.')); bn.append(el('span', 'stf stf-s1 mf-agent-art'), tx, ico('clock')); body.append(bn); }
     const grid = el('div', 'mf-grid three');
     for (const [id, G] of Object.entries(SHOP.GEAR)) {
       const sale = !!deals && deals.ids.includes(id) && !deals.taken[id], card = el('button', `mf-card stack${sale ? ' pick' : ''}`), r = el('div', 'mf-row');
@@ -1589,9 +1589,9 @@ const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...c
 const frameOf = (node, big = false) => { const f = el('span', `mf-frame${big ? ' big' : ''}`); f.append(node); return f; };
 const playerFace = (p, size = 64) => (p.heroId ? portrait(heroById(p.heroId), size, 'celebrate') : portraitFace(p, p.team ? teamById(p.team) : null, size) || faceEl(p, kitOf(p), size));
 // staff with a job have a painted portrait (the skin's .stf-NAME classes): the factory's designers, printers and packers, the physios, the agent
-const STAFF_ART = { designer: ['f2', 'f3'], printer: ['f4', 'f5'], packer: ['f6', 'f1'], physio: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'], agent: ['agent'] };
+const STAFF_ART = { designer: ['f2', 'f3'], printer: ['f4', 'f5'], packer: ['f6', 'f1'], physio: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'], agent: ['agent'], accountant: ['o3', 'o1', 'o4'], 'coach-bat': ['c4', 'c1'], 'coach-pace': ['c2', 'c5'], 'coach-spin': ['c3', 'c6'] };
 function staffFace(s, club, size = 64) {
-  const kind = s.role && STAFF_ART[s.role] ? s.role : /^Dr /.test(s.name || '') ? 'physio' : null;
+  const kind = s.role && STAFF_ART[s.role] ? s.role : s.kind && STAFF_ART[`coach-${s.kind}`] ? `coach-${s.kind}` : /^Dr /.test(s.name || '') ? 'physio' : null;
   if (kind) { const pool = STAFF_ART[kind], idn = String(s.id).match(/\d+/); const sp = el('span', `stf stf-${pool[(idn ? +idn[0] : 0) % pool.length]}`); sp.setAttribute('role', 'img'); return sp; }
   return faceEl({ id: `staff-${s.id}`, name: s.name, nation: 'IN' }, club, size);
 }
@@ -2398,7 +2398,7 @@ function paintAcademy(c) {
     for (const t of a.trips) {
       const R = SCOUT_REGIONS[t.region], card = el('div', 'mf-card'), info = el('div', 'mf-info'), bar = el('div', 'mf-bar green'), f = el('i');
       f.style.width = `${Math.max(3, Math.min(100, Math.round(100 - (t.end - now) / (t.hours * 3600000) * 100)))}%`; bar.append(f);
-      const im = document.createElement('img'); im.src = `img/region/card-${t.region}.webp`; im.alt = '';
+      const im = el('span', `stf stf-sc${1 + (t.id % 5)}`);   // (a painted scout)
       info.append(el('b', '', `${R.name} · ${t.hours} h`), bar, el('div', 'mf-row', `back in ${left(t.end - now)}`));
       card.append(frameOf(im), info); col.append(card);
     }

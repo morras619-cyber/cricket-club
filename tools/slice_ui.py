@@ -55,3 +55,10 @@ for sh, d in (('staff-cricket', CRICKET), ('staff-medical', MEDICAL), ('staff-fa
 BADGES = {'badge-blue': (140, 55, 860, 270), 'badge-red': (915, 55, 1630, 270), 'badge-green': (140, 300, 860, 515), 'badge-purple': (915, 300, 1630, 515), 'btn-go': (715, 520, 1060, 845)}
 bs = sheet('badges')
 for n, b in BADGES.items(): print(n, cut(bs, b, n))
+
+# ---- shop clerks, the office team, the academy scouts, the coaches (2x2 and 3x2 grids) ----
+def grid(cols, w=1536, h=1024, prefix=''):
+    cw, ch = w // cols, h // 2
+    return {f'{prefix}{i + 1}': ((i % cols) * cw, (i // cols) * ch, (i % cols + 1) * cw, (i // cols + 1) * ch) for i in range(cols * 2)}
+for sh, d in (('staff-shop', grid(2, prefix='s')), ('staff-office', grid(2, prefix='o')), ('staff-scouts', grid(3, prefix='sc')), ('staff-coaches', grid(3, prefix='c'))):
+    for n, b in d.items(): print(n, person(sh, b, n))

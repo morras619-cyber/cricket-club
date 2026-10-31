@@ -134,7 +134,7 @@ def build():
     out.append(f".leaguescreen .title, #records .title, #daily .title, #trophies .title, #stats .title {{ align-self: center; display: inline-block; margin: 0; padding: 8px 34px 16px; font-size: 28px; line-height: 1; color: #ffe94d; -webkit-text-stroke: 0; transform: none; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); background: {rb} center / 100% 100% no-repeat; }}")
     out.append(".leaguescreen .lede, #records .lede { margin-top: -6px; }")
     # ---- painted staff portraits, the contract cards, the role badges ----
-    for nme in ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'agent', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6']:
+    for nme in ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'agent', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'o1', 'o3', 'o4', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5', 's1']:
         u, _ = uri('staff/' + nme, 170, 78)
         out.append(f".stf-{nme} {{ background-image: {u}; }}")
     out.append(".stf { display: block; background-color: #20358a; background-size: cover; background-position: 50% 12%; background-repeat: no-repeat; } .mf-frame .stf { position: absolute; inset: 13%; border-radius: 4px; }")
