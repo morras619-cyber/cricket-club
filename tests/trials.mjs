@@ -210,7 +210,7 @@ for (const kind of ['Batting coach', 'Pace coach']) {
   await page.evaluate(() => document.querySelector('#trainBody .mf-card.empty').click()); await page.waitForTimeout(200);
   await page.evaluate(k => [...document.querySelectorAll('#trainSheet .mf-role')].find(b => b.textContent.includes(k)).click(), kind); await page.waitForTimeout(250);
 }
-check(await page.evaluate(() => window.__sixcharge.demo.training.coaches.length === 2 && document.querySelectorAll('#trainBody .mf-card .mf-frame canvas').length === 2), 'two coaches are hired, each with a picture in a frame');
+check(await page.evaluate(() => window.__sixcharge.demo.training.coaches.length === 2 && document.querySelectorAll('#trainBody .mf-card .mf-frame .stf').length === 2), 'two coaches are hired, each with a picture in a frame');
 await trainTab('Players');
 for (let i = 0; i < 2; i++) {
   await page.evaluate(() => document.querySelector('#trainBody .mf-card.empty').click()); await page.waitForTimeout(200);
@@ -250,7 +250,7 @@ check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card.
 await page.evaluate(() => document.querySelector('#officeBody .mf-card.empty').click()); await page.waitForTimeout(300);
 check(await page.evaluate(() => document.querySelectorAll('#officeSheet .mf-role').length === 2), 'the empty place offers an accountant and an agent');
 await page.evaluate(() => document.querySelector('#officeSheet .mf-role').click()); await page.waitForTimeout(300);
-check(await page.evaluate(() => window.__sixcharge.demo.office.staff.length === 1 && document.querySelectorAll('#officeBody .mf-card .mf-frame canvas').length === 1) && await offFits(), 'an officer is hired with a framed portrait, and it fits');
+check(await page.evaluate(() => window.__sixcharge.demo.office.staff.length === 1 && document.querySelectorAll('#officeBody .mf-card .mf-frame .stf').length === 1) && await offFits(), 'an officer is hired with a framed portrait, and it fits');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-staff.png') });
 await page.evaluate(() => document.getElementById('officeBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the club office is the settings');
