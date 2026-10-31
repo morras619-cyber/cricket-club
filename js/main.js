@@ -2330,7 +2330,7 @@ const TIER_CLS = ['common', 'rare', 'epic', 'super'];
 function paintAcademy(c) {
   const a = c.academy, L = PC.levelRow(AC.ACAD.LEVELS, a.level), now = serverNow(), ctx = () => acadCtx(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) acadSheet = null; } saveProfile(profile); acadTick(c); paintAcademy(c); };
-  paintShell(c, 'acad', 'academy', acadTab === 'seniors' || acadTab === 'trips' ? 'small' : 'mid'); $('acadLede').textContent = acadTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
+  paintShell(c, 'acad', 'academy', acadTab === 'seniors' ? 'tiny' : acadTab === 'trips' ? 'small' : 'mid'); $('acadLede').textContent = acadTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
   $('acadLvl').replaceChildren(ico('factory'), el('span', '', `LV ${a.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   $('acadStats').replaceChildren(stat('coin', 'gold', kfmt(a.fund), 'in the fund'), stat('users', 'blue', `${AC.placesUsed(a)}/${L.slots}`, 'places used'), stat('clock', 'red', kfmt(AC.upkeepPerDay(a)), 'upkeep a day'));
