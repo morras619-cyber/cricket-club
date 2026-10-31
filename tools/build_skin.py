@@ -133,6 +133,19 @@ def build():
     out.append(".screen-inner > .topbar { flex: none; } .topbar[hidden] { display: none; } .lg-logo { display: none; }")
     out.append(f".leaguescreen .title, #records .title, #daily .title, #trophies .title, #stats .title {{ align-self: center; display: inline-block; margin: 0; padding: 8px 34px 16px; font-size: 28px; line-height: 1; color: #ffe94d; -webkit-text-stroke: 0; transform: none; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); background: {rb} center / 100% 100% no-repeat; }}")
     out.append(".leaguescreen .lede, #records .lede { margin-top: -6px; }")
+    # ---- painted staff portraits, the contract cards, the role badges ----
+    for nme in ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'agent', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6']:
+        u, _ = uri('staff/' + nme, 170, 78)
+        out.append(f".stf-{nme} {{ background-image: {u}; }}")
+    out.append(".stf { display: block; background-color: #20358a; background-size: cover; background-position: 50% 12%; background-repeat: no-repeat; } .mf-frame .stf { position: absolute; inset: 13%; border-radius: 4px; }")
+    for key, nm in (('bat', 'blue'), ('bowl', 'red'), ('all', 'green'), ('wk', 'purple')):
+        u, size = uri('badge-' + nm, 320); k = size[0] / Image.open(os.path.join(D, 'badge-' + nm + '.png')).width
+        out.append(f".role-{key} {{ border: 6px solid transparent; border-image: {u} {round(90 * k)} fill / 6px stretch; }}")
+    out.append(".role-badge { display: inline-block; align-self: flex-start; padding: 0 5px; line-height: 14px; font-size: 10px; font-weight: 900; letter-spacing: .3px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, .55); white-space: nowrap; }")
+    go, _ = uri('btn-go', 110)
+    out.append(f".btn-go {{ flex: none; width: 38px; height: 38px; background: {go} center / contain no-repeat; }}")
+    out.append(".cc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto !important; align-content: start; flex: 0 0 auto; } .mf-card.cc { flex-direction: row; text-align: left; gap: 6px; padding: 0 2px; } .mf-card.cc .mf-frame { --fs: 52px; } .mf-card.cc .mf-info { overflow: hidden; } .mf-card.cc .role-badge { max-width: 100%; overflow: hidden; font-size: 9px; } .mf-card.cc .btn-go { width: 32px; height: 32px; } .mf-card.cc .mf-info b { font-size: 14px; } .mf-card.cc .mf-row { gap: 4px; font-size: 11px; flex-wrap: nowrap; } .mf-card.cc .mf-row .ico { width: 14px; height: 14px; }")
+    out.append(".mf-card.mf-agent { position: relative; padding: 0 6px 0 92px; min-height: 70px; } .mf-agent .mf-agent-art { position: absolute; left: 2px; bottom: 0; width: 86px; height: 92px; background-color: transparent; background-size: contain; background-position: 50% 100%; } .mf-agent .mf-info b { font-size: 16px; } .mf-agent .mf-info small { font-size: 11px; font-weight: 700; opacity: .8; line-height: 1.2; } .mf-agent > .ico { width: 24px; height: 24px; flex: none; }")
     out.append(".tab { padding: 2px 4px; min-height: 40px; } .map-tab { min-height: 56px; padding: 0 2px; }")
     bk2, _ = uri('back-blue', 200)
     out.append(f".pt-back {{ width: 50px; height: 50px; background: {bk2} center / 100% 100% no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }}")

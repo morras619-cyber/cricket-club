@@ -1588,7 +1588,14 @@ const ico = (name, cls = '') => { const sp = el('span', `ico ${cls}`.trim()); sp
 const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...content); if (fn) b.addEventListener('click', fn); return b; };
 const frameOf = (node, big = false) => { const f = el('span', `mf-frame${big ? ' big' : ''}`); f.append(node); return f; };
 const playerFace = (p, size = 64) => (p.heroId ? portrait(heroById(p.heroId), size, 'celebrate') : portraitFace(p, p.team ? teamById(p.team) : null, size) || faceEl(p, kitOf(p), size));
-const staffFace = (s, club, size = 64) => faceEl({ id: `staff-${s.id}`, name: s.name, nation: 'IN' }, club, size);
+// staff with a job have a painted portrait (the skin's .stf-NAME classes): the factory's designers, printers and packers, the physios, the agent
+const STAFF_ART = { designer: ['f2', 'f3'], printer: ['f4', 'f5'], packer: ['f6', 'f1'], physio: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'], agent: ['agent'] };
+function staffFace(s, club, size = 64) {
+  const kind = s.role && STAFF_ART[s.role] ? s.role : /^Dr /.test(s.name || '') ? 'physio' : null;
+  if (kind) { const pool = STAFF_ART[kind], idn = String(s.id).match(/\d+/); const sp = el('span', `stf stf-${pool[(idn ? +idn[0] : 0) % pool.length]}`); sp.setAttribute('role', 'img'); return sp; }
+  return faceEl({ id: `staff-${s.id}`, name: s.name, nation: 'IN' }, club, size);
+}
+const ROLE_NAME = { bat: 'Batter', bowl: 'Bowler', all: 'All-rounder', wk: 'Keeper' };
 const lastName = n => n.split(' ').slice(-1)[0];
 async function renderMerch(test = false) {
   merchTest = test;
@@ -2032,16 +2039,21 @@ function paintOffice(c) {
     for (const b of [...(o.board || [])].reverse().slice(0, 3)) { const r = el('div', 'mf-card'); r.append(ico(b.met ? 'check' : 'cross'), el('span', 'mf-row', `Season ${b.season}: wanted top ${b.target}, finished ${b.pos}${b.met ? ` · +${money(b.reward)}` : ''}`)); col.append(r); }
     body.append(col);
   } else if (officeTab === 'contracts') {
-    const list = contractList(c).slice(0, 6), grid = el('div', 'mf-grid');
+    const list = contractList(c).slice(0, 6), grid = el('div', 'mf-grid cc-grid');
     for (const p of list) {
-      const card = el('button', 'mf-card stack'), stock = c.merch?.live?.[p.id] || 0, r = el('div', 'mf-row');
-      r.append(ico('clock'), el('span', '', p.contract <= 1 ? 'last season' : `${p.contract} seasons`), ico('jersey'), el('span', '', String(stock)));
-      card.append(frameOf(playerFace(p, 72)), el('b', '', lastName(p.name)), r);
-      if (p.contract <= 1) { card.classList.add('pick'); card.addEventListener('click', () => { officeSheet = { type: 'extend', pid: p.id }; sfx.click(); paintOffice(c); }); }
+      const card = el('button', `mf-card cc${p.contract <= 1 ? ' pick' : ''}`), stock = c.merch?.live?.[p.id] || 0, inf = el('div', 'mf-info'), r1 = el('div', 'mf-row'), r2 = el('div', 'mf-row');
+      const badge = el('span', `role-badge role-${p.role in ROLE_NAME ? p.role : 'bat'}`, ROLE_NAME[p.role] || 'Batter');
+      r1.append(ico('clock'), el('span', '', p.contract <= 1 ? '1 season' : `${p.contract} seasons`)); r2.append(ico('jersey'), el('span', '', String(stock)));
+      inf.append(el('b', '', lastName(p.name)), badge, r1, r2);
+      card.append(frameOf(playerFace(p, 64)), inf, el('i', 'btn-go'));
+      card.addEventListener('click', () => { officeSheet = { type: 'extend', pid: p.id }; sfx.click(); paintOffice(c); });
       grid.append(card);
     }
     body.append(grid);
-    const foot = el('div', 'mf-card'); foot.append(ico('warn'), el('span', 'mf-row', extensionsLeft(c) ? `Tap a player in his last season: your agent can keep him (${extensionsLeft(c)} left this season). Otherwise he goes to the auction.` : 'When a contract ends, the player goes to the auction. An agent can keep a player in his last season. His jerseys in the factory turn into cheap vintage stock.')); body.append(foot);
+    const ag = el('div', 'mf-card mf-agent'), agent = o.staff.find(x => x.role === 'agent'), tx = el('div', 'mf-info');
+    tx.append(el('b', '', 'Contract info'), el('small', '', extensionsLeft(c) ? `Your agent can keep a player in his last season (${extensionsLeft(c)} left this season).` : 'When a contract ends, the player goes to the auction. An agent can keep a player in his last season.'));
+    ag.append(Object.assign(el('span', 'stf stf-agent mf-agent-art'), {}), tx, ico('search'));
+    body.append(ag);
   } else {
     const col = el('div', 'mf-col'), places = officePlaces(c), grid = el('div', 'mf-grid three');
     const OIC = { accountant: 'coin', agent: 'users' };
@@ -2108,8 +2120,9 @@ function paintOffice(c) {
     const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(p, 96), true), el('b', '', p.name), close);
     const fee = extendFee(c, p), r = el('div', 'mf-row'); r.append(ico('clock'), el('span', '', `Last season · +${OFFICE.EXTEND} seasons for ${money(fee)}`));
     const go = mfBtn('mf-big', [ico('check'), el('span', '', `Extend · ${money(fee)}`)], () => done(extendContract(c, p.id), true));
-    go.disabled = extensionsLeft(c) < 1 || c.money < fee;
+    go.disabled = p.contract > 1 || extensionsLeft(c) < 1 || c.money < fee;
     card.append(hd, r, go);
+    if (p.contract > 1) card.append(el('p', 'sheetnote', `He has ${p.contract} seasons left: an agent can only keep a player in his last season.`));
     if (!office(c).staff.some(x => x.role === 'agent')) card.append(el('p', 'sheetnote', 'You need an agent: hire one in the Office tab.'));
     else if (extensionsLeft(c) < 1) card.append(el('p', 'sheetnote', 'Your agent has done all he can this season.'));
   } else { officeSheet = null; sh.hidden = true; return; }

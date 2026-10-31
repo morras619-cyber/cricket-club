@@ -243,7 +243,7 @@ if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_
 await offTab('Board');
 check(await page.evaluate(() => /Finish in the top/.test(document.getElementById('officeBody').textContent)) && await offFits(), 'the board has its target for the season, and it fits the screen');
 await offTab('Contracts');
-check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card.stack').length >= 4) && await offFits(), 'the contracts tab shows players with their seasons left, and fits');
+check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card.cc').length >= 4 && document.querySelectorAll('#officeBody .role-badge').length >= 4 && !!document.querySelector('#officeBody .mf-agent')) && await offFits(), 'the contracts tab shows players with a role badge and seasons left, and the agent banner, and fits');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-contracts.png') });
 await offTab('Office');
 check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card.empty').length === 1 && /Office level 1/.test(document.getElementById('officeBody').textContent) && /Build level 2/.test(document.getElementById('officeBody').textContent)) && await offFits(), 'the Office tab: one place for staff, the level and the Build button, fitting the screen');

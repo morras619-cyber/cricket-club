@@ -35,3 +35,23 @@ b2 = np.array(sheet('icons-b')); lab2, _ = ndi.label(ndi.binary_dilation(b2[:, :
 m = lab2 == ids[np.argmax(counts)]; ys, xs_ = np.where(m); box = (xs_.min(), ys.min(), xs_.max() + 1, ys.max() + 1); sub = b2[box[1]:box[3], box[0]:box[2]].copy(); sub[~m[box[1]:box[3], box[0]:box[2]], 3] = 0
 Image.fromarray(sub).save(os.path.join(D, 'ic-hammer.png'))
 print('icons done')
+
+# ---- the staff portraits: boxes round each person in the three sheets; the biggest piece in the box is kept (neighbours that touch are cut away) ----
+def person(sheetname, box, name):
+    im = sheet(sheetname); a = np.array(im); x0, y0, x1, y1 = box
+    sub = a[y0:y1, x0:x1].copy(); al = sub[:, :, 3] > 40
+    lab, n = ndi.label(ndi.binary_dilation(al, iterations=3))
+    if n == 0: print('empty', name); return
+    sizes = ndi.sum(al, lab, range(1, n + 1)); keep = ndi.binary_dilation(lab == (1 + int(np.argmax(sizes))), iterations=2) & (sub[:, :, 3] > 0)
+    sub[~keep, 3] = 0
+    sub[:, :, 3] = np.where(sub[:, :, 3] < 90, 0, sub[:, :, 3])   # the dark halo of the black background
+    out = trim(Image.fromarray(sub)); out.save(os.path.join(D, 'staff', name + '.png')); return out.size
+CRICKET = {'p1': (0, 15, 452, 470), 'p2': (455, 15, 905, 470), 'p3': (885, 15, 1305, 470), 'p4': (1310, 15, 1774, 470), 'p5': (15, 470, 495, 880), 'p6': (505, 470, 995, 880), 'agent': (1040, 470, 1774, 880)}
+MEDICAL = {'m1': (0, 5, 440, 455), 'm2': (440, 5, 860, 455), 'm3': (845, 5, 1335, 455), 'm4': (1335, 5, 1774, 455), 'm5': (55, 450, 560, 880), 'm6': (555, 450, 1120, 880), 'm7': (1125, 450, 1600, 880)}
+FACTORY = {'f1': (0, 10, 515, 500), 'f2': (515, 10, 1000, 500), 'f3': (1000, 10, 1536, 500), 'f4': (30, 505, 470, 1010), 'f5': (470, 505, 1040, 1010), 'f6': (1040, 505, 1536, 1010)}
+for sh, d in (('staff-cricket', CRICKET), ('staff-medical', MEDICAL), ('staff-factory', FACTORY)):
+    for n, b in d.items(): print(n, person(sh, b, n))
+# the role badges and the arrow
+BADGES = {'badge-blue': (140, 55, 860, 270), 'badge-red': (915, 55, 1630, 270), 'badge-green': (140, 300, 860, 515), 'badge-purple': (915, 300, 1630, 515), 'btn-go': (715, 520, 1060, 845)}
+bs = sheet('badges')
+for n, b in BADGES.items(): print(n, cut(bs, b, n))
