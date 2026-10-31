@@ -1599,14 +1599,14 @@ function candidateRow(kind, opts) {
   for (const x of list) {
     const need = HIRE_AT[x.rating], locked = opts.level < need, mine = opts.hired.has(x.id), [country, flag] = FLAGS[x.c];
     const card = el('div', `mf-card cand${locked ? ' locked' : ''}${mine ? ' mine' : ''}`), top = el('div', 'cand-top'), inf = el('div', 'cand-info');
-    const fr = frameOf(Object.assign(el('span', `stf stf-${x.id}`), {}), true); fr.style.setProperty('--fs', '88px');
+    const art = el('div', 'cand-art'); art.append(el('span', `stf stf-${x.id}`));
     inf.append(el('b', '', x.name), el('small', '', `${flag} ${country} · ${x.age}`), el('span', 'mf-stars cand-stars', '★'.repeat(x.rating) + '☆'.repeat(3 - x.rating)), el('span', 'cand-job', CAND_JOB[x.role]));
-    top.append(fr, inf);
+    top.append(inf);
     const foot = el('div', 'cand-foot'), btn = mfBtn('mf-big cand-hire', [ico(locked ? 'lock' : 'plus'), el('span', '', mine ? 'Hired' : locked ? `Level ${need}` : opts.full ? 'No free place' : 'Hire')], () => opts.onHire(x));
     btn.disabled = locked || mine || opts.full;
     foot.append(el('span', 'cand-wage', `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`), btn);
-    card.append(top, el('p', 'cand-about', x.about), foot);
-    if (locked) card.append(el('div', 'cand-lock', `Joins at level ${need}`));
+    card.append(art, top, el('p', 'cand-about', x.about), foot);
+    if (locked) art.append(el('div', 'cand-lock', `Joins at level ${need}`));
     row.append(card); dots.append(el('i'));
   }
   const sync = () => { const w = row.firstChild?.getBoundingClientRect().width || 1, k = Math.round(row.scrollLeft / (w + 10)); [...dots.children].forEach((d, j) => d.classList.toggle('on', j === k)); };
@@ -1621,6 +1621,15 @@ function fanCard(p, club, { name, fill, barClass = '', vals, variant, onClick, p
   const bar = el('div', `mf-bar fc-bar ${barClass}`.trim()), f = el('i'); f.style.width = `${Math.max(4, Math.min(100, Math.round(fill)))}%`; bar.append(f);
   const inf = el('div', 'fc-info'); inf.append(el('b', 'fc-name', name), bar);
   vals.forEach((v, i) => { const x = el('span', `fc-v fc-v${i + 1}${v.dim ? ' dim' : ''}`, v.t); x.title = v.title || ''; inf.append(x); });
+  card.append(art, inf); card.addEventListener('click', onClick);
+  return card;
+}
+// a hired person on the gold card: his whole picture on the left, his name above a stars bar, and his stars and wage in the slots
+function staffCard(s, club, { name, wage, onClick }) {
+  const card = el('button', 'mf-card fc fcv-staff fc-staff'), art = el('span', 'fc-art');
+  art.append(staffFace(s, club, 120));
+  const bar = el('div', 'mf-bar fc-bar'), f = el('i'); f.style.width = `${Math.round(s.lvl / 3 * 100)}%`; bar.append(f);
+  const inf = el('div', 'fc-info'); inf.append(el('b', 'fc-name', name), bar, el('span', 'fc-v fc-v1', '★'.repeat(s.lvl)), el('span', 'fc-v fc-v2', wage));
   card.append(art, inf); card.addEventListener('click', onClick);
   return card;
 }
@@ -1709,12 +1718,9 @@ function paintMerch(c) {
       body.append(grid);
     }
   } else if (merchTab === 'staff') {
-    const grid = el('div', 'mf-grid three');
+    const grid = el('div', 'mf-grid fc-grid');
     for (const s of m.staff) {
-      const card = el('button', 'mf-card stack'), stars = el('span', 'mf-stars', '★'.repeat(s.lvl)), r = el('div', 'mf-row');
-      r.append(ico({ designer: 'pencil', printer: 'printer', packer: 'box' }[s.role]), stars);
-      card.append(frameOf(staffFace(s, club, 64)), el('b', '', staffShort(s, s.name)), r);
-      card.addEventListener('click', () => { merchSheet = { type: 'staff', id: s.id }; sfx.click(); paintMerch(c); });
+      const card = staffCard(s, club, { name: staffShort(s, s.name), wage: kfmt(wageText(MF.ROLES[s.role].wage, s.lvl)), onClick: () => { merchSheet = { type: 'staff', id: s.id }; sfx.click(); paintMerch(c); } });
       grid.append(card);
     }
     for (let i = m.staff.length; i < L.staff; i++) {
@@ -1883,11 +1889,9 @@ function paintTraining(c) {
     body.append(grid);
     if (!list.length) body.append(el('p', 'sheetnote', 'Nobody in your squad can learn more right now.'));
   } else if (trainTab === 'coaches') {
-    const grid = el('div', 'mf-grid three');
+    const grid = el('div', 'mf-grid fc-grid');
     for (const k of t.coaches) {
-      const card = el('button', 'mf-card stack'), r = el('div', 'mf-row'); r.append(ico(KIND_ICON[k.kind]), el('span', 'mf-stars', '★'.repeat(k.lvl)));
-      card.append(frameOf(staffFace(k, club, 64)), el('b', '', staffShort(k, k.name.replace('Coach ', ''))), el('small', '', TG.KINDS[k.kind].name.split(' ')[0]), r);
-      card.addEventListener('click', () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); });
+      const card = staffCard(k, club, { name: staffShort(k, k.name.replace('Coach ', '')), wage: kfmt(wageText(TG.TRAIN.WAGE, k.lvl)), onClick: () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); } });
       grid.append(card);
     }
     for (let i = t.coaches.length; i < L.coaches; i++) {
@@ -2072,12 +2076,10 @@ function paintOffice(c) {
     ag.append(Object.assign(el('span', 'stf stf-agent mf-agent-art'), {}), tx, ico('search'));
     body.append(ag);
   } else {
-    const col = el('div', 'mf-col'), places = officePlaces(c), grid = el('div', 'mf-grid three');
+    const col = el('div', 'mf-col'), places = officePlaces(c), grid = el('div', 'mf-grid fc-grid');
     const OIC = { accountant: 'coin', agent: 'users' };
     for (const st of o.staff) {
-      const card = el('button', 'mf-card stack'), r = el('div', 'mf-row'); r.append(ico(OIC[st.role]), el('span', 'mf-stars', '★'.repeat(st.lvl)));
-      card.append(frameOf(staffFace(st, club, 64)), el('b', '', staffShort(st, st.name.split(' ')[1])), el('small', '', OFFICERS[st.role].name), r);
-      card.addEventListener('click', () => { officeSheet = { type: 'officer', id: st.id }; sfx.click(); paintOffice(c); });
+      const card = staffCard(st, club, { name: staffShort(st, st.name.split(' ')[1]), wage: kfmt(wageText(OFFICE.WAGE[st.role], st.lvl)), onClick: () => { officeSheet = { type: 'officer', id: st.id }; sfx.click(); paintOffice(c); } });
       grid.append(card);
     }
     for (let i = o.staff.length; i < places; i++) {
@@ -2580,11 +2582,9 @@ function paintMedical(c) {
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${inBed} of ${m.beds.length} beds in use. Each physio looks after two beds, so ${m.physios.length} physio${m.physios.length === 1 ? '' : 's'} can treat ${m.physios.length * 2}. A bed heals 4 times as fast as resting.`)); body.append(foot);
   } else if (medTab === 'staff') {
-    const grid = el('div', 'mf-grid three');
+    const grid = el('div', 'mf-grid fc-grid');
     for (const ph of m.physios) {
-      const card = el('button', 'mf-card stack'), r = el('div', 'mf-row'); r.append(ico('heart'), el('span', 'mf-stars', '★'.repeat(ph.lvl)));
-      card.append(frameOf(staffFace({ id: `phys-${ph.id}`, name: ph.name, cand: ph.cand }, club, 64)), el('b', '', staffShort(ph, ph.name.replace('Dr ', ''))), el('small', '', 'Physio'), r);
-      card.addEventListener('click', () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); });
+      const card = staffCard(Object.assign({}, ph, { id: `phys-${ph.id}` }), club, { name: staffShort(ph, ph.name.replace('Dr ', '')), wage: kfmt(wageText(MD.MED.WAGE, ph.lvl)), onClick: () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); } });
       grid.append(card);
     }
     for (let i = m.physios.length; i < L.physios; i++) {

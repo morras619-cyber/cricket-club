@@ -78,7 +78,7 @@ const tab = async name => { await page.evaluate(n => [...document.querySelectorA
 const pick = async (sheet, job) => { await page.evaluate(([sh, j]) => [...document.querySelectorAll(sh + ' .cand')].find(c => c.querySelector('.cand-job').textContent.includes(j) && !c.classList.contains('locked')).querySelector('.cand-hire').click(), [sheet, job]); await page.waitForTimeout(300); };
 const hire = async role => { await page.evaluate(() => document.querySelector('#merchBody .mf-card.empty').click()); await page.waitForTimeout(200); await pick('#merchSheet', role); };
 await tab('Staff'); await hire('Designer'); await hire('Printer');
-check(await page.evaluate(() => window.__sixcharge.profile.career.merch.staff.length === 2 && document.querySelectorAll('#merchBody .mf-card .mf-frame .stf').length === 2), 'a designer and a printer are hired, each with a picture in a frame');
+check(await page.evaluate(() => window.__sixcharge.profile.career.merch.staff.length === 2 && document.querySelectorAll('#merchBody .fc-staff .fc-art .stf').length === 2), 'a designer and a printer are hired, each with a picture in a frame');
 check(await noScroll(), 'the staff tab fits the screen');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'merch-staff.png') });
 await tab('Fans');
@@ -211,7 +211,7 @@ for (const kind of ['Batting coach', 'Pace coach']) {
   await page.evaluate(() => document.querySelector('#trainBody .mf-card.empty').click()); await page.waitForTimeout(200);
   await pick('#trainSheet', kind);
 }
-check(await page.evaluate(() => window.__sixcharge.demo.training.coaches.length === 2 && document.querySelectorAll('#trainBody .mf-card .mf-frame .stf').length === 2), 'two coaches are hired, each with a picture in a frame');
+check(await page.evaluate(() => window.__sixcharge.demo.training.coaches.length === 2 && document.querySelectorAll('#trainBody .fc-staff .fc-art .stf').length === 2), 'two coaches are hired, each with a picture in a frame');
 await trainTab('Players');
 for (let i = 0; i < 2; i++) {
   await page.evaluate(() => document.querySelector('#trainBody .mf-card.empty').click()); await page.waitForTimeout(200);
@@ -251,7 +251,7 @@ check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card.
 await page.evaluate(() => document.querySelector('#officeBody .mf-card.empty').click()); await page.waitForTimeout(300);
 check(await page.evaluate(() => document.querySelectorAll('#officeSheet .cand').length >= 4 && [...document.querySelectorAll('#officeSheet .cand')].some(c => c.classList.contains('locked'))), 'the empty place offers a shortlist of accountants and agents, some locked');
 await pick('#officeSheet', 'Accountant');
-check(await page.evaluate(() => window.__sixcharge.demo.office.staff.length === 1 && document.querySelectorAll('#officeBody .mf-card .mf-frame .stf').length === 1) && await offFits(), 'an officer is hired with a framed portrait, and it fits');
+check(await page.evaluate(() => window.__sixcharge.demo.office.staff.length === 1 && document.querySelectorAll('#officeBody .fc-staff .fc-art .stf').length === 1) && await offFits(), 'an officer is hired with a framed portrait, and it fits');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-staff.png') });
 await page.evaluate(() => document.getElementById('officeBack').click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the club office is the settings');
@@ -375,7 +375,7 @@ if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_
 await mdTab('Staff');
 await page.evaluate(() => document.querySelector('#medBody .mf-card.empty').click()); await page.waitForTimeout(300);
 await pick('#medSheet', 'Physio');
-check(await page.evaluate(() => window.__sixcharge.demo.medical.physios.length === 1 && document.querySelectorAll('#medBody .mf-card .mf-frame .stf').length === 1) && await mdFits(), 'a physio is hired, with a picture in a frame');
+check(await page.evaluate(() => window.__sixcharge.demo.medical.physios.length === 1 && document.querySelectorAll('#medBody .fc-staff .fc-art .stf').length === 1) && await mdFits(), 'a physio is hired, with a picture in a frame');
 await mdTab('Beds');
 await page.evaluate(() => document.querySelector('#medBody .mf-card.empty').click()); await page.waitForTimeout(250);
 await page.evaluate(() => document.querySelector('#medSheet .mf-card').click()); await page.waitForTimeout(300);
