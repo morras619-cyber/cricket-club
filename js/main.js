@@ -31,7 +31,7 @@ import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './config.js';
 import { teamStars } from './teamrating.js';
-import { createClubMap } from './clubmap.js';
+import { createClubMap, buildingPicture } from './clubmap.js';
 import * as MF from './merch.js';
 import * as PC from './pacing.js';
 import * as TG from './training.js';
@@ -1479,6 +1479,29 @@ function buildTick(c) {
   return done;
 }
 const canBuild = (c, id) => !PC.whyNot(c, id, buildCtx(c)) && c.money >= PC.costOf(id, levelOfBuilding(c, id) + 1);
+// ---------- the shell of a building's screen: the top bar (club level, cash, diamonds) and the hero picture of the building ----------
+function fillTopbar(host, c) {
+  const b = PC.buildOf(c), lv = PC.clubLevel(b.xp), base = PC.XP_AT[lv], next = PC.XP_AT[lv + 1];
+  const shield = el('div', 'tb-shield'); shield.append(el('span', '', String(lv)));
+  const bar = el('div', 'tb-xp'), fill = el('i'); fill.style.width = `${Math.max(3, Math.round(PC.levelShare(b.xp) * 100))}%`; bar.append(fill, el('span', '', lv >= PC.MAX_LEVEL ? 'MAX' : `${Math.round(b.xp - base)}/${next - base}`));
+  const pill = (icon, text, go) => { const d = el('div', 'tb-pill'); d.append(ico(icon), el('span', '', text), mfBtn('tb-plus', [ico('plus')], go)); return d; };
+  host.replaceChildren(shield, bar,
+    pill('coin', money(c.money), () => { sfx.click(); fromMap = true; renderOffice(false); }),
+    pill('diamond', String(b.diamonds), () => { sfx.click(); fromMap = true; shopTab = 'diamonds'; renderShop(); }),
+    mfBtn('tb-gear', [ico('gear')], () => { sfx.click(); renderSettings(); }));
+}
+// the building's own picture (the map's, painted in the club's colours) behind the screen's title
+async function paintHero(host, c, id) {
+  const club = teamById(c.club), look = PC.lookOf(levelOfBuilding(c, id) || 1), key = `${id}|${club.suit}|${club.trim}|${look}`;
+  if (host.dataset.key === key) return;
+  host.dataset.key = key; host.querySelector('.bhero-art')?.remove();
+  try {
+    const src = await buildingPicture(id, club, look);
+    if (host.dataset.key !== key) return;
+    const cv = document.createElement('canvas'); cv.className = 'bhero-art'; cv.width = 620; cv.height = Math.round(620 * src.height / src.width);
+    cv.getContext('2d').drawImage(src, 0, 0, cv.width, cv.height); host.prepend(cv);
+  } catch { /* no picture: the title alone */ }
+}
 // the upgrade part of a building's screen: what the next level costs and takes, and the button; or the builder at work
 function buildBlock(c, id, after) {
   const lv = levelOfBuilding(c, id), b = PC.buildOf(c), job = b.jobs.find(j => j.id === id), out = [];
@@ -1519,6 +1542,7 @@ let merchTest = false, merchDemo = null;
 const demoCareer = () => { if (!merchDemo) { merchDemo = newCareer(Date.now() >>> 0); chooseClub(merchDemo, merchDemo.divisions.d3[0]); merchDemo.money = 2; merchDemo.build = PC.freshBuild(PC.XP_AT[10]); PC.addDiamonds(merchDemo, 500); if (window.__sixcharge) window.__sixcharge.demo = merchDemo; } return merchDemo; };
 // the icons (24 x 24, drawn with the game's thick dark outline)
 const ICON = {
+  diamond: '<path d="M7 3h10l5 6-10 12L2 9z"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none"/>',
   jersey: '<path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3c-1 2-7 2-8 0z"/>',
   coin: '<circle cx="12" cy="12" r="9"/><text x="12" y="16.6" text-anchor="middle" font-size="12" font-weight="900" fill="#14102a" stroke="none">$</text>',
   pencil: '<path d="M4 20l1-5L15 5l4 4L9 19z"/><path d="M13 7l4 4" fill="none"/>',
@@ -1571,6 +1595,7 @@ function paintMerch(c) {
   const m = c.merch, club = teamById(c.club), roster = merchRoster(c), dmap = MF.demandMap(m, merchCtx(c)), L = PC.levelRow(MF.MERCH.LEVELS, m.level);
   const ctx = () => merchCtx(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) merchSheet = null; } saveProfile(profile); merchTick(c); paintMerch(c); };
+  fillTopbar($('merchTop'), c); paintHero($('merchHero'), c, 'merch');
   // the top: the till, what it earns and costs, and the button to collect
   $('merchLede').textContent = merchTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   const lv = $('merchLvl'); lv.replaceChildren(ico('factory'), el('span', '', `LV ${m.level}`));
@@ -1597,13 +1622,13 @@ function paintMerch(c) {
   body.replaceChildren();
   if (merchTab === 'fans') {
     // the fans: the six players they want most
-    const grid = el('div', 'mf-grid');
+    const grid = el('div', 'mf-grid three');
     for (const [pid, info] of [...roster].sort((a, b) => (dmap.get(b[0]) || 0) - (dmap.get(a[0]) || 0)).slice(0, 6)) {
       const p = c.players[pid], stock = m.live[pid] || 0, forever = p.contract >= 50;
       const card = el('button', `mf-card stack${merchSheet?.pid === pid ? ' pick' : ''}`);
       const bar = el('div', 'mf-bar'); const fill = el('i'); fill.style.width = `${Math.max(4, info.fame)}%`; bar.append(fill);
       const r1 = el('div', 'mf-row'); r1.append(ico('heart'), el('span', '', String(Math.round(dmap.get(pid) || 0))), ico('jersey'), el('span', '', String(stock)));
-      const r2 = el('div', `mf-row ${m.designs[pid] ? 'ok' : 'no'}`); r2.append(ico(m.designs[pid] ? 'check' : 'pencil'), el('span', '', m.designs[pid] ? 'designed' : 'no design'), ico('clock'), el('span', '', forever ? '∞' : String(matchesLeft(c, p))));
+      const r2 = el('div', `mf-row ${m.designs[pid] ? 'ok' : 'no'}`); r2.append(ico(m.designs[pid] ? 'check' : 'pencil'), ico('clock'), el('span', '', forever ? '∞' : String(matchesLeft(c, p)))); r2.title = m.designs[pid] ? 'Jersey designed' : 'No jersey design yet';
       card.append(frameOf(playerFace(p, 72)), el('b', '', lastName(info.name)), bar, r1, r2);
       card.addEventListener('click', () => { merchSheet = { type: 'order', pid }; sfx.click(); paintMerch(c); });
       grid.append(card);
@@ -1619,7 +1644,8 @@ function paintMerch(c) {
         const bar = el('div', 'mf-bar green'); const fill = el('i'); fill.style.width = `${Math.max(3, Math.round(frac * 100))}%`; bar.append(fill);
         const row = el('div', 'mf-row'); row.append(ico(designed ? 'printer' : 'pencil'), el('span', '', designed ? `${Math.ceil(o.left)} to go` : 'designing…'));
         info.append(el('b', '', `${lastName(p.name)} · ${o.qty}`), bar, row);
-        card.append(frameOf(playerFace(p, 64)), info, mfBtn('mf-x', [ico('cross')], () => done(MF.cancel(m, i))));
+        const jer = el('div', 'mf-jersey'); jer.append(ico('jersey', 'jer'), el('i', 'mf-qty-badge', String(o.qty)));
+        card.append(jer, frameOf(playerFace(p, 48)), info, mfBtn('mf-x', [ico('cross')], () => done(MF.cancel(m, i))));
         grid.append(card);
       });
       body.append(grid);

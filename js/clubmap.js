@@ -74,6 +74,17 @@ function paint(sheet, id, club, lv) {
   return { canvas: c, w, h, solid, gw, gh, K };
 }
 
+// one building painted in a club's colours at one look (1-3), as a canvas: for the hero picture of a building's own screen (main.js)
+const pictures = new Map();
+export async function buildingPicture(id, club, look) {
+  const key = `${id}|${club.suit}|${club.trim}|${look}`;
+  if (!pictures.has(key)) {
+    const sheet = await load(`img/map/buildings${look === 1 ? '' : look}.webp`);
+    pictures.set(key, paint(sheet, id, club, look).canvas);
+  }
+  return pictures.get(key);
+}
+
 export function createClubMap(canvas, { onSelect, onFirstDraw } = {}) {
   const g = canvas.getContext('2d');
   let base = null, club = null, levels = {}, ORDER = Object.keys(SITES[1]), info = {}, selected = null, shown = false, dirty = false, session = 0;
