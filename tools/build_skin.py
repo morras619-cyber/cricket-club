@@ -28,6 +28,22 @@ def make_green():
     for src, dst in (('btn-yellow', 'btn-green'), ('btn-yellow-p', 'btn-green-p')):
         im = Image.open(os.path.join(D, src + '.png')).convert('RGBA'); a = im.getchannel('A'); h, sat, v = im.convert('RGB').convert('HSV').split()
         h = h.point(lambda x: (x + 46) % 256); g = Image.merge('HSV', (h, sat, v)).convert('RGB'); g.putalpha(a); g.save(os.path.join(D, dst + '.png'))
+
+# the fan card with other icons: the painted ones are cleaned off (tools/ui/src/fan-card-clean.png) and four others are painted on in their place
+CARD_ICONS = {'train': ['xp', 'up', 'hammer', 'clock'], 'med': ['heart', 'medkit', 'warn', 'xp'], 'acad': ['xp', 'up', 'clock', 'trophy']}
+def icon_variants():
+    base = Image.open(os.path.join(D, 'src', 'fan-card-clean.png')).convert('RGBA').crop((35, 36, 1501, 983))
+    out = {}
+    for name, icons in CARD_ICONS.items():
+        card = base.copy()
+        for k, ic in enumerate(icons):
+            im = Image.open(os.path.join(D, 'ic-' + ic + '.png')).convert('RGBA'); s = 128 / max(im.size)
+            im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+            cy = (365, 513, 658, 801)[k]; card.alpha_composite(im, (1003 - 35 - im.width // 2, cy - 36 - im.height // 2))
+        buf = io.BytesIO(); card.resize((460, round(460 * card.height / card.width)), Image.LANCZOS).save(buf, 'WEBP', quality=86, method=6)
+        out[name] = f"url(data:image/webp;base64,{base64.b64encode(buf.getvalue()).decode()})"
+    return out
+
 def build():
     out = [A]
     ic, rows = atlas()
@@ -148,19 +164,22 @@ def build():
     out.append(".mf-card.mf-agent { position: relative; padding: 0 6px 0 92px; min-height: 70px; } .mf-agent .mf-agent-art { position: absolute; left: 2px; bottom: 0; width: 86px; height: 92px; background-color: transparent; background-size: contain; background-position: 50% 100%; } .mf-agent .mf-info b { font-size: 16px; } .mf-agent .mf-info small { font-size: 11px; font-weight: 700; opacity: .8; line-height: 1.2; } .mf-agent > .ico { width: 24px; height: 24px; flex: none; }")
     out.append(".title-topbar { width: 100%; justify-content: flex-end; } .title-topbar .tb-xp { min-width: 40px; }")
     # ---- the fan cards of the factory: the supplied gold card (its icons and slots painted in), the portrait on its left, the numbers in its slots ----
-    FC = json.load(open(os.path.join(D, 'fan-card.json'))); fu, _ = uri('fan-card', 460, 86)
+    FC = json.load(open(os.path.join(D, 'fan-card.json'))); fu, _ = uri('fan-card', 460, 86); variants = icon_variants()
     def at(n): q = FC[n]; return f"left: {q['l']}%; top: {q['t']}%; width: {q['w']}%; height: {q['h']}%;"
-    out.append(f"#merch .fc {{ position: relative; display: block; width: 100%; aspect-ratio: {FC['aspect']}; min-height: 0; padding: 0; border: 0; border-radius: 0; background: {fu} center / 100% 100% no-repeat; box-shadow: none; overflow: hidden; text-align: left; border-image: none; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .4)); }}")
-    out.append("#merch .fc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 6px; align-content: start; flex: 0 0 auto; }")
-    out.append(f"#merch .fc-art {{ position: absolute; {at('art')} display: block; overflow: hidden; border-radius: 6px; }} #merch .fc-art .face {{ position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; object-position: 50% 30%; border: 0; border-radius: 0; }} #merch .fc-art .fut-pic {{ position: absolute; inset: 0; }} #merch .fc-art .fut-pic canvas {{ position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: auto; height: 108%; max-width: 135%; border: 0; border-radius: 0; }}")
-    out.append("#merch .fc-info { position: absolute; inset: 0; margin: 0; padding: 0; display: block; }")
-    out.append(f"#merch .fc-bar {{ position: absolute; {at('bar')} height: {FC['bar']['h']}%; border-width: 0; border-radius: 999px; background: none; box-shadow: none; }} #merch .fc-bar i {{ border-radius: 999px; }}")
+    out.append(f".mf .fc {{ position: relative; display: block; width: 100%; aspect-ratio: {FC['aspect']}; min-height: 0; padding: 0; border: 0; border-radius: 0; background: {fu} center / 100% 100% no-repeat; box-shadow: none; overflow: hidden; text-align: left; border-image: none; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .4)); }}")
+    out.append(".mf .fc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 6px; align-content: start; flex: 0 0 auto; }")
+    out.append(f".mf .fc-art {{ position: absolute; {at('art')} display: block; overflow: hidden; border-radius: 6px; }} .mf .fc-art .face {{ position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; object-position: 50% 30%; border: 0; border-radius: 0; }} .mf .fc-art .fut-pic {{ position: absolute; inset: 0; }} .mf .fc-art .fut-pic canvas {{ position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: auto; height: 108%; max-width: 135%; border: 0; border-radius: 0; }}")
+    out.append(".mf .fc-info { position: absolute; inset: 0; margin: 0; padding: 0; display: block; }")
+    out.append(f".mf .fc-bar {{ position: absolute; {at('bar')} height: {FC['bar']['h']}%; border-width: 0; border-radius: 999px; background: none; box-shadow: none; }} .mf .fc-bar i {{ border-radius: 999px; }}")
     for n in '1234':
-        out.append(f"#merch .fc-v{n} {{ position: absolute; {at('r' + n)} display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; line-height: 1; color: #14102a; }}")
-    out.append("#merch .fc-v.dim { opacity: .55; }")
-    out.append("#merch .fc-name { position: absolute; left: 6%; bottom: 7%; max-width: 46%; font-size: 14px; line-height: 1; color: #fff; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 #14102a, 0 0 4px #14102a, 1px 1px 0 #14102a, -1px -1px 0 #14102a; }")
-    out.append("#merch .fc.pick { filter: brightness(1.07) saturate(1.15) drop-shadow(0 3px 3px rgba(0, 0, 0, .4)); }")
-    out.append('#merch .mf[data-tight="2"] .fc-grid, #merch .mf[data-tight="3"] .fc-grid, #merch .mf[data-tight="4"] .fc-grid { width: 88%; margin: 0 auto; } #merch .mf[data-tight="3"] .fc-grid, #merch .mf[data-tight="4"] .fc-grid { width: 78%; gap: 3px; } #merch .mf[data-tight="3"] .fc-v, #merch .mf[data-tight="4"] .fc-v { font-size: 10px; } #merch .mf[data-tight="3"] .fc-name, #merch .mf[data-tight="4"] .fc-name { font-size: 11px; }')
+        out.append(f".mf .fc-v{n} {{ position: absolute; {at('r' + n)} display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; line-height: 1; color: #14102a; }}")
+    out.append(".mf .fc-v.dim { opacity: .55; }")
+    out.append(".mf .fc-name { position: absolute; left: 6%; bottom: 7%; max-width: 46%; font-size: 14px; line-height: 1; color: #fff; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 #14102a, 0 0 4px #14102a, 1px 1px 0 #14102a, -1px -1px 0 #14102a; }")
+    out.append(".mf .fc.pick { filter: brightness(1.07) saturate(1.15) drop-shadow(0 3px 3px rgba(0, 0, 0, .4)); }")
+    out.append('.mf[data-tight="2"] .fc-grid, .mf[data-tight="3"] .fc-grid, .mf[data-tight="4"] .fc-grid { width: 88%; margin: 0 auto; } .mf[data-tight="3"] .fc-grid, .mf[data-tight="4"] .fc-grid { width: 78%; gap: 3px; } .mf[data-tight="3"] .fc-v, .mf[data-tight="4"] .fc-v { font-size: 10px; } .mf[data-tight="3"] .fc-name, .mf[data-tight="4"] .fc-name { font-size: 11px; }')
+    for vname, vu in variants.items():
+        out.append(f".mf .fc.fcv-{vname} {{ background-image: {vu}; }}")
+    out.append(".mf .fc-grid .mf-card.empty { aspect-ratio: 1.548; min-height: 0; border-width: 8px; border-image-width: 8px; }")
     out.append(".tab { padding: 2px 4px; min-height: 40px; } .map-tab { min-height: 56px; padding: 0 2px; }")
     bk2, _ = uri('back-blue', 200)
     out.append(f".pt-back {{ width: 50px; height: 50px; background: {bk2} center / 100% 100% no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }}")
