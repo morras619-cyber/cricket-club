@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, CANDIDATES, HIRE_AT, FLAGS, candidatesOf, wageText, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, CANDIDATES, HIRE_AT, FLAGS, candidatesOf, candidateById, wageText, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
 import * as MD from './stamina.js';
@@ -1591,27 +1591,54 @@ function staffFace(s, club, size = 64) {
 const ROLE_NAME = { bat: 'Batter', bowl: 'Bowler', all: 'All-rounder', wk: 'Keeper' };
 const staffShort = (s, old) => (s.cand ? lastName(s.name.replace(/^Dr /, '')) : old);
 const CAND_JOB = { designer: 'Designer', printer: 'Printer', packer: 'Packer', bat: 'Batting coach', pace: 'Pace coach', spin: 'Spin coach', physio: 'Physio', accountant: 'Accountant', agent: 'Agent' };
-// the people you can hire in a building, as cards you swipe along: his portrait, name, country and age, stars, a few words, his wage, and the Hire button
-// (or why not: already hired, no free place, or the building level he joins at). opts: { level, hired: Set of ids, full, wage(role) -> $k a day, onHire(candidate) }
-function candidateRow(kind, opts) {
+// one person on a big card, used for the shortlist and for the people already hired: name, flag and job on top; his whole picture beside a few words;
+// stars and wage; and the button. f: { name, flag, job, face (an element), about, stars, wage, btn, cls }
+function personCard(f) {
+  const card = el('div', `mf-card cand ${f.cls || ''}`.trim()), top = el('div', 'cand-top'), mid = el('div', 'cand-mid'), art = el('div', 'cand-art'), foot = el('div', 'cand-foot'), tl = el('div', 'cand-tl');
+  art.append(f.face);
+  top.append(el('b', 'cand-name', f.name), el('span', 'cand-flag', f.flag || ''), el('span', 'cand-job', f.job));
+  mid.append(art, el('p', 'cand-about', f.about));
+  tl.append(el('span', 'mf-stars cand-stars', '★'.repeat(f.stars) + '☆'.repeat(3 - f.stars)), el('span', 'cand-wage', f.wage));
+  foot.append(tl, f.btn);
+  card.append(top, mid, foot);
+  return { card, art };
+}
+// cards in a row you swipe along, with dots under it (the next card peeks in)
+function swipeRow(cards) {
   const wrap = el('div', 'cand-wrap'), row = el('div', 'cand-row'), dots = el('div', 'cand-dots');
-  const list = candidatesOf(kind).slice().sort((a, b) => a.rating - b.rating);
-  for (const x of list) {
-    const need = HIRE_AT[x.rating], locked = opts.level < need, mine = opts.hired.has(x.id), [country, flag] = FLAGS[x.c];
-    const card = el('div', `mf-card cand${locked ? ' locked' : ''}${mine ? ' mine' : ''}`), top = el('div', 'cand-top');
-    const art = el('div', 'cand-art'); art.append(el('span', `stf stf-${x.id}`));
-    top.append(el('b', 'cand-name', x.name), el('span', 'cand-flag', flag), el('span', 'cand-job', CAND_JOB[x.role]));
-    const mid = el('div', 'cand-mid'); mid.append(art, el('p', 'cand-about', x.about));
-    const foot = el('div', 'cand-foot'), btn = mfBtn('mf-big cand-hire', [ico(locked ? 'lock' : 'plus'), el('span', '', mine ? 'Hired' : locked ? `Level ${need}` : opts.full ? 'No free place' : 'Hire')], () => opts.onHire(x));
-    btn.disabled = locked || mine || opts.full;
-    foot.append(el('span', 'cand-wage', `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`), btn);
-    card.append(top, mid, el('span', 'mf-stars cand-stars', '★'.repeat(x.rating) + '☆'.repeat(3 - x.rating)), foot);
-    if (locked) art.append(el('div', 'cand-lock', `Joins at level ${need}`));
-    row.append(card); dots.append(el('i'));
-  }
+  for (const c of cards) { row.append(c); dots.append(el('i')); }
   const sync = () => { const w = row.firstChild?.getBoundingClientRect().width || 1, k = Math.round(row.scrollLeft / (w + 10)); [...dots.children].forEach((d, j) => d.classList.toggle('on', j === k)); };
   row.addEventListener('scroll', sync, { passive: true }); requestAnimationFrame(sync);
   wrap.append(row, dots); return wrap;
+}
+// the people you can hire in a building, as cards you swipe along (or why not: already hired, no free place, or the building level he joins at).
+// opts: { level, hired: Set of ids, full, wage(role) -> $k a day, onHire(candidate) }
+function candidateRow(kind, opts) {
+  const list = candidatesOf(kind).slice().sort((a, b) => a.rating - b.rating), cards = [];
+  for (const x of list) {
+    const need = HIRE_AT[x.rating], locked = opts.level < need, mine = opts.hired.has(x.id), [, flag] = FLAGS[x.c];
+    const btn = mfBtn('mf-big cand-hire', [ico(locked ? 'lock' : 'plus'), el('span', '', mine ? 'Hired' : locked ? `Level ${need}` : opts.full ? 'No free place' : 'Hire')], () => opts.onHire(x));
+    btn.disabled = locked || mine || opts.full;
+    const { card, art } = personCard({ name: x.name, flag, job: CAND_JOB[x.role], face: el('span', `stf stf-${x.id}`), about: x.about, stars: x.rating, wage: `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`, btn, cls: `${locked ? 'locked' : ''} ${mine ? 'mine' : ''}` });
+    if (locked) art.append(el('div', 'cand-lock', `Joins at level ${need}`));
+    cards.push(card);
+  }
+  return swipeRow(cards);
+}
+// the people already hired, on the same big cards (tap to open), then one card for each free place.
+// people: [{ s (the staff entry), face (element), job (key of CAND_JOB), base ($k a day), onOpen }]; free: how many places are empty; onFree opens the shortlist
+function staffRow(people, free, onFree, freeLabel = 'Hire') {
+  const cards = [];
+  for (const q of people) {
+    const x = q.s.cand ? candidateById(q.s.cand) : null, btn = mfBtn('mf-big alt cand-hire', [ico('gear'), el('span', '', 'Open')], q.onOpen);
+    const { card } = personCard({ name: q.s.name, flag: x ? FLAGS[x.c][1] : '', job: CAND_JOB[q.job], face: q.face, about: x ? x.about : 'One of your first hires.', stars: q.s.lvl, wage: `${kfmt(wageText(q.base, q.s.lvl))} a day`, btn });
+    card.addEventListener('click', e => { if (!e.target.closest('button')) q.onOpen(); }); cards.push(card);
+  }
+  for (let i = 0; i < free; i++) {
+    const card = el('button', 'mf-card cand free'); card.append(ico('plus'), el('b', '', freeLabel), el('small', '', 'Choose who joins'));
+    card.addEventListener('click', onFree); cards.push(card);
+  }
+  return swipeRow(cards);
 }
 // the gold player card (the skin's .fc): his portrait on the left, a bar and four numbers beside it. variant picks the icons painted on the card
 // ('train', 'med', 'acad'); vals are four { t, title, dim } for its slots; barClass is 'green' for a progress bar
@@ -1621,15 +1648,6 @@ function fanCard(p, club, { name, fill, barClass = '', vals, variant, onClick, p
   const bar = el('div', `mf-bar fc-bar ${barClass}`.trim()), f = el('i'); f.style.width = `${Math.max(4, Math.min(100, Math.round(fill)))}%`; bar.append(f);
   const inf = el('div', 'fc-info'); inf.append(el('b', 'fc-name', name), bar);
   vals.forEach((v, i) => { const x = el('span', `fc-v fc-v${i + 1}${v.dim ? ' dim' : ''}`, v.t); x.title = v.title || ''; inf.append(x); });
-  card.append(art, inf); card.addEventListener('click', onClick);
-  return card;
-}
-// a hired person on the gold card: his whole picture on the left, his name above a stars bar, and his stars and wage in the slots
-function staffCard(s, club, { name, wage, onClick }) {
-  const card = el('button', 'mf-card fc fcv-staff fc-staff'), art = el('span', 'fc-art');
-  art.append(staffFace(s, club, 120));
-  const bar = el('div', 'mf-bar fc-bar'), f = el('i'); f.style.width = `${Math.round(s.lvl / 3 * 100)}%`; bar.append(f);
-  const inf = el('div', 'fc-info'); inf.append(el('b', 'fc-name', name), bar, el('span', 'fc-v fc-v1', '★'.repeat(s.lvl)), el('span', 'fc-v fc-v2', wage));
   card.append(art, inf); card.addEventListener('click', onClick);
   return card;
 }
@@ -1718,16 +1736,7 @@ function paintMerch(c) {
       body.append(grid);
     }
   } else if (merchTab === 'staff') {
-    const grid = el('div', 'mf-grid fc-grid');
-    for (const s of m.staff) {
-      const card = staffCard(s, club, { name: staffShort(s, s.name), wage: kfmt(wageText(MF.ROLES[s.role].wage, s.lvl)), onClick: () => { merchSheet = { type: 'staff', id: s.id }; sfx.click(); paintMerch(c); } });
-      grid.append(card);
-    }
-    for (let i = m.staff.length; i < L.staff; i++) {
-      const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Hire'));
-      card.addEventListener('click', () => { merchSheet = { type: 'hire' }; sfx.click(); paintMerch(c); });
-      grid.append(card);
-    }
+    const grid = staffRow(m.staff.map(q => ({ s: q, face: staffFace(q, club, 120), job: q.role, base: MF.ROLES[q.role].wage, onOpen: () => { merchSheet = { type: 'staff', id: q.id }; sfx.click(); paintMerch(c); } })), L.staff - m.staff.length, () => { merchSheet = { type: 'hire' }; sfx.click(); paintMerch(c); });
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${m.staff.length} of ${L.staff} places used · ${kfmt(MF.wagePerDay(m))} a day${m.level < PC.MAX_LEVEL ? ' · upgrade the factory for more places' : ''}`)); body.append(foot);
   } else {
@@ -1889,16 +1898,7 @@ function paintTraining(c) {
     body.append(grid);
     if (!list.length) body.append(el('p', 'sheetnote', 'Nobody in your squad can learn more right now.'));
   } else if (trainTab === 'coaches') {
-    const grid = el('div', 'mf-grid fc-grid');
-    for (const k of t.coaches) {
-      const card = staffCard(k, club, { name: staffShort(k, k.name.replace('Coach ', '')), wage: kfmt(wageText(TG.TRAIN.WAGE, k.lvl)), onClick: () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); } });
-      grid.append(card);
-    }
-    for (let i = t.coaches.length; i < L.coaches; i++) {
-      const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Hire'));
-      card.addEventListener('click', () => { trainSheet = { type: 'hire' }; sfx.click(); paintTraining(c); });
-      grid.append(card);
-    }
+    const grid = staffRow(t.coaches.map(k => ({ s: k, face: staffFace(k, club, 120), job: k.kind, base: TG.TRAIN.WAGE, onOpen: () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); } })), L.coaches - t.coaches.length, () => { trainSheet = { type: 'hire' }; sfx.click(); paintTraining(c); });
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${t.coaches.length} of ${L.coaches} coaches · ${kfmt(TG.wagePerDay(t))} a day · each coach teaches two players at a time`)); body.append(foot);
   } else {
@@ -2076,17 +2076,7 @@ function paintOffice(c) {
     ag.append(Object.assign(el('span', 'stf stf-agent mf-agent-art'), {}), tx, ico('search'));
     body.append(ag);
   } else {
-    const col = el('div', 'mf-col'), places = officePlaces(c), grid = el('div', 'mf-grid fc-grid');
-    const OIC = { accountant: 'coin', agent: 'users' };
-    for (const st of o.staff) {
-      const card = staffCard(st, club, { name: staffShort(st, st.name.split(' ')[1]), wage: kfmt(wageText(OFFICE.WAGE[st.role], st.lvl)), onClick: () => { officeSheet = { type: 'officer', id: st.id }; sfx.click(); paintOffice(c); } });
-      grid.append(card);
-    }
-    for (let i = o.staff.length; i < places; i++) {
-      const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Hire'));
-      card.addEventListener('click', () => { officeSheet = { type: 'hire' }; sfx.click(); paintOffice(c); });
-      grid.append(card);
-    }
+    const col = el('div', 'mf-col'), places = officePlaces(c), grid = staffRow(o.staff.map(q => ({ s: q, face: staffFace(q, club, 120), job: q.role, base: OFFICE.WAGE[q.role], onOpen: () => { officeSheet = { type: 'officer', id: q.id }; sfx.click(); paintOffice(c); } })), places - o.staff.length, () => { officeSheet = { type: 'hire' }; sfx.click(); paintOffice(c); });
     col.append(grid);
     const card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head'), row = officeRow(c);
     hd.append(ico('factory'), el('b', '', `Office level ${o.level}`), el('span', 'mf-stars', '★'.repeat(PC.lookOf(o.level))));
@@ -2582,16 +2572,7 @@ function paintMedical(c) {
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${inBed} of ${m.beds.length} beds in use. Each physio looks after two beds, so ${m.physios.length} physio${m.physios.length === 1 ? '' : 's'} can treat ${m.physios.length * 2}. A bed heals 4 times as fast as resting.`)); body.append(foot);
   } else if (medTab === 'staff') {
-    const grid = el('div', 'mf-grid fc-grid');
-    for (const ph of m.physios) {
-      const card = staffCard(Object.assign({}, ph, { id: `phys-${ph.id}` }), club, { name: staffShort(ph, ph.name.replace('Dr ', '')), wage: kfmt(wageText(MD.MED.WAGE, ph.lvl)), onClick: () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); } });
-      grid.append(card);
-    }
-    for (let i = m.physios.length; i < L.physios; i++) {
-      const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Hire a physio'));
-      card.addEventListener('click', () => { medSheet = { type: 'hire' }; sfx.click(); paintMedical(c); });
-      grid.append(card);
-    }
+    const grid = staffRow(m.physios.map(ph => ({ s: ph, face: staffFace({ id: `phys-${ph.id}`, name: ph.name, cand: ph.cand }, club, 120), job: 'physio', base: MD.MED.WAGE, onOpen: () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); } })), L.physios - m.physios.length, () => { medSheet = { type: 'hire' }; sfx.click(); paintMedical(c); }, 'Hire a physio');
     body.append(grid);
     const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${m.physios.length} of ${L.physios} physios · ${kfmt(MD.medWagePerDay(m))} a day. Without a physio the beds do nothing.`)); body.append(foot);
   } else {
