@@ -74,7 +74,7 @@ def build():
     out.append(f"SC .mf-frame {{ position: relative; border: 0; box-shadow: none; border-radius: 0; background: none; overflow: visible; }} SC .mf-frame canvas, SC .mf-frame img {{ position: absolute; inset: 13%; width: 74% !important; height: 74% !important; border-radius: 4px; }} SC .mf-frame::after {{ content: ''; position: absolute; inset: 0; background: {window('frame-blue', 0.13)} center / 100% 100% no-repeat; pointer-events: none; }}")
     nine('SC .mf-sheet-card', 'card-cream', 80, 16, 480, 'padding: 0 4px calc(8px + var(--safe-b)); color: #14102a;')
     xc, _ = uri('x-circle', 200)
-    out.append(f"SC .mf-x {{ width: 54px; height: 54px; padding: 0; background: {xc} center / contain no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }} SC .mf-x .ico {{ display: none; }}")
+    out.append(f"SC .mf-x {{ width: 40px; height: 40px; padding: 0; background: {xc} center / contain no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }} SC .mf-x .ico {{ display: none; }}")
     bk, _ = uri('back-blue', 200)
     out.append(f"SC .pt-back {{ width: 50px; height: 50px; background: {bk} center / 100% 100% no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }}")
     dot, _ = uri('dot-red', 80)
