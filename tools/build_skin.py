@@ -151,7 +151,7 @@ def build():
     out.append(".leaguescreen .lede, #records .lede { margin-top: -6px; }")
     # ---- painted staff portraits, the contract cards, the role badges ----
     for nme in ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'agent', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'o1', 'o2', 'o3', 'o4', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5', 's1']:
-        u, _ = uri('staff/' + nme, 170, 78)
+        u, _ = uri('staff/' + nme, 448, 74)
         out.append(f".stf-{nme} {{ background-image: {u}; }}")
     out.append(".stf { display: block; background-color: #20358a; background-size: cover; background-position: 50% 12%; background-repeat: no-repeat; } .mf-frame .stf { position: absolute; inset: 13%; border-radius: 4px; }")
     for key, nm in (('bat', 'blue'), ('bowl', 'red'), ('all', 'green'), ('wk', 'purple')):
@@ -182,7 +182,7 @@ def build():
         out.append(f".mf .fc.fcv-{vname} {{ background-image: {vu}; }}")
     out.append(".mf .fc-grid .mf-card.empty { aspect-ratio: 1.548; min-height: 0; border-width: 8px; border-image-width: 8px; }")
     # ---- the hire sheets and the staff lists: one big card. The stadium picture (with its gold frame) is the whole card; his picture stands on it, the header band, the About panel, a ribbon of stars, the wage chip and the button sit on top ----
-    stad, _ = uri('stadium-card', 640, 82)
+    stad, _ = uri('stadium-card', 1020, 80)
     ab = {n: uri('about-' + n, 520, 84)[0] for n in ('med', 'factory', 'coach', 'fin')}
     rb, _ = uri('ribbon-laurel', 640)
     out.append(".cand-wrap { min-width: 0; } .cand-row { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 2px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; } .cand-row::-webkit-scrollbar { display: none; }")
