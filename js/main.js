@@ -1635,7 +1635,7 @@ function candidateRow(kind, opts) {
 function staffRow(kind, people, free, onFree, freeLabel = 'Hire') {
   const cards = [];
   for (const q of people) {
-    const x = q.s.cand ? candidateById(q.s.cand) : null, btn = mfBtn('mf-big cand-hire', [ico('plus'), el('span', '', 'Hire')], q.onOpen);
+    const x = q.s.cand ? candidateById(q.s.cand) : null, btn = mfBtn('mf-big alt cand-hire', [ico('gear'), el('span', '', 'Open')], q.onOpen);
     const { card } = personCard({ panel: PANEL[kind], name: q.s.name, flag: x ? FLAGS[x.c][1] : '', key: q.job, age: x?.age, job: CAND_JOB[q.job], face: q.face, about: x ? x.about : 'One of your first hires.', stars: q.s.lvl, wage: kfmt(wageText(q.base, q.s.lvl)), btn });
     card.addEventListener('click', e => { if (!e.target.closest('button')) q.onOpen(); }); cards.push(card);
   }
