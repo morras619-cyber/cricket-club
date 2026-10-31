@@ -1600,7 +1600,7 @@ function personCard(f) {
   const stars = el('span', 'mf-stars cand-stars', '★'.repeat(f.stars) + '☆'.repeat(3 - f.stars));
   job.append(ico(CAND_ICON[f.key] || 'star'), el('span', '', f.job));
   top.append(el('b', `cand-name${f.name.length > 16 ? ' longer' : f.name.length > 12 ? ' long' : ''}`, f.name), el('span', 'cand-flag', f.flag || ''), job);
-  const about = el('div', `cand-aboutbox ab-${f.panel}`); about.append(el('p', 'cand-about', f.about));
+  const about = el('div', `cand-aboutbox ab-${f.panel}`); about.append(el('i', 'cand-gap'), el('p', `cand-about${f.about.length > 70 ? ' small' : ''}`, f.about));
   const chip = el('div', 'cand-wage'), age = el('div', 'cand-age'); chip.append(el('b', '', f.wage), el('small', '', '/day')); age.append(el('small', '', 'Age'), el('b', '', f.age ? String(f.age) : '–'));
   body.append(art, stars, about, chip, age, f.btn);
   card.append(top, body);
