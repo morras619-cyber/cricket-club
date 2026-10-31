@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, CANDIDATES, HIRE_AT, FLAGS, candidatesOf, wageText, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
 import * as MD from './stamina.js';
@@ -1551,6 +1551,7 @@ let merchTest = false, merchDemo = null;
 const demoCareer = () => { if (!merchDemo) { merchDemo = newCareer(Date.now() >>> 0); chooseClub(merchDemo, merchDemo.divisions.d3[0]); merchDemo.money = 2; merchDemo.build = PC.freshBuild(PC.XP_AT[10]); PC.addDiamonds(merchDemo, 500); if (window.__sixcharge) window.__sixcharge.demo = merchDemo; } return merchDemo; };
 // the icons (24 x 24, drawn with the game's thick dark outline)
 const ICON = {
+  lock: '<path d="M7 10V7a5 5 0 0110 0v3h1.5v11h-13V10zM9.2 10h5.6V7a2.8 2.8 0 00-5.6 0z"/>',
   upgrade: '<path d="M12 2l9 10h-5v10H8V12H3z"/>',
   diamond: '<path d="M7 3h10l5 6-10 12L2 9z"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none"/>',
   jersey: '<path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3c-1 2-7 2-8 0z"/>',
@@ -1582,11 +1583,36 @@ const playerFace = (p, size = 64) => (p.heroId ? portrait(heroById(p.heroId), si
 // staff with a job have a painted portrait (the skin's .stf-NAME classes): the factory's designers, printers and packers, the physios, the agent
 const STAFF_ART = { designer: ['f2', 'f3'], printer: ['f4', 'f5'], packer: ['f6', 'f1'], physio: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'], agent: ['agent'], accountant: ['o3', 'o1', 'o4'], 'coach-bat': ['c4', 'c1'], 'coach-pace': ['c2', 'c5'], 'coach-spin': ['c3', 'c6'] };
 function staffFace(s, club, size = 64) {
+  if (s.cand) { const sp = el('span', `stf stf-${s.cand}`); sp.setAttribute('role', 'img'); return sp; }   // (hired from the roster: his own portrait)
   const kind = s.role && STAFF_ART[s.role] ? s.role : s.kind && STAFF_ART[`coach-${s.kind}`] ? `coach-${s.kind}` : /^Dr /.test(s.name || '') ? 'physio' : null;
   if (kind) { const pool = STAFF_ART[kind], idn = String(s.id).match(/\d+/); const sp = el('span', `stf stf-${pool[(idn ? +idn[0] : 0) % pool.length]}`); sp.setAttribute('role', 'img'); return sp; }
   return faceEl({ id: `staff-${s.id}`, name: s.name, nation: 'IN' }, club, size);
 }
 const ROLE_NAME = { bat: 'Batter', bowl: 'Bowler', all: 'All-rounder', wk: 'Keeper' };
+const staffShort = (s, old) => (s.cand ? lastName(s.name.replace(/^Dr /, '')) : old);
+const CAND_JOB = { designer: 'Designer', printer: 'Printer', packer: 'Packer', bat: 'Batting coach', pace: 'Pace coach', spin: 'Spin coach', physio: 'Physio', accountant: 'Accountant', agent: 'Agent' };
+// the people you can hire in a building, as cards you swipe along: his portrait, name, country and age, stars, a few words, his wage, and the Hire button
+// (or why not: already hired, no free place, or the building level he joins at). opts: { level, hired: Set of ids, full, wage(role) -> $k a day, onHire(candidate) }
+function candidateRow(kind, opts) {
+  const wrap = el('div', 'cand-wrap'), row = el('div', 'cand-row'), dots = el('div', 'cand-dots');
+  const list = candidatesOf(kind).slice().sort((a, b) => a.rating - b.rating);
+  for (const x of list) {
+    const need = HIRE_AT[x.rating], locked = opts.level < need, mine = opts.hired.has(x.id), [country, flag] = FLAGS[x.c];
+    const card = el('div', `mf-card cand${locked ? ' locked' : ''}${mine ? ' mine' : ''}`), top = el('div', 'cand-top'), inf = el('div', 'cand-info');
+    const fr = frameOf(Object.assign(el('span', `stf stf-${x.id}`), {}), true); fr.style.setProperty('--fs', '88px');
+    inf.append(el('b', '', x.name), el('small', '', `${flag} ${country} · ${x.age}`), el('span', 'mf-stars cand-stars', '★'.repeat(x.rating) + '☆'.repeat(3 - x.rating)), el('span', 'cand-job', CAND_JOB[x.role]));
+    top.append(fr, inf);
+    const foot = el('div', 'cand-foot'), btn = mfBtn('mf-big cand-hire', [ico(locked ? 'lock' : 'plus'), el('span', '', mine ? 'Hired' : locked ? `Level ${need}` : opts.full ? 'No free place' : 'Hire')], () => opts.onHire(x));
+    btn.disabled = locked || mine || opts.full;
+    foot.append(el('span', 'cand-wage', `${kfmt(wageText(opts.wage(x.role), x.rating))} a day`), btn);
+    card.append(top, el('p', 'cand-about', x.about), foot);
+    if (locked) card.append(el('div', 'cand-lock', `Joins at level ${need}`));
+    row.append(card); dots.append(el('i'));
+  }
+  const sync = () => { const w = row.firstChild?.getBoundingClientRect().width || 1, k = Math.round(row.scrollLeft / (w + 10)); [...dots.children].forEach((d, j) => d.classList.toggle('on', j === k)); };
+  row.addEventListener('scroll', sync, { passive: true }); requestAnimationFrame(sync);
+  wrap.append(row, dots); return wrap;
+}
 // the gold player card (the skin's .fc): his portrait on the left, a bar and four numbers beside it. variant picks the icons painted on the card
 // ('train', 'med', 'acad'); vals are four { t, title, dim } for its slots; barClass is 'green' for a progress bar
 function fanCard(p, club, { name, fill, barClass = '', vals, variant, onClick, pick = false }) {
@@ -1687,7 +1713,7 @@ function paintMerch(c) {
     for (const s of m.staff) {
       const card = el('button', 'mf-card stack'), stars = el('span', 'mf-stars', '★'.repeat(s.lvl)), r = el('div', 'mf-row');
       r.append(ico({ designer: 'pencil', printer: 'printer', packer: 'box' }[s.role]), stars);
-      card.append(frameOf(staffFace(s, club, 64)), el('b', '', s.name), r);
+      card.append(frameOf(staffFace(s, club, 64)), el('b', '', staffShort(s, s.name)), r);
       card.addEventListener('click', () => { merchSheet = { type: 'staff', id: s.id }; sfx.click(); paintMerch(c); });
       grid.append(card);
     }
@@ -1733,15 +1759,9 @@ function paintMerch(c) {
     if (Number.isFinite(ms) && ms > left) { const w = el('div', 'mf-warn'); w.append(ico('warn'), el('span', '', `At your pace (${durfmt(m.pace)} a match) his contract ends in about ${durfmt(left)}, before this batch is done. What is unmade is cancelled; what is made sells as cheap vintage stock after two days.`)); card.append(w); }
     card.append(go);
   } else if (merchSheet.type === 'hire') {
-    const hd = el('div', 'mf-sheet-head'); hd.append(ico('users'), el('b', '', 'Hire someone'), close);
-    const roles = el('div', 'mf-roles');
-    for (const [role, R] of Object.entries(MF.ROLES)) {
-      const b = el('button', 'mf-role'), t = el('div'); t.append(el('b', '', R.name), el('small', '', `${R.about} ${kfmt(R.wage)} a day.`));
-      b.append(ico({ designer: 'pencil', printer: 'printer', packer: 'box' }[role]), t);
-      b.addEventListener('click', () => done(MF.hire(m, role), true));
-      roles.append(b);
-    }
-    card.append(hd, roles);
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('users'), el('b', '', 'Choose who joins'), close);
+    card.append(hd, el('p', 'sheetnote', `Swipe for more · ${L.staff - m.staff.length} free place${L.staff - m.staff.length === 1 ? '' : 's'}`),
+      candidateRow('merch', { level: m.level, hired: new Set(m.staff.map(x => x.cand).filter(Boolean)), full: m.staff.length >= L.staff, wage: r => MF.ROLES[r].wage, onHire: x => done(MF.hire(m, x.role, x), true) }));
   } else if (merchSheet.type === 'staff') {
     const s = m.staff.find(x => x.id === merchSheet.id);
     if (!s) { merchSheet = null; sh.hidden = true; return; }
@@ -1866,7 +1886,7 @@ function paintTraining(c) {
     const grid = el('div', 'mf-grid three');
     for (const k of t.coaches) {
       const card = el('button', 'mf-card stack'), r = el('div', 'mf-row'); r.append(ico(KIND_ICON[k.kind]), el('span', 'mf-stars', '★'.repeat(k.lvl)));
-      card.append(frameOf(staffFace(k, club, 64)), el('b', '', k.name.replace('Coach ', '')), el('small', '', TG.KINDS[k.kind].name.split(' ')[0]), r);
+      card.append(frameOf(staffFace(k, club, 64)), el('b', '', staffShort(k, k.name.replace('Coach ', ''))), el('small', '', TG.KINDS[k.kind].name.split(' ')[0]), r);
       card.addEventListener('click', () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); });
       grid.append(card);
     }
@@ -1933,15 +1953,9 @@ function paintTraining(c) {
     const r = el('div', 'mf-row'); r.append(el('span', '', `${info.ovr}`), ico('up'), el('span', '', `potential ${info.pot}`), ico('clock'), el('span', '', `${Math.round(t.tp[pid] || 0)} / ${TG.tpCost(info.ovr, info.age)} points to the next`));
     card.append(hd, r, mfBtn('mf-big red', [ico('cross'), el('span', '', 'Take out of training')], () => done(TG.release(t, trainSheet.index), true)));
   } else if (trainSheet.type === 'hire') {
-    const hd = el('div', 'mf-sheet-head'); hd.append(ico('star'), el('b', '', 'Hire a coach'), close);
-    const roles = el('div', 'mf-roles');
-    for (const [kind, K] of Object.entries(TG.KINDS)) {
-      const b = el('button', 'mf-role'), x = el('div'); x.append(el('b', '', K.name), el('small', '', `${K.about} ${kfmt(TG.TRAIN.WAGE)} a day.`));
-      b.append(ico(KIND_ICON[kind]), x);
-      b.addEventListener('click', () => done(TG.hire(t, kind), true));
-      roles.append(b);
-    }
-    card.append(hd, roles);
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('star'), el('b', '', 'Choose a coach'), close);
+    card.append(hd, el('p', 'sheetnote', `Swipe for more · ${L.coaches - t.coaches.length} free place${L.coaches - t.coaches.length === 1 ? '' : 's'}`),
+      candidateRow('training', { level: t.level, hired: new Set(t.coaches.map(x => x.cand).filter(Boolean)), full: t.coaches.length >= L.coaches, wage: () => TG.TRAIN.WAGE, onHire: x => done(TG.hire(t, x.role, x), true) }));
   } else if (trainSheet.type === 'coach') {
     const k = t.coaches.find(x => x.id === trainSheet.id);
     if (!k) { trainSheet = null; sh.hidden = true; return; }
@@ -2062,7 +2076,7 @@ function paintOffice(c) {
     const OIC = { accountant: 'coin', agent: 'users' };
     for (const st of o.staff) {
       const card = el('button', 'mf-card stack'), r = el('div', 'mf-row'); r.append(ico(OIC[st.role]), el('span', 'mf-stars', '★'.repeat(st.lvl)));
-      card.append(frameOf(staffFace(st, club, 64)), el('b', '', st.name.split(' ')[1]), el('small', '', OFFICERS[st.role].name), r);
+      card.append(frameOf(staffFace(st, club, 64)), el('b', '', staffShort(st, st.name.split(' ')[1])), el('small', '', OFFICERS[st.role].name), r);
       card.addEventListener('click', () => { officeSheet = { type: 'officer', id: st.id }; sfx.click(); paintOffice(c); });
       grid.append(card);
     }
@@ -2098,16 +2112,9 @@ function paintOffice(c) {
       card.append(b);
     }
   } else if (officeSheet.type === 'hire') {
-    const hd = el('div', 'mf-sheet-head'); hd.append(ico('plus'), el('b', '', 'Hire an officer'), close);
-    const roles = el('div', 'mf-roles');
-    for (const [role, R] of Object.entries(OFFICERS)) {
-      const b = el('button', 'mf-role'), x = el('div'); x.append(el('b', '', R.name), el('small', '', `${R.about} ${kfmt(OFFICE.WAGE[role])} a day.`));
-      b.append(ico(role === 'agent' ? 'users' : 'coin'), x);
-      b.disabled = o.staff.some(st => st.role === role);
-      b.addEventListener('click', () => done(hireOfficer(c, role), true));
-      roles.append(b);
-    }
-    card.append(hd, roles);
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('plus'), el('b', '', 'Choose an officer'), close);
+    card.append(hd, el('p', 'sheetnote', `Swipe for more · ${officePlaces(c) - o.staff.length} free place${officePlaces(c) - o.staff.length === 1 ? '' : 's'}`),
+      candidateRow('office', { level: o.level, hired: new Set(o.staff.map(x => x.cand).filter(Boolean)), full: o.staff.length >= officePlaces(c), wage: r => OFFICE.WAGE[r], onHire: x => done(hireOfficer(c, x.role, x), true) }));
   } else if (officeSheet.type === 'officer') {
     const st = o.staff.find(x => x.id === officeSheet.id);
     if (!st) { officeSheet = null; sh.hidden = true; return; }
@@ -2576,13 +2583,13 @@ function paintMedical(c) {
     const grid = el('div', 'mf-grid three');
     for (const ph of m.physios) {
       const card = el('button', 'mf-card stack'), r = el('div', 'mf-row'); r.append(ico('heart'), el('span', 'mf-stars', '★'.repeat(ph.lvl)));
-      card.append(frameOf(staffFace({ id: `phys-${ph.id}`, name: ph.name }, club, 64)), el('b', '', ph.name.replace('Dr ', '')), el('small', '', 'Physio'), r);
+      card.append(frameOf(staffFace({ id: `phys-${ph.id}`, name: ph.name, cand: ph.cand }, club, 64)), el('b', '', staffShort(ph, ph.name.replace('Dr ', ''))), el('small', '', 'Physio'), r);
       card.addEventListener('click', () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); });
       grid.append(card);
     }
     for (let i = m.physios.length; i < L.physios; i++) {
       const card = el('button', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Hire a physio'));
-      card.addEventListener('click', () => done(MD.hirePhysio(m)));
+      card.addEventListener('click', () => { medSheet = { type: 'hire' }; sfx.click(); paintMedical(c); });
       grid.append(card);
     }
     body.append(grid);
@@ -2607,7 +2614,11 @@ function paintMedical(c) {
   sh.onclick = e => { if (e.target === sh) { medSheet = null; paintMedical(c); } };
   const card = el('div', 'mf-sheet-card');
   const close = mfBtn('mf-x', [ico('cross')], () => { medSheet = null; sfx.click(); paintMedical(c); });
-  if (medSheet.type === 'player') {
+  if (medSheet.type === 'hire') {
+    const hd = el('div', 'mf-sheet-head'); hd.append(ico('heart'), el('b', '', 'Choose a physio'), close);
+    card.append(hd, el('p', 'sheetnote', `Swipe for more · ${L.physios - m.physios.length} free place${L.physios - m.physios.length === 1 ? '' : 's'}`),
+      candidateRow('medical', { level: m.level, hired: new Set(m.physios.map(x => x.cand).filter(Boolean)), full: m.physios.length >= L.physios, wage: () => MD.MED.WAGE, onHire: x => done(MD.hirePhysio(m, x), true) }));
+  } else if (medSheet.type === 'player') {
     const p = c.players[medSheet.id];
     if (!p || p.team !== c.club) { medSheet = null; sh.hidden = true; return; }
     const f = Math.round(MD.fitOf(m, p.id)), kn = MD.isKnocked(m, p.id), idx = m.beds.indexOf(p.id), hd = el('div', 'mf-sheet-head');
@@ -2637,7 +2648,7 @@ function paintMedical(c) {
   } else if (medSheet.type === 'physio') {
     const ph = m.physios.find(x => x.id === medSheet.id);
     if (!ph) { medSheet = null; sh.hidden = true; return; }
-    const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(staffFace({ id: `phys-${ph.id}`, name: ph.name }, club, 96), true), el('b', '', `${ph.name} · Physio`), close);
+    const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(staffFace({ id: `phys-${ph.id}`, name: ph.name, cand: ph.cand }, club, 96), true), el('b', '', `${ph.name} · Physio`), close);
     const info = el('div', 'mf-row'); info.append(el('span', 'mf-stars', '★'.repeat(ph.lvl)), ico('coin'), el('span', '', `${kfmt(MD.MED.WAGE * (1 + 0.25 * (ph.lvl - 1)))} a day`));
     const maxed = ph.lvl >= MD.physioMax(m);
     const tr = mfBtn('mf-big alt', [ico('up'), el('span', '', maxed ? 'Best for now' : `Train · ${kfmt(MD.physioTrainCost(ph))}`)], () => done(MD.trainPhysio(m, ph.id, ctx())));

@@ -5,6 +5,7 @@
 // clock gets you nothing. A jersey belongs to a live contract: when the player goes, what is not yet printed is cancelled (and refunded),
 // what is printed sells at full demand for two days, then as vintage stock (cheap, fading over a week), and a re-signed player brings it back.
 import { levelRow, lookOf } from './pacing.js';
+const HIRE_AT = { 1: 1, 2: 5, 3: 10 };   // (the building level a 1, 2 or 3-star hand joins at: career.js HIRE_AT)
 export const MIN = 60000, HOUR = 3600000, DAY = 86400000;
 export const MERCH = {
   LEVELS: [null,
@@ -206,11 +207,15 @@ function payFrom(m, cost, ctx) {   // from the till first, then the club's money
   if (!got || got < need) return false;
   m.till += got - cost; return true;
 }
-export function hire(m, role) {
+// cand: a person from the roster (career.js CANDIDATES): he comes with his name, his stars as his level, and his id (for his portrait)
+export function hire(m, role, cand = null) {
   if (!ROLES[role]) return no('No such job');
   if (m.staff.length >= cap(m).staff) return no(`The factory has room for ${cap(m).staff} staff: upgrade it for more`);
+  if (cand && (cand.kind !== 'merch' || cand.role !== role)) return no('He does not do that job');
+  if (cand && m.staff.some(s => s.cand === cand.id)) return no('He is hired already');
+  if (cand && m.level < HIRE_AT[cand.rating]) return no(`He joins when the factory is level ${HIRE_AT[cand.rating]}`);
   const id = m.nextId++;
-  m.staff.push({ id, role, lvl: 1, name: NAMES[(id * 7 + role.length) % NAMES.length] });
+  m.staff.push(cand ? { id, role, lvl: cand.rating, name: cand.name, cand: cand.id } : { id, role, lvl: 1, name: NAMES[(id * 7 + role.length) % NAMES.length] });
   seal(m); return ok;
 }
 export function fire(m, id) { const i = m.staff.findIndex(s => s.id === id); if (i < 0) return no('Not on the staff'); m.staff.splice(i, 1); seal(m); return ok; }

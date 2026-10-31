@@ -3,6 +3,7 @@
 // and at most a few points a season), on top of the natural growth. TP only comes from real time, so playing faster does not train anyone faster.
 // Pure data and functions (no screen): the state is career.training, and money is in $k. The time is the server's (main.js).
 import { levelRow, lookOf } from './pacing.js';
+const HIRE_AT = { 1: 1, 2: 5, 3: 10 };   // (the building level a 1, 2 or 3-star hand joins at: career.js HIRE_AT)
 export const MIN = 60000, HOUR = 3600000, DAY = 86400000;
 export const TRAIN = {
   LEVELS: [null,
@@ -146,11 +147,14 @@ function payFrom(t, cost, ctx) {
   if (!got || got < need) return false;
   t.fund += got - cost; return true;
 }
-export function hire(t, kind) {
+export function hire(t, kind, cand = null) {
   if (!KINDS[kind]) return no('No such coach');
   if (t.coaches.length >= cap(t).coaches) return no(`The ground has room for ${cap(t).coaches} coaches: upgrade it for more`);
+  if (cand && (cand.kind !== 'training' || cand.role !== kind)) return no('He does not teach that');
+  if (cand && t.coaches.some(x => x.cand === cand.id)) return no('He is hired already');
+  if (cand && t.level < HIRE_AT[cand.rating]) return no(`He joins when the ground is level ${HIRE_AT[cand.rating]}`);
   const id = t.nextId++;
-  t.coaches.push({ id, kind, lvl: 1, name: NAMES[(id * 3 + kind.length) % NAMES.length] });
+  t.coaches.push(cand ? { id, kind, lvl: cand.rating, name: cand.name, cand: cand.id } : { id, kind, lvl: 1, name: NAMES[(id * 3 + kind.length) % NAMES.length] });
   seal(t); return ok;
 }
 export function fire(t, id) { const i = t.coaches.findIndex(c => c.id === id); if (i < 0) return no('Not on the staff'); t.coaches.splice(i, 1); seal(t); return ok; }

@@ -48,7 +48,7 @@ def build():
     out = [A]
     ic, rows = atlas()
     out.append(f".ico[data-n] {{ background: {ic} no-repeat; background-size: {COLS * 100}% {rows * 100}%; }} .ico[data-n] svg {{ display: none; }}")
-    m = {'coin': 'coin', 'users': 'users', 'clock': 'clock', 'warn': 'warn', 'plus': 'plus', 'heart': 'heart', 'up': 'up', 'check': 'check', 'trophy': 'trophy', 'chart': 'chart', 'star': 'star-on', 'ball': 'ball', 'search': 'search', 'cross': 'cross', 'jersey': 'jersey', 'box': 'box', 'gear': 'gear', 'factory': 'hammer', 'pencil': 'pencil', 'printer': 'printer', 'diamond': 'diamond', 'upgrade': 'upgrade'}
+    m = {'coin': 'coin', 'users': 'users', 'clock': 'clock', 'warn': 'warn', 'plus': 'plus', 'heart': 'heart', 'up': 'up', 'check': 'check', 'trophy': 'trophy', 'chart': 'chart', 'star': 'star-on', 'ball': 'ball', 'search': 'search', 'cross': 'cross', 'jersey': 'jersey', 'box': 'box', 'gear': 'gear', 'factory': 'hammer', 'pencil': 'pencil', 'printer': 'printer', 'diamond': 'diamond', 'upgrade': 'upgrade', 'lock': 'lock'}
     for name, key in m.items():
         i = ICONS.index(key); out.append(f".ico[data-n={name}] {{ background-position: {(i % COLS) / (COLS - 1) * 100:.3f}% {(i // COLS) / (rows - 1) * 100:.3f}%; }}")
     def nine(sel, name, slice_, bw, width=None, extra=''):
@@ -150,7 +150,7 @@ def build():
     out.append(f".leaguescreen .title, #records .title, #daily .title, #trophies .title, #stats .title {{ align-self: center; display: inline-block; margin: 0; padding: 8px 34px 16px; font-size: 28px; line-height: 1; color: #ffe94d; -webkit-text-stroke: 0; transform: none; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); background: {rb} center / 100% 100% no-repeat; }}")
     out.append(".leaguescreen .lede, #records .lede { margin-top: -6px; }")
     # ---- painted staff portraits, the contract cards, the role badges ----
-    for nme in ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'agent', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'o1', 'o3', 'o4', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5', 's1']:
+    for nme in ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'agent', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'o1', 'o2', 'o3', 'o4', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5', 's1']:
         u, _ = uri('staff/' + nme, 170, 78)
         out.append(f".stf-{nme} {{ background-image: {u}; }}")
     out.append(".stf { display: block; background-color: #20358a; background-size: cover; background-position: 50% 12%; background-repeat: no-repeat; } .mf-frame .stf { position: absolute; inset: 13%; border-radius: 4px; }")
@@ -180,6 +180,12 @@ def build():
     for vname, vu in variants.items():
         out.append(f".mf .fc.fcv-{vname} {{ background-image: {vu}; }}")
     out.append(".mf .fc-grid .mf-card.empty { aspect-ratio: 1.548; min-height: 0; border-width: 8px; border-image-width: 8px; }")
+    # ---- the hire sheets: a row of candidate cards you swipe along ----
+    out.append(".cand-wrap { min-width: 0; } .cand-row { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 2px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; } .cand-row::-webkit-scrollbar { display: none; }")
+    out.append(".mf-card.cand { position: relative; flex: 0 0 86%; scroll-snap-align: center; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 6px; padding: 0 2px; min-height: 0; } .cand-top { display: flex; align-items: center; gap: 10px; } .cand-top .mf-frame { flex: none; } .cand-top .stf { background-position: 50% 8%; } .cand-info { min-width: 0; display: flex; flex-direction: column; gap: 3px; } .cand-info b { font-size: 17px; line-height: 1.1; } .cand-info small { font-size: 12px; font-weight: 800; opacity: .8; } .cand-stars { font-size: 17px; letter-spacing: 1px; } .cand-job { align-self: flex-start; padding: 1px 8px; border-radius: 999px; background: #1f5fd6; color: #fff; font-size: 11px; font-weight: 900; letter-spacing: .3px; text-transform: uppercase; }")
+    out.append(".cand-about { margin: 0; font-size: 12.5px; font-weight: 700; line-height: 1.3; min-height: 2.6em; } .cand-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .cand-wage { font-weight: 900; font-size: 13px; } .mf-big.cand-hire { flex: none; min-width: 112px; min-height: 42px; padding: 0 6px; font-size: 15px; } .mf-big.cand-hire .ico { width: 22px; height: 22px; }")
+    out.append(".mf-card.cand.locked > *:not(.cand-lock) { filter: grayscale(.85) brightness(.9); opacity: .7; } .cand-lock { position: absolute; left: 10px; top: 10px; padding: 2px 8px; border-radius: 8px; background: rgba(20, 16, 42, .85); color: #ffd23f; font-size: 11px; font-weight: 900; } .mf-card.cand.mine { filter: saturate(.8); }")
+    out.append(".cand-dots { display: flex; justify-content: center; gap: 6px; padding: 2px 0 0; } .cand-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(20, 16, 42, .25); } .cand-dots i.on { background: #ffb800; box-shadow: 0 0 0 1.5px #14102a; }")
     out.append(".tab { padding: 2px 4px; min-height: 40px; } .map-tab { min-height: 56px; padding: 0 2px; }")
     bk2, _ = uri('back-blue', 200)
     out.append(f".pt-back {{ width: 50px; height: 50px; background: {bk2} center / 100% 100% no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }}")

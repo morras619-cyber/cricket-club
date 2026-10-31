@@ -45,6 +45,7 @@ export const paceTired = e => 1 - S.effect.bowlPace * tiredness(e);
 // he starts the next match with (match.js), so the rules above are all the match needs. Pure data and functions: the state is career.medical, money in $k.
 // The time is the server's (main.js), as for the other buildings.
 import { levelRow, lookOf } from './pacing.js';
+const HIRE_AT = { 1: 1, 2: 5, 3: 10 };   // (the building level a 1, 2 or 3-star hand joins at: career.js HIRE_AT)
 export const MIN = 60000, HOUR = 3600000, DAY = 86400000;
 export const MED = {
   LEVELS: [null,
@@ -163,10 +164,13 @@ function medPay(m, cost, ctx) {
   if (!got || got < need) return false;
   m.fund += got - cost; return true;
 }
-export function hirePhysio(m) {
+export function hirePhysio(m, cand = null) {
   if (m.physios.length >= mcap(m).physios) return mno(`The centre has room for ${mcap(m).physios} physio${mcap(m).physios > 1 ? 's' : ''}: upgrade it for more`);
+  if (cand && cand.kind !== 'medical') return mno('He is not a physio');
+  if (cand && m.physios.some(x => x.cand === cand.id)) return mno('He is hired already');
+  if (cand && m.level < HIRE_AT[cand.rating]) return mno(`He joins when the centre is level ${HIRE_AT[cand.rating]}`);
   const id = m.nextId++;
-  m.physios.push({ id, lvl: 1, name: PHYSIOS[(id * 5) % PHYSIOS.length] });
+  m.physios.push(cand ? { id, lvl: cand.rating, name: cand.name, cand: cand.id } : { id, lvl: 1, name: PHYSIOS[(id * 5) % PHYSIOS.length] });
   medSeal(m); return mok;
 }
 export function firePhysio(m, id) { const i = m.physios.findIndex(p => p.id === id); if (i < 0) return mno('Not on the staff'); m.physios.splice(i, 1); medSeal(m); return mok; }

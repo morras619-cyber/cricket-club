@@ -1231,6 +1231,45 @@ export function setLook(c, kind, id) {
 export const lookColour = (c, kind) => { const id = c.shop?.look?.[kind]; return (id && SHOP.LOOKS[kind][id]?.colour) || null; };
 // who is on a short contract (seasons left; the soonest to go first)
 export const contractList = c => clubPlayers(c, c.club).filter(p => p.contract < 50).sort((a, b) => a.contract - b.contract || ovr(b) - ovr(a));
+// ---------- the people you can hire (their painted portraits, tools/ui/staff): a name that fits the face, an age, a country, a few words, and a rating (1 to 3 stars) ----------
+// The rating is the level he starts at (so he is paid and works as a trained man): a 1-star hand is there from the start, a 2-star from building level 5, a 3-star from level 10.
+// Whoever is hired from here keeps his id (staff.cand) and his portrait; staff hired before this (a name from a list, no cand) are left as they were.
+export const HIRE_AT = { 1: 1, 2: 5, 3: 10 };
+export const FLAGS = { IN: ['India', '🇮🇳'], PK: ['Pakistan', '🇵🇰'], LK: ['Sri Lanka', '🇱🇰'], BD: ['Bangladesh', '🇧🇩'], AU: ['Australia', '🇦🇺'], NZ: ['New Zealand', '🇳🇿'], ZA: ['South Africa', '🇿🇦'], GB: ['England', '🇬🇧'], JM: ['Jamaica', '🇯🇲'] };
+export const CANDIDATES = [
+  // the factory (kind 'merch'): designers, printers, packers
+  { id: 'f3', kind: 'merch', role: 'designer', name: 'Tariq Anwar', sex: 'm', age: 27, c: 'PK', rating: 1, about: 'Sketches a new kit between matches. Quick, and easy on the wages.' },
+  { id: 'f2', kind: 'merch', role: 'designer', name: 'Meera Iyer', sex: 'f', age: 31, c: 'IN', rating: 2, about: 'Plans every jersey on paper first. The fans love her colours.' },
+  { id: 'f4', kind: 'merch', role: 'printer', name: 'Sana Farooq', sex: 'f', age: 26, c: 'PK', rating: 1, about: 'Fast with the heat press, and has never spoiled a jersey on purpose.' },
+  { id: 'f5', kind: 'merch', role: 'printer', name: 'Dilan Perera', sex: 'm', age: 38, c: 'LK', rating: 2, about: 'Runs the sewing line. Steady hands and an eye for detail.' },
+  { id: 'f6', kind: 'merch', role: 'packer', name: 'Omar Siddiqui', sex: 'm', age: 29, c: 'BD', rating: 1, about: 'Packs fast, wastes nothing, and carries twice what he should.' },
+  { id: 'f1', kind: 'merch', role: 'packer', name: 'Ravi Kulkarni', sex: 'm', age: 54, c: 'IN', rating: 3, about: 'Thirty years on the factory floor. Nothing leaves until he has checked it twice.' },
+  // the training ground (kind 'training'): role is the coach's kind
+  { id: 'c4', kind: 'training', role: 'bat', name: 'Anjali Deshmukh', sex: 'f', age: 33, c: 'IN', rating: 1, about: 'A former opener. Drills the basics until they are habit.' },
+  { id: 'c1', kind: 'training', role: 'bat', name: 'Imtiaz Qureshi', sex: 'm', age: 56, c: 'PK', rating: 3, about: 'Two decades of county cricket. Strict, patient, and always right about your front foot.' },
+  { id: 'c2', kind: 'training', role: 'pace', name: 'Brett Hollis', sex: 'm', age: 40, c: 'AU', rating: 1, about: 'Teaches rhythm before raw speed. His bowlers stay fit.' },
+  { id: 'c5', kind: 'training', role: 'pace', name: 'Kemar Brown', sex: 'm', age: 45, c: 'JM', rating: 2, about: 'Ran in hard for his island for years. Now he teaches others to.' },
+  { id: 'c3', kind: 'training', role: 'spin', name: 'Nuwan Jayasuriya', sex: 'm', age: 43, c: 'LK', rating: 1, about: 'Grew up on dry pitches. Makes the ball talk.' },
+  { id: 'c6', kind: 'training', role: 'spin', name: 'Callum Ward', sex: 'm', age: 39, c: 'GB', rating: 2, about: 'A tactician with a board and a plan for every batter.' },
+  // the medical centre (kind 'medical'): physios
+  { id: 'm3', kind: 'medical', role: 'physio', name: 'Marcus Doyle', sex: 'm', age: 30, c: 'AU', rating: 1, about: 'First on the pitch when someone goes down. Calm under pressure.' },
+  { id: 'm4', kind: 'medical', role: 'physio', name: 'Aisha Khan', sex: 'f', age: 28, c: 'PK', rating: 1, about: 'Quick hands and a quicker diagnosis. Sends nobody out half-fit.' },
+  { id: 'm7', kind: 'medical', role: 'physio', name: 'Emma Walsh', sex: 'f', age: 29, c: 'NZ', rating: 1, about: 'Keeps recovering players in good spirits, and in the beds on time.' },
+  { id: 'm2', kind: 'medical', role: 'physio', name: 'Dr Priya Sharma', sex: 'f', age: 34, c: 'IN', rating: 2, about: 'Careful and thorough. Never sends a player back too soon.' },
+  { id: 'm5', kind: 'medical', role: 'physio', name: 'Devon Campbell', sex: 'm', age: 41, c: 'JM', rating: 2, about: 'Recovery and massage. Players swear by his sessions.' },
+  { id: 'm6', kind: 'medical', role: 'physio', name: 'Dr Lucas Meyer', sex: 'm', age: 37, c: 'ZA', rating: 2, about: 'Reads the numbers. Spots a strain before the player feels it.' },
+  { id: 'm1', kind: 'medical', role: 'physio', name: 'Dr Rajesh Nair', sex: 'm', age: 58, c: 'IN', rating: 3, about: 'Thirty years in sports medicine. Has patched up three captains and a mascot.' },
+  // the club office (kind 'office'): accountants and agents
+  { id: 'o4', kind: 'office', role: 'accountant', name: 'Neha Kapoor', sex: 'f', age: 32, c: 'IN', rating: 1, about: 'Keeps the books tidy and the sponsors happy.' },
+  { id: 'o3', kind: 'office', role: 'accountant', name: 'Rohan Mehta', sex: 'm', age: 35, c: 'IN', rating: 1, about: 'Counts every cent twice and is never late with the figures.' },
+  { id: 'o1', kind: 'office', role: 'accountant', name: 'Farah Malik', sex: 'f', age: 41, c: 'PK', rating: 2, about: 'Reads a balance sheet like a scoreboard.' },
+  { id: 'agent', kind: 'office', role: 'agent', name: 'Vikram Khanna', sex: 'm', age: 47, c: 'IN', rating: 1, about: 'Knows every club\'s price. A smooth talker and a harder negotiator.' },
+  { id: 'o2', kind: 'office', role: 'agent', name: 'Anwar Chaudhry', sex: 'm', age: 55, c: 'PK', rating: 3, about: 'Thirty years of contracts. One phone call and the deal is done.' },
+];
+export const candidatesOf = kind => CANDIDATES.filter(x => x.kind === kind);
+export const candidateById = id => CANDIDATES.find(x => x.id === id) || null;
+export const wageText = (base, rating) => base * (1 + 0.25 * (rating - 1));   // $k a day: the base wage, +25% for each star above the first
+
 // ---------- the officers: wages by the day from the club's money (time is the server's, as for the other buildings) ----------
 const onok = { ok: true }, onno = why => ({ ok: false, why });
 // ctx: { now, trusted }; the away time counts for ten hours at most (an hour if the time was not checked with the server)
@@ -1250,17 +1289,21 @@ export function officeTick(c, ctx) {
   while (o.unpaidMs >= OFFICE.QUIT && o.staff.length) { const g = o.staff.pop(); o.unpaidMs -= OFFICE.DAY; left.push(g.name); o.log = [...(o.log || []), { season: c.season, quit: g.name }].slice(-6); }
   return { ms: run, left };
 }
-export function hireOfficer(c, role) {
+export function hireOfficer(c, role, cand = null) {
   const o = office(c);
   if (!OFFICERS[role]) return onno('No such officer');
   if (o.staff.some(s => s.role === role)) return onno('You have one already');
   if (o.staff.length >= officePlaces(c)) return onno(`The office has room for ${officePlaces(c)}: build it bigger for more`);
+  if (cand && (cand.kind !== 'office' || cand.role !== role)) return onno('He does not do that job');
+  if (cand && o.staff.some(s => s.cand === cand.id)) return onno('He is hired already');
+  if (cand && o.level < HIRE_AT[cand.rating]) return onno(`He joins when the office is level ${HIRE_AT[cand.rating]}`);
   const id = o.nextId++;
-  o.staff.push({ id, role, lvl: 1, name: `${role === 'agent' ? 'Ms' : 'Mr'} ${OFFICER_NAMES[(id * 3 + role.length) % OFFICER_NAMES.length]}` });
+  o.staff.push(cand ? { id, role, lvl: cand.rating, name: cand.name, cand: cand.id } : { id, role, lvl: 1, name: `${role === 'agent' ? 'Ms' : 'Mr'} ${OFFICER_NAMES[(id * 3 + role.length) % OFFICER_NAMES.length]}` });
   return onok;
 }
 export function fireOfficer(c, id) { const o = office(c), i = o.staff.findIndex(s => s.id === id); if (i < 0) return onno('Not on the staff'); o.staff.splice(i, 1); return onok; }
 export const officerTrainCost = s => round2(OFFICE.TRAIN * s.lvl / 1000);
+export const staffOf = c => office(c).staff;
 export function trainOfficer(c, id) {
   const s = office(c).staff.find(x => x.id === id);
   if (!s) return onno('Not on the staff');
