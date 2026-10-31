@@ -127,6 +127,12 @@ def build():
     out.append("@media (max-height: 720px) { #office .mf-stats, #clubhouse .mf-stats, #apartment .mf-stats { display: none; } }")
     out.append(".mf-jersey { position: relative; flex: none; width: 56px; height: 56px; } .mf-jersey .ico.jer { width: 56px; height: 56px; } .mf-qty-badge { position: absolute; right: -4px; bottom: -2px; min-width: 22px; padding: 0 5px; height: 20px; line-height: 17px; border-radius: 10px; background: #14102a; color: #fff; border: 2px solid #ffd23f; font-style: normal; font-size: 11px; font-weight: 900; text-align: center; }")
     out.append("#merch .mf-grid.three .mf-card.stack .mf-frame { --fs: 54px; } #merch .mf-grid.three .mf-card.stack { gap: 2px; } #merch .mf-grid.three .mf-card.stack .mf-row { flex-wrap: nowrap; } @media (max-height: 720px) { #merch .mf-grid.three .mf-card.stack .mf-frame { --fs: 38px; } #merch .mf-grid.three { grid-auto-rows: minmax(0, 118px); } }")
+    # ---- the map header and the career pages: the same top bar, and the title as the same sign ----
+    out.append(".map-top { flex-wrap: wrap; row-gap: 4px; } .map-topbar { flex: 0 0 100%; } .map-topbar[hidden] { display: none; } .map-gear { display: none; } .map-title .map-pace { margin-top: 0; } .map-title b { font-size: 22px; }")
+    out.append(".topbar .ico { display: inline-flex; flex: none; } .menu.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; } .menu.row .bigbtn { min-width: 0; font-size: 20px; padding: 2px 2px; white-space: nowrap; letter-spacing: 0; }")
+    out.append(".screen-inner > .topbar { flex: none; } .topbar[hidden] { display: none; } .lg-logo { display: none; }")
+    out.append(f".leaguescreen .title, #records .title, #daily .title, #trophies .title, #stats .title {{ align-self: center; display: inline-block; margin: 0; padding: 8px 34px 16px; font-size: 28px; line-height: 1; color: #ffe94d; -webkit-text-stroke: 0; transform: none; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); background: {rb} center / 100% 100% no-repeat; }}")
+    out.append(".leaguescreen .lede, #records .lede { margin-top: -6px; }")
     out.append(".tab { padding: 2px 4px; min-height: 40px; } .map-tab { min-height: 56px; padding: 0 2px; }")
     bk2, _ = uri('back-blue', 200)
     out.append(f".pt-back {{ width: 50px; height: 50px; background: {bk2} center / 100% 100% no-repeat; border: 0; box-shadow: none; font-size: 0; color: transparent; }}")

@@ -242,6 +242,7 @@ vs a random team</small></button>
 
   <section id="career" class="screen leaguescreen" hidden>
     <div class="screen-inner wide">
+      <div class="topbar" id="careerTop" hidden></div>
       <img class="lg-logo" src="img/logo-sixcharge.webp" alt="Sixcharge" width="900" height="458">
       <h2 class="title" id="careerTitle">Super League</h2>
       <p class="lede" id="careerLede"></p>
@@ -260,6 +261,7 @@ vs a random team</small></button>
   <section id="clubmap" class="screen" hidden>
     <canvas id="mapCanvas" aria-label="Your club: drag to look around, tap a building"></canvas>
     <div class="map-top">
+      <div class="topbar map-topbar" id="mapTop"></div>
       <button class="pt-back" id="mapBack" aria-label="Back">‹</button>
       <div class="map-title"><b id="mapClub"></b><small id="mapSub"></small><div class="pace map-pace" id="mapPace"></div><div class="map-build" id="mapBuild"></div></div>
       <button class="map-gear" id="mapSettings" aria-label="Settings"><img src="img/menu/gear.webp" alt=""></button>
@@ -388,6 +390,7 @@ vs a random team</small></button>
 
   <section id="records" class="screen" hidden>
     <div class="screen-inner wide">
+      <div class="topbar" id="recordsTop" hidden></div>
       <h2 class="title">League records</h2>
       <p class="lede">Every run and wicket since season 1. These never reset.</p>
       <div id="recordsBody" class="statsbody"></div>
@@ -397,6 +400,7 @@ vs a random team</small></button>
 
   <section id="daily" class="screen" hidden>
     <div class="screen-inner">
+      <div class="topbar" id="dailyTop" hidden></div>
       <h2 class="title" id="dailyTitle">Daily Challenge</h2>
       <div class="panel paper dailycard" id="dailyCard"></div>
       <div class="menu row">

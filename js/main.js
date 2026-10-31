@@ -1311,16 +1311,12 @@ const fname = p => `${flag(p)} ${p.name}`.trim(); // flag and plain name, for li
 // the club's level and its builders, under the map's title
 function fillBuild(host, c) {
   buildTick(c);
-  const b = PC.buildOf(c), lvl = PC.clubLevel(b.xp);
+  const b = PC.buildOf(c);
   host.replaceChildren();
-  const lv = el('span', 'mb-lv'); lv.append(ico('star', 'on'), el('b', '', `Club LV ${lvl}`));
-  const bar = el('span', 'mb-bar'), fill = el('i'); fill.style.width = `${Math.round(PC.levelShare(b.xp) * 100)}%`; bar.append(fill);
-  host.append(lv, bar);
   const now = serverNow(), left = j => durfmt(Math.max(0, j.end - now));
   const job = b.jobs[0];
   const bt = el('span', 'mb-txt'); bt.append(ico('gear', b.jobs.length ? 'on' : ''), el('span', '', b.jobs.length ? `${BUILD_NAME[job.id]} → ${job.to} · ${left(job)}${b.jobs.length > 1 ? ` (+${b.jobs.length - 1})` : ''}` : `Builder${b.builders > 1 ? 's' : ''} free`));
   host.append(bt);
-  const dm = el('span', 'mb-txt', `💎 ${b.diamonds}`); host.append(dm);
   if (b.builders < 2) {
     const buy = el('button', 'chipbtn', `2nd builder · ${PC.BUILD.BUILDER2} 💎`);
     buy.addEventListener('click', () => { const r = PC.buyBuilder(c); if (!r.ok) { ui.toast(r.why); return; } sfx.dhol(); saveProfile(profile); fillBuild(host, c); });
@@ -1397,6 +1393,7 @@ function renderClubMap(test = false) {
   ui.show('clubmap');
   $('mapSheet').hidden = true; mapPick = null;
   $('mapClub').textContent = club.name;
+  fillTopbar($('mapTop'), c, () => renderClubMap()); $('mapTop').hidden = test;
   fillPace($('mapPace'), c); $('mapPace').hidden = test;
   fillBuild($('mapBuild'), c); $('mapBuild').hidden = test;
   syncClock().then(() => { if (!$('clubmap').hidden) { fillPace($('mapPace'), c); fillBuild($('mapBuild'), c); } });
@@ -1480,7 +1477,7 @@ function buildTick(c) {
 }
 const canBuild = (c, id) => !PC.whyNot(c, id, buildCtx(c)) && c.money >= PC.costOf(id, levelOfBuilding(c, id) + 1);
 // ---------- the shell of a building's screen: the top bar (club level, cash, diamonds) and the hero picture of the building ----------
-function fillTopbar(host, c) {
+function fillTopbar(host, c, back = null) {
   const b = PC.buildOf(c), lv = PC.clubLevel(b.xp), base = PC.XP_AT[lv], next = PC.XP_AT[lv + 1];
   const shield = el('div', 'tb-shield'); shield.append(el('span', '', String(lv)));
   const bar = el('div', 'tb-xp'), fill = el('i'); fill.style.width = `${Math.max(3, Math.round(PC.levelShare(b.xp) * 100))}%`; bar.append(fill, el('span', '', lv >= PC.MAX_LEVEL ? 'MAX' : `${Math.round(b.xp - base)}/${next - base}`));
@@ -1488,7 +1485,7 @@ function fillTopbar(host, c) {
   host.replaceChildren(shield, bar,
     pill('coin', money(c.money), () => { sfx.click(); fromMap = true; renderOffice(false); }),
     pill('diamond', String(b.diamonds), () => { sfx.click(); fromMap = true; shopTab = 'diamonds'; renderShop(); }),
-    mfBtn('tb-gear', [ico('gear')], () => { sfx.click(); renderSettings(); }));
+    mfBtn('tb-gear', [ico('gear')], () => { sfx.click(); if (back) { if (!$('clubmap').hidden) clubMap.close(); settingsFrom = back; } renderSettings(); }));
 }
 // a building screen whose content does not fit takes tighter steps (the skin's data-tight 1-4) until it does; at the last the body scrolls
 function tightenScreen(mf) {
@@ -2641,6 +2638,7 @@ function renderCareer(notes = careerNotes) {
   const c = career();
   careerNotes = [];
   ui.show('career');
+  if (c.club) { fillTopbar($('careerTop'), c, () => renderCareer()); $('careerTop').hidden = false; } else $('careerTop').hidden = true;
   const bidding = c.phase === 'auction' && careerView !== 'squad' && !!currentLot(c); // the lot on the block: the auction stage's look (css .is-auction)
   $('career').classList.toggle('is-auction', bidding);
   $('career').classList.toggle('in-auction', c.phase === 'auction' && careerView !== 'squad'); // the auction's own backdrop (css), also on its closing card
@@ -3356,6 +3354,7 @@ function careerSquad(c, body) {
 function renderRecords() {
   const c = career();
   ui.show('records');
+  if (c.club) { fillTopbar($('recordsTop'), c, () => renderRecords()); $('recordsTop').hidden = false; } else $('recordsTop').hidden = true;
   const body = $('recordsBody');
   body.innerHTML = '';
   const team = p => (p.retired ? 'retired' : p.team ? teamById(p.team).name : 'free agent');
@@ -3400,6 +3399,7 @@ $('recordsBack').addEventListener('click', () => { if (fromMap) renderClubMap();
 // ---------- the daily challenge ----------
 function renderDaily() {
   ui.show('daily');
+  { const cc = profile.career; if (cc?.club) { fillTopbar($('dailyTop'), cc, () => renderDaily()); $('dailyTop').hidden = false; } else $('dailyTop').hidden = true; }
   const sc = dailyScenario(), done = profile.dailyChallenge?.key === sc.key ? profile.dailyChallenge : null;
   $('dailyTitle').textContent = `Daily #${sc.no}`;
   const c = $('dailyCard');
