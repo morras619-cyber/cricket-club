@@ -1490,10 +1490,25 @@ function fillTopbar(host, c) {
     pill('diamond', String(b.diamonds), () => { sfx.click(); fromMap = true; shopTab = 'diamonds'; renderShop(); }),
     mfBtn('tb-gear', [ico('gear')], () => { sfx.click(); renderSettings(); }));
 }
+// a building screen whose content does not fit takes tighter steps (the skin's data-tight 1-4) until it does; at the last the body scrolls
+function tightenScreen(mf) {
+  delete mf.dataset.tight;
+  for (let n = 1; n <= 4 && mf.scrollHeight > mf.clientHeight + 1; n++) mf.dataset.tight = String(n);
+}
+function watchTight(mf) {
+  if (mf._fit) return;
+  let queued = 0;
+  const run = () => { queued = 0; if (mf.offsetParent !== null) tightenScreen(mf); };
+  mf._fit = new MutationObserver(() => { if (!queued) queued = requestAnimationFrame(run); });
+  mf._fit.observe(mf, { childList: true, subtree: true });
+  window.addEventListener('resize', () => { if (!queued) queued = requestAnimationFrame(run); });
+}
+for (const mf of document.querySelectorAll('.mf')) watchTight(mf);
 // the top bar and the hero of a building's screen: size is how tall the picture may be (dense tabs ask for a small one)
 function paintShell(c, prefix, id, size = 'mid') {
   fillTopbar($(`${prefix}Top`), c);
   const hero = $(`${prefix}Hero`); hero.dataset.size = size;
+  if (!hero._watch && window.ResizeObserver) { hero._watch = new ResizeObserver(() => { if (hero.getBoundingClientRect().height < 118) hero.dataset.compact = '1'; else delete hero.dataset.compact; }); hero._watch.observe(hero); }   // (a hero squeezed small shows only its sign)
   paintHero(hero, c, id);
 }
 // the building's own picture (the map's, painted in the club's colours) behind the screen's title
