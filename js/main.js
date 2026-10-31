@@ -1597,7 +1597,8 @@ const CAND_JOB = { designer: 'Designer', printer: 'Printer', packer: 'Packer', b
 function personCard(f) {
   const card = el('div', `mf-card cand ${f.cls || ''}`.trim()), top = el('div', 'cand-top'), body = el('div', 'cand-body'), art = el('div', 'cand-art'), job = el('span', 'cand-job');
   art.append(f.face);
-  const stars = el('span', 'mf-stars cand-stars', '★'.repeat(f.stars) + '☆'.repeat(3 - f.stars));
+  const stars = el('span', 'cand-stars'); for (let i = 0; i < 3; i++) stars.append(el('i', `st ${i < f.stars ? 'on' : 'off'}`));
+  stars.setAttribute('role', 'img'); stars.setAttribute('aria-label', `${f.stars} of 3 stars`);
   job.append(ico(CAND_ICON[f.key] || 'star'), el('span', '', f.job));
   top.append(el('b', `cand-name${f.name.length > 16 ? ' longer' : f.name.length > 12 ? ' long' : ''}`, f.name), el('span', 'cand-flag', f.flag || ''), job);
   const about = el('div', `cand-aboutbox ab-${f.panel}`); about.append(el('i', 'cand-gap'), el('p', `cand-about${f.about.length > 70 ? ' small' : ''}`, f.about));
