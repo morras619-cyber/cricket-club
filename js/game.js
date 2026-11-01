@@ -3458,7 +3458,7 @@ export class Game {
     const bp = this.ballPos();
     if (bp) {
       S.trail.push(bp);
-      const trailSamples = this.practicePrediction && kind === 'bat' ? 11 : 7;
+      const trailSamples = this.practicePrediction && kind === 'bat' ? 18 : 7;
       if (S.trail.length > trailSamples) S.trail.shift();
       if (S.maya && S.delivery) {
         const t = this.gameTime - S.ballT0, d = S.delivery;
