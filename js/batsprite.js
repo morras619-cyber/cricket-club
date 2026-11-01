@@ -121,12 +121,10 @@ export function batFrame(b, now) {
       t -= ms; prev = f;
     }
   }
+  // Keep the bat grounded while waiting. The backlift is only triggered by
+  // the player's deliberate batting input above; do not lift during idle time.
   if (b.angle <= -2) return { f: 'backlift' };
-
-  // A quiet pre-delivery routine: settle, lift the bat, then settle again.
-  // The real-time clock pauses cleanly with the match.
-  const idle = Math.max(0, now - (b.idleT0 ?? now)) % 4800;
-  return { f: idle >= 2200 && idle < 2900 ? 'backlift' : 'ready' };
+  return { f: 'ready' };
 }
 
 function drawOne(ctx, img, name, px, py, k, alpha) {
