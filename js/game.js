@@ -328,6 +328,18 @@ export class Game {
         this.innings.push(inn);
         await this.introBanner('CHALLENGE!', `Beat ${opts.challenge.name}'s ${opts.challenge.target} off the same 30 balls`);
         await this.battingInnings(inn, script);
+      } else if (mode === 'practice-batting') {
+        const inn = new Innings('player');
+        this.innings.push(inn);
+        this.newCharge(40);
+        await this.introBanner('BATTING PRACTICE', '30 balls · no match result or rewards');
+        await this.battingInnings(inn, script);
+      } else if (mode === 'practice-bowling') {
+        const inn = new Innings('ai');
+        this.innings.push(inn);
+        this.newCharge(40);
+        await this.introBanner('BOWLING PRACTICE', '30 balls · no match result or rewards');
+        await this.bowlingInnings(inn);
       } else if (opts.order === 'bowl') {
         const first = new Innings('ai');
         this.innings.push(first);
@@ -350,6 +362,9 @@ export class Game {
         this.innings.push(second);
         this.newCharge(carry);
         await this.bowlingInnings(second);
+      }
+      if (mode === 'practice-batting' || mode === 'practice-bowling') {
+        return { mode, practice: true, innings: this.innings.slice(), stats: this.stats };
       }
       if (this.innings.length === 2 && this.innings[0].runs === this.innings[1].runs) await this.tiebreaks(script);
       return this.summary();
