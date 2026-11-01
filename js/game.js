@@ -1085,6 +1085,9 @@ export class Game {
     this.crowdHeat(inn, this.myTeam.id === this.home, true);
     this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
 
+    // Start the batter's quick lift-drop-lift in sync with the bowler's run-up.
+    S.batter.runupT0 = this.realTime;
+
     // run-up: freezes mid-stride while a power's comic panel is on screen
     let prog = 0, last = this.gameTime;
     await this.until(() => {
