@@ -1042,6 +1042,7 @@ export class Game {
     S.bowler.look = teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.bowler.z = 20.6 + runUp(btype).m;   // (he waits where his run-up starts)
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler); // their own skin and hair on the drawn sprites
+    S.batter.idleT0 = this.realTime; S.batter.backlift = false;
     const partner = this.nets ? null : this.nonStrikerOf(inn);   // (the nets: one batter)
     S.nonStriker = partner ? { team: this.myTeam, people: lookOf(partner) } : null;
     if (btype.left) S.bowler.x = -0.6;
@@ -1084,6 +1085,8 @@ export class Game {
     this.crowdHeat(inn, this.myTeam.id === this.home, true);
     this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
 
+    // The batter sets his bat as the bowler starts his run-up, then holds that stance.
+    S.batter.backlift = true;
     // run-up: freezes mid-stride while a power's comic panel is on screen
     let prog = 0, last = this.gameTime;
     await this.until(() => {
@@ -1145,6 +1148,7 @@ export class Game {
         swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, defend: tap };
         S.batter.swingT0 = this.realTime;
         if (!tap) this.swingArc(this.myTeam, 'bat');
+        S.batter.backlift = false;
         S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.ax ?? g.dx, g.ay ?? g.dy, this.loftPx, this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
