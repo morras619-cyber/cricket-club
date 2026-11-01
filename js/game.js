@@ -23,7 +23,7 @@ import { resolveLineup, overPlan, bowlType, runUp, canBowl, MAX_OVERS, starSquad
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './config.js';
-import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, waitForGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
 import { netBall } from './nets.js';
 import { adaptScale, NO_DIALS, dialsFor } from './adapt.js';
 import { CROWD_TIMING } from './chirp.js';
@@ -35,9 +35,9 @@ import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { TAUNTS, pick } from './story.js';
 import { Duels, FULL, HOLD, gainOf, hotSpec, Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './heat.js';
 import { CutIn } from './cutin.js';
-import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
+import { loadBatSprites, drawBatSprite, shotAnim, batFrame, batSpriteMissing } from './batsprite.js';
 import { handHint } from './handhint.js';
-import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
+import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite, spriteStatus } from './bowlsprite.js';
 import { drawKitFielder } from './kitsprite.js';
 
 const F = CFG.fielding;
@@ -360,6 +360,19 @@ export class Game {
       if (mode === 'tutorial' && opts.trial) return await this.runTrial(opts.trial);
       if (mode === 'tutorial') return opts.opening ? await this.runOpening() : await this.runTutorial(!!opts.story);
       await this.pitchReport();
+      // Assets are requested at match setup, then allowed to finish during the pitch report.
+      // Do not let first-use stadium or player-sheet loading interrupt live deliveries.
+      const assetStart = performance.now();
+      const [groundAssets] = await Promise.all([
+        waitForGround(this.home, 7000),
+        masksReady(7000),
+        this.waitForMatchSprites(7000),
+      ]);
+      this.assetPreparation = {
+        ms: Math.round(performance.now() - assetStart),
+        groundReady: groundAssets.ready,
+        groundFailed: groundAssets.failed,
+      };
       const script = aiBowlingScript(this.seed, this.aiPlan, this.mindOn ? null : this.rival.bowl?.power.kind);   // (with a mind the AI chooses its own moment for the power)
       if (mode === 'daily') {
         // join the match late: the scoreboard, the over and the batter are already set
@@ -422,6 +435,18 @@ export class Game {
     } finally {
       this.ui.hud(false); this.clearBowlUI(); this.ui.hint(null);
     }
+  }
+
+  // Wait briefly for the selected match's shared sprite sheets. Failed assets retain
+  // the existing fallback art; the timeout prevents a broken request blocking a match.
+  async waitForMatchSprites(timeout = 7000) {
+    const started = performance.now();
+    while (performance.now() - started < timeout) {
+      const bowls = spriteStatus();
+      if (!batSpriteMissing().length && bowls.ready === bowls.total) return true;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return false;
   }
 
   // before the first ball: where we are, and what the pitch will do
