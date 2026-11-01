@@ -121,7 +121,7 @@ export function batFrame(b, now) {
       t -= ms; prev = f;
     }
   }
-  if (b.backlift || b.angle <= -2) return { f: 'backlift' };
+  if (b.angle <= -2) return { f: 'backlift' };
 
   // A quiet pre-delivery routine: settle, lift the bat, then settle again.
   // The real-time clock pauses cleanly with the match.
