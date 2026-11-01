@@ -360,6 +360,7 @@ export class Game {
       if (mode === 'tutorial' && opts.trial) return await this.runTrial(opts.trial);
       if (mode === 'tutorial') return opts.opening ? await this.runOpening() : await this.runTutorial(!!opts.story);
       await this.pitchReport();
+      this.ui.banner('PREPARING MATCH', 'Loading the stadium and player artwork...', 8000);
       // Assets are requested at match setup, then allowed to finish during the pitch report.
       // Do not let first-use stadium or player-sheet loading interrupt live deliveries.
       const assetStart = performance.now();
