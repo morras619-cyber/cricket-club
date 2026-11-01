@@ -20,9 +20,12 @@
   <div id="performanceProfiler" hidden style="position:fixed;z-index:9999;top:env(safe-area-inset-top, 0px);left:8px;max-width:calc(100vw - 16px);padding:8px 10px;border:1px solid rgba(255,244,218,.45);border-radius:9px;background:rgba(16,22,50,.92);color:#fff4da;font:600 11px/1.45 system-ui,sans-serif;letter-spacing:.02em;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,.35)">
     <div style="font-weight:800;color:#ffd23f;margin-bottom:2px">SIXCHARGE · PERFORMANCE</div>
     <div>FPS <b id="profFps">—</b> · Avg <b id="profFrame">—</b> · Worst <b id="profWorst">—</b></div>
-    <div>Frame spikes (&gt;25 ms) <b id="profSpikes">—</b></div>
+    <div>Frame spikes (&gt;25 ms) <b id="profSpikes">—</b> · P95 <b id="profP95">—</b></div>
     <div>Canvas <b id="profCanvas">—</b> · DPR <b id="profDpr">—</b></div>
     <div>Update <b id="profUpdate">—</b> · Scene <b id="profScene">—</b> · FX/UI <b id="profFx">—</b></div>
+    <div>Last spike <b id="profCause">—</b></div>
+    <div>Slow event <b id="profEvent">—</b></div>
+    <div>Asset prep <b id="profAssets">—</b></div>
     <div>View <b id="profView">—</b></div>
   </div>
 
