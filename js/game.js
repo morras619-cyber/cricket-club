@@ -131,9 +131,10 @@ export class Game {
   }
 
   frame(now) {
-    const raw = Math.min(50, now - this.lastNow);
+    const observed = Math.max(0, now - this.lastNow);
+    const raw = Math.min(50, observed);
     this.lastNow = now;
-    this.updateProfiler(now, raw);
+    this.updateProfiler(now, observed);
     if (!this.paused) {
       const dt = raw * this.speed;
       this.realTime += dt;
