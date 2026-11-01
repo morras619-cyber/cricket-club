@@ -121,7 +121,12 @@ export function batFrame(b, now) {
       t -= ms; prev = f;
     }
   }
-  return { f: b.angle <= -2 ? 'backlift' : 'ready' };
+  if (b.backlift || b.angle <= -2) return { f: 'backlift' };
+
+  // A quiet pre-delivery routine: settle, lift the bat, then settle again.
+  // The real-time clock pauses cleanly with the match.
+  const idle = Math.max(0, now - (b.idleT0 ?? now)) % 4800;
+  return { f: idle >= 2200 && idle < 2900 ? 'backlift' : 'ready' };
 }
 
 function drawOne(ctx, img, name, px, py, k, alpha) {
