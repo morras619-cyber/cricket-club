@@ -108,6 +108,8 @@ export class Game {
     this.profilerEnabled = (() => { try { return localStorage.getItem('sixcharge.profiler') === '1'; } catch { return false; } })();
     this.profilerSamples = [];
     this.profilerLastPaint = 0;
+    this.profilerLastSpike = null;
+    this.profilerSpans = [];
     const profilerPanel = document.getElementById('performanceProfiler');
     if (profilerPanel) profilerPanel.hidden = !this.profilerEnabled;
     this.armed = {};
@@ -134,7 +136,7 @@ export class Game {
     const observed = Math.max(0, now - this.lastNow);
     const raw = Math.min(50, observed);
     this.lastNow = now;
-    const stages = this.profilerEnabled ? { update: 0, scene: 0, fx: 0 } : null;
+    const stages = this.profilerEnabled ? { update: 0, scene: 0, fx: 0, view: this.view } : null;
     if (!this.paused) {
       const updateStart = stages ? performance.now() : 0;
       const dt = raw * this.speed;
@@ -154,39 +156,72 @@ export class Game {
     this.profilerEnabled = !!enabled;
     this.profilerSamples = [];
     this.profilerLastPaint = 0;
+    this.profilerLastSpike = null;
+    this.profilerSpans = [];
     const panel = document.getElementById('performanceProfiler');
     if (panel) panel.hidden = !this.profilerEnabled;
     try { localStorage.setItem('sixcharge.profiler', this.profilerEnabled ? '1' : '0'); } catch { /* private browsing */ }
   }
 
+  async profileSpanAsync(name, fn) {
+    if (!this.profilerEnabled) return fn();
+    const start = performance.now();
+    try { return await fn(); }
+    finally {
+      this.profilerSpans.push({ name, ms: performance.now() - start, at: performance.now() });
+      if (this.profilerSpans.length > 24) this.profilerSpans.shift();
+    }
+  }
+
+  profileSpan(name, fn) {
+    if (!this.profilerEnabled) return fn();
+    const start = performance.now();
+    try { return fn(); }
+    finally {
+      this.profilerSpans.push({ name, ms: performance.now() - start, at: performance.now() });
+      if (this.profilerSpans.length > 24) this.profilerSpans.shift();
+    }
+  }
+
   updateProfiler(now, frameMs, stages) {
     if (!this.profilerEnabled) return;
-    const samples = this.profilerSamples || (this.profilerSamples = []);
-    samples.push({ frame: frameMs, update: stages.update, scene: stages.scene, fx: stages.fx });
+    const samples = this.profilerSamples;
+    samples.push({ frame: frameMs, update: stages.update, scene: stages.scene, fx: stages.fx, view: stages.view });
     if (samples.length > 120) samples.shift();
-    if (now - (this.profilerLastPaint || 0) < 250) return;
+    if (frameMs > 25) this.profilerLastSpike = {
+      frame: frameMs, view: stages.view,
+      stage: stages.scene >= stages.fx && stages.scene >= stages.update ? 'scene' : stages.fx >= stages.update ? 'FX/UI' : 'update'
+    };
+    if (now - this.profilerLastPaint < 250) return;
     this.profilerLastPaint = now;
     const panel = document.getElementById('performanceProfiler');
     if (!panel) return;
-    const avg = key => samples.reduce((sum, sample) => sum + sample[key], 0) / Math.max(1, samples.length);
-    const worst = Math.max(...samples.map(sample => sample.frame));
-    const spikes = samples.filter(sample => sample.frame > 25).length;
+    const avg = key => samples.reduce((sum, item) => sum + item[key], 0) / Math.max(1, samples.length);
+    const sorted = samples.map(item => item.frame).sort((x, y) => x - y);
+    const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] || 0;
+    const worst = sorted[sorted.length - 1] || 0;
+    const spikes = samples.filter(item => item.frame > 25).length;
     const fps = avg('frame') > 0 ? 1000 / avg('frame') : 0;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const set = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
     set('profFps', fps.toFixed(0));
     set('profFrame', avg('frame').toFixed(1) + ' ms');
     set('profWorst', worst.toFixed(1) + ' ms');
-    set('profSpikes', spikes + ' / 120');
+    set('profP95', p95.toFixed(1) + ' ms');
+    set('profSpikes', spikes + ' / ' + samples.length);
     set('profCanvas', this.cv.width + ' × ' + this.cv.height);
     set('profDpr', dpr.toFixed(2) + '×');
     set('profUpdate', avg('update').toFixed(1) + ' ms');
     set('profScene', avg('scene').toFixed(1) + ' ms');
     set('profFx', avg('fx').toFixed(1) + ' ms');
     set('profView', this.view || '—');
+    const spike = this.profilerLastSpike;
+    set('profCause', spike ? spike.stage + ' · ' + spike.view + ' · ' + spike.frame.toFixed(1) + ' ms' : 'No frame >25 ms yet');
+    const recent = this.profilerSpans.filter(span => performance.now() - span.at < 10000).sort((x, y) => y.ms - x.ms);
+    set('profEvent', recent[0] ? recent[0].name + ' ' + recent[0].ms.toFixed(1) + ' ms' : '—');
+    set('profAssets', this.assetPreparation ? this.assetPreparation.ms + ' ms · ground ' + (this.assetPreparation.groundReady ? 'ready' : this.assetPreparation.groundFailed ? 'failed' : 'timeout') : 'not measured');
     panel.hidden = false;
   }
-
   tick() {
     const due = [];
     this.timers = this.timers.filter(tm => {
@@ -376,7 +411,7 @@ export class Game {
       };
       // Prepare expensive first-use artwork while the preparation banner is still visible,
       // rather than during the bowler-card or wicketkeeper camera transition.
-      await this.prepareTransitionArt();
+      await this.profileSpanAsync('match art prewarm', () => this.prepareTransitionArt());
       const script = aiBowlingScript(this.seed, this.aiPlan, this.mindOn ? null : this.rival.bowl?.power.kind);   // (with a mind the AI chooses its own moment for the power)
       if (mode === 'daily') {
         // join the match late: the scoreboard, the over and the batter are already set
@@ -2700,8 +2735,10 @@ export class Game {
   // ---------- Wicket-Keeper Mode ----------
   async keeperEvent(kind, d, offset, opt = {}) {
     const S = this.S;
-    this.view = 'keeper';
-    this.phase = 'keeper';
+    this.profileSpan('keeper transition setup', () => {
+      this.view = 'keeper';
+      this.phase = 'keeper';
+    });
     this.refreshPowers();
     const cam = this.cams.keeper;
     const A = this.armed;
