@@ -495,15 +495,29 @@ export class Game {
       if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => resolve(), { timeout: 700 });
       else setTimeout(resolve, 24);
     });
-    for (const player of this.mySide?.attack || []) {
-      await idle();
-      try { cardFor(player, this.myTeam); } catch { /* keep the existing fallback card */ }
-    }
-    const people = this.keeperPeople();
-    if (!people || !this.myTeam) return;
+    const attack = [...(this.mySide?.attack || [])];
+    const activeBowler = this.inn ? this.bowlerOf(this.inn) : null;
+    if (activeBowler) attack.sort((a, b) => Number(b.id === activeBowler.id) - Number(a.id === activeBowler.id));
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 4;
     const ctx = canvas.getContext('2d');
+    for (const player of attack) {
+      await idle();
+      try { cardFor(player, this.myTeam); } catch { /* keep the existing fallback card */ }
+      // Build the exact player-specific bowling sprite before he enters the camera.
+      // Otherwise drawBowlSprite temporarily falls back to the older team sprite while
+      // the player's skin, hair, shirt print and club colours are being composed.
+      const spin = bowlType(player.bowl).spin;
+      const view = spin ? 'spin-back' : 'back';
+      let ready = false;
+      for (let attempt = 0; attempt < 10 && !ready; attempt++) {
+        await idle();
+        try { ready = drawBowlSprite(ctx, 2, 2, 1, 'start', this.myTeam, !!bowlType(player.bowl).left, view, lookOf(player)); }
+        catch { ready = false; }
+      }
+    }
+    const people = this.keeperPeople();
+    if (!people || !this.myTeam) return;
     const poses = ['kf_ready', 'kf_hands', 'kf_catch', 'kf_dive', 'kb_ready', 'kb_rise', 'kb_reach', 'kb_dive'];
     for (const pose of poses) {
       let ready = false;
