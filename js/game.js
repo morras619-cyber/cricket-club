@@ -256,6 +256,7 @@ export class Game {
     this.cancelAll();
     const mode = opts.mode;
     this.mode = mode;
+    this.practicePrediction = mode === 'practice-batting';
     this.seed = opts.seed;
     // the player's team against a fixed opponent (a fixture), or one picked by the seed
     this.myTeam = teamById(opts.team);
@@ -934,6 +935,10 @@ export class Game {
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
     S.readPre = false;
+    if (this.practicePrediction && d.bounce) {
+      const predictionRng = makeRng((this.seed * 31337 + ballNo * 7919 + (this.rebowls || 0) * 104729) >>> 0);
+      S.predictionError = { x: predictionRng.normal() * 0.65, z: predictionRng.normal() * 1.7 };
+    }
     if (fx.read && S.read === undefined) S.read = d.bounce ? { x: d.bounce.x, z: d.bounce.z, name: LENGTH_LABEL[lengthForBounce(d.bounce.z)] } : { none: true };
     this.fx.bubbles = [];
     if (!this.bot && !opt.hint) this.showTag(`${speedText(d.kmh)} · ${String(spec.type || '').toUpperCase()}`);
@@ -3483,8 +3488,10 @@ export class Game {
     if (kind === 'bowl') this.drawBowlOverlay(cam);
     finishLight(this.ctx, this.W, this.H, cam.hy, NIGHT[this.ground?.time] ?? 1);
 
-    // Read the Bowler: where it will land
-    if (kind === 'bat' && S.read && !S.read.none && (S.readPre || (S.delivery && this.gameTime - S.ballT0 < (S.delivery.bounceT ?? 0) + 0.05))) this.drawReadMark(cam);
+    // Read the Bowler is suppressed in the isolated batting experiment: it would reveal the landing spot early.
+    if (!this.practicePrediction && kind === 'bat' && S.read && !S.read.none && (S.readPre || (S.delivery && this.gameTime - S.ballT0 < (S.delivery.bounceT ?? 0) + 0.05))) this.drawReadMark(cam);
+    // The experimental moving prediction is visual-only and exists only in batting practice.
+    if (this.practicePrediction && kind === 'bat' && S.delivery?.bounce && S.predictionError) this.drawDynamicLandingPrediction(cam);
     // timing ring (batting)
     if (kind === 'bat' && S.ring && S.delivery) this.drawTimingRing(cam);
     if ((kind === 'bat' || kind === 'bowl') && S.field3d && !S.delivery && !S.flight) this.drawFieldMap(S.field3d, kind);
@@ -3556,6 +3563,35 @@ export class Game {
     ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.fillStyle = '#ffd23f';
     const t = `LANDS ${String(R.name || '').toUpperCase()}`;
     ctx.strokeText(t, p.x, p.y - r * 0.6); ctx.fillText(t, p.x, p.y - r * 0.6);
+    ctx.restore();
+  }
+
+  drawDynamicLandingPrediction(cam) {
+    const ctx = this.ctx, S = this.S, d = S.delivery;
+    if (!d?.bounce || !S.predictionError) return;
+    const elapsed = Math.max(0, this.gameTime - S.ballT0);
+    const duration = Math.max(0.001, d.bounceT || 0.001);
+    const progress = clamp(elapsed / duration, 0, 1);
+    // Start with a deliberately imperfect estimate, then converge on the true pitch point.
+    const uncertainty = 1 - progress;
+    const x = d.bounce.x + S.predictionError.x * uncertainty;
+    const z = d.bounce.z + S.predictionError.z * uncertainty;
+    const p = cam.project(x, 0, z);
+    if (!p) return;
+    const pulse = 1 + Math.sin(this.realTime / 95) * 0.07;
+    const r = Math.max(9, 0.2 * p.k) * pulse;
+    ctx.save();
+    ctx.globalAlpha = 0.72 + progress * 0.25;
+    ctx.strokeStyle = INK; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r + 2, (r + 2) * 0.45, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#3ec6ff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r * 0.45, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x - r * 0.55, p.y); ctx.lineTo(p.x + r * 0.55, p.y);
+    ctx.moveTo(p.x, p.y - r * 0.55); ctx.lineTo(p.x, p.y + r * 0.55); ctx.stroke();
+    ctx.font = `800 italic 11px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.fillStyle = '#fff4da';
+    ctx.strokeText('PREDICTED PITCH', p.x, p.y - r * 0.7);
+    ctx.fillText('PREDICTED PITCH', p.x, p.y - r * 0.7);
     ctx.restore();
   }
 
