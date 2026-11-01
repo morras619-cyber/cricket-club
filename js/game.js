@@ -3457,7 +3457,9 @@ export class Game {
     // ball(s)
     const bp = this.ballPos();
     if (bp) {
-      S.trail.push(bp); if (S.trail.length > 7) S.trail.shift();
+      S.trail.push(bp);
+      const trailSamples = this.practicePrediction && kind === 'bat' ? 11 : 7;
+      if (S.trail.length > trailSamples) S.trail.shift();
       if (S.maya && S.delivery) {
         const t = this.gameTime - S.ballT0, d = S.delivery;
         const split = d.bounceT != null ? clamp((t - d.bounceT * 0.6) / 0.25, 0, 1) : clamp(t / 0.4, 0, 1);
@@ -3474,7 +3476,11 @@ export class Game {
         if (split > 0.5 && !S.maya.picked && kind === 'bat') this.ui.hint('PICK THE REAL BALL · OR TAP TO DEFEND');
       } else {
         const bending = S.bendT && this.realTime - S.bendT < 150;
-        push(bp.z, () => drawBall3D(ctx, cam, bp, { trail: S.trail, glow: bending ? '#3ec6ff' : S.batter.glow && S.flight ? S.batter.glow : null }));
+        push(bp.z, () => drawBall3D(ctx, cam, bp, {
+          trail: S.trail,
+          trailBoost: this.practicePrediction && kind === 'bat',
+          glow: bending ? '#3ec6ff' : S.batter.glow && S.flight ? S.batter.glow : null,
+        }));
       }
     } else S.trail = [];
 
