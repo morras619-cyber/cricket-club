@@ -1104,13 +1104,32 @@ export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false
   const r = Math.max(3.4, BALL_R * s.k);
   if (sh) { ctx.fillStyle = 'rgba(10,8,20,0.35)'; ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); }
   if (trail.length > 1) {
-    ctx.strokeStyle = trailBoost ? 'rgba(255,244,218,0.68)' : glow || cosmetics.trail || 'rgba(255,244,218,0.5)'; ctx.lineCap = 'round';
+    ctx.lineCap = 'round';
     for (let i = 1; i < trail.length; i++) {
       const a = cam.project(trail[i - 1].x, trail[i - 1].y, trail[i - 1].z), b = cam.project(trail[i].x, trail[i].y, trail[i].z);
       if (!a || !b) continue;
-      ctx.globalAlpha = i / trail.length * (trailBoost ? 0.88 : 0.8);
-      ctx.lineWidth = r * (trailBoost ? 1.6 : 1.4) * (i / trail.length);
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      const taper = i / trail.length;
+      if (trailBoost) {
+        // A bold, clean comic-style motion streak for batting practice only.
+        // The dark edge keeps it readable over both the pitch and stadium.
+        ctx.globalAlpha = taper * 0.72;
+        ctx.strokeStyle = '#141018';
+        ctx.lineWidth = r * 4.2 * taper;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.globalAlpha = taper * 0.92;
+        ctx.strokeStyle = '#3ec6ff';
+        ctx.lineWidth = r * 2.7 * taper;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.globalAlpha = taper * 0.96;
+        ctx.strokeStyle = '#fff4da';
+        ctx.lineWidth = Math.max(1, r * 0.9 * taper);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      } else {
+        ctx.strokeStyle = glow || cosmetics.trail || 'rgba(255,244,218,0.5)';
+        ctx.globalAlpha = taper * 0.8;
+        ctx.lineWidth = r * 1.4 * taper;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
   }
