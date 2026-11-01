@@ -339,6 +339,8 @@ $('setTrophies').addEventListener('click', () => { unlockAudio(); moreFrom = ren
 $('setStats').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; renderStats(); });
 $('setTutorial').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; showCover(); });
 $('setStory').addEventListener('click', () => { unlockAudio(); careerOpening().then(renderSettings); });   // (the career's opening story again; it plays by itself only the first time)
+$('setTestBatting').addEventListener('click', () => { sfx.click(); startMatch({ mode: 'practice-batting' }); });
+$('setTestBowling').addEventListener('click', () => { sfx.click(); startMatch({ mode: 'practice-bowling' }); });
 $('setStadiumTest').addEventListener('click', () => {   // (testing only: shows your own club's ground at level 1, 2 or 3 in your next match; the saved game is not touched)
   stadiumTest.level = (stadiumTest.level + 1) % 4;
   try { localStorage.setItem('sixcharge.stadiumTest', String(stadiumTest.level)); } catch { /* private window: it lasts until you reload */ }
@@ -943,6 +945,12 @@ async function startMatch(opts) {
     crowdMute.on = false;
   }
   if (opts.opening || opts.trial) { game.quit(); return summary; }   // (the story's final: no result screen, the story goes on)
+  if (mode === 'practice-batting' || mode === 'practice-bowling') {
+    game.quit();
+    renderSettings();
+    ui.toast(mode === 'practice-batting' ? 'Batting practice complete · no match rewards' : 'Bowling practice complete · no match rewards');
+    return summary;
+  }
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   if (mode === 'career' && profile.career?.merch) MF.notePace(profile.career.merch, performance.now() - matchStart);   // (how fast you play: the factory warns when a contract would end first)
@@ -959,7 +967,7 @@ $('btnPause').addEventListener('pointerdown', e => {
 });
 $('resumeBtn').addEventListener('click', () => { game.paused = false; $('pause').hidden = true; });
 $('pausePitch').addEventListener('click', () => { sfx.click(); openPitchGuide(game.pitch?.id || 'flat'); });   // (the pitch of this match; Back returns here)
-$('quitBtn').addEventListener('click', () => { game.quit(); renderHome(); });
+$('quitBtn').addEventListener('click', () => { const practice = game.mode === 'practice-batting' || game.mode === 'practice-bowling'; game.quit(); practice ? renderSettings() : renderHome(); });
 
 // "🏟 The Snakepit · AWAY · Pitch: Dusty turner"
 
