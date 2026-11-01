@@ -374,6 +374,9 @@ export class Game {
         groundReady: groundAssets.ready,
         groundFailed: groundAssets.failed,
       };
+      // Prepare expensive first-use artwork while the preparation banner is still visible,
+      // rather than during the bowler-card or wicketkeeper camera transition.
+      await this.prepareTransitionArt();
       const script = aiBowlingScript(this.seed, this.aiPlan, this.mindOn ? null : this.rival.bowl?.power.kind);   // (with a mind the AI chooses its own moment for the power)
       if (mode === 'daily') {
         // join the match late: the scoreboard, the over and the batter are already set
@@ -448,6 +451,34 @@ export class Game {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     return false;
+  }
+
+  // Warm the first-use artwork for the two transitions that otherwise build canvases
+  // synchronously: the selected bowler's introduction card and the keeper's special poses.
+  async prepareTransitionArt() {
+    const idle = () => new Promise(resolve => {
+      if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => resolve(), { timeout: 700 });
+      else setTimeout(resolve, 24);
+    });
+    for (const player of this.mySide?.attack || []) {
+      await idle();
+      try { cardFor(player, this.myTeam); } catch { /* keep the existing fallback card */ }
+    }
+    const people = this.keeperPeople();
+    if (!people || !this.myTeam) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 4;
+    const ctx = canvas.getContext('2d');
+    const poses = ['kf_ready', 'kf_hands', 'kf_catch', 'kf_dive', 'kb_ready', 'kb_rise', 'kb_reach', 'kb_dive'];
+    for (const pose of poses) {
+      let ready = false;
+      for (let attempt = 0; attempt < 8 && !ready; attempt++) {
+        await idle();
+        try { ready = drawKitFielder(ctx, 2, 2, 1, pose, this.myTeam, people); } catch { ready = false; }
+        if (!ready) await new Promise(resolve => setTimeout(resolve, 180));
+      }
+    }
+    canvas.width = canvas.height = 0;
   }
 
   // before the first ball: where we are, and what the pitch will do
