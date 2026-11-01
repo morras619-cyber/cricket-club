@@ -134,16 +134,19 @@ export class Game {
     const observed = Math.max(0, now - this.lastNow);
     const raw = Math.min(50, observed);
     this.lastNow = now;
-    this.updateProfiler(now, observed);
+    const stages = this.profilerEnabled ? { update: 0, scene: 0, fx: 0 } : null;
     if (!this.paused) {
+      const updateStart = stages ? performance.now() : 0;
       const dt = raw * this.speed;
       this.realTime += dt;
       const scale = this.realTime < this.hitStopUntil ? 0 : this.timeScale;
       this.gameTime += (dt * scale) / 1000;
       // (one failing update must not end the loop: the game would stop for good)
       try { this.tick(); this.fx.update(dt); this.of.update(dt); } catch (e) { this.loopError = e; console.error('frame update', e); }
+      if (stages) stages.update = performance.now() - updateStart;
     }
-    try { this.render(); } catch (e) { console.error(e); }
+    try { this.render(stages); } catch (e) { console.error(e); }
+    if (stages) this.updateProfiler(now, observed, stages);
     requestAnimationFrame(t => this.frame(t));
   }
 
@@ -156,27 +159,31 @@ export class Game {
     try { localStorage.setItem('sixcharge.profiler', this.profilerEnabled ? '1' : '0'); } catch { /* private browsing */ }
   }
 
-  updateProfiler(now, frameMs) {
+  updateProfiler(now, frameMs, stages) {
     if (!this.profilerEnabled) return;
     const samples = this.profilerSamples || (this.profilerSamples = []);
-    samples.push(frameMs);
+    samples.push({ frame: frameMs, update: stages.update, scene: stages.scene, fx: stages.fx });
     if (samples.length > 120) samples.shift();
     if (now - (this.profilerLastPaint || 0) < 250) return;
     this.profilerLastPaint = now;
     const panel = document.getElementById('performanceProfiler');
     if (!panel) return;
-    const avg = samples.reduce((sum, n) => sum + n, 0) / Math.max(1, samples.length);
-    const worst = Math.max(...samples);
-    const spikes = samples.filter(n => n > 25).length;
-    const fps = avg > 0 ? 1000 / avg : 0;
+    const avg = key => samples.reduce((sum, sample) => sum + sample[key], 0) / Math.max(1, samples.length);
+    const worst = Math.max(...samples.map(sample => sample.frame));
+    const spikes = samples.filter(sample => sample.frame > 25).length;
+    const fps = avg('frame') > 0 ? 1000 / avg('frame') : 0;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const set = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
     set('profFps', fps.toFixed(0));
-    set('profFrame', avg.toFixed(1) + ' ms');
+    set('profFrame', avg('frame').toFixed(1) + ' ms');
     set('profWorst', worst.toFixed(1) + ' ms');
     set('profSpikes', spikes + ' / 120');
     set('profCanvas', this.cv.width + ' × ' + this.cv.height);
     set('profDpr', dpr.toFixed(2) + '×');
+    set('profUpdate', avg('update').toFixed(1) + ' ms');
+    set('profScene', avg('scene').toFixed(1) + ' ms');
+    set('profFx', avg('fx').toFixed(1) + ' ms');
+    set('profView', this.view || '—');
     panel.hidden = false;
   }
 
@@ -3309,17 +3316,20 @@ export class Game {
   }
 
   // ---------- rendering ----------
-  render() {
+  render(stages = null) {
     const { ctx, W, H } = this;
     const [ox, oy] = this.fx.offset();
     ctx.save();
     ctx.clearRect(0, 0, W, H);
     ctx.translate(ox, oy);
+    const sceneStart = stages ? performance.now() : 0;
     if (this.view === 'fieldedit' && this.E) this.renderFieldEditor();
     else if (this.view === 'outfield' && this.O) this.renderOutfield();
     else if (this.view === 'bat' || this.view === 'bowl' || this.view === 'keeper') this.render3D(this.view);
     else this.renderIdle();
+    if (stages) stages.scene = performance.now() - sceneStart;
     ctx.restore();
+    const fxStart = stages ? performance.now() : 0;
     this.fx.draw(ctx, W, H);
     if (this.disco) { if (this.realTime - this.disco.at > DISCO_MS) this.disco = null; else drawDisco(ctx, W, H, this.realTime - this.disco.at, this.disco.colors, quality.high); }
     if (this.view === 'bowl' && this.thinks) this.drawThinks(ctx, this.thinks);
@@ -3329,6 +3339,7 @@ export class Game {
     this.ui.chargeZap(zap, this.realTime);
     this.cutin.draw(ctx, W, H, this.realTime);
     if (this.cutin.busy !== this.cutinShown) { this.cutinShown = this.cutin.busy; document.getElementById('hud').classList.toggle('cutin-on', this.cutinShown); }
+    if (stages) stages.fx = performance.now() - fxStart;
   }
 
   renderIdle() {
