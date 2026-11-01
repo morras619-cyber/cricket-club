@@ -648,12 +648,20 @@ export class Game {
       if (this.bot || choices.length === 1 || this.mode === 'tutorial') p = choices[0];
       else {
         this.view = 'bowl';
-        const id = await this.ui.pickBowler({
-          over: over + 1, left,
-          options: att.map(b => ({ id: b.id, name: `${flag(b)} ${b.name}`.trim(), star: !!b.hero, type: this.typeLine(b), overs: overs[b.id] || 0, max: MAX_OVERS,
-            figs: inn.figs[b.id] ? `${inn.figs[b.id].wkts}/${inn.figs[b.id].runs}` : '', ok: choices.includes(b),
-            why: b.id === last ? 'Bowled the last over' : (overs[b.id] || 0) >= MAX_OVERS ? `Bowled his ${MAX_OVERS}` : '' })),
-        });
+        // The picker is an overlay, so the previous over's bowler would otherwise
+        // remain visible behind it. Hide only the bowler layer until a new player is chosen.
+        this.bowlerPicking = true;
+        let id;
+        try {
+          id = await this.ui.pickBowler({
+            over: over + 1, left,
+            options: att.map(b => ({ id: b.id, name: `${flag(b)} ${b.name}`.trim(), star: !!b.hero, type: this.typeLine(b), overs: overs[b.id] || 0, max: MAX_OVERS,
+              figs: inn.figs[b.id] ? `${inn.figs[b.id].wkts}/${inn.figs[b.id].runs}` : '', ok: choices.includes(b),
+              why: b.id === last ? 'Bowled the last over' : (overs[b.id] || 0) >= MAX_OVERS ? `Bowled his ${MAX_OVERS}` : '' })),
+          });
+        } finally {
+          this.bowlerPicking = false;
+        }
         p = att.find(b => b.id === id) || choices[0];
       }
     }
@@ -3550,7 +3558,8 @@ export class Game {
     push(0, () => drawStumps(ctx, cam, 0, S.stumps[0], S.stumpGlow ? '#e8343b' : null, this.realTime));
 
     // bowler
-    if (kind !== 'keeper') {
+    // Keep the previous bowler out of the scene while the next-bowler picker is open.
+    if (kind !== 'keeper' && !this.bowlerPicking) {
       let bx = S.bowler.x, bz = S.bowler.z;
       if (kind === 'bowl' && S.bowler.followT0 != null) {
         const p = clamp((this.realTime - S.bowler.followT0) / 600, 0, 1);
