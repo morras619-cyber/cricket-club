@@ -3575,7 +3575,10 @@ export class Game {
     const c = movingBall || d.atContact;
     const s = cam.project(c.x, c.y, c.z);
     if (!s) return;
-    const r0 = Math.max(16, 0.22 * s.k);
+    // Slightly smaller timing ring in batting practice only; preserve the match ring.
+    const r0 = this.practicePrediction
+      ? Math.max(14, 0.19 * s.k)
+      : Math.max(16, 0.22 * s.k);
     const left = d.tContact - t;
     if (left < -0.3) return;
     const r = r0 * (1 + Math.max(0, left) / 0.45);
