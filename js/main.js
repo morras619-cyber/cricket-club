@@ -318,6 +318,7 @@ function renderSettings() {
   $('setMapLevel').textContent = mapLevelText();
   $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 4 hours)' : 'Match limit: OFF (play freely)';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
+  $('setProfiler').textContent = `Performance profiler: ${game.profilerEnabled ? 'on' : 'off'}`;
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });
 $('settingsBack').addEventListener('click', () => { const f = settingsFrom; settingsFrom = null; (f || renderHome)(); });
@@ -341,6 +342,7 @@ $('setTutorial').addEventListener('click', () => { unlockAudio(); moreFrom = ren
 $('setStory').addEventListener('click', () => { unlockAudio(); careerOpening().then(renderSettings); });   // (the career's opening story again; it plays by itself only the first time)
 $('setTestBatting').addEventListener('click', () => { sfx.click(); startMatch({ mode: 'practice-batting' }); });
 $('setTestBowling').addEventListener('click', () => { sfx.click(); startMatch({ mode: 'practice-bowling' }); });
+$('setProfiler').addEventListener('click', () => { sfx.click(); game.setProfilerEnabled(!game.profilerEnabled); renderSettings(); });
 $('setStadiumTest').addEventListener('click', () => {   // (testing only: shows your own club's ground at level 1, 2 or 3 in your next match; the saved game is not touched)
   stadiumTest.level = (stadiumTest.level + 1) % 4;
   try { localStorage.setItem('sixcharge.stadiumTest', String(stadiumTest.level)); } catch { /* private window: it lasts until you reload */ }
