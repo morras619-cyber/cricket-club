@@ -1097,19 +1097,19 @@ export function paintBall(ctx, x, y, r, spin, { glow = null, alpha = 1 } = {}) {
 // hand to the bat (fast enough to read as spin, slow enough to see the seam go round)
 export const ballSpin = (...d) => d.reduce((a, v) => a + (v || 0), 0) * 2;
 
-export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false } = {}) {
+export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false, trailBoost = false } = {}) {
   const s = cam.project(p.x, p.y, p.z);
   if (!s) return null;
   const sh = cam.project(p.x, 0, p.z);
   const r = Math.max(3.4, BALL_R * s.k);
   if (sh) { ctx.fillStyle = 'rgba(10,8,20,0.35)'; ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); }
   if (trail.length > 1) {
-    ctx.strokeStyle = glow || cosmetics.trail || 'rgba(255,244,218,0.5)'; ctx.lineCap = 'round';
+    ctx.strokeStyle = trailBoost ? 'rgba(255,244,218,0.68)' : glow || cosmetics.trail || 'rgba(255,244,218,0.5)'; ctx.lineCap = 'round';
     for (let i = 1; i < trail.length; i++) {
       const a = cam.project(trail[i - 1].x, trail[i - 1].y, trail[i - 1].z), b = cam.project(trail[i].x, trail[i].y, trail[i].z);
       if (!a || !b) continue;
-      ctx.globalAlpha = i / trail.length * 0.8;
-      ctx.lineWidth = r * 1.4 * (i / trail.length);
+      ctx.globalAlpha = i / trail.length * (trailBoost ? 0.88 : 0.8);
+      ctx.lineWidth = r * (trailBoost ? 1.6 : 1.4) * (i / trail.length);
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
     ctx.globalAlpha = 1;
