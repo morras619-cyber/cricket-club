@@ -3562,7 +3562,9 @@ export class Game {
         const view = (S.bowler.spin ? 'spin-' : '') + (kind === 'bat' ? 'front' : 'back'), p = cam.project(bx, 0, bz);
         const team = kind === 'bat' ? this.oppTeam : this.myTeam, plain = kind === 'bat' ? 'front' : 'back';
         if (p && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, view), team, !!S.bowler.left, view, S.bowler.people)) return;
-        // never the plain cartoon while a hand-drawn bowler can be shown
+        // A named player must never flash the generic team/fallback figure while his
+        // personalised kit sprite is being prepared. Keep that layer empty until ready.
+        if (S.bowler.people?.who) return;
         if (p && view !== plain && drawBowlSprite(ctx, p.x, p.y, p.k, bowlFrame(S.bowler.spr, this.gameTime, this.realTime, plain), team, !!S.bowler.left, plain, S.bowler.people)) return;
         drawFigure3D(ctx, cam, bx, bz, S.bowler.look || AI_LOOK, S.bowler.pose, { back: kind === 'bowl', emblem: S.bowler.emblem });
       });
