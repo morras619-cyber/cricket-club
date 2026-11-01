@@ -3457,9 +3457,13 @@ export class Game {
     // ball(s)
     const bp = this.ballPos();
     if (bp) {
-      S.trail.push(bp);
-      const trailSamples = 7;
-      if (S.trail.length > trailSamples) S.trail.shift();
+      // Batting practice intentionally has no ball trail: keep the ball visually clean.
+      if (this.practicePrediction) S.trail = [];
+      else {
+        S.trail.push(bp);
+        const trailSamples = 7;
+        if (S.trail.length > trailSamples) S.trail.shift();
+      }
       if (S.maya && S.delivery) {
         const t = this.gameTime - S.ballT0, d = S.delivery;
         const split = d.bounceT != null ? clamp((t - d.bounceT * 0.6) / 0.25, 0, 1) : clamp(t / 0.4, 0, 1);
@@ -3477,7 +3481,7 @@ export class Game {
       } else {
         const bending = S.bendT && this.realTime - S.bendT < 150;
         push(bp.z, () => drawBall3D(ctx, cam, bp, {
-          trail: S.trail,
+          trail: this.practicePrediction ? [] : S.trail,
           glow: bending ? '#3ec6ff' : S.batter.glow && S.flight ? S.batter.glow : null,
         }));
       }
