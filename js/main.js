@@ -100,7 +100,7 @@ const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance
 const fitWatch = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => fitPage(e.target))) : null;
 function fitPage(pg) {
   if (pg.parentElement && getComputedStyle(pg.parentElement).flexGrow === '0') return;
-  if (pg.querySelector('.chirp')) { pg.classList.add('scrolls'); return; }   // (the feed is long: it scrolls instead of shrinking)
+  if (pg.querySelector('.chirp, .tcard')) { pg.classList.add('scrolls'); return; }   // (the feed and the net-trial lists are long: they scroll instead of shrinking)
   let box = pg.querySelector(':scope > .fitbox');
   if (!box) {
     box = el('div', 'fitbox');

@@ -43,6 +43,7 @@ await page.evaluate(() => [...document.querySelectorAll('#careerBody button')].f
 await page.waitForFunction(() => document.querySelectorAll('.tcard').length === 12, null, { timeout: 240000 });
 check(true, 'twelve candidates were tried and the pick screen is up');
 if (process.env.SHOTS_DIR) { await page.waitForTimeout(500); await page.screenshot({ path: join(process.env.SHOTS_DIR, 'trials-pick.png') }); }
+for (const k of ['bat', 'bowl']) check(await page.evaluate(kind => { const pg = [...document.querySelectorAll('#careerBody .pages > .page')].find(p => p.querySelector(`.tcard[data-k="${kind}"]`)); pg.scrollTop = pg.scrollHeight; const cards = [...pg.querySelectorAll('.tcard')], last = cards.at(-1).getBoundingClientRect(), r = pg.getBoundingClientRect(); const ok = cards.length === 6 && last.bottom <= r.bottom + 1 && last.top >= r.top; pg.scrollTop = 0; return ok; }, k), `the last ${k === 'bat' ? 'batter' : 'bowler'} of the six can be reached on the list (it scrolls when the screen is short)`);
 const lines = await page.evaluate(() => [...document.querySelectorAll('.tcard .tr')].map(e => e.textContent));
 check(lines.length === 12 && lines.every(l => /^Nets: /.test(l)), `every candidate has a net result (${lines[0]} | ${lines[6]})`);
 await page.evaluate(() => {
