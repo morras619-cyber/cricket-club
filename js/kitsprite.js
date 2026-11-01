@@ -45,6 +45,7 @@ const POSE_FIELD = Object.fromEntries(['ready_front', 'ready_side', 'ready_back'
 const FIELD_PX_PER_M = 304; // the sheet's scale: the bowler's
 const FIELD_KEEP = 0.5;     // each player's frames are kept at half size (a whole team is on screen at once)
 const views = {}; // view -> { img, mask, tone, hair: { style: img }, data }
+const thunderViews = {}; // Thunder's finished artwork, separate from shared recolouring
 let fontReady = false;
 const crestImgs = new Map();
 
@@ -60,6 +61,11 @@ const loaded = img => img && img.complete && img.naturalWidth > 0;
 export const painted = { off: (() => { try { return !(/[?&]painted=1/.test(location.search) || localStorage.getItem('sixcharge.painted') === '1'); } catch { return true; } })() };
 export function loadKitSprites(...teamIds) {
   for (const view of ['front', 'back', 'bat-back', 'bat-paint', 'field']) if (!views[view] && KIT_SHEETS[view] && !(view === 'bat-paint' && painted.off)) views[view] = openView(view);
+  if (teamIds.includes('thunder')) {
+    for (const view of ['front', 'back', 'bat-back', 'field']) {
+      if (!thunderViews[view]) thunderViews[view] = image(`img/kit/thunder-${view}.webp`);
+    }
+  }
   for (const id of teamIds) if (id && !crestImgs.has(logoSrc(id))) crestImgs.set(logoSrc(id), image(logoSrc(id)));
   if (!fontReady && typeof document !== 'undefined' && document.fonts?.load) {
     document.fonts.load('800 100px "Barlow Condensed"').then(() => { fontReady = true; }, () => { fontReady = true; });
@@ -220,6 +226,18 @@ function teamSheet(view, team) {
   const key = [view, team.id, team.suit, team.trim].join('|');
   if (teamCache.has(key)) return teamCache.get(key);
   const v = views[view], meta = KIT_SHEETS[view], data = viewData(view);
+  if (team.id === 'thunder' && thunderViews[view]) {
+    const source = thunderViews[view];
+    if (!loaded(source) || !data) return null;
+    const c = document.createElement('canvas');
+    c.width = source.naturalWidth; c.height = source.naturalHeight;
+    const g = c.getContext('2d');
+    if (!g) return null;
+    g.drawImage(source, 0, 0);
+    teamCache.set(key, c);
+    while (teamCache.size > 4) { const [k, old] = teamCache.entries().next().value; teamCache.delete(k); old.width = 0; old.height = 0; }
+    return c;
+  }
   const c = document.createElement('canvas');
   c.width = v.img.naturalWidth; c.height = v.img.naturalHeight;
   const g = c.getContext('2d', { willReadFrequently: true });
@@ -549,7 +567,7 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
   if (!team || !look?.who || !KIT_SHEETS['bat-back']) return false;
   // the painted sheet draws every pose (the old sheet only when ?painted=0); until it is built nothing
   // is drawn from the old art, which was a different height and shade and popped in as a lighter, shorter man
-  const pm = KIT_SHEETS['bat-paint'], usePaint = pm && !painted.off;
+  const pm = KIT_SHEETS['bat-paint'], usePaint = team.id !== 'thunder' && pm && !painted.off;
   const sheet = playerSheet(usePaint ? 'bat-paint' : 'bat-back', team, look, false);
   if (!sheet) return false;
   const [bh, bw] = buildOf(look), meta = KIT_SHEETS[usePaint ? 'bat-paint' : 'bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
