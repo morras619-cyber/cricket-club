@@ -1085,8 +1085,6 @@ export class Game {
     this.crowdHeat(inn, this.myTeam.id === this.home, true);
     this.bowlCrowdStart(this.oppTeam); // (the home crowd builds as their bowler runs in, if they are at home)
 
-    // The batter sets his bat as the bowler starts his run-up, then holds that stance.
-    S.batter.backlift = true;
     // run-up: freezes mid-stride while a power's comic panel is on screen
     let prog = 0, last = this.gameTime;
     await this.until(() => {
