@@ -659,6 +659,25 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
+    // Do not expose the bowler to the match camera until his exact player-specific
+    // kit sprite is ready. The general renderer deliberately has an older team-sheet
+    // fallback, which is useful elsewhere but creates a visible old-to-new swap here.
+    const spin = bowlType(p.bowl).spin;
+    if (!spin) {
+      const team = inn.side === 'player' ? this.oppTeam : this.myTeam;
+      const view = inn.side === 'player' ? 'front' : 'back';
+      const warm = document.createElement('canvas');
+      warm.width = warm.height = 4;
+      const warmCtx = warm.getContext('2d');
+      let ready = false;
+      const started = performance.now();
+      while (!ready && performance.now() - started < 8000) {
+        try { ready = drawKitSprite(warmCtx, 2, 2, 1, 'start', team, !!bowlType(p.bowl).left, view, lookOf(p)); }
+        catch { ready = false; }
+        if (!ready) await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      warm.width = warm.height = 0;
+    }
     this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 2300, cardFor(p, inn.side === 'player' ? this.oppTeam : this.myTeam));
     await this.sleepReal(50); // let the banner show first
     this.prepPlayers(inn);
