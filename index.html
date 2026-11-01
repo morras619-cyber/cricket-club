@@ -17,6 +17,12 @@
 <div id="app">
   <div id="splash" aria-hidden="true"><img src="img/logo-sixcharge.webp" alt="" width="900" height="458"></div>
   <canvas id="cv" aria-label="Cricket field"></canvas>
+  <div id="performanceProfiler" hidden style="position:fixed;z-index:9999;top:env(safe-area-inset-top, 0px);left:8px;max-width:calc(100vw - 16px);padding:8px 10px;border:1px solid rgba(255,244,218,.45);border-radius:9px;background:rgba(16,22,50,.92);color:#fff4da;font:600 11px/1.45 system-ui,sans-serif;letter-spacing:.02em;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,.35)">
+    <div style="font-weight:800;color:#ffd23f;margin-bottom:2px">SIXCHARGE · PERFORMANCE</div>
+    <div>FPS <b id="profFps">—</b> · Avg <b id="profFrame">—</b> · Worst <b id="profWorst">—</b></div>
+    <div>Frame spikes (&gt;25 ms) <b id="profSpikes">—</b></div>
+    <div>Canvas <b id="profCanvas">—</b> · DPR <b id="profDpr">—</b></div>
+  </div>
 
   <div id="hud" hidden>
     <div class="hud-top">
@@ -179,6 +185,7 @@ vs a random team</small></button>
       <p class="lede">Practice batting or bowling using the live match mechanics. Each session is 30 balls and does not award match rewards or change your career results.</p>
       <button class="bigbtn" id="setTestBatting">Test batting</button>
       <button class="bigbtn" id="setTestBowling">Test bowling</button>
+      <button class="bigbtn" id="setProfiler">Performance profiler: off</button>
       <button class="bigbtn primary" id="settingsBack">Done</button>
       <p class="fineprint">Playtest build · v0.3</p>
     </div>
