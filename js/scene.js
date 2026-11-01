@@ -1112,12 +1112,7 @@ export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false
       ctx.strokeStyle = glow || cosmetics.trail || 'rgba(255,244,218,0.5)';
       ctx.globalAlpha = taper * 0.8;
       ctx.lineWidth = r * 1.4 * taper;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); else {
-        ctx.strokeStyle = glow || cosmetics.trail || 'rgba(255,244,218,0.5)';
-        ctx.globalAlpha = taper * 0.8;
-        ctx.lineWidth = r * 1.4 * taper;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      }
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
     ctx.globalAlpha = 1;
   }
