@@ -411,7 +411,7 @@ export class Game {
       };
       // Prepare expensive first-use artwork while the preparation banner is still visible,
       // rather than during the bowler-card or wicketkeeper camera transition.
-      await this.profileSpanAsync('match art prewarm', () => this.prepareTransitionArt());
+      await this.prepareTransitionArt();
       const script = aiBowlingScript(this.seed, this.aiPlan, this.mindOn ? null : this.rival.bowl?.power.kind);   // (with a mind the AI chooses its own moment for the power)
       if (mode === 'daily') {
         // join the match late: the scoreboard, the over and the batter are already set
@@ -3424,7 +3424,7 @@ export class Game {
     if (stages) stages.scene = performance.now() - sceneStart;
     ctx.restore();
     const fxStart = stages ? performance.now() : 0;
-    this.fx.draw(ctx, W, H);
+    this.profileSpan('FX draw', () => this.fx.draw(ctx, W, H));
     if (this.disco) { if (this.realTime - this.disco.at > DISCO_MS) this.disco = null; else drawDisco(ctx, W, H, this.realTime - this.disco.at, this.disco.colors, quality.high); }
     if (this.view === 'bowl' && this.thinks) this.drawThinks(ctx, this.thinks);
     else if ((this.view === 'bowl' || this.view === 'bat') && this.tag && this.realTime < this.tag.until) this.drawThinks(ctx, this.tag.text, this.tag.color);
