@@ -123,11 +123,10 @@ export function batFrame(b, now) {
   }
   if (b.angle <= -2) return { f: 'backlift' };
 
-  // Keep the bat grounded while waiting. At the start of the bowler's run-up,
-  // make one quick lift-drop-lift rhythm, then hold the raised stance.
-  if (b.runupT0 == null) return { f: 'ready' };
-  const t = Math.max(0, now - b.runupT0);
-  return { f: t < 140 || (t >= 290 && t < 430) ? 'ready' : 'leave1' };
+  // A quiet pre-delivery routine: settle, lift the bat, then settle again.
+  // The real-time clock pauses cleanly with the match.
+  const idle = Math.max(0, now - (b.idleT0 ?? now)) % 4800;
+  return { f: idle >= 2200 && idle < 2900 ? 'backlift' : 'ready' };
 }
 
 function drawOne(ctx, img, name, px, py, k, alpha) {
