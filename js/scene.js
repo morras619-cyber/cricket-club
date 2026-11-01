@@ -111,6 +111,24 @@ export function setGround(teamId, onChange, opts = {}) {
   onChange?.();
 }
 
+// Wait for the selected ground's source artwork before gameplay begins. A timeout
+// preserves the existing code-painted fallback if a device or connection is slow.
+export function waitForGround(teamId, timeout = 7000) {
+  const a = ART[artKey(teamId)];
+  if (!a || a.ready) return Promise.resolve({ ready: !!a?.ready, failed: !!a?.failed });
+  return new Promise(resolve => {
+    const started = performance.now();
+    const check = () => {
+      if (a.ready || performance.now() - started >= timeout) {
+        resolve({ ready: !!a.ready, failed: !!a.failed });
+        return;
+      }
+      setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
 // ---------- painted grounds ----------
 // A club with painted art (js/groundart.js) gets its own stands, pitch, grass and stumps; the
 // rest are painted by code below. The pieces load in the background: until they all have, the
