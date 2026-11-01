@@ -105,6 +105,11 @@ export class Game {
     this.bot = !!window.__SIXCHARGE_BOT;
     this.speed = window.__SIXCHARGE_SPEED || 1;
     this.settings = { fielding: 'key' };
+    this.profilerEnabled = (() => { try { return localStorage.getItem('sixcharge.profiler') === '1'; } catch { return false; } })();
+    this.profilerSamples = [];
+    this.profilerLastPaint = 0;
+    const profilerPanel = document.getElementById('performanceProfiler');
+    if (profilerPanel) profilerPanel.hidden = !this.profilerEnabled;
     this.armed = {};
     this.charge = new Charge();
     this.resize();
@@ -128,6 +133,7 @@ export class Game {
   frame(now) {
     const raw = Math.min(50, now - this.lastNow);
     this.lastNow = now;
+    this.updateProfiler(now, raw);
     if (!this.paused) {
       const dt = raw * this.speed;
       this.realTime += dt;
@@ -138,6 +144,39 @@ export class Game {
     }
     try { this.render(); } catch (e) { console.error(e); }
     requestAnimationFrame(t => this.frame(t));
+  }
+
+  setProfilerEnabled(enabled) {
+    this.profilerEnabled = !!enabled;
+    this.profilerSamples = [];
+    this.profilerLastPaint = 0;
+    const panel = document.getElementById('performanceProfiler');
+    if (panel) panel.hidden = !this.profilerEnabled;
+    try { localStorage.setItem('sixcharge.profiler', this.profilerEnabled ? '1' : '0'); } catch { /* private browsing */ }
+  }
+
+  updateProfiler(now, frameMs) {
+    if (!this.profilerEnabled) return;
+    const samples = this.profilerSamples || (this.profilerSamples = []);
+    samples.push(frameMs);
+    if (samples.length > 120) samples.shift();
+    if (now - (this.profilerLastPaint || 0) < 250) return;
+    this.profilerLastPaint = now;
+    const panel = document.getElementById('performanceProfiler');
+    if (!panel) return;
+    const avg = samples.reduce((sum, n) => sum + n, 0) / Math.max(1, samples.length);
+    const worst = Math.max(...samples);
+    const spikes = samples.filter(n => n > 25).length;
+    const fps = avg > 0 ? 1000 / avg : 0;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const set = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
+    set('profFps', fps.toFixed(0));
+    set('profFrame', avg.toFixed(1) + ' ms');
+    set('profWorst', worst.toFixed(1) + ' ms');
+    set('profSpikes', spikes + ' / 120');
+    set('profCanvas', this.cv.width + ' × ' + this.cv.height);
+    set('profDpr', dpr.toFixed(2) + '×');
+    panel.hidden = false;
   }
 
   tick() {
