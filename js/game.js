@@ -16,6 +16,7 @@ import { lookOf, faceCanvas, masksReady, colourLook } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
+import { drawKitSprite } from './kitsprite.js';
 import { portraitFace } from './futcard.js';
 import { paceTired, tiredness } from './stamina.js';
 import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
@@ -510,10 +511,13 @@ export class Game {
       const spin = bowlType(player.bowl).spin;
       const view = spin ? 'spin-back' : 'back';
       let ready = false;
-      for (let attempt = 0; attempt < 10 && !ready; attempt++) {
-        await idle();
-        try { ready = drawBowlSprite(ctx, 2, 2, 1, 'start', this.myTeam, !!bowlType(player.bowl).left, view, lookOf(player)); }
+      // Call the player-kit renderer directly. drawBowlSprite intentionally falls back
+      // to the older team sprite and returns true, which used to make this warm-up think
+      // the named player artwork was ready when it was not.
+      for (let attempt = 0; attempt < 100 && !ready; attempt++) {
+        try { ready = drawKitSprite(ctx, 2, 2, 1, 'start', this.myTeam, !!bowlType(player.bowl).left, 'back', lookOf(player)); }
         catch { ready = false; }
+        if (!ready) await new Promise(resolve => setTimeout(resolve, 50));
       }
     }
     const people = this.keeperPeople();
