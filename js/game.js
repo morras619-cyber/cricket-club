@@ -3571,6 +3571,7 @@ export class Game {
     if (!d?.bounce || !S.predictionError) return;
     const elapsed = Math.max(0, this.gameTime - S.ballT0);
     const duration = Math.max(0.001, d.bounceT || 0.001);
+    if (elapsed >= duration) return;
     const progress = clamp(elapsed / duration, 0, 1);
     // Start with a deliberately imperfect estimate, then converge on the true pitch point.
     const uncertainty = 1 - progress;
