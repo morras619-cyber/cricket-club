@@ -1097,7 +1097,7 @@ export function paintBall(ctx, x, y, r, spin, { glow = null, alpha = 1 } = {}) {
 // hand to the bat (fast enough to read as spin, slow enough to see the seam go round)
 export const ballSpin = (...d) => d.reduce((a, v) => a + (v || 0), 0) * 2;
 
-export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false, trailBoost = false } = {}) {
+export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false } = {}) {
   const s = cam.project(p.x, p.y, p.z);
   if (!s) return null;
   const sh = cam.project(p.x, 0, p.z);
@@ -1109,22 +1109,10 @@ export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false
       const a = cam.project(trail[i - 1].x, trail[i - 1].y, trail[i - 1].z), b = cam.project(trail[i].x, trail[i].y, trail[i].z);
       if (!a || !b) continue;
       const taper = i / trail.length;
-      if (trailBoost) {
-        // A bold, clean comic-style motion streak for batting practice only.
-        // The dark edge keeps it readable over both the pitch and stadium.
-        ctx.globalAlpha = taper * 0.72;
-        ctx.strokeStyle = '#141018';
-        ctx.lineWidth = r * 4.2 * taper;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-        ctx.globalAlpha = taper * 0.92;
-        ctx.strokeStyle = '#3ec6ff';
-        ctx.lineWidth = r * 2.7 * taper;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-        ctx.globalAlpha = taper * 0.96;
-        ctx.strokeStyle = '#fff4da';
-        ctx.lineWidth = Math.max(1, r * 0.9 * taper);
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      } else {
+      ctx.strokeStyle = glow || cosmetics.trail || 'rgba(255,244,218,0.5)';
+      ctx.globalAlpha = taper * 0.8;
+      ctx.lineWidth = r * 1.4 * taper;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); else {
         ctx.strokeStyle = glow || cosmetics.trail || 'rgba(255,244,218,0.5)';
         ctx.globalAlpha = taper * 0.8;
         ctx.lineWidth = r * 1.4 * taper;
