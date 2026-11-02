@@ -1189,7 +1189,7 @@ export class Game {
     // Timing abilities cannot turn a physically unreachable, post-stumps swing into contact.
     if (swing && swing.t > S.ballT0 + d.tStumps) grade = 'miss';
     // defending is forgiving: anywhere in the wide window keeps the ball out
-    if (swing?.defend) grade = Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
+    if (swing?.defend) grade = swing.t <= S.ballT0 + d.tStumps && Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
     this.lastTiming = { err, grade };
     let res;
     if (fx.meteor) {
