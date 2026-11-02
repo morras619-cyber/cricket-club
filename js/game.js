@@ -1127,8 +1127,17 @@ export class Game {
     const myC = this.myCounter; this.myCounter = null;   // my answer to his power
     if (myC === 'brace' && aiPower === 'tornado') spec = { ...spec, kmh: BRACE.tornadoKmh };
     fx.squeeze = aiPower === 'googly' || stormNow ? (myC === 'brace' ? 0.93 : 0.85) : 0;   // (he reads it wrong, so my timing is that much tighter)
+    // Calculate the delivery's timing windows before it is bowled. The visual green
+    // ring and the eventual shot grade both use this exact same window.
+    let skill = striker.bat;
+    if (striker.ability === 'eagleEye') skill += 12;
+    if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
+    if (bowler.ability === 'mystery') skill -= 12;
+    const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;
+    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
-    S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
+    S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor, perfectMs: w.perfect };
     S.readPre = false;
     if (fx.read && S.read === undefined) S.read = d.bounce ? { x: d.bounce.x, z: d.bounce.z, name: LENGTH_LABEL[lengthForBounce(d.bounce.z)] } : { none: true };
     this.fx.bubbles = [];
@@ -1177,13 +1186,6 @@ export class Game {
 
     // ----- resolve -----
     // star abilities: an Eagle Eye or Finisher batter times it better; a Mystery bowler is harder to read
-    let skill = striker.bat;
-    if (striker.ability === 'eagleEye') skill += 12;
-    if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
-    if (bowler.ability === 'mystery') skill -= 12;
-    const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;   // (his bowler is a little better or worse, as you play)
-    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
     if (swing && !swing.defend) { this.stats.swings++; if (grade === 'perfect' || grade === 'good') this.stats.swingGood++; }   // (what the AI learns your skill from)
@@ -3798,7 +3800,7 @@ export class Game {
     const left = d.tContact - t;
     if (left < -0.3) return;
     const r = r0 * (1 + Math.max(0, left) / 0.45);
-    const near = Math.abs(left) < (CFG.timing.perfect + CFG.touchSlackMs) / 1000;
+    const near = Math.abs(left) * 1000 <= S.ring.perfectMs;
     ctx.save();
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(20,16,24,0.6)';
