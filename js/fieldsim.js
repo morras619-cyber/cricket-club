@@ -3,9 +3,6 @@ import { positionName } from './tactics.js';
 
 // Top-down field: origin at the striker's stumps, +y toward the bowler, +x the off side.
 const G = 9.8;
-// Hard upper bound for a playable cricket shot's flight carry (metres).
-// Prevents exaggerated arcade launch speeds from producing physically absurd distances.
-const MAX_SHOT_CARRY = 105;
 const { boundaryR: R, centerY: CY } = CFG.ground;
 const F = CFG.fielding;
 export const ENDS = { striker: { x: 0, y: 0 }, bowler: { x: 0, y: CFG.ground.pitch } };
@@ -114,7 +111,7 @@ export function makePath(res) {
   if (forcedSix || res.loft) {
     const th = (res.launchDeg || 32) * Math.PI / 180;
     T = (2 * res.v * Math.sin(th) / G) * 0.92;
-    carry = forcedSix ? Math.min(MAX_SHOT_CARRY, bd + 14) : Math.min(MAX_SHOT_CARRY, res.v * Math.cos(th) * T * 0.72);
+    carry = forcedSix ? bd + 14 : res.v * Math.cos(th) * T * 0.72;
     const apex = Math.max(6, carry * Math.tan(th) * 0.25);
     const vr = (carry / T) * 0.35, tau = 1.6;
     along = t => (t <= T ? carry * t / T : carry + vr * tau * (1 - Math.exp(-(t - T) / tau)));
