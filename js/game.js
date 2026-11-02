@@ -287,9 +287,7 @@ export class Game {
       const g = this.g; this.g = null;
       g.x = e.clientX; g.y = e.clientY;
       const tUp = evReal(e), aim = aimVector(g.path, g.x0, g.y0, g.x, g.y, tUp);   // (ax, ay: the direction of the flick at the length of the swipe; dx, dy stay the whole swipe)
-      // Time the swing from the first deliberate swipe movement, not the initial hold or finger lift.
-      const swipeStart = g.path.find(p => Math.hypot(p.x - g.x0, p.y - g.y0) >= 8);
-      this.emit('up', { ...g, dx: g.x - g.x0, dy: g.y - g.y0, ax: aim.dx, ay: aim.dy, ts: swipeStart?.t ?? tUp, t: tUp });
+      this.emit('up', { ...g, dx: g.x - g.x0, dy: g.y - g.y0, ax: aim.dx, ay: aim.dy, t: tUp });
     });
     cv.addEventListener('pointercancel', () => { this.g = null; });
 
@@ -1121,17 +1119,8 @@ export class Game {
     const myC = this.myCounter; this.myCounter = null;   // my answer to his power
     if (myC === 'brace' && aiPower === 'tornado') spec = { ...spec, kmh: BRACE.tornadoKmh };
     fx.squeeze = aiPower === 'googly' || stormNow ? (myC === 'brace' ? 0.93 : 0.85) : 0;   // (he reads it wrong, so my timing is that much tighter)
-    // Calculate the real batting windows before the ball is released. The ring and
-    // the eventual grade must use the same player, bowler, pitch and ability modifiers.
-    let skill = striker.bat;
-    if (striker.ability === 'eagleEye') skill += 12;
-    if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
-    if (bowler.ability === 'mystery') skill -= 12;
-    const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;
-    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
-    S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor, perfectMs: w.perfect };
+    S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
     S.readPre = false;
     if (fx.read && S.read === undefined) S.read = d.bounce ? { x: d.bounce.x, z: d.bounce.z, name: LENGTH_LABEL[lengthForBounce(d.bounce.z)] } : { none: true };
     this.fx.bubbles = [];
@@ -1154,7 +1143,7 @@ export class Game {
       } else if (type === 'up' && !fx.meteor && !swing) {
         // a quick tap with no swipe = defend, timed from the touch
         const tap = Math.hypot(g.dx, g.dy) < 28 && g.t - g.t0 < 320;
-        const tg = this.realToGame(tap ? g.t0 : (g.ts ?? g.t));
+        const tg = this.realToGame(tap ? g.t0 : g.t);
         if (tg < S.ballT0 + 0.15) { S.batter.angle = -0.4; return; }
         swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, defend: tap };
         S.batter.swingT0 = this.realTime;
@@ -1165,8 +1154,7 @@ export class Game {
     };
     if (this.bot) this.botBat(d, S, fx, rng);
 
-    // A shot may be late, but never after the ball has crossed the stumps.
-    const deadline = Math.min(d.tStumps, d.tContact + (CFG.timing.edge + CFG.touchSlackMs) / 1000);
+    const deadline = d.tContact + (CFG.timing.edge + 60) / 1000;
     await this.until(() => {
       const tb = this.gameTime - S.ballT0;
       if (fx.meteor && tb > d.tContact - 0.45) { this.timeScale = 0.35; this.fx.speed = 1; }
@@ -1180,16 +1168,22 @@ export class Game {
     this.fx.speed = 0;
 
     // ----- resolve -----
+    // star abilities: an Eagle Eye or Finisher batter times it better; a Mystery bowler is harder to read
+    let skill = striker.bat;
+    if (striker.ability === 'eagleEye') skill += 12;
+    if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
+    if (bowler.ability === 'mystery') skill -= 12;
+    const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;   // (his bowler is a little better or worse, as you play)
+    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
     if (swing && !swing.defend) { this.stats.swings++; if (grade === 'perfect' || grade === 'good') this.stats.swingGood++; }   // (what the AI learns your skill from)
     if (fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
     if (fx.match.edgeP && (grade === 'early' || grade === 'late') && rng.chance(fx.match.edgeP)) grade = 'edge';   // (an aggressive opener early on)
     if (myC === 'steady' && swing && !swing.defend && grade !== 'perfect' && grade !== 'good') grade = 'good';   // Steady Hands: a Good timing, however he bowls it
-    // Timing abilities cannot turn a physically unreachable, post-stumps swing into contact.
-    if (swing && swing.t > S.ballT0 + d.tStumps) grade = 'miss';
     // defending is forgiving: anywhere in the wide window keeps the ball out
-    if (swing?.defend) grade = swing.t <= S.ballT0 + d.tStumps && Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
+    if (swing?.defend) grade = Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
     this.lastTiming = { err, grade };
     let res;
     if (fx.meteor) {
@@ -3785,7 +3779,7 @@ export class Game {
     const left = d.tContact - t;
     if (left < -0.3) return;
     const r = r0 * (1 + Math.max(0, left) / 0.45);
-    const near = Math.abs(left) < (S.ring.perfectMs ?? (CFG.timing.perfect + CFG.touchSlackMs)) / 1000;
+    const near = Math.abs(left) < (CFG.timing.perfect + CFG.touchSlackMs) / 1000;
     ctx.save();
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(20,16,24,0.6)';
