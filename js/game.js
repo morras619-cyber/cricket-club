@@ -1930,7 +1930,7 @@ export class Game {
     this.crowdHeat(inn, this.oppTeam.id === this.home, false);
     // Prepare the ball before the existing line-and-length gesture. The bot and scripted
     // deliveries retain their established path; this first milestone does not alter physics.
-    if (!this.bot && !opt.scripted) await this.bowlingPreparation(S, bowler, btype);
+    if (!this.bot && !opt.scripted) this.currentDeliverySetup = await this.bowlingPreparation(S, bowler, btype);
     // the swipe (the FIELD button may interrupt it)
     let G;
     for (;;) {
@@ -2209,7 +2209,6 @@ export class Game {
     };
     this.view = 'bowlprep';
     this.phase = 'bowlprep';
-    this.ui.hint('DRAG THE BALL TO INSPECT IT · SETTINGS ARE SEPARATE');
     this.onInput = (type, g) => {
       const x = g.x, y = g.y, w = this.W, h = this.H;
       const ballY = h * 0.355, ballR = Math.min(w * 0.205, h * 0.145);
@@ -2236,7 +2235,6 @@ export class Game {
     };
     await this.until(() => P.confirmed);
     this.onInput = null;
-    this.ui.hint(null);
     this.bowlingPrep = null;
     this.view = 'bowl';
     return { type: P.type, direction: P.direction, intensity: P.intensity };
