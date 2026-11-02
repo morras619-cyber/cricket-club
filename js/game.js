@@ -5,7 +5,7 @@ import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
-import { makeDelivery, lengthById } from './physics.js';
+import { makeDelivery, lengthById, isWideDelivery } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
@@ -1206,6 +1206,8 @@ export class Game {
       if (aiPower === 'bouncer' && res.outcome === 'hit' && res.grade !== 'defend' && !(grade === 'perfect' || (myC === 'brace' && grade === 'good'))) res = { ...res, loft: true, launchDeg: 55 + rng.range(0, 12), v: Math.min(res.v || 20, 20), forced: { chance: true }, label: 'SKIED!' };
     }
     if (opt.assist) res = opt.assist(res, grade) || res;
+    // A wide is called only when the ball passes outside reach without being struck.
+    if (!opt.noBall && isWideDelivery(d) && !['hit', 'edge'].includes(res.outcome)) res = { outcome: 'wide', grade: 'wide' };
     this.timeScale = 1;
 
     const contact = d.pos(d.tContact);
@@ -1237,7 +1239,10 @@ export class Game {
     }
 
     // ----- outcomes -----
-    if (res.outcome === 'bowled') {
+    if (res.outcome === 'wide') {
+      inn.extra(1);
+      this.fx.word('WIDE BALL!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
+    } else if (res.outcome === 'bowled') {
       S.stumps[0] = { dir: rng.range(-1, 1) };
       this.stumpsBurst(this.oppTeam, 'bat');
       if (fx.lucky) {   // Lucky Break: a free hit, the stumps are spared
@@ -1250,6 +1255,9 @@ export class Game {
         this.charge.wicketLost();
         if (opt.onOut) opt.onOut();
       }
+    } else if (res.outcome === 'wide') {
+      inn.extra(1);
+      this.fx.word('WIDE BALL!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs');
       this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
@@ -2281,9 +2289,11 @@ export class Game {
     if (this.aiMirror > 0) this.aiMirror--;
     if (opt.forceAi) ai = opt.forceAi(d, ai) || ai;
     if (opt.findHit) { const r = this.findHit(opt.findHit, field); if (r) ai = { ...ai, grade: 'good', res: r }; }
+    // A wide is an extra, not a legal ball or dismissal, unless the batter makes contact.
+    if (!noBall && isWideDelivery(d) && !['hit', 'edge'].includes(ai.res.outcome)) ai.res = { outcome: 'wide', grade: 'wide' };
 
     await this.until(() => this.gameTime - S.ballT0 >= d.tContact);
-    if (ai.res.outcome !== 'leave') { S.batter.swingT0 = this.realTime; if (ai.res.outcome !== 'defend') this.swingArc(this.oppTeam, 'bowl'); }
+    if (ai.res.outcome !== 'leave' && ai.res.outcome !== 'wide') { S.batter.swingT0 = this.realTime; if (ai.res.outcome !== 'defend') this.swingArc(this.oppTeam, 'bowl'); }
     S.batter.shot = { anim: ai.res.outcome === 'leave' ? 'leave' : shotAnim({ kind: 'drive', angle: ai.res.angle ?? 0 }), t0: this.realTime, from: 'ready' };
     const res = ai.res;
     const contact = d.pos(d.tContact);
