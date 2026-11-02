@@ -1082,7 +1082,7 @@ export class Game {
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
     else if (aiPower) this.ui.hint('SPECIAL BALL! TAP TO DEFEND');
-    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('HOLD · SWIPE · LIFT ON THE RING · TAP TO DEFEND');
+    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('SWIPE LEFT / RIGHT TO MOVE · SWIPE TO HIT · TAP TO DEFEND');
     // Before release, horizontal swipes move the striker across the crease.
     // A map tap keeps its existing behaviour; vertical/diagonal gestures are ignored here.
     this.onInput = (type, g) => {
