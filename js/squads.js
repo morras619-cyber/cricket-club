@@ -169,9 +169,11 @@ export const WEAK = [
 function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
 
 // Composure is a separate mental attribute; it must not duplicate batting skill.
-function composureFor(bat, role, variation = 0) {
-  const roleBias = role === 'wk' ? 4 : role === 'bat' ? 2 : role === 'bowl' ? -3 : 0;
-  return Math.max(25, Math.min(90, Math.round(52 + ((bat ?? 50) - 65) * 0.3 + roleBias + variation)));
+function composureFor(playerId, role) {
+  // Stable per-player seed: composure is independent of batting/bowling skill and never
+  // consumes the roster RNG, so adding this attribute cannot alter existing squad data.
+  const base = 35 + hashStr(`composure-${playerId}`) % 46;
+  return Math.max(25, Math.min(90, base + (role === 'wk' ? 2 : 0)));
 }
 
 const TIER_OFFSET = { 1: -5, 2: -2, 3: 1, 4: 4 };
@@ -244,7 +246,7 @@ function clubRoster(team) {
     const bat = role === 'bowl' ? rng.int(12, 24) : role === 'all' ? base - 6 + rng.int(-3, 4) : base + rng.int(-3, 6);
     return {
       id: `${team.id}-${i}`, name, nick: rng.pick(CLUB_NICKS), short: name.split(' ').slice(1).join(' '), role, label, team: team.id,
-      trait: rng.pick(CLUB_TRAITS[role]), hero: false, bowl, nation, bat, composure: composureFor(bat, role), bowlSkill: bowl ? base + (role === 'bowl' ? 3 : -2) + rng.int(-3, 5) : 0,
+      trait: rng.pick(CLUB_TRAITS[role]), hero: false, bowl, nation, bat, composure: composureFor(`${team.id}-${i}`, role), bowlSkill: bowl ? base + (role === 'bowl' ? 3 : -2) + rng.int(-3, 5) : 0,
       ai: { ...WEAK[rng.int(0, WEAK.length - 1)], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) },
     };
   });
@@ -261,7 +263,7 @@ export function roster(teamId) {
   const off = TIER_OFFSET[teamById(teamId).tier] || 0;
   const list = (SQUADS[teamId] || SQUADS.thunder).map(([name, nick, role, label, bat, bowl, bowlSkill, trait, w, nation], i) => ({
     id: `${teamId}-${i}`, name, nick, short: name.split(' ').slice(1).join(' '), role, label, team: teamId, trait, hero: false, bowl, nation,
-    bat: role === 'bowl' ? bat : Math.min(95, bat + off), composure: composureFor(role === 'bowl' ? bat : Math.min(95, bat + off), role), bowlSkill: bowl ? Math.min(95, bowlSkill + off) : 0,
+    bat: role === 'bowl' ? bat : Math.min(95, bat + off), composure: composureFor(`${teamId}-${i}`, role), bowlSkill: bowl ? Math.min(95, bowlSkill + off) : 0,
     ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.25, 0.5) },
   }));
   rosterCache.set(teamId, list);
@@ -288,7 +290,7 @@ export function heroPlayer(hero, lv = 1) {
   const x = { ...base, bat: base.bat + (h.slot === 'bowl' ? 0 : up), bowlSkill: base.bowlSkill ? base.bowlSkill + up : 0 };
   return {
     id: h.id, name: h.name, short: h.name.split(' ').slice(1).join(' '), role: h.slot === 'bat' ? 'bat' : h.slot === 'bowl' ? 'bowl' : x.keeper ? 'wk' : 'bat',
-    label: h.role, bat: x.bat, composure: composureFor(x.bat, h.slot === 'bowl' ? 'bowl' : x.keeper ? 'wk' : 'bat'), bowl: x.bowl || null, bowlSkill: x.bowlSkill || 0, hero: h, nation: base.nation,
+    label: h.role, bat: x.bat, composure: composureFor(h.id, h.slot === 'bowl' ? 'bowl' : x.keeper ? 'wk' : 'bat'), bowl: x.bowl || null, bowlSkill: x.bowlSkill || 0, hero: h, nation: base.nation,
     ai: h.ai ? { ...h.ai } : { weak: { lengths: ['good'], lanes: ['off'] }, label: 'pokes at good length outside off', honesty: 0.7, fire: 0.3, rattle: 0.3 },
   };
 }
