@@ -42,6 +42,18 @@ const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };
 // how far the ball strays from the swipe's direction (a standard deviation, radians), by the timing grade: a clean contact goes where the finger went
 const SPREAD = { perfect: 0.025, good: 0.07, early: 0.16, late: 0.16 };
 
+// Lateral ball velocity at contact (positive = off side, negative = leg side).
+// Sample the delivery on either side of contact so swing and post-bounce seam/spin
+// are both represented, rather than relying on the initial line at release.
+export function lateralVelocityAtContact(d) {
+  if (typeof d?.pos !== 'function' || !Number.isFinite(d.tContact)) return 0;
+  const dt = 0.01;
+  const before = d.pos(Math.max(0, d.tContact - dt));
+  const after = d.pos(d.tContact + dt);
+  if (!Number.isFinite(before?.x) || !Number.isFinite(after?.x)) return 0;
+  return (after.x - before.x) / (2 * dt);
+}
+
 function isAgainstLine(angle, d) {
   const full = ['full', 'yorker', 'good', 'fulltoss'].includes(d.length);
   if (angle < -0.35 && d.xt > 0.15 && full) return true; // dragging a wide full ball to leg
@@ -78,6 +90,15 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   let power = POWER[grade];
   let angle = shot.angle + errMs * 0.0035 + rng.normal() * SPREAD[grade];
   let loft = shot.loft;
+
+  // The ball carries lateral momentum into the bat. Playing with that movement
+  // adds a little power; playing against it costs power and makes redirection harder.
+  // The outgoing angle also inherits a small part of the ball's lateral velocity.
+  const lateralV = lateralVelocityAtContact(d);
+  const lateralInfluence = Math.max(-1, Math.min(1, lateralV / 8));
+  const alignment = lateralInfluence * Math.sin(shot.angle);
+  power *= 1 + alignment * 0.12;
+  angle += lateralInfluence * 0.12;
   let launchDeg = loft ? 28 + rng.range(0, 10) : 0;
   let label = '';
 
