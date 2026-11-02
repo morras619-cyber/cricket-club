@@ -62,7 +62,7 @@ export function swipeSpeed(path, x0, y0, x, y, t0, tUp, minPx = 28) {
 export function swipePowerFromSpeed(speedPxPerSec) {
   const t = Math.max(0, Math.min(1, (speedPxPerSec - 250) / (1500 - 250)));
   const eased = t * t * (3 - 2 * t);
-  return 0.65 + eased * 0.70;
+  return 0.85 + eased * 0.25;
 }
 
 const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };
