@@ -1928,6 +1928,9 @@ export class Game {
 
     this.crowdBuild = this.wantBuild(ballNo) && !this.lastOverChorus(inn, ballNo, false);
     this.crowdHeat(inn, this.oppTeam.id === this.home, false);
+    // Prepare the ball before the existing line-and-length gesture. The bot and scripted
+    // deliveries retain their established path; this first milestone does not alter physics.
+    if (!this.bot && !opt.scripted) await this.bowlingPreparation(S, bowler, btype);
     // the swipe (the FIELD button may interrupt it)
     let G;
     for (;;) {
@@ -2196,6 +2199,120 @@ export class Game {
 
   // where my bowler starts his run-up (the bowling view): a long way back for a fast bowler, near the crease for a spinner
   bowlRunZ(S) { return 20.7 + BOWL_RUNUP_M * (S.bowler.runup ?? 0.8); }
+
+  // Bowling preparation: inspection rotation is visual only and never alters delivery controls.
+  async bowlingPreparation(S, bowler, btype) {
+    const P = this.bowlingPrep = {
+      type: btype.spin ? 'spin' : (bowler.bowl === 'seam' ? 'seam' : 'swing'),
+      direction: 1, intensity: 55, yaw: 0.35, pitch: -0.18,
+      dragging: false, confirmed: false,
+    };
+    this.view = 'bowlprep';
+    this.phase = 'bowlprep';
+    this.ui.hint('DRAG THE BALL TO INSPECT IT · SETTINGS ARE SEPARATE');
+    this.onInput = (type, g) => {
+      const x = g.x, y = g.y, w = this.W, h = this.H;
+      const ballY = h * 0.355, ballR = Math.min(w * 0.205, h * 0.145);
+      if (type === 'down') {
+        if (Math.hypot(x - w / 2, y - ballY) < ballR * 1.35) {
+          P.dragging = true; P.lastX = x; P.lastY = y; return;
+        }
+        if (y > h * 0.52 && y < h * 0.65) {
+          const gap = 8, cardW = (w - 32 - gap * 2) / 3, idx = clamp(Math.floor((x - 16) / (cardW + gap)), 0, 2);
+          P.type = ['swing', 'seam', 'spin'][idx]; sfx.click(); return;
+        }
+        if (y > h * 0.68 && y < h * 0.82) {
+          P.direction = x < w / 2 ? -1 : 1; sfx.click(); return;
+        }
+        if (y > h * 0.82 && y < h * 0.91) {
+          P.intensity = clamp(Math.round(((x - 24) / Math.max(1, w - 48)) * 100), 0, 100); return;
+        }
+        if (y >= h * 0.91) { P.confirmed = true; sfx.click(); }
+      } else if (type === 'move' && P.dragging) {
+        P.yaw += (x - P.lastX) * 0.012;
+        P.pitch = clamp(P.pitch + (y - P.lastY) * 0.009, -1.15, 1.15);
+        P.lastX = x; P.lastY = y;
+      } else if (type === 'up') P.dragging = false;
+    };
+    await this.until(() => P.confirmed);
+    this.onInput = null;
+    this.ui.hint(null);
+    this.bowlingPrep = null;
+    this.view = 'bowl';
+    return { type: P.type, direction: P.direction, intensity: P.intensity };
+  }
+
+  drawBowlingPrep() {
+    const ctx = this.ctx, w = this.W, h = this.H, P = this.bowlingPrep;
+    if (!P) return;
+    const ink = '#141018', cream = '#fff4da', yellow = '#ffd23f', cyan = '#3ec6ff';
+    ctx.save();
+    ctx.fillStyle = '#11102f'; ctx.fillRect(0, 0, w, h);
+    const glow = ctx.createRadialGradient(w * .5, h * .34, 8, w * .5, h * .34, Math.max(w, h) * .62);
+    glow.addColorStop(0, '#29246b'); glow.addColorStop(1, '#10102c');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, w, h);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 13px "Barlow Condensed", sans-serif'; ctx.fillStyle = cyan;
+    ctx.fillText('BOWLING PREPARATION', w / 2, h * .065);
+    ctx.font = 'bold 26px "Bangers", Impact, sans-serif'; ctx.fillStyle = cream;
+    ctx.fillText('READ THE BALL. SET YOUR DELIVERY.', w / 2, h * .115);
+    ctx.font = '12px "Baloo 2", sans-serif'; ctx.fillStyle = 'rgba(255,244,218,.75)';
+    ctx.fillText('Drag to rotate freely. Inspection never changes your settings.', w / 2, h * .155);
+
+    // Hand-painted style ball, with a shaded sphere and a seam projected from independent yaw/pitch.
+    const cx = w / 2, cy = h * .355, r = Math.min(w * .205, h * .145);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(P.yaw * .18);
+    ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 12;
+    const bg = ctx.createRadialGradient(-r*.34, -r*.4, r*.06, r*.08, r*.12, r*1.15);
+    bg.addColorStop(0, '#fff0cf'); bg.addColorStop(.52, '#d64b50'); bg.addColorStop(1, '#671c39');
+    ctx.fillStyle = bg; ctx.strokeStyle = ink; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r-2, 0, Math.PI*2); ctx.clip();
+    ctx.translate(0, P.pitch * r * .32);
+    ctx.rotate(P.yaw);
+    ctx.strokeStyle = '#fff4da'; ctx.lineWidth = Math.max(3, r*.055);
+    ctx.beginPath(); ctx.ellipse(0, 0, r*.34, r*1.18, 0, -Math.PI/2, Math.PI/2); ctx.stroke();
+    ctx.strokeStyle = '#6e2633'; ctx.lineWidth = Math.max(1.5, r*.018);
+    for (let i=-4;i<=4;i++) {
+      ctx.beginPath(); ctx.moveTo(-r*.07, i*r*.09); ctx.lineTo(r*.07, i*r*.09-r*.025); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore(); ctx.restore();
+    ctx.font = 'bold 12px "Baloo 2", sans-serif'; ctx.fillStyle = cream;
+    ctx.fillText('BALL INSPECTION', cx, h*.49);
+
+    const top = h*.535, gap=8, cw=(w-32-gap*2)/3;
+    for (let i=0;i<3;i++) {
+      const x=16+i*(cw+gap), selected=P.type===['swing','seam','spin'][i];
+      ctx.fillStyle=selected?'#ffd23f':'#282653'; ctx.strokeStyle=ink; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.roundRect(x,top,cw,h*.105,10); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=selected?ink:cream; ctx.font='bold 16px "Bangers", Impact, sans-serif';
+      ctx.fillText(['SWING','SEAM','SPIN'][i],x+cw/2,top+h*.052);
+    }
+    ctx.font='bold 14px "Barlow Condensed", sans-serif'; ctx.fillStyle=cream;
+    ctx.fillText('MOVEMENT DIRECTION',w/2,h*.665);
+    const left=P.direction<0;
+    ctx.fillStyle=left?'#ffd23f':'#282653'; ctx.strokeStyle=ink; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.roundRect(18,h*.69,w*.43,h*.09,9); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=left?ink:cream; ctx.font='bold 14px "Baloo 2",sans-serif'; ctx.fillText('← AWAY',18+w*.215,h*.735);
+    ctx.fillStyle=!left?'#ffd23f':'#282653'; ctx.beginPath(); ctx.roundRect(w*.53,h*.69,w*.43,h*.09,9); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=!left?ink:cream; ctx.fillText('TOWARDS →',w*.745,h*.735);
+    ctx.fillStyle=cream; ctx.font='bold 13px "Barlow Condensed",sans-serif'; ctx.fillText('MOVEMENT INTENSITY',w/2,h*.805);
+    const sx=24, ex=w-24, sy=h*.85;
+    ctx.strokeStyle='rgba(255,244,218,.28)'; ctx.lineWidth=7; ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,sy);ctx.stroke();
+    const knob=sx+(ex-sx)*P.intensity/100;
+    ctx.strokeStyle=yellow;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(knob,sy);ctx.stroke();
+    ctx.fillStyle=yellow;ctx.strokeStyle=ink;ctx.lineWidth=2;ctx.beginPath();ctx.arc(knob,sy,9,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle=cream;ctx.font='12px "Baloo 2",sans-serif';ctx.textAlign='left';ctx.fillText('0',sx,h*.885);ctx.textAlign='right';ctx.fillText('100',ex,h*.885);
+    ctx.textAlign='center';ctx.fillStyle='rgba(255,244,218,.7)';ctx.font='11px "Baloo 2",sans-serif';
+    ctx.fillText('Preview only · bowler skill, pitch and execution affect the result',w/2,h*.91);
+    ctx.fillStyle=yellow;ctx.strokeStyle=ink;ctx.lineWidth=3;
+    ctx.beginPath();ctx.roundRect(18,h*.925,w-36,h*.06,11);ctx.fill();ctx.stroke();
+    ctx.fillStyle=ink;ctx.font='bold 19px "Bangers",Impact,sans-serif';ctx.fillText('CONFIRM BALL  →',w/2,h*.955);
+    ctx.restore();
+  }
 
   // Waits for the delivery swipe. Touch down starts the run-up; lift to bowl.
   async captureBowlGesture(S, kind) {
@@ -3264,7 +3381,8 @@ export class Game {
     ctx.save();
     ctx.clearRect(0, 0, W, H);
     ctx.translate(ox, oy);
-    if (this.view === 'fieldedit' && this.E) this.renderFieldEditor();
+    if (this.view === 'bowlprep' && this.bowlingPrep) this.drawBowlingPrep();
+    else if (this.view === 'fieldedit' && this.E) this.renderFieldEditor();
     else if (this.view === 'outfield' && this.O) this.renderOutfield();
     else if (this.view === 'bat' || this.view === 'bowl' || this.view === 'keeper') this.render3D(this.view);
     else this.renderIdle();
