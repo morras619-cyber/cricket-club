@@ -916,8 +916,17 @@ export class Game {
     const myC = this.myCounter; this.myCounter = null;   // my answer to his power
     if (myC === 'brace' && aiPower === 'tornado') spec = { ...spec, kmh: BRACE.tornadoKmh };
     fx.squeeze = aiPower === 'googly' || stormNow ? (myC === 'brace' ? 0.93 : 0.85) : 0;   // (he reads it wrong, so my timing is that much tighter)
+    // Calculate the delivery's timing windows before it is bowled. The visual green
+    // ring and the eventual shot grade both use this exact same window.
+    let skill = striker.bat;
+    if (striker.ability === 'eagleEye') skill += 12;
+    if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
+    if (bowler.ability === 'mystery') skill -= 12;
+    const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;
+    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
-    S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor };
+    S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor, perfectMs: w.perfect };
     S.readPre = false;
     if (fx.read && S.read === undefined) S.read = d.bounce ? { x: d.bounce.x, z: d.bounce.z, name: LENGTH_LABEL[lengthForBounce(d.bounce.z)] } : { none: true };
     this.fx.bubbles = [];
@@ -964,14 +973,6 @@ export class Game {
     this.fx.speed = 0;
 
     // ----- resolve -----
-    // star abilities: an Eagle Eye or Finisher batter times it better; a Mystery bowler is harder to read
-    let skill = striker.bat;
-    if (striker.ability === 'eagleEye') skill += 12;
-    if (striker.ability === 'finisher' && ballNo >= 25) skill += 20;
-    if (bowler.ability === 'mystery') skill -= 12;
-    const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;   // (his bowler is a little better or worse, as you play)
-    fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
     if (swing && !swing.defend) { this.stats.swings++; if (grade === 'perfect' || grade === 'good') this.stats.swingGood++; }   // (what the AI learns your skill from)
@@ -1681,7 +1682,11 @@ export class Game {
       if (A && target) {
         const p = Math.min(1, Math.max(0, (t - 0.25) / Math.max(0.3, tArrive - 0.25)));
         A.x = lerp(start.x, target.x, p); A.y = lerp(start.y, target.y, p);
-        A.pose = p < 1 ? POSES.run(t * 14) : o.caught ? POSES.celebrate() : POSES.crouch();
+        const diveSave = (sim.intercept?.action === 'dive' && A.id === sim.intercept.fielder.id) || (sim.save?.action === 'dive' && A.id === sim.save.fielder.id);
+        const diveWindow = diveSave && t >= tArrive - 0.38 && t <= tArrive + 0.48;
+        A.pose = diveWindow
+          ? POSES.dive(Math.sign(target.x - start.x) || 1)
+          : p < 1 ? POSES.run(t * 14) : o.caught ? POSES.celebrate() : POSES.crouch();
       }
       if (chaser) {
         // he sets off after it at full tilt but the ball beats him to the rope
@@ -3554,7 +3559,7 @@ export class Game {
     const left = d.tContact - t;
     if (left < -0.3) return;
     const r = r0 * (1 + Math.max(0, left) / 0.45);
-    const near = Math.abs(left) < (CFG.timing.perfect + CFG.touchSlackMs) / 1000;
+    const near = Math.abs(left) * 1000 <= (S.ring.perfectMs ?? (CFG.timing.perfect + CFG.touchSlackMs));
     ctx.save();
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(20,16,24,0.6)';
@@ -3972,20 +3977,48 @@ export class Game {
     if (!O) return;
     O.buT = now;
     for (const f of O.fielders) {
-      if (f.buX != null && (Math.abs(f.x - f.buX) > 1e-6 || Math.abs(f.y - f.buY) > 1e-6)) f.onPlay = true; // moved by the play
+      // Backup movement is not a new play commitment; only the primary play animation sets onPlay.
+      if (!f.backup && f.buX != null && (Math.abs(f.x - f.buX) > 1e-6 || Math.abs(f.y - f.buY) > 1e-6)) f.onPlay = true;
     }
-    const out = b && Math.hypot(b.x, b.y - CFG.ground.centerY) > 9 && Math.hypot(b.x, b.y - CFG.ground.centerY) < CFG.ground.boundaryR;
-    const free = O.fielders.filter(f => !f.keeper && !f.onPlay && !f.ctrl);
-    const near = out ? free.map(f => [f, Math.hypot(f.x - b.x, f.y - b.y)]).filter(([, d]) => d < 32).sort((u, v) => u[1] - v[1]).slice(0, O.fielders.some(f => f.onPlay || f.ctrl) ? 1 : 2) : [];
-    for (const f of free) {
-      const go = near.find(([g]) => g === f);
-      if (go && go[1] > 5) {
-        const s2 = Math.min(go[1] - 5, 5.2 * dt);
-        f.x += (b.x - f.x) / go[1] * s2; f.y += (b.y - f.y) / go[1] * s2;
-        f.pose = POSES.run(now * 12);
-      } else if (f.pose?.name === 'run') f.pose = POSES.crouch();
-      f.buX = f.x; f.buY = f.y;
+
+    // A backup is assigned once per delivery. Keep him out of future selections so another
+    // fielder is not sent running on every render frame.
+    const backup = O.fielders.find(f => f.id === O.backupFielderId);
+    const ballLoose = O.loose !== false;
+    const distanceFromCentre = b && Math.hypot(b.x, b.y - CFG.ground.centerY);
+    const inOutfield = !!b && distanceFromCentre > 9 && distanceFromCentre < CFG.ground.boundaryR;
+
+    if (!ballLoose || !inOutfield) {
+      if (backup?.pose?.name === 'run') backup.pose = POSES.crouch();
+      for (const f of O.fielders) { f.buX = f.x; f.buY = f.y; }
+      return;
     }
+
+    let assigned = backup;
+    if (!assigned) {
+      const candidate = O.fielders
+        .filter(f => !f.keeper && !f.onPlay && !f.ctrl && !f.backup)
+        .map(f => ({ f, d: Math.hypot(f.x - b.x, f.y - b.y) }))
+        .filter(({ d }) => d < 32)
+        .sort((a, c) => a.d - c.d)[0];
+      if (candidate) {
+        assigned = candidate.f;
+        assigned.backup = true;
+        O.backupFielderId = assigned.id;
+      }
+    }
+
+    if (assigned && !assigned.onPlay && !assigned.ctrl) {
+      const d = Math.hypot(assigned.x - b.x, assigned.y - b.y);
+      if (d > 5) {
+        const step = Math.min(d - 5, 5.2 * dt);
+        assigned.x += (b.x - assigned.x) / d * step;
+        assigned.y += (b.y - assigned.y) / d * step;
+        assigned.pose = POSES.run(now * 12);
+      } else if (assigned.pose?.name === 'run') assigned.pose = POSES.crouch();
+    }
+
+    for (const f of O.fielders) { f.buX = f.x; f.buY = f.y; }
   }
 
   renderOutfield() {
