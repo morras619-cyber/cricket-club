@@ -137,7 +137,7 @@ function chooseShot(d, ctx, rng) {
 export function aiBat(d, ctx, rng) {
   let sigma = 78;
   // the batter's own skill (a squads.js rating, 75 = a solid regular)
-  if (ctx.skill != null) sigma *= aiSpread(ctx.skill);
+  if (ctx.skill != null) sigma *= aiSpread(ctx.skill, ctx.confidence);
   if (ctx.bowlSkill != null) sigma *= bowlerTrouble(ctx.bowlSkill); // the bowler he's facing
   sigma *= ctx.style?.sigma || 1;
   if (ctx.release === 'perfect') sigma *= 1.2;
