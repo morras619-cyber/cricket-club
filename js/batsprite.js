@@ -136,26 +136,6 @@ function drawOne(ctx, img, name, px, py, k, alpha) {
 
 // Draw at the projected feet position (px, py); kPerM is pixels per metre at that depth.
 export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
-  const move = opts.move;
-  // A quick two-step shuffle: lean into the move, alternate the body weight,
-  // and lift slightly between steps while keeping the feet anchored to the crease.
-  if (move) {
-    const p = Math.max(0, Math.min(1, (now - move.t0) / move.dur));
-    const step = Math.sin(p * Math.PI * 2);
-    const lean = move.dir * Math.sin(p * Math.PI) * 0.12;
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(lean);
-    px = step * 0.025 * kPerM;
-    py = -Math.abs(step) * 0.045 * kPerM;
-    const drawn = drawBatSpriteFrame(ctx, px, py, kPerM, b, now, opts);
-    ctx.restore();
-    return drawn;
-  }
-  return drawBatSpriteFrame(ctx, px, py, kPerM, b, now, opts);
-}
-
-function drawBatSpriteFrame(ctx, px, py, kPerM, b, now, opts) {
   // a named batter: the kit sheet (his club's colours, his skin, his name and number)
   const fr = batFrame(b, now);
   if (b.people?.who && drawKitBatter(ctx, px, py, kPerM, fr.f, fr.prev, fr.a ?? 1, teamById(b.team), b.people, opts.glow)) return true;
@@ -170,6 +150,7 @@ function drawBatSpriteFrame(ctx, px, py, kPerM, b, now, opts) {
   // ground shadow
   softShadow(ctx, px, py, 0.55 * kPerM, 0.12 * kPerM, 0.28);
   if (opts.glow) { ctx.shadowColor = opts.glow; ctx.shadowBlur = 22; }
+  // the previous frame fades out underneath, which reads as motion blur on a fast swing
   if (prev && a < 1) drawOne(ctx, img, prev, px, py, k, (1 - a) * 0.6);
   drawOne(ctx, img, f, px, py, k, 1);
   ctx.restore();
