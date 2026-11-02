@@ -4230,20 +4230,48 @@ export class Game {
     if (!O) return;
     O.buT = now;
     for (const f of O.fielders) {
-      if (f.buX != null && (Math.abs(f.x - f.buX) > 1e-6 || Math.abs(f.y - f.buY) > 1e-6)) f.onPlay = true; // moved by the play
+      // Backup movement is not a new play commitment; only the primary play animation sets onPlay.
+      if (!f.backup && f.buX != null && (Math.abs(f.x - f.buX) > 1e-6 || Math.abs(f.y - f.buY) > 1e-6)) f.onPlay = true;
     }
-    const out = b && Math.hypot(b.x, b.y - CFG.ground.centerY) > 9 && Math.hypot(b.x, b.y - CFG.ground.centerY) < CFG.ground.boundaryR;
-    const free = O.fielders.filter(f => !f.keeper && !f.onPlay && !f.ctrl);
-    const near = out ? free.map(f => [f, Math.hypot(f.x - b.x, f.y - b.y)]).filter(([, d]) => d < 32).sort((u, v) => u[1] - v[1]).slice(0, O.fielders.some(f => f.onPlay || f.ctrl) ? 1 : 2) : [];
-    for (const f of free) {
-      const go = near.find(([g]) => g === f);
-      if (go && go[1] > 5) {
-        const s2 = Math.min(go[1] - 5, 5.2 * dt);
-        f.x += (b.x - f.x) / go[1] * s2; f.y += (b.y - f.y) / go[1] * s2;
-        f.pose = POSES.run(now * 12);
-      } else if (f.pose?.name === 'run') f.pose = POSES.crouch();
-      f.buX = f.x; f.buY = f.y;
+
+    // A backup is assigned once per delivery. Keep him out of future selections so another
+    // fielder is not sent running on every render frame.
+    const backup = O.fielders.find(f => f.id === O.backupFielderId);
+    const ballLoose = O.loose !== false;
+    const distanceFromCentre = b && Math.hypot(b.x, b.y - CFG.ground.centerY);
+    const inOutfield = !!b && distanceFromCentre > 9 && distanceFromCentre < CFG.ground.boundaryR;
+
+    if (!ballLoose || !inOutfield) {
+      if (backup?.pose?.name === 'run') backup.pose = POSES.crouch();
+      for (const f of O.fielders) { f.buX = f.x; f.buY = f.y; }
+      return;
     }
+
+    let assigned = backup;
+    if (!assigned) {
+      const candidate = O.fielders
+        .filter(f => !f.keeper && !f.onPlay && !f.ctrl && !f.backup)
+        .map(f => ({ f, d: Math.hypot(f.x - b.x, f.y - b.y) }))
+        .filter(({ d }) => d < 32)
+        .sort((a, c) => a.d - c.d)[0];
+      if (candidate) {
+        assigned = candidate.f;
+        assigned.backup = true;
+        O.backupFielderId = assigned.id;
+      }
+    }
+
+    if (assigned && !assigned.onPlay && !assigned.ctrl) {
+      const d = Math.hypot(assigned.x - b.x, assigned.y - b.y);
+      if (d > 5) {
+        const step = Math.min(d - 5, 5.2 * dt);
+        assigned.x += (b.x - assigned.x) / d * step;
+        assigned.y += (b.y - assigned.y) / d * step;
+        assigned.pose = POSES.run(now * 12);
+      } else if (assigned.pose?.name === 'run') assigned.pose = POSES.crouch();
+    }
+
+    for (const f of O.fielders) { f.buX = f.x; f.buY = f.y; }
   }
 
   renderOutfield() {
