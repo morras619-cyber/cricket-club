@@ -98,6 +98,27 @@ export function boundaryDist(angle) {
 
 export const sigmoid = m => 1 / (1 + Math.exp(-1.8 * m));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// Fielders accelerate into a sprint instead of instantly reaching top speed.
+const RUN_ACCEL = 13.5;
+export function fielderRunDistance(seconds, sideSpeed = 1) {
+  const t = Math.max(0, seconds);
+  const maxSpeed = F.runSpeed * sideSpeed;
+  const accel = RUN_ACCEL * sideSpeed;
+  const accelTime = maxSpeed / accel;
+  if (t <= accelTime) return 0.5 * accel * t * t;
+  return 0.5 * accel * accelTime * accelTime + maxSpeed * (t - accelTime);
+}
+export function fielderArrivalTime(distance, sideSpeed = 1) {
+  const need = Math.max(0, distance);
+  const maxSpeed = F.runSpeed * sideSpeed;
+  const accel = RUN_ACCEL * sideSpeed;
+  const accelTime = maxSpeed / accel;
+  const accelDistance = 0.5 * accel * accelTime * accelTime;
+  return need <= accelDistance
+    ? Math.sqrt(2 * need / accel)
+    : accelTime + (need - accelDistance) / maxSpeed;
+}
 const outside = p => Math.hypot(p.x, p.y - CY) > R;
 
 // Builds the ball's top-down path from a contact result.
@@ -190,7 +211,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
       out.ropeT = t; out.ropePoint = p; // when and where it crosses the rope (the replay lets it run there)
       let best = null;
       for (const f of outfield) {
-        const m = F.runSpeed * sp * Math.max(0, t - F.react) + F.reach + F.diveReach - dist(f, p);
+        const m = fielderRunDistance(t - F.react, sp) + F.reach + F.diveReach - dist(f, p);
         const pr = sigmoid(m);
         if (!best || pr > best.p) best = { fielder: f, p: pr, t, point: p };
       }
@@ -203,23 +224,26 @@ export function simulateHit(res, fielders, rng, opts = {}) {
       break;
     }
     if (res.forced?.four) continue; // powered fours beat every fielder
+    // Compare every fielder at this ball position. The old loop accepted the first eligible
+    // man in array order, making outcomes depend on list order instead of arrival time.
     let hit = null;
     for (const f of outfield) {
-      const need = dist(f, p) - F.reach;
-      if (need <= F.runSpeed * sp * Math.max(0, t - F.react)) { hit = f; break; }
+      const need = Math.max(0, dist(f, p) - F.reach);
+      const arrival = F.react + fielderArrivalTime(need, sp);
+      if (arrival <= t + 0.025 && (!hit || arrival < hit.arrival)) hit = { fielder: f, arrival };
     }
     if (hit) {
-      out.intercept = { fielder: hit, t, point: insideRope(p) };
+      out.intercept = { fielder: hit.fielder, t, point: insideRope(p), action: 'pickup', arrival: hit.arrival };
       out.runs = runsAfterCollect(t, p);
       if (res.forced?.cap != null) out.runs = Math.min(out.runs, res.forced.cap);
       out.duration = Math.min(t + 0.8, 3.2);
       if (opts.aiBatting && out.runs < 3) {
         const m = runOutMargins(t, p, out.runs);
         const worst = Math.min(m.striker, m.bowler);
-        // the AI takes a second run only when it looks no worse than a gamble; it gambles on a close one only when it must have the runs
+        // The AI takes a second run only when it looks no worse than a gamble; it gambles on a close one only when it must have the runs
         const lo = opts.riskyRun != null ? -0.6 : opts.gamble ? -0.5 : -0.3;
         if (worst > lo && worst < 0.6 && rng.chance(opts.riskyRun ?? 0.55)) {
-          out.runOut = { margins: m, point: p, t, fielder: hit, attempt: out.runs + 1 };
+          out.runOut = { margins: m, point: p, t, fielder: hit.fielder, attempt: out.runs + 1 };
         }
       }
       break;
