@@ -18,7 +18,7 @@ import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
 import { portraitFace } from './futcard.js';
 import { paceTired, tiredness } from './stamina.js';
-import { matchup, keeperEase, hitStrength, timingFor, confidenceEffect, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
+import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, runUp, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
@@ -816,9 +816,9 @@ export class Game {
 
   // skill: the batter's rating (ratings.js): a star has far more room than a tail-ender, and a
   // good bowler (bowlSkill) squeezes everyone's timing
-  windowsFor(fx, extra = 0, tornado = false, skill = 75, bowlSkill = 75, confidence = 50) {
+  windowsFor(fx, extra = 0, tornado = false, skill = 75, bowlSkill = 75) {
     const w = { ...CFG.timing };
-    const f = timingFor(skill) * confidenceEffect(confidence) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1) * (1 + (this.crowdLift || 0));
+    const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1) * (1 + (this.crowdLift || 0));
     const braced = fx.counter === 'brace';   // (the bowler answered this power with Brace: half of it)
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? (braced ? 20 : 40) : 0);
     if (fx.focus) { const h = braced ? BRACE.focusWindow : 1; w.perfect += 55 * h; w.good += 45 * h; }
@@ -924,7 +924,7 @@ export class Game {
     if (bowler.ability === 'mystery') skill -= 12;
     const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;
     fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate, inn.confidenceOf(striker.id));
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor, perfectMs: w.perfect };
     S.readPre = false;
