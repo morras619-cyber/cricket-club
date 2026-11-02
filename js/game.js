@@ -3476,7 +3476,7 @@ export class Game {
     // Read the Bowler: where it will land
     if (kind === 'bat' && S.read && !S.read.none && (S.readPre || (S.delivery && this.gameTime - S.ballT0 < (S.delivery.bounceT ?? 0) + 0.05))) this.drawReadMark(cam);
     // timing ring (batting)
-    if (kind === 'bat' && S.ring && S.delivery) this.drawTimingRing(cam);
+    if (kind === 'bat' && S.ring && S.delivery) this.drawTimingRing(cam, bp);
     if ((kind === 'bat' || kind === 'bowl') && S.field3d && !S.delivery && !S.flight) this.drawFieldMap(S.field3d, kind);
     if (kind === 'keeper' && S.reticle) this.drawReticle(cam);
     if (S.frozen) { ctx.fillStyle = 'rgba(62,198,255,0.15)'; ctx.fillRect(0, 0, this.W, this.H); }
@@ -3549,10 +3549,12 @@ export class Game {
     ctx.restore();
   }
 
-  drawTimingRing(cam) {
+  drawTimingRing(cam, movingBall = null) {
     const ctx = this.ctx, S = this.S, d = S.delivery;
     const t = this.gameTime - S.ballT0;
-    const c = d.atContact;
+    // Follow the live ball in every batting mode; fall back to predicted contact
+    // only if the ball position is temporarily unavailable.
+    const c = movingBall || d.atContact;
     const s = cam.project(c.x, c.y, c.z);
     if (!s) return;
     const r0 = Math.max(16, 0.22 * s.k);
