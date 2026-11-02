@@ -255,16 +255,18 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     if (hit) {
       if (out.nearMiss?.fielder.id === hit.fielder.id) out.nearMiss = null;
       out.intercept = { fielder: hit.fielder, t, point: insideRope(p), action: hit.action, arrival: hit.arrival };
-      out.runs = runsAfterCollect(t, p);
+      // A fielder who has dived must get back up before gathering and releasing the throw.
+      const gatherAt = t + (hit.action === 'dive' ? 0.55 : 0);
+      out.runs = runsAfterCollect(gatherAt, p);
       if (res.forced?.cap != null) out.runs = Math.min(out.runs, res.forced.cap);
-      out.duration = Math.min(t + 0.8, 3.2);
+      out.duration = Math.min(gatherAt + 0.8, 3.2);
       if (opts.aiBatting && out.runs < 3) {
-        const m = runOutMargins(t, p, out.runs);
+        const m = runOutMargins(gatherAt, p, out.runs);
         const worst = Math.min(m.striker, m.bowler);
         // The AI takes a second run only when it looks no worse than a gamble; it gambles on a close one only when it must have the runs
         const lo = opts.riskyRun != null ? -0.6 : opts.gamble ? -0.5 : -0.3;
         if (worst > lo && worst < 0.6 && rng.chance(opts.riskyRun ?? 0.55)) {
-          out.runOut = { margins: m, point: p, t, fielder: hit.fielder, attempt: out.runs + 1 };
+          out.runOut = { margins: m, point: p, t: gatherAt, fielder: hit.fielder, attempt: out.runs + 1 };
         }
       }
       break;
