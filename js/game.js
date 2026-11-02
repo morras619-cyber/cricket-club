@@ -6,7 +6,7 @@ import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
 import { makeDelivery, lengthById, isWideDelivery } from './physics.js';
-import { gradeTiming, swipeToShot, resolveContact, aimVector } from './shots.js';
+import { gradeTiming, swipeToShot, resolveContact, aimVector, swipeSpeed, swipePowerFromSpeed } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower, correctAfterWide } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
@@ -286,8 +286,8 @@ export class Game {
       if (!this.g || e.pointerId !== this.g.id) return;
       const g = this.g; this.g = null;
       g.x = e.clientX; g.y = e.clientY;
-      const tUp = evReal(e), aim = aimVector(g.path, g.x0, g.y0, g.x, g.y, tUp);   // (ax, ay: the direction of the flick at the length of the swipe; dx, dy stay the whole swipe)
-      this.emit('up', { ...g, dx: g.x - g.x0, dy: g.y - g.y0, ax: aim.dx, ay: aim.dy, t: tUp });
+      const tUp = evReal(e), aim = aimVector(g.path, g.x0, g.y0, g.x, g.y, tUp), speed = swipeSpeed(g.path, g.x0, g.y0, g.x, g.y, g.t0, tUp);   // (ax, ay: the direction of the flick at the length of the swipe; dx, dy stay the whole swipe)
+      this.emit('up', { ...g, dx: g.x - g.x0, dy: g.y - g.y0, ax: aim.dx, ay: aim.dy, speed, t: tUp });
     });
     cv.addEventListener('pointercancel', () => { this.g = null; });
 
@@ -1162,7 +1162,7 @@ export class Game {
         const tap = Math.hypot(g.dx, g.dy) < 28 && g.t - g.t0 < 320;
         const tg = this.realToGame(tap ? g.t0 : g.t);
         if (tg < S.ballT0 + 0.15) { S.batter.angle = -0.4; return; }
-        swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, defend: tap };
+        swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, speed: g.speed ?? swipeSpeed(null, g.x0, g.y0, g.x, g.y, g.t0, g.t), defend: tap };
         S.batter.swingT0 = this.realTime;
         if (!tap) this.swingArc(this.myTeam, 'bat');
         S.batter.backlift = false;
@@ -1209,7 +1209,7 @@ export class Game {
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
       const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
-      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * fx.match.power * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
+      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * fx.match.power * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1), swipePower: swing && !swing.defend ? swipePowerFromSpeed(swing.speed) : 1 });
       if (aiPower === 'tornado' && myC !== 'brace' && grade === 'miss') res.outcome = 'bowled';
       if (fx.gap && swing && !swing.defend && res.outcome === 'hit') res = this.gapShot(res, grade, aiField, fx.counter === 'brace', rng);
       // his Bouncer Barrage: a hit short of a Perfect (a braced one spares a Good) goes up in the air, a catch chance every time
