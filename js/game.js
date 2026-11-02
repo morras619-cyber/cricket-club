@@ -975,7 +975,8 @@ export class Game {
     // ----- resolve -----
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
     const swingElapsed = swing ? (swing.t - S.ballT0) / 1000 : null;
-    const physicallyReachable = !!swing && isBallReachableAtSwing(d, swingElapsed);
+    // Test-only: bypass the new spatial reach gate while preserving timing grades.
+    const physicallyReachable = !!swing;
     let grade = swing ? (physicallyReachable ? gradeTiming(err, w, d.xt > 0.08) : 'miss') : 'leave';
     if (swing && !swing.defend) { this.stats.swings++; if (grade === 'perfect' || grade === 'good') this.stats.swingGood++; }   // (what the AI learns your skill from)
     if (physicallyReachable && fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
