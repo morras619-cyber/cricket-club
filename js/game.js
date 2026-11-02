@@ -18,7 +18,7 @@ import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
 import { portraitFace } from './futcard.js';
 import { paceTired, tiredness } from './stamina.js';
-import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
+import { matchup, keeperEase, hitStrength, timingFor, confidenceEffect, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, runUp, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
@@ -816,9 +816,9 @@ export class Game {
 
   // skill: the batter's rating (ratings.js): a star has far more room than a tail-ender, and a
   // good bowler (bowlSkill) squeezes everyone's timing
-  windowsFor(fx, extra = 0, tornado = false, skill = 75, bowlSkill = 75) {
+  windowsFor(fx, extra = 0, tornado = false, skill = 75, bowlSkill = 75, confidence = 50) {
     const w = { ...CFG.timing };
-    const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1) * (1 + (this.crowdLift || 0));
+    const f = timingFor(skill) * confidenceEffect(confidence) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1) * (1 + (this.crowdLift || 0));
     const braced = fx.counter === 'brace';   // (the bowler answered this power with Brace: half of it)
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? (braced ? 20 : 40) : 0);
     if (fx.focus) { const h = braced ? BRACE.focusWindow : 1; w.perfect += 55 * h; w.good += 45 * h; }
@@ -924,7 +924,7 @@ export class Game {
     if (bowler.ability === 'mystery') skill -= 12;
     const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;
     fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
-    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
+    const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate, inn.confidenceOf(striker.id));
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor, perfectMs: w.perfect };
     S.readPre = false;
@@ -2075,7 +2075,7 @@ export class Game {
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * (pf.ai / pf.bat) ** 1.5 * aiHome };   // (raised: the pitch has to be felt)
     const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
-    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, confidence: inn.confidenceOf(striker.id), bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
     if (fxFlags.bouncer && ai.res.outcome === 'hit' && ai.res.grade !== 'defend' && !(ai.grade === 'perfect' || (fxFlags.bouncerBrace && ai.grade === 'good'))) {
       ai.res = { ...ai.res, loft: true, launchDeg: 55 + rng.range(0, 12), v: Math.min(ai.res.v || 20, 20), forced: { chance: true }, label: 'SKIED!' };
