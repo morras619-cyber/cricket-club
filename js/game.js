@@ -2200,6 +2200,24 @@ export class Game {
   // where my bowler starts his run-up (the bowling view): a long way back for a fast bowler, near the crease for a spinner
   bowlRunZ(S) { return 20.7 + BOWL_RUNUP_M * (S.bowler.runup ?? 0.8); }
 
+  // Settings-only playtest: opens the bowling preparation screen without starting a match or touching career data.
+  async testBowlingPreparation() {
+    this.cancelAll();
+    this.ui.hud(false);
+    this.S = this.freshScene();
+    this.view = 'bowl';
+    this.phase = 'bowlprep-test';
+    try {
+      await this.bowlingPreparation(this.S, { bowl: 'swing' }, bowlType('swing'));
+    } finally {
+      this.bowlingPrep = null;
+      this.view = 'idle';
+      this.phase = 'idle';
+      this.onInput = null;
+      this.ui.show('settings');
+    }
+  }
+
   // Bowling preparation: inspection rotation is visual only and never alters delivery controls.
   async bowlingPreparation(S, bowler, btype) {
     const P = this.bowlingPrep = {
