@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""The crowd's moods (snd/crowd-boo.wav ...; the singing is tools/build_crowd_songs.py now), from tools/audio/src/crowd-{sing,boo}.mp3 (js/audio.js plays them):
+  crowd-boo.wav   an angry crowd booing: attack, hold, a natural decay to silence (kept whole)
+  crowd-clap.wav  a crowd applauding, 3 s, whole: a short fade in over the cut-off start, its own natural fade out. Levelled
+                  to 0.8 of the boos' loudest moment (clapping sits under the other crowd sounds)
+  crowd-boo2.wav, crowd-boo3.wav  two more boos (the same shape), so the booing is not always the same one; each is
+                  levelled to crowd-boo's loudest moment
+The recordings have a narrow whistle line near 6 kHz: any bin in 1.5-8 kHz that stands out from its neighbours is pulled
+down to them. Each file starts and ends on silence.
+usage: python3 tools/build_crowd_mood.py   (needs ffmpeg, numpy, scipy)
+"""
+import os, subprocess, tempfile
+import numpy as np
+import scipy.io.wavfile as w
+from scipy.signal import stft, istft
+from scipy.ndimage import median_filter
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SRC = os.path.join(HERE, 'audio', 'src')
+OUT = os.path.join(HERE, '..', 'snd')
+SR = 32000
+SING_LEN = 10.0      # seconds of singing: js/audio.js plays as much of it as a moment needs
+SING_IN = 0.35       # fade in
+SING_OUT = 1.6       # fade out
+
+
+def load(name):
+    tmp = os.path.join(tempfile.mkdtemp(), 'a.wav')
+    subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', os.path.join(SRC, name), '-ar', str(SR), '-ac', '2', tmp], check=True)
+    return w.read(tmp)[1].astype(np.float64) / 32768
+
+
+def untone(x, lo=1500, hi=8000, ratio=1.3, passes=3):
+    out = []
+    for c in range(x.shape[1]):
+        y = x[:, c]
+        for _ in range(passes):
+            f, t, Z = stft(y, SR, nperseg=2048, noverlap=1536)
+            mag, ph = np.abs(Z), np.angle(Z)
+            floor = median_filter(mag, size=(41, 5))
+            band = ((f >= lo) & (f <= hi))[:, None]
+            mag = np.where(band & (mag > ratio * floor), floor, mag)
+            y = istft(mag * np.exp(1j * ph), SR, nperseg=2048, noverlap=1536)[1][:len(x)]
+        out.append(y)
+    return np.stack(out, 1)
+
+
+def xfade_append(x, y, n):
+    t = np.linspace(0, np.pi / 2, n)[:, None]
+    return np.concatenate([x[:-n], x[-n:] * np.cos(t) + y[:n] * np.sin(t), y[n:]])
+
+
+def save(name, x, peak=0.92):
+    x = x * min(1.0, peak / max(abs(x).max(), 1e-9))
+    p = os.path.join(OUT, name)
+    w.write(p, SR, (np.clip(x, -1, 1) * 32767).astype(np.int16))
+    print('wrote', p, f'{len(x) / SR:.2f}s', os.path.getsize(p) // 1024, 'KB', '| peak', round(float(abs(x).max()), 2), '| rms', round(float(np.sqrt((x.mean(1) ** 2).mean())), 3))
+
+
+os.makedirs(OUT, exist_ok=True)
+boo = untone(load('crowd-boo.mp3'))
+n = int(0.04 * SR)
+boo[-n:] *= np.linspace(1, 0, n)[:, None]; boo[:n // 2] *= np.linspace(0, 1, n // 2)[:, None]
+save('crowd-boo.wav', boo)
+
+# the two further boos, levelled to the first; and a longer one for a crowd that is really angry
+def loud(x, win=int(0.25 * SR)):
+    m = x.mean(1) if x.ndim > 1 else x
+    return max(np.sqrt((m[i:i + win] ** 2).mean()) for i in range(0, len(m) - win, win // 4))
+ref = loud(boo * min(1.0, 0.92 / abs(boo).max()))          # (as crowd-boo.wav was saved)
+b = {'boo': boo}
+for k in ('boo2', 'boo3'):
+    x = untone(load(f'crowd-{k}.mp3'))
+    x[-n:] *= np.linspace(1, 0, n)[:, None]; x[:n // 2] *= np.linspace(0, 1, n // 2)[:, None]
+    b[k] = x
+    save(f'crowd-{k}.wav', x * (ref / loud(x)))
+
+# the applause (tools/audio/src/clap-a.mp3; clap-b.mp3 is to be a second take: js/audio.js takes turns between them)
+clap = load('clap-a.mp3')
+n_in = int(0.15 * SR)
+clap[:n_in] *= np.linspace(0, 1, n_in)[:, None]
+clap[-n:] *= np.linspace(1, 0, n)[:, None]
+save('crowd-clap.wav', clap * (0.8 * ref / loud(clap)))

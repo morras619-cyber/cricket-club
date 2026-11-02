@@ -1,0 +1,1623 @@
+// Career mode: Super League seasons. You pick a club (the giants unlock in later seasons),
+// bid for players in a pre-season auction against the AI clubs, play the league, and earn
+// prize money by where you finish. Players have ages, ratings and a potential they can grow
+// into (until 33), young players arrive every season, the best become stars with an ability,
+// and every run and wicket goes into records that never reset. Pure data and functions:
+// the state lives in the profile (profile.career).
+import { PORTRAIT_AGE } from './portraits-list.js';
+import { CFG } from './config.js';
+import { makeRng } from './rng.js';
+import { TEAMS, CLUBS, LEAGUE_CLUBS, teamById, divisionName, setMyClub } from './teams.js';
+import { HEROES, heroById } from './heroes.js';
+import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating, WEAK, BOWL_TYPES } from './squads.js';
+import { newLeague, simLeague, advance, playerResult, table, finish, nextFixture } from './tournament.js';
+import { NATIONS, pickNation } from './nations.js';
+import { randomLook } from './looks.js';
+import { ensureRivals, nemesisOf, say, afterMatch, messageNote, rivalKind, meetings, speakerOf } from './rivals.js';
+import { ensureChirp, afterMatchPopularity, seasonPopularity, storyOf, sponsorBonus, compact, postMilestone } from './chirp.js';
+import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
+import { memOf } from './chirpfacts.js';
+import { fameAfter, startFame } from './merch.js';
+import { seasonGain } from './training.js';
+import { tierOf, pickTier, POT_RANGE, ACAD } from './academy.js';
+import { freshMedical, medAfterMatch, fitOf } from './stamina.js';
+import { addXp, XP, levelRow, lookOf, buildOf, addDiamonds } from './pacing.js';
+
+export const PEAK_AGE = 33;           // no growth from this age
+export const MIN_SQUAD = 10, MAX_SQUAD = 14;
+export const START_MONEY = 3;          // $M in your first season
+export const SPONSOR = 1;              // $M every season, whatever happens
+export const WIN_BONUS = 0.4;          // $M per league win in the top division (less lower down: DIV_MONEY)
+export const PRIZE = [10, 7, 5, 4.5, 3.5, 3, 2.5, 2]; // $M by final position
+export const STAR_OVR = 86;            // a regular who gets here becomes a star
+const AI_BUDGET = { 1: 6, 2: 8, 3: 10, 4: 13 };
+// the three divisions, top to bottom: prize money and income shrink the lower you go
+export const DIV_ORDER = ['asl', 'd2', 'd3'];
+const DIV_MONEY = { asl: 1, d2: 0.55, d3: 0.35 };
+const START_BUDGET = { d2: 4.5, d3: 3 };
+const AI_INCOME = 3;
+const LOTS = 16;                       // lots you bid on yourself; the rest are settled quickly
+
+export const ABILITIES = {
+  eagleEye: { name: 'Eagle Eye', role: 'bat', desc: 'Wider timing windows whenever he bats' },
+  finisher: { name: 'Finisher', role: 'bat', desc: 'Far wider timing in the last over' },
+  swingMaster: { name: 'Swing Master', role: 'bowl', desc: '30% more swing and seam' },
+  deathKing: { name: 'Death King', role: 'bowl', desc: 'Never sprays it in the last over' },
+  mystery: { name: 'Mystery Ball', role: 'bowl', desc: 'Batters find him harder to time' },
+};
+
+const round2 = x => Math.round(x * 20) / 20; // to $0.05M
+export const money = x => `$${(Math.round(x * 100) / 100).toFixed(x >= 10 ? 1 : 2).replace(/\.?0+$/, '')}M`;
+function hashStr(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+const blankStats = () => ({ m: 0, inns: 0, runs: 0, balls: 0, hs: 0, fours: 0, sixes: 0, outs: 0, wkts: 0, bballs: 0, bruns: 0, bb: null });
+
+// ---------- players ----------
+// Every career starts in Division 3: the clubs you can pick are the ones there now.
+export const divisionOf = (c, teamId) => DIV_ORDER.find(d => c.divisions?.[d]?.includes(teamId)) || 'asl';
+export const isUnlocked = (c, team) => divisionOf(c, team.id) === 'd3';
+export { divisionName };
+const primary = p => (p.role === 'bowl' ? ['bowlSkill'] : p.role === 'all' ? ['bat', 'bowlSkill'] : ['bat']);
+
+// What a player is worth in $M: rating above all, young potential adds, age takes away.
+export function value(p) {
+  const o = ovr(p);
+  let v = 0.15 + 8 * Math.max(0, Math.min(1, (o - 45) / 50)) ** 2.4;
+  if (p.age <= 23) v += 2.5 * Math.max(0, Math.min(1, (p.pot - o) / 40)) ** 1.4;
+  if (p.heroId) v = Math.max(5, v * 1.25);
+  if (p.age >= 34) v *= 0.5; else if (p.age >= 32) v *= 0.75;
+  return round2(v);
+}
+// Potential as stars (1-5), from what he could grow into.
+export const potentialStars = p => Math.max(1, Math.min(5, Math.round((p.pot - 55) / 8)));
+export const ageNote = p => (p.age >= PEAK_AGE ? 'at his peak' : p.age <= 21 ? 'still growing fast' : 'still improving');
+
+function newPlayer(base, extra) {
+  return { ...base, ...extra, form: 0, ability: null, stats: { all: blankStats(), season: blankStats() } };
+}
+
+// The whole league at the start: every club's regulars, the eight heroes (all up for auction
+// in the first season) and the first youth intake.
+export function newCareer(seed = Date.now() >>> 0) {
+  const rng = makeRng(seed);
+  const c = { nations: true, seed, season: 1, phase: 'pick', club: null, money: START_MONEY, players: {}, league: null, auction: null,
+    budgets: {}, titles: {}, history: [], records: { hs: [], bb: [] }, news: [], lineup: null, youthNo: 0,
+    divisions: startDivisions() };
+  for (const t of CLUBS) addClub(c, t);
+  for (const h of HEROES) {
+    const { hero, ...rest } = heroPlayer(h);
+    const main = Math.max(...primary(rest).map(k => rest[k]));
+    c.players[h.id] = newPlayer(rest, { heroId: h.id, age: lookAge(rest) ?? rng.int(25, 31), pot: Math.min(97, main + 2), team: null, contract: 0, home: teamOfStar(h.id) });
+  }
+  youthIntake(c, rng, 6);
+  c.lookAges = {};
+  for (const p of Object.values(c.players)) { const a = lookAge(p); if (a != null) c.lookAges[p.id] = a; }
+  return c;
+}
+function startDivisions() {
+  return { asl: TEAMS.map(t => t.id), d2: LEAGUE_CLUBS.filter(t => t.div === 'd2').map(t => t.id), d3: LEAGUE_CLUBS.filter(t => t.div === 'd3').map(t => t.id) };
+}
+// a club's regulars join the career, with its budget
+function addClub(c, t) {
+  c.budgets[t.id] = t.div ? START_BUDGET[t.div] : AI_BUDGET[t.tier];
+  for (const r of roster(t.id)) {
+    const pr = makeRng(hashStr(r.id) ^ c.seed);
+    const age = lookAge(r) ?? pr.int(19, 35);
+    const main = Math.max(...primary(r).map(k => r[k]));
+    const pot = Math.min(95, main + (age <= 22 ? pr.int(6, 16) : age <= 26 ? pr.int(2, 6) : age < PEAK_AGE ? pr.int(0, 2) : 0));
+    const { hero, ...rest } = r;
+    c.players[r.id] = newPlayer(rest, { age, pot, team: t.id, contract: pr.int(1, 3) });
+  }
+}
+// a player with a painted portrait is as old as he looks in it
+const portraitKey = name => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+export const lookAge = p => PORTRAIT_AGE[portraitKey(p.name || '')];
+const teamOfStar = id => TEAMS.find(t => t.star === id)?.id || null;
+
+const NICKS = ['Kid', 'Rookie', 'Spark', 'Pocket Rocket', 'Wonderboy', 'Junior', 'Prodigy', 'Rising Sun', 'Little Master', 'Cub', 'Comet', 'Bullet', 'Whiz', 'Ace'];
+const ROLES = [['bat', 'Top-order prospect'], ['bat', 'Hard-hitting prospect'], ['wk', 'Keeper prospect'], ['all', 'All-round prospect'], ['bowl', 'Pace prospect'], ['bowl', 'Spin prospect']];
+
+// New teenagers each season: cheap, raw, and a few will be special.
+export function youthIntake(c, rng, n) {
+  const used = new Set(Object.values(c.players).map(p => p.name));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    // academy graduates come from every cricket nation
+    let name, nation;
+    do { nation = pickNation(rng); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+    used.add(name);
+    const [role, label] = rng.pick(ROLES);
+    const spin = label.startsWith('Spin');
+    const bowl = role === 'bowl' || role === 'all' ? rng.pick(spin ? ['offspin', 'legspin'] : role === 'all' ? Object.keys(BOWL_TYPES) : ['express', 'swing', 'seam', 'leftpace']) : null;
+    const r = rng.next();
+    const pot = r < 0.15 ? rng.int(86, 95) : r < 0.45 ? rng.int(76, 85) : rng.int(64, 75); // one in seven is a future star
+    const bat = role === 'bowl' ? rng.int(10, 26) : role === 'all' ? rng.int(40, 52) : rng.int(44, 58);
+    const bowlSkill = bowl ? (role === 'all' ? rng.int(40, 52) : rng.int(46, 60)) : 0;
+    const id = `y${c.season}-${++c.youthNo}`;
+    const w = rng.int(0, WEAK.length - 1);
+    const p = newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), role, label, bat, bowl, bowlSkill,
+      trait: pot >= 86 ? 'Academy wonderkid' : 'Academy graduate', hero: false,
+      ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
+    { age: rng.int(17, 20), pot, team: null, contract: 0, youth: true, app: randomLook(nation, rng) });
+    c.players[id] = p;
+    out.push(p);
+  }
+  return out;
+}
+
+// ---------- travelling scouts ----------
+// Send a scout to a region for the season: every second match he finds a player there (up to
+// three). At the start of next season you can sign his finds at a set price before the auction;
+// anyone you don't sign goes into the auction for every club to bid on.
+export const SCOUT_FEE = 0.2;
+export const SCOUT_REGIONS = {
+  africa: { name: 'Africa', nations: ['ZA', 'ZW', 'KE', 'NA', 'UG'], tag: 'Raw talent' },
+  europe: { name: 'Europe', nations: ['EN', 'IE', 'SC', 'NL'], tag: 'Accurate bowlers' },
+  namerica: { name: 'North America', nations: ['US', 'CA', 'WI'], tag: 'Power hitters' },
+  samerica: { name: 'South America', nations: ['AR', 'BR'], tag: 'Unpredictable talent' },
+  oceania: { name: 'Oceania', nations: ['AU', 'NZ', 'PG'], tag: 'Fast bowlers' },
+};
+const FINDS = 3, EVERY = 2;
+export const scoutOut = (c, region) => c.scouting?.[region]?.season === c.season;
+export function sendScout(c, region) {
+  if (scoutOut(c, region) || c.money < SCOUT_FEE || c.phase !== 'season') return false;
+  c.money = round2(c.money - SCOUT_FEE); book(c, 'out', 'players', SCOUT_FEE);
+  c.scouting = { ...c.scouting, [region]: { season: c.season, matches: 0, finds: [] } };
+  return true;
+}
+// what each region's players are like
+function scoutPlayer(c, region, rng) {
+  const R = SCOUT_REGIONS[region];
+  const used = new Set(Object.values(c.players).map(p => p.name));
+  let name, nation;
+  do { nation = rng.pick(R.nations); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+  const pace = () => rng.pick(['express', 'swing', 'seam', 'leftpace']);
+  let role, label, bat, bowl = null, bowlSkill = 0, age, pot, ability = null;
+  if (region === 'africa') {
+    // young and raw: low now, a lot later
+    [role, label] = rng.pick([['bat', 'Raw batting talent'], ['bowl', 'Raw pace talent'], ['all', 'Raw all-round talent']]);
+    age = rng.int(17, 20);
+    bat = role === 'bowl' ? rng.int(14, 26) : rng.int(46, 58);
+    if (role !== 'bat') { bowl = pace(); bowlSkill = rng.int(48, 60); }
+    pot = rng.next() < 0.35 ? rng.int(86, 94) : rng.int(76, 86);
+  } else if (region === 'europe') {
+    // tidy, accurate bowlers and the odd correct batter
+    [role, label] = rng.pick([['bowl', 'Accurate seamer'], ['bowl', 'Swing specialist'], ['bat', 'Technically correct batter']]);
+    age = rng.int(22, 28);
+    if (role === 'bowl') { bat = rng.int(14, 28); bowl = label.startsWith('Swing') ? 'swing' : 'seam'; bowlSkill = rng.int(64, 76); } else bat = rng.int(62, 72);
+    pot = Math.min(92, Math.max(bat, bowlSkill) + rng.int(2, 8));
+  } else if (region === 'namerica') {
+    // big hitters
+    [role, label] = rng.pick([['bat', 'Power hitter'], ['bat', 'Six machine'], ['all', 'Big-hitting all-rounder']]);
+    age = rng.int(20, 27);
+    bat = rng.int(62, 74);
+    if (role === 'all') { bowl = pace(); bowlSkill = rng.int(50, 62); }
+    pot = Math.min(93, bat + rng.int(3, 10));
+  } else if (region === 'samerica') {
+    // anything can happen: some arrive with a special ability
+    [role, label] = rng.pick([['bat', 'Unorthodox batter'], ['bowl', 'Mystery spinner'], ['all', 'Maverick all-rounder']]);
+    age = rng.int(19, 26);
+    bat = role === 'bowl' ? rng.int(14, 30) : rng.int(54, 68);
+    if (role !== 'bat') { bowl = role === 'bowl' ? rng.pick(['offspin', 'legspin']) : pace(); bowlSkill = rng.int(56, 68); }
+    pot = Math.min(93, Math.max(bat, bowlSkill) + rng.int(4, 14));
+    if (rng.next() < 0.4) ability = role === 'bat' ? rng.pick(['eagleEye', 'finisher']) : role === 'bowl' ? 'mystery' : rng.pick(['eagleEye', 'swingMaster']);
+  } else {
+    // quick bowlers and athletes
+    [role, label] = rng.pick([['bowl', 'Tearaway quick'], ['bowl', 'Left-arm quick'], ['all', 'Athletic all-rounder']]);
+    age = rng.int(19, 26);
+    bat = role === 'bowl' ? rng.int(16, 30) : rng.int(52, 64);
+    bowl = label.startsWith('Left') ? 'leftpace' : 'express'; bowlSkill = rng.int(62, 74);
+    pot = Math.min(93, bowlSkill + rng.int(3, 10));
+  }
+  const id = `s${c.season}-${region}-${(c.scoutNo = (c.scoutNo || 0) + 1)}`;
+  const w = rng.int(0, WEAK.length - 1);
+  const p = newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), role, label, bat, bowl, bowlSkill,
+    trait: `Scouted in ${R.name}`, hero: false,
+    ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
+  { age, pot, team: null, contract: 0, app: randomLook(nation, rng) });
+  p.ability = ability;
+  p.scouted = { region, season: c.season, price: Math.max(0.1, round2(value(p) * 0.8)) };
+  c.players[id] = p;
+  return p;
+}
+const findFor = (c, region, n) => scoutPlayer(c, region, makeRng(hashStr(`${c.seed}-${c.season}-${region}-${n}`)));
+// after each of your league matches: the scouts out this season report back
+function scoutReports(c) {
+  const notes = [];
+  for (const [region, s] of Object.entries(c.scouting || {})) {
+    if (s.season !== c.season) continue;
+    s.matches++;
+    if (s.matches % EVERY || s.finds.length >= FINDS) continue;
+    const p = findFor(c, region, s.finds.length);
+    s.finds.push(p.id);
+    notes.push(`🔎 Your scout in ${SCOUT_REGIONS[region].name} has found ${p.name} (${p.age}), ${p.label.toLowerCase()}. You can sign him before next season's auction.`);
+  }
+  return notes;
+}
+// the finds you can sign now, before this season's auction
+export const scoutFinds = c => Object.values(c.players).filter(p => p.scouted && p.scouted.season === c.season - 1 && !p.team && !p.retired);
+export function signFind(c, id) {
+  const p = c.players[id];
+  if (!p?.scouted || p.team || c.money < p.scouted.price || clubPlayers(c, c.club).length >= MAX_SQUAD || repBlock(c, p)) return false;
+  sign(c, p, c.club, p.scouted.price);
+  chirpSigned(c, p, p.scouted.price, 'scouted');
+  return true;
+}
+export function finishScouts(c) { if (c.phase === 'scouts') startAuction(c); }
+
+// Careers saved before players had countries: the regulars take their new names and
+// nations from the squads, heroes get theirs, and older academy graduates get one.
+export function migrateCareer(c) {
+  if (!c) return c;
+  // careers from before the divisions: the eight are the Super League (where a club already
+  // chosen stays), and the sixteen lower-division clubs join with their squads
+  if (!c.divisions) {
+    c.divisions = startDivisions();
+    for (const t of LEAGUE_CLUBS) addClub(c, t);
+  }
+  // careers from before the simulated matches had two batters: a big score off more than 24 balls can't have happened, so it goes
+  // from the records lists (only those lists; players' own totals stay as they are)
+  if (c.records?.hs) c.records.hs = c.records.hs.filter(r => (r.balls || 0) <= 24);
+  // painted players get the age they look (as of season 1, older by the seasons since)
+  c.lookAges = c.lookAges || {};
+  for (const p of Object.values(c.players)) {
+    const a = lookAge(p);
+    if (a == null || c.lookAges[p.id] === a) continue;
+    const pot = p.pot, main = Math.max(...primary(p).map(k => p[k] || 0));
+    p.age = a + (c.season - 1);
+    // a young face keeps room to grow; an older one doesn't keep a youngster's ceiling
+    if (p.age <= 22) p.pot = Math.max(pot, Math.min(95, main + 8));
+    else if (p.age >= 28) p.pot = Math.min(pot, Math.max(main, main + 2));
+    c.lookAges[p.id] = a;
+  }
+  if (c.club && c.divisions) ensureChirp(c);   // careers from before Chirp get a feed
+  if (c.club && !c.rivals && c.divisions) refreshRivals(c);   // careers from before the rivals get them
+  if (c.nations) return c;
+  for (const p of Object.values(c.players)) {
+    const [team] = p.id.split('-');
+    const r = TEAMS.some(t => t.id === team) && roster(team).find(x => x.id === p.id);
+    if (r) Object.assign(p, { name: r.name, nick: r.nick, short: r.short, nation: r.nation, trait: r.trait });
+    else if (p.heroId) p.nation = heroPlayer(heroById(p.heroId)).nation;
+    else if (!p.nation) p.nation = ['IN', 'PK', 'BD'][hashStr(p.id) % 3];
+  }
+  c.nations = true;
+  return c;
+}
+
+// ---------- clubs ----------
+export const clubPlayers = (c, teamId) => Object.values(c.players).filter(p => p.team === teamId && !p.retired);
+// The squad as the match engine wants it (heroes carry their hero card).
+export const enginePlayer = p => ({ ...p, hero: p.heroId ? heroById(p.heroId) : false });
+export const clubPool = (c, teamId) => clubPlayers(c, teamId).map(enginePlayer);
+// The club's heroes by slot (first one of each slot): their powers are the club's powers.
+export function clubHeroes(pool) {
+  const sq = { bat: null, bowl: null, field: null };
+  for (const p of pool) if (p.hero && !sq[p.hero.slot]) sq[p.hero.slot] = p.hero;
+  return sq;
+}
+export const clubRating = (c, teamId) => teamRating(clubPool(c, teamId));
+
+// ---------- rivals (js/rivals.js) ----------
+// the nemesis and the rival of your division: made when you take a club, and again whenever you change division. The messages they send
+// go into the inbox (the Newsroom); the first word from your nemesis comes with the club.
+function refreshRivals(c) {
+  const first = !c.rivals;
+  const next = ensureRivals(c, id => clubRating(c, id), c.divisions[divisionOf(c, c.club)]);
+  const out = [];
+  if (first) out.push(say(c, 'nemesis', 'intro', nemesisOf(c)));
+  if (next) out.push(say(c, 'division', 'new', next));
+  return out.filter(Boolean);
+}
+
+// ---------- choosing a club ----------
+export function chooseClub(c, teamId, { hold = false } = {}) {
+  const t = teamById(teamId);
+  // (a new career picks from Division 3; after that you stay with your club and climb)
+  if (c.club ? teamId !== c.club : !isUnlocked(c, t)) return false;
+  if (c.club !== teamId) c.lineup = null;
+  c.club = teamId;
+  ensureChirp(c).startDiv = c.chirp.startDiv || divisionOf(c, teamId);   // (where the club started: the fans remember it)
+  refreshRivals(c);
+  // your scouts' finds come first, at their set price; then the auction
+  if (hold) c.phase = 'trials'; else if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c);
+  return true;
+}
+
+// ---------- the caretaker: your ground starts rough (a club from nothing) and he brings it up ----------
+// The grass and the pitch of a new club are worn and dry. A caretaker costs a fee to hire and a wage every week (a week is each of your league matches), and
+// as long as he is paid the ground gets better week by week; if he goes, or is never hired, it slowly goes back. A club saved before this has a ground in full condition.
+export const CARE = { START: 0.08, FLOOR: 0.05, HIRE: 0.1, WAGE: 0.05, GAIN: 0.11, DECAY: 0.025 };
+export const groundCond = c => c.custom?.cond ?? 1;
+export const hasCaretaker = c => !!c.custom?.caretaker;
+export function hireCaretaker(c) {
+  if (!c.custom || c.custom.caretaker || c.money < CARE.HIRE) return false;
+  c.money = round2(c.money - CARE.HIRE); book(c, 'out', 'buildings', CARE.HIRE);
+  c.custom.caretaker = true; c.custom.careWeeks = 0;
+  setMyClub(c.custom);
+  return true;
+}
+export function dismissCaretaker(c) {
+  if (!c.custom?.caretaker) return false;
+  c.custom.caretaker = false; setMyClub(c.custom);
+  return true;
+}
+// after each of your league matches: a week goes by on the ground
+export function groundWeek(c) {
+  const m = c.custom, notes = [];
+  if (!m || m.cond === undefined) return notes;
+  if (m.caretaker) {
+    if (c.money >= CARE.WAGE) {
+      c.money = round2(c.money - CARE.WAGE); book(c, 'out', 'buildings', CARE.WAGE);
+      const before = m.cond; m.cond = Math.min(1, round3(m.cond + CARE.GAIN)); m.careWeeks = (m.careWeeks || 0) + 1;
+      notes.push(`🌱 Your caretaker worked on ${m.ground} (wage ${money(CARE.WAGE)})${m.cond >= 1 ? ': it is in perfect order' : m.cond - before > 0 && m.careWeeks === 2 ? ': the grass is greening up' : ''}`);
+    } else {
+      m.caretaker = false;
+      notes.push(`🌱 Your caretaker has left: you could not pay him. ${m.ground} will go back to seed`);
+    }
+  } else if (m.cond > CARE.FLOOR) m.cond = Math.max(CARE.FLOOR, round3(m.cond - CARE.DECAY));
+  setMyClub(m);
+  return notes;
+}
+const round3 = x => Math.round(x * 1000) / 1000;
+
+// Your own club: it takes the place of the weakest Division 3 club (its budget and ground), and
+// that club's regulars become a squad of young unknowns: rough now, with room to grow.
+// spec: { name, short, suit, trim, emblem, ground, crest (an image URL) }
+export function createClub(c, spec, { trials = false } = {}) {
+  if (c.club) return false;
+  const base = [...c.divisions.d3].sort((a, b) => clubRating(c, a) - clubRating(c, b))[0];
+  const rng = makeRng(hashStr(`mine-${c.seed}`));
+  if (trials) {
+    // the story's way: the club starts with nobody. The regulars of the club it replaces go back on the market, and the squad is chosen in the nets (trialists, below)
+    for (const p of clubPlayers(c, base)) { p.team = null; p.contract = 0; }
+    c.custom = { ...spec, base, gone: teamById(base).name, stadium: 1, cond: CARE.START, caretaker: false };
+    setMyClub(c.custom);
+    if (!chooseClub(c, base, { hold: true })) return false;
+    makeTrialists(c);
+    return true;
+  }
+  for (const p of clubPlayers(c, base)) {
+    const main = Math.max(...primary(p).map(k => p[k]));
+    p.age = rng.int(18, 21);
+    p.pot = Math.min(90, main + rng.int(12, 22));
+    p.contract = 3;
+  }
+  c.custom = { ...spec, base, gone: teamById(base).name, stadium: 1, cond: CARE.START, caretaker: false };
+  setMyClub(c.custom);
+  return chooseClub(c, base);
+}
+
+// ---------- the net trials: a new club's first squad (the story) ----------
+// Dev has found a keeper; the rest of the squad is picked in the nets from six batters and six bowlers (none of them any good yet: they are
+// young, and each has a type). The founder, Kabir, is already in it and can't be sold. You pick 4 batters and 5 bowlers: 4 + 5 + the keeper + Kabir = 11.
+export const TRIAL_BATS = [
+  { label: 'Aggressive opener', trait: 'Quick starter' }, { label: 'Power batter', trait: 'Swings from the first ball' }, { label: 'Anchor', trait: 'Hard to dislodge' },
+  { label: 'Finisher', trait: 'Calm when it counts' }, { label: 'Touch batter', trait: 'Sweet timing' }, { label: 'Tactical batter', trait: 'Finds the gaps' },
+];
+export const TRIAL_BOWLS = ['express', 'swing', 'seam', 'leftpace', 'offspin', 'legspin'];
+export const TRIAL_PICKS = { bat: 4, bowl: 5 };
+const KABIR = { id: 'kabir-anand', name: 'Kabir Anand', short: 'Kabir', nick: 'The Founder', nation: 'IN', role: 'bat', label: 'Tactical batter', trait: 'Plays through the pain', bat: 66, bowl: null, bowlSkill: 0, number: 9, hero: false };
+function trialPlayer(c, rng, base, extra) {
+  const nation = pickNation(rng), used = new Set(Object.values(c.players).map(p => p.name));
+  let name;
+  do { name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+  const id = `tr-${++c.youthNo}`;
+  const w = rng.int(0, WEAK.length - 1);
+  return newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), hero: false, ...base,
+    ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
+  { age: rng.int(18, 24), pot: rng.int(62, 84), team: null, contract: 0, trial: true, app: randomLook(nation, rng), ...extra });
+}
+function makeTrialists(c) {
+  const rng = makeRng(hashStr(`trial-${c.seed}`));
+  const T = { bats: [], bowls: [], keeper: null, results: null };
+  for (const b of TRIAL_BATS) {
+    const bat = rng.int(46, 60), p = trialPlayer(c, rng, { role: 'bat', label: b.label, trait: b.trait, bat, bowl: null, bowlSkill: 0 }, {});
+    c.players[p.id] = p; T.bats.push(p.id);
+  }
+  for (const type of TRIAL_BOWLS) {
+    const p = trialPlayer(c, rng, { role: 'bowl', label: `${bowlType(type).name}`, trait: 'A net bowler with something to prove', bat: rng.int(12, 28), bowl: type, bowlSkill: rng.int(46, 62) }, {});
+    c.players[p.id] = p; T.bowls.push(p.id);
+  }
+  const k = trialPlayer(c, rng, { role: 'wk', label: 'Keeper-batter', trait: 'Safe hands, quick feet', bat: rng.int(48, 58), bowl: null, bowlSkill: 0 }, { trial: false, age: rng.int(22, 27) });
+  k.team = c.club; k.contract = 3; c.players[k.id] = k; T.keeper = k.id;
+  // the founder: in the squad from the start, on a contract that never ends, and never sold
+  const kab = newPlayer({ ...KABIR, ai: { ...WEAK[0], honesty: 0.7, fire: 0.3, rattle: 0.4 } }, { age: 24, pot: 82, team: c.club, contract: 99, founder: true, app: { skin: 2, hair: 1, style: 'curly', beard: 'none', cut: 'curly' } });
+  c.players[kab.id] = kab;
+  c.trial = T;
+}
+// the picks: 4 batters and 5 bowlers from the trialists. They join; the others stay on the market (the auction sells them). The club has no money for its first auction.
+export function signTrialists(c, batIds, bowlIds) {
+  const T = c.trial;
+  if (!T || batIds.length !== TRIAL_PICKS.bat || bowlIds.length !== TRIAL_PICKS.bowl) return false;
+  if (!batIds.every(id => T.bats.includes(id)) || !bowlIds.every(id => T.bowls.includes(id)) || new Set([...batIds, ...bowlIds]).size !== batIds.length + bowlIds.length) return false;
+  for (const id of [...T.bats, ...T.bowls]) c.players[id].trial = false;
+  for (const id of [...batIds, ...bowlIds]) { const p = c.players[id]; p.team = c.club; p.contract = 3; }
+  c.money = 0;
+  c.lineup = null;
+  c.trialDone = { bats: batIds, bowls: bowlIds };
+  delete c.trial;
+  startAuction(c);
+  return true;
+}
+// the auction's pool must not include the trialists still being judged
+const inTrial = p => !!p.trial;
+
+// Your club's ground: ten levels, and its picture and name change at level 5 and level 10 (three looks): bigger crowds pay more at every home match.
+// The Arena (level 10) is for clubs out of Division 3. c.custom.stadiumLvl is the level (1-10); c.custom.stadium is the look (1-3), which the match scene reads.
+// A career from before the ten levels has only the look: it stands for level 1, 5 or 10.
+export const STADIUMS = [null,
+  { name: 'Community Ground', fans: '4,000', ticket: 0.1 },
+  { name: 'Club Stadium', fans: '18,000', ticket: 0.2 },
+  { name: 'Arena', fans: '45,000', ticket: 0.4, needs: 'd2' },
+];
+const STADIUM_ROWS = [null, { ticket: 0.1 }, { ticket: 0.2 }, { ticket: 0.4 }];
+export const stadiumLevel = c => (c.custom ? c.custom.stadium || 1 : 0);   // the look (1-3)
+export const stadiumLvl = c => (c.custom ? c.custom.stadiumLvl || [1, 1, 5, 10][c.custom.stadium || 1] : 0);   // the level (1-10)
+export const ticketOf = c => Math.round(levelRow(STADIUM_ROWS, stadiumLvl(c)).ticket * (1 + trophyBuffs(c).tickets) * 1000) / 1000;
+export function setStadiumLevel(c, level) { c.custom.stadiumLvl = level; c.custom.stadium = lookOf(level); setMyClub(c.custom); }
+// what stops the ground reaching a level, besides the money, the builder and the club level (pacing.js whyNot)
+export const stadiumBlocked = (c, to) => (to >= 10 && divisionOf(c, c.club) === 'd3' ? 'The Arena is for clubs out of Division 3' : null);
+
+// ---------- the auction ----------
+const inc = price => (price < 1 ? 0.1 : price < 3 ? 0.25 : 0.5);
+export const RESERVE_PER_PLACE = 0.3; // $M a club keeps back for each place it still has to fill (aiMaxes; the auction report's squad risk)
+export const openingPrice = p => Math.max(0.1, round2(value(p) * 0.5));
+const squadSize = (c, teamId) => clubPlayers(c, teamId).length;
+function aiMaxes(c, p) {
+  const rng = makeRng(hashStr(`${c.seed}-${c.season}-${p.id}`));
+  const out = {};
+  for (const t of CLUBS) {
+    if (t.id === c.club) continue;
+    const n = squadSize(c, t.id);
+    if (n >= MAX_SQUAD) { out[t.id] = 0; continue; }
+    const reserve = Math.max(0, MIN_SQUAD - n - 1) * RESERVE_PER_PLACE;
+    const free = c.budgets[t.id] - reserve;
+    const need = n < MIN_SQUAD ? 1.25 : n < 12 ? 1 : 0.7;
+    const homecoming = p.home === t.id ? 1.25 : 1; // a hero's old club wants him back
+    out[t.id] = Math.max(0, Math.min(free, round2(value(p) * (0.75 + rng.next() * 0.6) * need * (p.heroId ? 1.2 : 1) * homecoming)));
+  }
+  return out;
+}
+export function startAuction(c) {
+  const pool = Object.values(c.players).filter(p => !p.team && !p.retired && !p.prospect && !inTrial(p)).sort((a, b) => value(b) - value(a));
+  c.auction = { lots: pool.map(p => p.id), idx: 0, lot: null, results: [] };
+  c.phase = 'auction';
+  openLot(c);
+}
+function openLot(c) {
+  const A = c.auction;
+  while (A.idx < A.lots.length && c.players[A.lots[A.idx]].team) A.idx++;
+  if (A.idx >= Math.min(A.lots.length, LOTS)) { A.lot = null; return; }
+  const p = c.players[A.lots[A.idx]];
+  A.lot = { pid: p.id, price: openingPrice(p), leader: null, maxes: aiMaxes(c, p) };
+}
+export const currentLot = c => c.auction?.lot || null;
+export const nextBid = lot => (lot.leader ? round2(lot.price + inc(lot.price)) : lot.price);
+
+// ---------- the auction report: what a lot would do for your squad (the auction screen) ----------
+// Only existing measures: the squad rating is squads.js teamRating (best four batters, best three
+// bowlers); the money a place still to fill needs is the AI clubs' own reserve.
+const topAvg = (xs, n) => { const t = [...xs].sort((a, b) => b - a).slice(0, n); return t.length ? Math.round(t.reduce((a, b) => a + b, 0) / t.length) : 0; };
+// Your squad as it stands; with `extra` (a player), as it would be with him signed.
+export function squadNeeds(c, extra = null) {
+  const pool = [...clubPlayers(c, c.club), ...(extra ? [extra] : [])];
+  const bowlers = pool.filter(p => p.bowl);
+  return {
+    size: pool.length, needed: Math.max(0, MIN_SQUAD - pool.length), places: Math.max(0, MAX_SQUAD - pool.length),
+    rating: teamRating(pool.map(enginePlayer)), bat: topAvg(pool.map(p => p.bat), 4), bowl: topAvg(bowlers.map(p => p.bowlSkill), 3),
+    pace: bowlers.filter(p => !bowlType(p.bowl).spin).length, spin: bowlers.filter(p => bowlType(p.bowl).spin).length,
+    allr: pool.filter(p => p.role === 'all').length,
+  };
+}
+// The decision in four verdicts, each { label, tone: 'good' | 'ok' | 'warn' | 'bad', detail }, for the next bid on this lot.
+export function assessLot(c, lot) {
+  const p = c.players[lot.pid], bid = nextBid(lot), now = squadNeeds(c), after = squadNeeds(c, p);
+  const gain = after.rating - now.rating;
+  const fit = gain >= 3 ? ['Excellent', 'good'] : gain >= 1 ? ['Good', 'good'] : ['Depth', 'ok'];
+  const ratio = bid / Math.max(0.1, value(p));
+  const price = ratio < 0.8 ? ['Bargain', 'good'] : ratio <= 1.1 ? ['Fair', 'ok'] : ['Expensive', 'warn'];
+  const left = round2(c.money - bid), needAfter = Math.max(0, MIN_SQUAD - (now.size + 1)), reserve = round2(needAfter * RESERVE_PER_PLACE);
+  const cash = left < 0 ? [`-${money(-left)}`, 'bad'] : [money(left), left < reserve ? 'warn' : 'ok'];
+  const risk = now.size >= MAX_SQUAD ? ['Full', 'bad'] : left < 0 ? ['Too dear', 'bad'] : left < reserve ? ['High', 'bad'] : needAfter > 0 && left < 2 * reserve ? ['Medium', 'warn'] : ['Low', 'good'];
+  return {
+    fit: { label: fit[0], tone: fit[1], detail: gain > 0 ? `Rating ${now.rating} → ${after.rating}` : `Rating stays ${now.rating}` },
+    price: { label: price[0], tone: price[1], detail: `${Math.round(ratio * 100)}% of his worth` },
+    cash: { label: cash[0], tone: cash[1], detail: left < 0 ? `Short by ${money(-left)}` : c.money > 0 ? `Uses ${Math.round(bid / c.money * 100)}% of your cash` : 'No cash' },
+    risk: { label: risk[0], tone: risk[1], detail: now.size >= MAX_SQUAD ? 'Squad is full' : left < 0 ? 'Not enough money' : needAfter > 0 ? `Then ${needAfter} more to sign` : 'Squad complete' },
+    now, after, bid, left,
+  };
+}
+// ---------- what Chirp makes of the club's story ----------
+// where the club started and where it is now, for the fans who remember (null before there is anything to remember)
+export function journeyOf(c) {
+  const from = c.chirp?.startDiv || c.history?.[0]?.div, now = c.club && divisionOf(c, c.club);
+  return from && now ? { from: divisionName(from), div: divisionName(now), yrs: Math.max(1, c.history?.length || 0), yrsn: `${Math.max(1, c.history?.length || 0)} season${Math.max(1, c.history?.length || 0) === 1 ? '' : 's'}` } : null;
+}
+const notable = p => ovr(p) >= 72 || (p.stats?.all?.runs || 0) >= 60 || (p.stats?.all?.wkts || 0) >= 8;
+// a post for a big signing (a few a season, so the feed is not all signings)
+function chirpSigned(c, p, price, kind = null) {
+  if (!c.chirp || c.phase === 'pick') return;
+  const mem = memOf(c);
+  mem.signs = mem.signs?.season === c.season ? mem.signs : { season: c.season, n: 0 };
+  const type = kind || (ovr(p) >= 82 ? 'signedStar' : price >= 1.2 && ovr(p) < 70 ? 'signedOverpay' : price >= 1.2 ? 'signedBig' : p.age <= 20 && (p.pot || 0) >= 80 ? 'signedYoung' : ovr(p) >= 74 && price <= 0.4 ? 'signedBargain' : null);
+  if (!type || mem.signs.n >= 3) { chirpStoryQuiet(c, { t: kind || 'signed', pid: p.id, price }); return; }
+  mem.signs.n++;
+  chirpStory(c, { t: type, pid: p.id, price, journey: journeyOf(c) });
+}
+// only the memory: the fans will remember him (who left, who came), but there is no post
+function chirpStoryQuiet(c, ev) { if (c.chirp) { memOf(c).events = [...memOf(c).events, { ...ev, season: c.season }].slice(-40); if (ev.t === 'signed' || ev.t === 'scouted') delete memOf(c).former[ev.pid]; } }
+// a player of mine leaves (his contract ended, he retired, he was let go): the fans remember, and say so if he mattered
+function chirpLeft(c, p, kind) {
+  if (!c.chirp) return;
+  const mem = memOf(c);
+  mem.lefts = mem.lefts?.season === c.season ? mem.lefts : { season: c.season, n: 0 };
+  if (notable(p) && mem.lefts.n < 3) { mem.lefts.n++; chirpStory(c, { t: kind, pid: p.id, journey: journeyOf(c) }); } else chirpStoryQuiet(c, { t: kind === 'contractEnd' ? 'left' : kind, pid: p.id });
+  mem.former[p.id] = { season: c.season, kind };
+}
+// at the start of the season: a good player whose deal is in its last season (a couple of posts, so the feed is not all contracts)
+function chirpContracts(c) {
+  if (!c.chirp || !c.club) return;
+  let n = 0;
+  for (const p of clubPlayers(c, c.club).sort((a, b) => ovr(b) - ovr(a))) {
+    if (n >= 2 || ovr(p) < 76 || p.contract !== 1 || p.heroId) continue;
+    n++; chirpStory(c, { t: 'contractWorry', pid: p.id, left: 1, journey: journeyOf(c) });
+  }
+}
+// you let a player go
+export function releasePlayer(c, id) {
+  const p = c.players[id];
+  if (!p || p.team !== c.club || p.founder) return false;   // (the founder is never let go)
+  chirpLeft(c, p, 'released');
+  p.team = null; p.contract = 0;
+  return true;
+}
+// after the auction: a player who left us and joined another club (the fans notice)
+function chirpPoached(c) {
+  if (!c.chirp) return;
+  const mem = memOf(c);
+  let posts = 0;
+  for (const [pid, f] of Object.entries(mem.former)) {
+    const p = c.players[pid];
+    if (!p || f.poached || !p.team || p.team === c.club || p.retired) continue;
+    f.poached = true;
+    if (posts < 2 && notable(p)) { posts++; chirpStory(c, { t: 'poached', pid, they: p.team, journey: journeyOf(c) }); }
+  }
+}
+function sign(c, p, teamId, price, out = null) {
+  const was = p.team;
+  p.team = teamId;
+  const rng = makeRng(hashStr(`${p.id}-${c.season}-c`));
+  p.contract = p.age >= PEAK_AGE ? 1 : rng.int(1, 3);
+  if (teamId === c.club) { c.money = round2(c.money - price); book(c, 'out', 'players', price); } else c.budgets[teamId] = round2(c.budgets[teamId] - price);
+  c.auction?.results.push(out?.length ? { pid: p.id, team: teamId, price, out } : { pid: p.id, team: teamId, price });
+  if (teamId === c.club && was !== c.club) chirpSigned(c, p, price);
+}
+// The rival clubs bid in a fixed order for each lot (seeded: the same career and lot always go the same way).
+const bidOrder = (c, lot) => {
+  const rng = makeRng(hashStr(`${c.seed}-${c.season}-${lot.pid}-order`));
+  return Object.keys(lot.maxes).sort().map(t => [rng.next(), t]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+};
+// A rival raises to `raise`: the next club in the order, after the last one who bid, whose limit allows it. A club whose limit is
+// below it is out for this lot at the price it could not match (a club whose squad is full never bids). Null if none can: your bid stands.
+function rivalRaise(c, lot, raise) {
+  const order = bidOrder(c, lot), at = order.indexOf(lot.last);
+  lot.out = lot.out || {};
+  for (let k = 1; k <= order.length; k++) {
+    const t = order[(at + k + order.length) % order.length];
+    if (lot.out[t] != null || !(lot.maxes[t] > 0)) continue;
+    if (lot.maxes[t] >= raise) return t;
+    lot.out[t] = lot.price;
+  }
+  return null;
+}
+// The rival clubs for the screen, in their bidding order: leading, out (with the price they could not match), full (a full squad does not
+// bid), or still in (they have not had to answer yet: their limits stay hidden until they drop out).
+export function rivalsOf(c, lot) {
+  return bidOrder(c, lot).map(team => (lot.leader === team ? { team, state: 'lead' }
+    : lot.out?.[team] != null ? { team, state: 'out', at: lot.out[team] }
+    : !(lot.maxes[team] > 0) ? { team, state: 'full' } : { team, state: 'in' }));
+}
+// You bid. Returns 'won' | 'outbid' | 'broke' | 'full' | 'rep' (he will not sign for a club of your standing).
+export function bid(c) {
+  const lot = c.auction.lot, p = c.players[lot.pid];
+  if (squadSize(c, c.club) >= MAX_SQUAD) return 'full';
+  if (repBlock(c, p)) return 'rep';
+  const price = nextBid(lot);
+  if (c.money < price) return 'broke';
+  lot.price = price; lot.leader = c.club;
+  // a rival raises if any club still can (the same limits as ever: you win exactly when none can)
+  const raise = round2(price + inc(price)), rival = rivalRaise(c, lot, raise);
+  if (rival) { lot.price = raise; lot.leader = rival; lot.last = rival; return 'outbid'; }
+  sign(c, p, c.club, price, Object.entries(lot.out || {}).sort((x, y) => y[1] - x[1]));
+  c.auction.idx++; openLot(c);
+  return 'won';
+}
+// You let this one go: the AI clubs settle it between themselves (the keenest wins, at a step over the next keenest's limit).
+// The sale keeps who was outbid and where, for the sold list.
+export function pass(c) {
+  const lot = c.auction.lot, p = c.players[lot.pid];
+  const order = Object.entries(lot.maxes).sort((x, y) => y[1] - x[1]);
+  const [top, top2] = order;
+  let winner = null, price = lot.price;
+  if (top && top[1] >= lot.price) {
+    winner = top[0];
+    price = Math.max(lot.price, Math.min(top[1], round2((top2?.[1] || 0) + inc(top2?.[1] || 0))));
+  }
+  if (winner) {
+    const out = order.slice(1).filter(([, m]) => m >= openingPrice(p)).map(([team, m]) => [team, Math.min(m, round2(price))]);
+    sign(c, p, winner, round2(price), out);
+  } else c.auction.results.push({ pid: p.id, team: null, price: 0 });
+  c.auction.idx++; openLot(c);
+  return winner;
+}
+// Settle the rest, make sure every club has a full squad, and start the season.
+export function finishAuction(c) {
+  while (c.auction.lot) pass(c);
+  const rng = makeRng(hashStr(`${c.seed}-${c.season}-fill`));
+  // the lower lots go quickly: each AI club takes what it can use
+  for (const id of c.auction.lots.slice(LOTS)) {
+    const p = c.players[id];
+    if (p.team) continue;
+    const m = aiMaxes(c, p);
+    const [top] = Object.entries(m).sort((x, y) => y[1] - x[1]);
+    if (top && top[1] >= value(p) * 0.5) sign(c, p, top[0], round2(value(p) * 0.5));
+  }
+  // unsold heroes go home to their own club
+  for (const p of Object.values(c.players)) {
+    if (p.heroId && !p.team && p.home && squadSize(c, p.home) < MAX_SQUAD && p.home !== c.club) sign(c, p, p.home, 0);
+  }
+  // every club needs at least MIN_SQUAD players: the cheapest free agents, then fresh youth
+  for (const t of CLUBS) {
+    while (squadSize(c, t.id) < MIN_SQUAD) {
+      let p = Object.values(c.players).filter(x => !x.team && !x.retired && !x.heroId).sort((a, b) => value(a) - value(b))[0];
+      if (!p) p = youthIntake(c, rng, 1)[0];
+      sign(c, p, t.id, t.id === c.club ? Math.min(c.money, round2(value(p) * 0.5)) : round2(value(p) * 0.5));
+    }
+  }
+  c.auction.done = true;
+  chirpPoached(c);
+  startSeason(c);
+}
+
+// ---------- the season ----------
+export function startSeason(c) {
+  c.phase = 'season';
+  c.league = newLeague(c.club, hashStr(`${c.seed}-league-${c.season}`), c.divisions[divisionOf(c, c.club)]);
+  c.league.div = divisionOf(c, c.club);
+  c.league.season = c.season;
+  refreshRivals(c);   // (a new division has a new rival)
+  for (const p of Object.values(c.players)) p.stats.season = blankStats();
+  chirpContracts(c);
+  setObjective(c);
+}
+
+// A simulated match between two AI clubs, ball by ball, so every player gets a scorecard. favour: a club that is stronger in it
+// and must win (the match is played again, off the record, until it does: only the match that stands is written into the stats).
+// (raw: an object to hand the two innings back in, instead of writing them into the stats: the economy simulation, tools/sim_economy.mjs, plays your own matches this way)
+export function simCareerMatch(c, a, b, rng, favour = null, raw = null) {
+  let ia, ib, winner, tries = 0;
+  do {
+    ia = simInnings(c, a, b, rng, null, favour); ib = simInnings(c, b, a, rng, ia.runs + 1, favour);
+    winner = ib.runs > ia.runs ? b : ib.runs < ia.runs ? a : rng.chance(0.5) ? a : b; // (a tie goes to a super over)
+  } while (favour && (a === favour || b === favour) && winner !== favour && ++tries < 25);
+  // (a result that would still not go their way after all that has its scores turned round: practically never)
+  if (favour && (a === favour || b === favour) && winner !== favour) { [ia, ib] = [ib, ia]; winner = favour; }
+  if (raw) { raw.ia = ia; raw.ib = ib; return { a, b, ia: stripInnings(ia), ib: stripInnings(ib), winner }; }
+  commitInnings(c, ia); commitInnings(c, ib);
+  const la = lineupOf(c, a), lb = lineupOf(c, b);
+  played(c, [...la.order, ...la.attack, ...lb.order, ...lb.attack].filter(Boolean).map(p => p.id));
+  return { a, b, ia: stripInnings(ia), ib: stripInnings(ib), winner };
+}
+const stripInnings = ({ runs, wkts, balls, boundaries }) => ({ runs, wkts, balls, boundaries });
+function lineupOf(c, teamId) {
+  const pool = clubPool(c, teamId);
+  const l = defaultLineup(teamId, clubHeroes(pool), {}, pool);
+  const byId = id => pool.find(p => p.id === id);
+  return { order: l.order.map(byId), attack: l.attack.map(byId) };
+}
+// The Thunder Strikers' dynasty: until you reach the Super League nobody can beat them, so they take the title every year and you
+// build up to meeting them there. They are simply better in those matches (and win them, see simCareerMatch). Once you are in
+// the Super League its matches are played as normal.
+const DYNASTY = 'thunder';
+const dynastyMatch = c => (a, b, rng) => simCareerMatch(c, a, b, rng, DYNASTY);
+// One innings: two batters at the crease, as in the game: an odd number of runs and the end of an over change the strike, and a
+// new batter comes in on strike when one is out. Its cards are only written into the stats by commitInnings.
+function simInnings(c, batId, bowlId, rng, target = null, favour = null) {
+  const L = lineupOf(c, batId), B = lineupOf(c, bowlId);
+  // (a club whose bowlers have retired still bowls: its batters fill in, as part-timers)
+  const attack = B.attack.filter(Boolean);
+  const bowlers = attack.length ? attack : B.order.filter(Boolean).slice(0, 3).map(p => ({ ...p, bowlSkill: Math.min(p.bat, 55) - 10 }));
+  const plan = overPlan(bowlers, CFG.balls / 6);
+  let runs = 0, wkts = 0, balls = 0, boundaries = 0;
+  let strike = 0, other = 1, next = 2;
+  const last = L.order.length - 1;
+  const bat = new Map(), bowl = new Map();
+  const card = (m, id) => m.get(id) || (m.set(id, { runs: 0, balls: 0, fours: 0, sixes: 0, out: false, wkts: 0 }), m.get(id));
+  while (balls < CFG.balls && wkts < CFG.wickets && (target == null || runs < target)) {
+    const s = L.order[Math.min(strike, last)], bw = plan[Math.min(Math.floor(balls / 6), plan.length - 1)];
+    balls++;
+    const sc = card(bat, s.id), bc = card(bowl, bw.id);
+    sc.balls++; bc.balls++;
+    let d = (s.bat - bw.bowlSkill) / 100;
+    if (favour) d += (batId === favour ? 0.1 : 0) - (bowlId === favour ? 0.1 : 0);
+    if (s.ability === 'eagleEye') d += 0.05;
+    if (bw.ability === 'mystery' || bw.ability === 'swingMaster') d -= 0.04;
+    let x = 0;
+    if (rng.chance(Math.max(0.03, Math.min(0.16, 0.075 - 0.08 * d)))) { wkts++; sc.out = true; bc.wkts++; strike = next++; }
+    else {
+      const r = rng.next();
+      x = r < 0.32 - 0.2 * d ? 0 : r < 0.6 ? 1 : r < 0.73 ? 2 : r < 0.9 + 0.1 * d ? 4 : 6;
+      runs += x; sc.runs += x; bc.runs += x;
+      if (x === 4) { sc.fours++; boundaries++; }
+      if (x === 6) { sc.sixes++; boundaries++; }
+      if (x === 1) [strike, other] = [other, strike];
+    }
+    if (balls % 6 === 0) [strike, other] = [other, strike];   // (the end of an over: the other batter faces)
+  }
+  for (const p of L.order) if (p) card(bat, p.id); // the order all count as having played
+  return { runs, wkts, balls, boundaries, bat, bowl, L };
+}
+// write an innings into the players' stats, form and the records
+function commitInnings(c, { bat, bowl, L }) {
+  for (const [id, s] of bat) recordBat(c, id, s);
+  for (const [id, f] of bowl) recordBowl(c, id, f);
+  for (const p of [...L.order, ...L.attack]) if (p) formFrom(c, c.players[p.id], bat.get(p.id), bowl.get(p.id));
+}
+
+// ---------- stats that never go away ----------
+function bump(st, s) {
+  if (s.balls > 0 || s.out) { st.inns++; st.runs += s.runs; st.balls += s.balls; st.fours += s.fours; st.sixes += s.sixes; if (s.out) st.outs++; st.hs = Math.max(st.hs, s.runs); }
+}
+function bumpBowl(st, f) {
+  st.wkts += f.wkts; st.bballs += f.balls; st.bruns += f.runs;
+  if (!st.bb || f.wkts > st.bb.w || (f.wkts === st.bb.w && f.runs < st.bb.r)) st.bb = { w: f.wkts, r: f.runs };
+}
+// one appearance each, however many times he batted or bowled
+function played(c, ids) {
+  for (const id of new Set(ids)) { const p = c.players[id]; if (p) { p.stats.all.m++; p.stats.season.m++; } }
+}
+function recordBat(c, id, s) {
+  const p = c.players[id];
+  if (!p) return;
+  bump(p.stats.all, s); bump(p.stats.season, s);
+  if (s.runs >= 15) pushTop(c.records.hs, { pid: id, runs: s.runs, balls: s.balls, out: s.out, team: p.team, season: c.season }, (a, b) => b.runs - a.runs || a.balls - b.balls);
+}
+function recordBowl(c, id, f) {
+  const p = c.players[id];
+  if (!p || !f.balls) return;
+  bumpBowl(p.stats.all, f); bumpBowl(p.stats.season, f);
+  if (f.wkts >= 1) pushTop(c.records.bb, { pid: id, w: f.wkts, r: f.runs, balls: f.balls, team: p.team, season: c.season }, (a, b) => b.w - a.w || a.r - b.r);
+}
+function pushTop(list, item, cmp) { list.push(item); list.sort(cmp); list.length = Math.min(list.length, 10); }
+
+// ---------- growing ----------
+// Good games build form; every 4 points of form is a rating point, up to his potential,
+// and only until he turns 33.
+function formFrom(c, p, s, f) {
+  if (!p) return;
+  let pts = 0;
+  if (s) pts += s.runs >= 30 ? 2 : s.runs >= 15 ? 1 : 0;
+  if (f && f.balls) pts += (f.wkts >= 2 ? 2 : f.wkts >= 1 ? 1 : 0) + (f.balls >= 6 && f.runs / f.balls < 1 ? 1 : 0);
+  p.form = (p.form || 0) + pts;
+  while (p.form >= 4) { p.form -= 4; grow(c, p, 1); }
+}
+export function grow(c, p, n) {
+  if (p.age >= PEAK_AGE || n <= 0) return 0;
+  let g = 0;
+  for (const k of primary(p)) { const to = Math.min(p.pot, p[k] + n); g = Math.max(g, to - p[k]); p[k] = to; }
+  if (g) checkStar(c, p);
+  return g;
+}
+function checkStar(c, p) {
+  if (p.heroId || p.ability || ovr(p) < STAR_OVR) return;
+  const rng = makeRng(hashStr(p.id + 'star'));
+  const batter = p.role === 'bat' || p.role === 'wk' || (p.role === 'all' && p.bat >= p.bowlSkill);
+  p.ability = batter ? rng.pick(['eagleEye', 'finisher']) : bowlType(p.bowl).spin ? 'mystery' : rng.pick(['swingMaster', 'deathKing']);
+  c.news.push(`⭐ ${p.name} is now a STAR: ${ABILITIES[p.ability].name}!`);
+}
+
+// ---------- your matches ----------
+// Every player in both innings gets his runs and wickets; returns what changed for your club.
+export function recordPlayerMatch(c, summary) {
+  const before = new Map(clubPlayers(c, c.club).map(p => [p.id, ovr(p)]));
+  const newsAt = c.news.length;
+  const ids = [], perf = new Map();
+  for (const inn of summary.innings) {
+    const bat = new Map(), bowl = new Map();
+    for (const st of inn.battingCard()) if (st.id) bat.set(st.id, { runs: st.runs, balls: st.balls, fours: st.fours, sixes: st.sixes, out: st.out });
+    for (const f of inn.bowlingCard()) bowl.set(f.id, { balls: f.balls, runs: f.runs, wkts: f.wkts });
+    for (const [id, s] of bat) { recordBat(c, id, s); perf.set(id, { ...perf.get(id), bat: s }); }
+    for (const [id, f] of bowl) { recordBowl(c, id, f); perf.set(id, { ...perf.get(id), bowl: f }); }
+    for (const id of new Set([...bat.keys(), ...bowl.keys()])) formFrom(c, c.players[id], bat.get(id), bowl.get(id));
+    ids.push(...bat.keys(), ...bowl.keys());
+  }
+  played(c, ids);
+  chemAfterMatch(c, ids);
+  gearAfterMatch(c, ids);
+  // the medical centre: each of my players who played loses fitness by the stamina he used (he started the match on his fitness)
+  const used = new Map();
+  for (const inn of summary.innings) for (const [id, e] of Object.entries(inn.energy || {})) if (c.players[id]?.team === c.club) used.set(id, (used.get(id) || 0) + Math.max(0, fitnessOf(c, id) - e));
+  if (used.size) {
+    const m = (c.medical ||= freshMedical()), rng = makeRng(hashStr(`${c.seed}-knock-${c.season}-${m.matches}`));
+    const hurt = medAfterMatch(m, [...used].map(([id, drain]) => ({ id, start: fitnessOf(c, id), drain })), () => rng.next());
+    for (const id of hurt) c.news.push(`🩹 ${c.players[id].name} picked up a knock: his fitness will stay at 50 until he is treated`);
+  }
+  const sixes = [...perf].reduce((n, [id, x]) => n + (c.players[id]?.team === c.club ? (x.bat?.sixes || 0) : 0), 0);
+  const dealNotes = officeMatch(c, { won: summary.result.outcome === 'win', sixes });
+  for (const p of clubPlayers(c, c.club)) p.fame = fameAfter(fameOf(p), perf.get(p.id), summary.result.outcome === 'win');   // the fans' love, for the jerseys (js/merch.js)
+  if (summary.result.outcome === 'win') { const wb = round2(WIN_BONUS * (DIV_MONEY[divisionOf(c, c.club)] ?? 1)); c.money = round2(c.money + wb); book(c, 'in', 'wins', wb); }   // (the lower the division, the smaller the bonus: as with the prizes)
+  const ups = clubPlayers(c, c.club).filter(p => ovr(p) > (before.get(p.id) ?? 99)).map(p => `⬆ ${p.name} ${before.get(p.id)} → ${ovr(p)}`);
+  return [...ups, ...c.news.slice(newsAt), ...dealNotes];
+}
+// ---------- the club office: the books, the sponsors, the board ----------
+// The books: every $M that comes in or goes out of the club is written down by season (office.led[season] = { in: {...}, out: {...} }).
+export const INCOME = { prizes: 'Prizes & board bonus', wins: 'Win bonuses', tickets: 'Ticket money', sponsors: 'Sponsor deals', merch: 'Merchandise', transfers: 'Players sold' };
+export const OUTGOING = { players: 'Players & scouts', buildings: 'Buildings & staff' };
+// The office has ten levels (pacing.js). The level gives sponsor pay, the board's bonus (and how much it asks), and the places for staff; the
+// sponsor slots (shirt, ground, kit) open with the picture: 1, then 2 at level 5, then 3 at level 10.
+export const OFFICE = {
+  ROWS: [null, { pay: 1, ask: 0.6, reward: 1 }, { pay: 1.2, ask: 0.55, reward: 1.6 }, { pay: 1.5, ask: 0.5, reward: 2.5 }],   // the rows for level 1, 5 and 10 (levelRow fills in between): sponsor pay, the share of its rank the board asks, the board's bonus
+  SLOTS: ['shirt', 'ground', 'kit'], SLOT_PAY: { shirt: 1, ground: 0.6, kit: 0.4 },
+  WAGE: { accountant: 12, agent: 12 }, TRAIN: 20, STAFF_LVL_MAX: 3,      // $k a day for a level 1 officer (+25% a level); training him costs $k x his level
+  CAP: 10 * 3600000, CAP_UNVERIFIED: 3600000, QUIT: 72 * 3600000, DAY: 86400000,
+  EXTEND: 2, FEE: 0.3, CONTRACT_MAX: 5, FORECAST_LEVEL: 3,   // an agent adds two seasons to a contract for 30% of the player's value; five seasons at most; the Money tab forecasts from this level
+};
+export const OFFICERS = {
+  accountant: { name: 'Accountant', about: 'Haggles with the sponsors: every deal pays 10% more for each of his levels.' },
+  agent: { name: 'Agent', about: 'Talks players into longer contracts: one a season for each of his levels, for less money.' },
+};
+const OFFICER_NAMES = ['Mehta', 'Qureshi', 'Fernando', 'Iyer', 'Sheikh', 'Perera', 'Bose', 'Hussain', 'Naidu', 'Rahman'];
+export const office = c => {
+  const o = (c.office ||= { led: {}, deals: {}, pend: 0, objective: null, board: [], log: [], level: 1, staff: [], nextId: 1, last: null, owed: 0, unpaidMs: 0, ext: {} });
+  if (!o.deals) { o.deals = o.deal ? { shirt: { ...o.deal, slot: 'shirt' } } : {}; delete o.deal; }   // (a career from before the slots: its one deal is the shirt's)
+  o.level ||= 1; o.staff ||= []; o.nextId ||= 1; o.owed ||= 0; o.unpaidMs ||= 0; o.ext ||= {}; if (o.last === undefined) o.last = null;
+  return o;
+};
+export const officeRow = c => levelOfficeRow(office(c).level);
+const levelOfficeRow = level => levelRow(OFFICE.ROWS, level);
+export const officeSlots = c => lookOf(office(c).level);
+export const officePlaces = c => Math.min(2, lookOf(office(c).level));
+export const officerMax = c => Math.min(OFFICE.STAFF_LVL_MAX, lookOf(office(c).level) + 1);
+const officerSpeed = s => 1 + 0.25 * (s.lvl - 1);
+export const officerWage = s => OFFICE.WAGE[s.role] * officerSpeed(s);   // $k a day
+export const officeWagePerDay = c => office(c).staff.reduce((a, s) => a + officerWage(s), 0);
+// the officers work while their wages are paid
+const officer = (c, role) => { const o = office(c); return o.unpaidMs > 0 ? null : o.staff.find(s => s.role === role) || null; };
+export const accountantBonus = c => 0.1 * (officer(c, 'accountant')?.lvl || 0);
+export function book(c, dir, cat, amount) {
+  if (!amount || !c.club) return;
+  const l = (office(c).led[c.season] ||= { in: {}, out: {} });
+  l[dir][cat] = round3((l[dir][cat] || 0) + amount);
+}
+export const seasonBooks = (c, season = c.season) => office(c).led[season] || { in: {}, out: {} };
+export const totalOf = o => Object.values(o).reduce((a, b) => a + b, 0);
+
+// The sponsors: a deal lasts seven of your league matches. The better the division, the bigger the money. (Pennies are kept until they make $0.05M.)
+export const DEAL = { MATCHES: 7, SCALE: { asl: 1, d2: 0.6, d3: 0.4 } };
+export const SPONSORS = {
+  steady: { name: 'Harbour Bank', tag: 'Steady', about: 'Pays something every match, whatever happens', per: 0.05, bonus: 0, goal: null },
+  form: { name: 'Volt Drinks', tag: 'Form', about: 'A little each match and a big bonus if you win 4 of the 7', per: 0.02, bonus: 0.45, goal: { kind: 'wins', n: 4, text: 'Win 4 of the 7 matches' } },
+  power: { name: 'Meteor Energy', tag: 'Risky', about: 'Nothing at all unless you hit 9 sixes in the 7 matches', per: 0, bonus: 0.9, goal: { kind: 'sixes', n: 9, text: 'Hit 9 sixes in the 7 matches' } },
+};
+export const dealScale = c => DEAL.SCALE[divisionOf(c, c.club)] ?? 1;
+export const dealWorth = (c, id, slot = 'shirt') => { const S = SPONSORS[id], k = dealScale(c) * OFFICE.SLOT_PAY[slot] * officeRow(c).pay * (1 + accountantBonus(c)) * (1 + trophyBuffs(c).sponsor) * managerPay(c); return { per: S.per * k, bonus: S.bonus * k, top: (S.per * DEAL.MATCHES + S.bonus) * k }; };
+// a slot holds one deal; a sponsor is in one slot at a time
+export function signSponsor(c, id, slot = 'shirt') {
+  const o = office(c), at = OFFICE.SLOTS.indexOf(slot);
+  if (!SPONSORS[id] || at < 0 || at >= officeSlots(c) || o.deals[slot] || Object.values(o.deals).some(d => d.id === id)) return false;
+  o.deals[slot] = { id, slot, played: 0, wins: 0, sixes: 0, paid: 0 };
+  return true;
+}
+function payOut(c, amount, cat, deal) {
+  const o = office(c);
+  o.pend = round3((o.pend || 0) + amount);
+  const whole = Math.floor(o.pend * 20 + 1e-9) / 20;
+  if (whole > 0) { c.money = round2(c.money + whole); o.pend = round3(o.pend - whole); book(c, 'in', cat, whole); if (deal) deal.paid = round3(deal.paid + whole); }
+}
+// one of your league matches is over: the deals run on
+export function officeMatch(c, { won, sixes }) {
+  const o = office(c), notes = [];
+  for (const slot of OFFICE.SLOTS) {
+    const d = o.deals[slot];
+    if (!d) continue;
+    const S = SPONSORS[d.id], w = dealWorth(c, d.id, slot);
+    d.played++; if (won) d.wins++; d.sixes += sixes || 0;
+    payOut(c, w.per, 'sponsors', d);
+    if (d.played >= DEAL.MATCHES) {
+      const got = S.goal ? (S.goal.kind === 'wins' ? d.wins : d.sixes) >= S.goal.n : false;
+      if (S.goal && got) payOut(c, w.bonus, 'sponsors', d);
+      o.log = [...(o.log || []), { season: c.season, id: d.id, slot, got: !S.goal || got, paid: d.paid }].slice(-6);
+      notes.push(`📣 The ${S.name} deal is over: ${money(d.paid)} paid${S.goal ? (got ? ', and you earned the bonus!' : `, and the bonus was missed (${S.goal.kind === 'wins' ? d.wins + ' wins' : d.sixes + ' sixes'})`) : ''}`);
+      delete o.deals[slot];
+    }
+  }
+  return notes;
+}
+// The board: each season it sets a target for the table. Reach it and it pays a bonus.
+export function setObjective(c) {
+  if (!c.club || !c.league) return null;
+  const div = divisionOf(c, c.club), ids = c.divisions[div];
+  const rank = [...ids].sort((a, b) => clubRating(c, b) - clubRating(c, a)).indexOf(c.club) + 1;
+  const row = officeRow(c), target = Math.max(2, Math.ceil(rank * row.ask));
+  return (office(c).objective = { season: c.season, div, rank, target, reward: round2(0.5 * (DIV_MONEY[div] ?? 1) * row.reward) });
+}
+export const objectiveOf = c => { const o = office(c); if (!o.objective && c.league && c.phase === 'season') setObjective(c); return o.objective; };
+export function settleObjective(c, pos) {
+  const o = office(c), ob = o.objective;
+  if (!ob) return [];
+  const met = pos <= ob.target;
+  if (met) { c.money = round2(c.money + ob.reward); book(c, 'in', 'prizes', ob.reward); }
+  o.board = [...(o.board || []), { season: ob.season, div: ob.div, target: ob.target, pos, met, reward: ob.reward }].slice(-6);
+  o.objective = null;
+  return [met ? `🏛️ The board is pleased: you finished ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}, inside their target of ${ob.target}. A bonus of ${money(ob.reward)}.` : `🏛️ The board wanted a top ${ob.target} finish. You came ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}: no bonus this year.`];
+}
+// ---------- the clubhouse: chemistry, the rivalry board, supporter events ----------
+// Chemistry: two of your players who share a nation, or have played matches together, become linked; a link gives both a little extra rating in your matches
+// (never more than CLUB.ROWS cap: one point at level 1, two from level 3). The rivalry board shows your nemesis and your division's rival. Supporter events win
+// followers and buzz (Chirp) and take real hours; the clubhouse has places for one, two or three at a time (levels 1, 5, 10, like the picture).
+// c.clubhouse = { level, together: { 'a|b': games }, events: [{ kind, end }], cool: { kind: ms }, parade: season, log }. Money is in $M.
+export const CLUB = {
+  ROWS: [null, { cap: 1, boost: 1 }, { cap: 2, boost: 1.5 }, { cap: 2, boost: 2.5 }],   // the rows for level 1, 5 and 10 (levelRow fills in between): chemistry's most rating points, and how many more followers an event wins
+  NATION: 10, LINK: 10, STRONG: 25, GAMES_MAX: 40,   // a shared nation is worth 10 points; a link from 10 points, a strong one from 25; a match together is a point
+  HOUR: 3600000, COOL: 12 * 3600000,
+  EVENTS: {
+    fanday: { name: 'Fan day', about: 'Open the gates to your supporters for the day.', cost: 0.15, hours: 4, fans: 0.04, min: 150, buzz: 0.08 },
+    charity: { name: 'Charity match', about: 'A friendly with local legends for a good cause.', cost: 0.25, hours: 8, fans: 0.06, min: 250, buzz: 0.12 },
+    parade: { name: 'Victory parade', about: 'An open-top bus through town, after a title or a promotion.', cost: 0.4, hours: 6, fans: 0.1, min: 400, buzz: 0.25, needs: 'a title or a promotion' },
+  },
+};
+export const clubhouse = c => {
+  const h = (c.clubhouse ||= { level: 1, together: {}, events: [], cool: {}, parade: 0, log: [] });
+  h.level ||= 1; h.together ||= {}; h.events ||= []; h.cool ||= {}; h.log ||= [];
+  return h;
+};
+export const clubhouseRow = c => levelRow(CLUB.ROWS, clubhouse(c).level);
+export const eventSlots = c => lookOf(clubhouse(c).level);
+const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+// a match is over: the players of yours who took part have played together
+export function chemAfterMatch(c, ids) {
+  if (!c.club) return;
+  const h = clubhouse(c), mine = [...new Set(ids)].filter(id => c.players[id]?.team === c.club).sort();
+  for (let i = 0; i < mine.length; i++) for (let j = i + 1; j < mine.length; j++) { const k = `${mine[i]}|${mine[j]}`; h.together[k] = Math.min(CLUB.GAMES_MAX, (h.together[k] || 0) + 1); }
+  if (Object.keys(h.together).length > 600) for (const k of Object.keys(h.together)) { const [a, b] = k.split('|'); if (c.players[a]?.team !== c.club || c.players[b]?.team !== c.club) delete h.together[k]; }
+}
+export const linkPoints = (c, a, b) => (c.players[a].nation === c.players[b].nation ? CLUB.NATION : 0) + (clubhouse(c).together[pairKey(a, b)] || 0);
+export const linkKind = pts => (pts >= CLUB.STRONG ? 2 : pts >= CLUB.LINK ? 1 : 0);   // 0 none, 1 a link, 2 a strong link
+// the links in the squad, the strongest first
+export function chemLinks(c) {
+  const sq = clubPlayers(c, c.club), out = [];
+  for (let i = 0; i < sq.length; i++) for (let j = i + 1; j < sq.length; j++) {
+    const pts = linkPoints(c, sq[i].id, sq[j].id), kind = linkKind(pts);
+    if (kind) out.push({ a: sq[i].id, b: sq[j].id, pts, kind });
+  }
+  return out.sort((x, y) => y.pts - x.pts);
+}
+// the rating points each of your players gets from his links: half a point for a link, a whole one for a strong link, up to the clubhouse's most
+export function chemBonus(c) {
+  const sums = new Map(), cap = clubhouseRow(c).cap, out = new Map();
+  for (const l of chemLinks(c)) for (const id of [l.a, l.b]) sums.set(id, (sums.get(id) || 0) + (l.kind === 2 ? 1 : 0.5));
+  for (const [id, v] of sums) { const b = Math.min(cap, Math.floor(v)); if (b > 0) out.set(id, b); }
+  return out;
+}
+// the match's copies of your players, with the bonus in their batting and bowling
+export function chemPool(c, pool) {
+  const bonus = chemBonus(c);
+  return pool.map(p => { const b = bonus.get(p.id); return b ? { ...p, bat: Math.min(99, p.bat + b), bowlSkill: p.bowl ? Math.min(99, p.bowlSkill + b) : p.bowlSkill } : p; });
+}
+// the rivalry board: your nemesis and your division's rival, with the record between you and the last thing each said
+export function rivalBoard(c) {
+  if (!c.rivals) return [];
+  const ids = [[nemesisOf(c), 'nemesis'], [c.rivals.div, 'division']].filter(([id], i, a) => id && id !== c.club && a.findIndex(x => x[0] === id) === i);
+  return ids.map(([id, kind]) => ({ id, kind, who: speakerOf(c, id), ...meetings(c, id), said: c.rivals.inbox.find(m => m.from === id)?.text || null }));
+}
+// supporter events
+export const eventCost = (c, kind) => Math.max(0.05, Math.round(CLUB.EVENTS[kind].cost * dealScale(c) * 20) / 20);
+export function paradeDue(c) {
+  const last = c.history?.at(-1);
+  return !!last && (last.pos === 1 || !!last.promoted) && clubhouse(c).parade !== last.season;
+}
+// ctx: { now, trusted }
+export function whyNoEvent(c, kind, ctx) {
+  const E = CLUB.EVENTS[kind], h = clubhouse(c);
+  if (!E) return 'No such event';
+  if (h.events.some(e => e.kind === kind)) return 'Already on';
+  if (h.events.length >= eventSlots(c)) return 'All your places are busy';
+  if ((h.cool[kind] || 0) > ctx.now) return 'Wait a little before the next one';
+  if (kind === 'parade' && !paradeDue(c)) return `Needs ${E.needs}`;
+  if (!ctx.trusted) return 'The clubhouse needs the server clock: try again when you are online';
+  if (c.money + 1e-9 < eventCost(c, kind)) return 'Not enough money in the club';
+  return null;
+}
+export function startEvent(c, kind, ctx) {
+  const why = whyNoEvent(c, kind, ctx), h = clubhouse(c), E = CLUB.EVENTS[kind];
+  if (why) return { ok: false, why };
+  const cost = eventCost(c, kind), end = ctx.now + E.hours * CLUB.HOUR;
+  c.money = round2(c.money - cost); book(c, 'out', 'buildings', cost);
+  h.events.push({ kind, end }); h.cool[kind] = end + CLUB.COOL;
+  if (kind === 'parade') h.parade = c.history.at(-1).season;
+  return { ok: true, cost };
+}
+// events that have finished (only on a time the server confirmed): the supporters come out
+export function settleEvents(c, ctx) {
+  const h = clubhouse(c), done = [];
+  if (!ctx.trusted) return done;
+  for (const e of [...h.events].sort((x, y) => x.end - y.end)) {
+    if (e.end > ctx.now) continue;
+    const E = CLUB.EVENTS[e.kind], P = ensureChirp(c), boost = clubhouseRow(c).boost;
+    const gain = Math.round(Math.max(E.min, P.fans * E.fans) * boost);
+    P.fans += gain; P.buzz = Math.min(1, P.buzz + E.buzz);
+    h.events = h.events.filter(x => x !== e);
+    h.log = [...h.log, { kind: e.kind, season: c.season, gain }].slice(-6);
+    postMilestone(c, `${teamById(c.club).name} ${e.kind === 'parade' ? 'take the trophy through the streets' : e.kind === 'charity' ? 'play a charity match' : 'open the gates for a fan day'}: ${compact(gain)} new followers.`);
+    done.push({ kind: e.kind, gain });
+  }
+  return done;
+}
+// ---------- the apartment: the trophy cabinet, the manager's reputation and salary, the story, the decor ----------
+// Your own place. Everything here is worked out from the club's history (so a career from before the apartment finds it already full): the trophies are
+// the titles and promotions, each KIND giving one small permanent bonus the first time (popularity and money, never rating); the manager's points come
+// from every season played, titles and promotions, and from the decor; the salary is paid each season and spent on decor. The level (builder, pacing.js)
+// gives places for decor and a bigger salary. The manager's level raises sponsor pay and lets you sign better players (the reputation cap, repCap).
+// c.apartment = { level, decor: { id: true }, spent, life: { played, won } }. Money is in $M.
+export const APT = {
+  ROWS: [null, { slots: 3, pay: 1 }, { slots: 6, pay: 1.25 }, { slots: 9, pay: 1.5 }],   // the rows for level 1, 5 and 10 (levelRow fills in between): places for decor, and the salary
+  MR_AT: [0, 0, 40, 120, 260, 450, 700, 1000, 1400, 1900, 2500],   // the points that make manager level n (index n)
+  FACTOR: { d3: 1, d2: 1.5, asl: 2.5 }, SEASON: 10, TITLE: 60, PROMOTED: 40,   // points for a season played, for a title (times the division's factor) and for a promotion
+  SPONSOR_PER_LEVEL: 0.02,
+  DECOR: {
+    lamp: { name: 'Reading lamp', cost: 0.1, mp: 10 }, plant: { name: 'Big plant', cost: 0.1, mp: 10 }, sofa: { name: 'Leather sofa', cost: 0.15, mp: 15 },
+    rug: { name: 'Team rug', cost: 0.25, mp: 20 }, poster: { name: 'Framed poster', cost: 0.2, mp: 20 }, coffee: { name: 'Coffee machine', cost: 0.5, mp: 40 },
+    shelf: { name: 'Bookcase', cost: 0.4, mp: 40 }, tv: { name: 'Big TV', cost: 0.8, mp: 60 }, statue: { name: 'Golden statue', cost: 2.5, mp: 160 },
+  },
+  TROPHIES: {
+    'promo-d2': { name: 'Promotion to Division 2', buff: { sponsor: 0.02 }, text: '+2% sponsor pay' },
+    'promo-asl': { name: 'Promotion to the Super League', buff: { sponsor: 0.03 }, text: '+3% sponsor pay' },
+    'title-d3': { name: 'Division 3 champions', buff: { fans: 0.02 }, text: '+2% follower growth' },
+    'title-d2': { name: 'Division 2 champions', buff: { fans: 0.03, tickets: 0.03 }, text: '+3% followers, +3% gate money' },
+    'title-asl': { name: 'Super League champions', buff: { fans: 0.05, tickets: 0.05, merch: 0.05 }, text: '+5% followers, gate money and jersey demand' },
+  },
+};
+export const apartment = c => {
+  const a = (c.apartment ||= { level: 1, decor: {}, spent: 0, life: { played: 0, won: 0 } });
+  a.level ||= 1; a.decor ||= {}; a.spent ||= 0; a.life ||= { played: 0, won: 0 };
+  return a;
+};
+export const aptRow = c => levelRow(APT.ROWS, apartment(c).level);
+export const decorSlots = c => aptRow(c).slots;
+// the cabinet: each kind of trophy with how many times you won it and when last
+export function trophiesOf(c) {
+  const out = {};
+  for (const h of c.history || []) {
+    const kinds = [];
+    if (h.pos === 1) kinds.push(`title-${h.div}`);
+    if (h.promoted && APT.TROPHIES[`promo-${h.promoted}`]) kinds.push(`promo-${h.promoted}`);
+    for (const k of kinds) if (APT.TROPHIES[k]) { const t = (out[k] ||= { id: k, count: 0, last: 0 }); t.count++; t.last = h.season; }
+  }
+  return Object.values(out);
+}
+// the permanent bonuses: one for each kind of trophy won (a second title of a kind adds nothing)
+export function trophyBuffs(c) {
+  const b = { sponsor: 0, fans: 0, tickets: 0, merch: 0 };
+  for (const t of trophiesOf(c)) for (const [k, v] of Object.entries(APT.TROPHIES[t.id].buff)) b[k] += v;
+  return b;
+}
+export const decorPoints = c => Object.keys(apartment(c).decor).reduce((n, id) => n + (APT.DECOR[id]?.mp || 0), 0);
+export const mgrPoints = c => (c.history || []).reduce((n, h) => n + APT.SEASON + (h.pos === 1 ? APT.TITLE * (APT.FACTOR[h.div] || 1) : 0) + (h.promoted ? APT.PROMOTED : 0), 0) + decorPoints(c);
+export const mgrLevel = c => { const pts = mgrPoints(c); let n = 1; while (n < 10 && pts >= APT.MR_AT[n + 1]) n++; return n; };
+export const mgrShare = c => { const n = mgrLevel(c), pts = mgrPoints(c); return n >= 10 ? 1 : (pts - APT.MR_AT[n]) / (APT.MR_AT[n + 1] - APT.MR_AT[n]); };
+export const managerPay = c => 1 + APT.SPONSOR_PER_LEVEL * (mgrLevel(c) - 1);   // sponsors pay more to a manager with a name
+export const repBonus = c => Math.floor(mgrLevel(c) / 2);                           // ... and better players sign for him
+// the salary: paid at the end of every season (more in a better division, and for a title or a promotion), spent on decor
+export const salaryEarned = c => Math.round((c.history || []).reduce((n, h) => n + 0.3 * (DIV_MONEY[h.div] ?? 1) * (1 + (h.pos === 1 ? 1 : 0) + (h.promoted ? 0.5 : 0)), 0) * aptRow(c).pay * 100) / 100;
+export const salaryCash = c => Math.max(0, round2(salaryEarned(c) - apartment(c).spent));
+export function buyDecor(c, id) {
+  const a = apartment(c), D = APT.DECOR[id];
+  if (!D) return { ok: false, why: 'No such item' };
+  if (a.decor[id]) return { ok: false, why: 'You have it already' };
+  if (Object.keys(a.decor).length >= decorSlots(c)) return { ok: false, why: 'The apartment is full: build it bigger for more places' };
+  if (salaryCash(c) + 1e-9 < D.cost) return { ok: false, why: 'Not enough salary saved' };
+  a.spent = round2(a.spent + D.cost); a.decor[id] = true;
+  return { ok: true };
+}
+// a league match of yours is over (the lifetime record starts when the apartment does)
+export function aptMatch(c, won) { const l = apartment(c).life; l.played++; if (won) l.won++; }
+// the story so far, season by season (newest first)
+export function storyLog(c) {
+  return [...(c.history || [])].reverse().slice(0, 6).map(h => {
+    const nth = n => `${n}${['st', 'nd', 'rd'][n - 1] || 'th'}`;
+    return { season: h.season, text: `${h.pos === 1 ? '🏆 Champions' : `Finished ${nth(h.pos)}`} in ${divisionName(h.div)}${h.promoted ? ' · promoted' : h.relegated ? ' · relegated' : ''}`, title: h.pos === 1, promoted: !!h.promoted };
+  });
+}
+
+// ---------- the club shop: gear for your players (club cash), looks for the ground and the ball (diamonds), a few deals each day ----------
+// Gear gives one player a little rating (a bat for the batting, grips for the bowling, shoes for both); it wears out after SHOP.USES of your matches the
+// player took part in. A player carries one thing; the armoury holds so many (the shop's level). Three of the nine are on offer each day (the server's UTC
+// day), cheaper the bigger the shop. Looks (the colour of the lights when a six is hit at home, the ball's trail) are bought with diamonds and cost nothing in strength.
+// c.shop = { level, gear: [{ id, item, uses, on }], nextId, owned: { lights: {}, trail: {} }, look: { lights, trail }, deals: { day, ids, taken } }. Money is in $M.
+export const SHOP = {
+  ROWS: [null, { slots: 3, off: 0.2 }, { slots: 6, off: 0.3 }, { slots: 9, off: 0.4 }],   // the rows for level 1, 5 and 10 (levelRow fills in between): places in the armoury, and the deals' discount
+  USES: 20, DEALS: 3, DAY: 86400000,
+  GEAR: {
+    blaster: { name: 'Willow Blaster', kind: 'bat', bat: 2, cost: 0.5 }, edge: { name: 'Gold Edge Bat', kind: 'bat', bat: 3, cost: 1.5 }, thunder: { name: 'Thunder Willow', kind: 'bat', bat: 4, cost: 4 },
+    grips: { name: 'Seam Grips', kind: 'grip', bowl: 2, cost: 0.5 }, wrap: { name: 'Swing Wrap', kind: 'grip', bowl: 3, cost: 1.5 }, rocket: { name: 'Rocket Bands', kind: 'grip', bowl: 4, cost: 4 },
+    sprint: { name: 'Sprint Spikes', kind: 'shoes', bat: 1, bowl: 1, cost: 0.5 }, pro: { name: 'Pro Spikes', kind: 'shoes', bat: 1, bowl: 1, cost: 1.5 }, elite: { name: 'Elite Spikes', kind: 'shoes', bat: 2, bowl: 2, cost: 4 },
+  },
+  LOOKS: {
+    lights: { gold: { name: 'Gold lights', colour: '#ffd23f', cost: 40 }, neon: { name: 'Neon lights', colour: '#ff4ad8', cost: 40 }, sky: { name: 'Sky lights', colour: '#3ec6ff', cost: 40 }, lime: { name: 'Lime lights', colour: '#8cff4a', cost: 40 } },
+    trail: { comet: { name: 'Comet trail', colour: '#ffd23f', cost: 40 }, frost: { name: 'Frost trail', colour: '#9be8ff', cost: 40 }, flame: { name: 'Flame trail', colour: '#ff6a2b', cost: 40 }, toxic: { name: 'Toxic trail', colour: '#8cff4a', cost: 40 } },
+  },
+  PACKS: [{ diamonds: 100, price: '$0.99' }, { diamonds: 550, price: '$4.99' }, { diamonds: 1200, price: '$9.99' }],   // (shown only: paying needs the server)
+};
+export const shopOf = c => {
+  const h = (c.shop ||= { level: 1, gear: [], nextId: 1, owned: { lights: {}, trail: {} }, look: { lights: null, trail: null }, deals: { day: -1, ids: [], taken: {} } });
+  h.level ||= 1; h.gear ||= []; h.nextId ||= 1; h.owned ||= { lights: {}, trail: {} }; h.look ||= { lights: null, trail: null }; h.deals ||= { day: -1, ids: [], taken: {} };
+  return h;
+};
+export const shopRow = c => levelRow(SHOP.ROWS, shopOf(c).level);
+export const armourySlots = c => shopRow(c).slots;
+const no2 = why => ({ ok: false, why });
+// today's deals (the same for the whole day, from the club's seed)
+export function dealsToday(c, now) {
+  const h = shopOf(c), day = Math.floor(now / SHOP.DAY);
+  if (h.deals.day !== day) {
+    const rng = makeRng(hashStr(`${c.seed}-deals-${day}`)), pool = Object.keys(SHOP.GEAR), ids = [];
+    while (ids.length < SHOP.DEALS) { const id = rng.pick(pool); if (!ids.includes(id)) ids.push(id); }
+    h.deals = { day, ids, taken: {} };
+  }
+  return h.deals;
+}
+export const gearPrice = (c, id, onDeal = false) => Math.round(SHOP.GEAR[id].cost * (onDeal ? 1 - shopRow(c).off : 1) * 100) / 100;
+// ctx: { now, trusted }; a deal is only for a confirmed time
+export function buyGear(c, id, ctx) {
+  const h = shopOf(c), G = SHOP.GEAR[id];
+  if (!G) return no2('No such item');
+  if (h.gear.length >= armourySlots(c)) return no2('The armoury is full: let something go, or build the shop bigger');
+  const d = ctx.trusted ? dealsToday(c, ctx.now) : null, onDeal = !!d && d.ids.includes(id) && !d.taken[id], price = gearPrice(c, id, onDeal);
+  if (c.money + 1e-9 < price) return no2('Not enough money in the club');
+  c.money = round2(c.money - price); book(c, 'out', 'buildings', price);
+  if (onDeal) d.taken[id] = true;
+  h.gear.push({ id: `g${h.nextId++}`, item: id, uses: SHOP.USES, on: null });
+  return { ok: true, price, onDeal };
+}
+// a player carries one item: what he had goes back in the armoury
+export function equipGear(c, gid, pid) {
+  const h = shopOf(c), g = h.gear.find(x => x.id === gid), p = c.players[pid];
+  if (!g) return no2('Not in the armoury');
+  if (!p || p.team !== c.club) return no2('He is not in your squad');
+  const kind = SHOP.GEAR[g.item].kind;
+  if (kind === 'grip' && !p.bowl) return no2('He does not bowl');
+  for (const x of h.gear) if (x.on === pid) x.on = null;
+  g.on = pid;
+  return { ok: true };
+}
+export function unequipGear(c, gid) { const g = shopOf(c).gear.find(x => x.id === gid); if (!g) return no2('Not in the armoury'); g.on = null; return { ok: true }; }
+export function discardGear(c, gid) { const h = shopOf(c), i = h.gear.findIndex(x => x.id === gid); if (i < 0) return no2('Not in the armoury'); h.gear.splice(i, 1); return { ok: true }; }
+// a match is over: what the players who took part carried wears down; at nothing it is gone
+export function gearAfterMatch(c, ids) {
+  if (!c.club || !c.shop) return;
+  const took = new Set(ids);
+  for (const g of c.shop.gear) if (g.on && took.has(g.on) && c.players[g.on]?.team === c.club) g.uses--;
+  c.shop.gear = c.shop.gear.filter(g => g.uses > 0);
+}
+// the rating points each of your players gets from what he carries: { bat, bowl }
+export function gearBonus(c) {
+  const out = new Map();
+  for (const g of c.shop?.gear || []) {
+    const p = g.on && c.players[g.on], G = SHOP.GEAR[g.item];
+    if (!p || p.team !== c.club || g.uses <= 0) continue;
+    const b = out.get(g.on) || { bat: 0, bowl: 0 };
+    b.bat += G.bat || 0; b.bowl += G.bowl || 0; out.set(g.on, b);
+  }
+  return out;
+}
+// the match's copies of your players, with chemistry and gear
+export function matchPool(c, pool) {
+  const gear = gearBonus(c);
+  return chemPool(c, pool).map(p => { const b = gear.get(p.id); return b ? { ...p, bat: Math.min(99, p.bat + b.bat), bowlSkill: p.bowl ? Math.min(99, p.bowlSkill + b.bowl) : p.bowlSkill } : p; });
+}
+// looks, in diamonds
+export function buyLook(c, kind, id) {
+  const L = SHOP.LOOKS[kind]?.[id], h = shopOf(c);
+  if (!L) return no2('No such look');
+  if (h.owned[kind][id]) return no2('You have it already');
+  if (buildOf(c).diamonds < L.cost) return no2(`Not enough diamonds: ${L.cost} needed`);
+  addDiamonds(c, -L.cost); h.owned[kind][id] = true; h.look[kind] = id;
+  return { ok: true };
+}
+export function setLook(c, kind, id) {
+  const h = shopOf(c);
+  if (id && !h.owned[kind]?.[id]) return no2('You do not have it');
+  h.look[kind] = id || null; return { ok: true };
+}
+export const lookColour = (c, kind) => { const id = c.shop?.look?.[kind]; return (id && SHOP.LOOKS[kind][id]?.colour) || null; };
+// who is on a short contract (seasons left; the soonest to go first)
+export const contractList = c => clubPlayers(c, c.club).filter(p => p.contract < 50).sort((a, b) => a.contract - b.contract || ovr(b) - ovr(a));
+// ---------- the people you can hire (their painted portraits, tools/ui/staff): a name that fits the face, an age, a country, a few words, and a rating (1 to 3 stars) ----------
+// The rating is the level he starts at (so he is paid and works as a trained man): a 1-star hand is there from the start, a 2-star from building level 5, a 3-star from level 10.
+// Whoever is hired from here keeps his id (staff.cand) and his portrait; staff hired before this (a name from a list, no cand) are left as they were.
+export const HIRE_AT = { 1: 1, 2: 5, 3: 10 };
+export const FLAGS = { IN: ['India', '🇮🇳'], PK: ['Pakistan', '🇵🇰'], LK: ['Sri Lanka', '🇱🇰'], BD: ['Bangladesh', '🇧🇩'], AU: ['Australia', '🇦🇺'], NZ: ['New Zealand', '🇳🇿'], ZA: ['South Africa', '🇿🇦'], GB: ['England', '🇬🇧'], JM: ['Jamaica', '🇯🇲'] };
+export const CANDIDATES = [
+  // the factory (kind 'merch'): designers, printers, packers
+  { id: 'f3', kind: 'merch', role: 'designer', name: 'Tariq Anwar', sex: 'm', age: 27, c: 'PK', rating: 1, about: 'Sketches a new kit between matches. Quick, and easy on the wages.' },
+  { id: 'f2', kind: 'merch', role: 'designer', name: 'Meera Iyer', sex: 'f', age: 31, c: 'IN', rating: 2, about: 'Plans every jersey on paper first. The fans love her colours.' },
+  { id: 'f4', kind: 'merch', role: 'printer', name: 'Sana Farooq', sex: 'f', age: 26, c: 'PK', rating: 1, about: 'Fast with the heat press, and has never spoiled a jersey on purpose.' },
+  { id: 'f5', kind: 'merch', role: 'printer', name: 'Dilan Perera', sex: 'm', age: 38, c: 'LK', rating: 2, about: 'Runs the sewing line. Steady hands and an eye for detail.' },
+  { id: 'f6', kind: 'merch', role: 'packer', name: 'Omar Siddiqui', sex: 'm', age: 29, c: 'BD', rating: 1, about: 'Packs fast, wastes nothing, and carries twice what he should.' },
+  { id: 'f1', kind: 'merch', role: 'packer', name: 'Ravi Kulkarni', sex: 'm', age: 54, c: 'IN', rating: 3, about: 'Thirty years on the factory floor. Nothing leaves until he has checked it twice.' },
+  // the training ground (kind 'training'): role is the coach's kind
+  { id: 'c4', kind: 'training', role: 'bat', name: 'Anjali Deshmukh', sex: 'f', age: 33, c: 'IN', rating: 1, about: 'A former opener. Drills the basics until they are habit.' },
+  { id: 'c1', kind: 'training', role: 'bat', name: 'Imtiaz Qureshi', sex: 'm', age: 56, c: 'PK', rating: 3, about: 'Two decades of county cricket. Strict, patient, and always right about your front foot.' },
+  { id: 'c2', kind: 'training', role: 'pace', name: 'Brett Hollis', sex: 'm', age: 40, c: 'AU', rating: 1, about: 'Teaches rhythm before raw speed. His bowlers stay fit.' },
+  { id: 'c5', kind: 'training', role: 'pace', name: 'Kemar Brown', sex: 'm', age: 45, c: 'JM', rating: 2, about: 'Ran in hard for his island for years. Now he teaches others to.' },
+  { id: 'c3', kind: 'training', role: 'spin', name: 'Nuwan Jayasuriya', sex: 'm', age: 43, c: 'LK', rating: 1, about: 'Grew up on dry pitches. Makes the ball talk.' },
+  { id: 'c6', kind: 'training', role: 'spin', name: 'Callum Ward', sex: 'm', age: 39, c: 'GB', rating: 2, about: 'A tactician with a board and a plan for every batter.' },
+  // the medical centre (kind 'medical'): physios
+  { id: 'm3', kind: 'medical', role: 'physio', name: 'Marcus Doyle', sex: 'm', age: 30, c: 'AU', rating: 1, about: 'First on the pitch when someone goes down. Calm under pressure.' },
+  { id: 'm4', kind: 'medical', role: 'physio', name: 'Aisha Khan', sex: 'f', age: 28, c: 'PK', rating: 1, about: 'Quick hands and a quicker diagnosis. Sends nobody out half-fit.' },
+  { id: 'm7', kind: 'medical', role: 'physio', name: 'Emma Walsh', sex: 'f', age: 29, c: 'NZ', rating: 1, about: 'Keeps recovering players in good spirits, and in the beds on time.' },
+  { id: 'm2', kind: 'medical', role: 'physio', name: 'Dr Priya Sharma', sex: 'f', age: 34, c: 'IN', rating: 2, about: 'Careful and thorough. Never sends a player back too soon.' },
+  { id: 'm5', kind: 'medical', role: 'physio', name: 'Devon Campbell', sex: 'm', age: 41, c: 'JM', rating: 2, about: 'Recovery and massage. Players swear by his sessions.' },
+  { id: 'm6', kind: 'medical', role: 'physio', name: 'Dr Lucas Meyer', sex: 'm', age: 37, c: 'ZA', rating: 2, about: 'Reads the numbers. Spots a strain before the player feels it.' },
+  { id: 'm1', kind: 'medical', role: 'physio', name: 'Dr Rajesh Nair', sex: 'm', age: 58, c: 'IN', rating: 3, about: 'Thirty years in sports medicine. Has patched up three captains and a mascot.' },
+  // the club office (kind 'office'): accountants and agents
+  { id: 'o4', kind: 'office', role: 'accountant', name: 'Neha Kapoor', sex: 'f', age: 32, c: 'IN', rating: 1, about: 'Keeps the books tidy and the sponsors happy.' },
+  { id: 'o3', kind: 'office', role: 'accountant', name: 'Rohan Mehta', sex: 'm', age: 35, c: 'IN', rating: 1, about: 'Counts every cent twice and is never late with the figures.' },
+  { id: 'o1', kind: 'office', role: 'accountant', name: 'Farah Malik', sex: 'f', age: 41, c: 'PK', rating: 2, about: 'Reads a balance sheet like a scoreboard.' },
+  { id: 'agent', kind: 'office', role: 'agent', name: 'Vikram Khanna', sex: 'm', age: 47, c: 'IN', rating: 1, about: 'Knows every club\'s price. A smooth talker and a harder negotiator.' },
+  { id: 'o2', kind: 'office', role: 'agent', name: 'Anwar Chaudhry', sex: 'm', age: 55, c: 'PK', rating: 3, about: 'Thirty years of contracts. One phone call and the deal is done.' },
+];
+export const candidatesOf = kind => CANDIDATES.filter(x => x.kind === kind);
+export const candidateById = id => CANDIDATES.find(x => x.id === id) || null;
+export const wageText = (base, rating) => base * (1 + 0.25 * (rating - 1));   // $k a day: the base wage, +25% for each star above the first
+
+// ---------- the officers: wages by the day from the club's money (time is the server's, as for the other buildings) ----------
+const onok = { ok: true }, onno = why => ({ ok: false, why });
+// ctx: { now, trusted }; the away time counts for ten hours at most (an hour if the time was not checked with the server)
+export function officeTick(c, ctx) {
+  const o = office(c);
+  if (o.last == null) { o.last = ctx.now; return { ms: 0 }; }
+  const dt = ctx.now - o.last;
+  if (dt < 0) return { skipped: 'clock' };
+  o.last = ctx.now;
+  if (!o.staff.length) { o.owed = 0; o.unpaidMs = 0; return { ms: 0 }; }
+  const run = Math.min(dt, ctx.trusted ? OFFICE.CAP : OFFICE.CAP_UNVERIFIED);
+  o.owed = round3(o.owed + officeWagePerDay(c) / 1000 * run / OFFICE.DAY);
+  const whole = Math.floor(o.owed * 20 + 1e-9) / 20;
+  if (whole > 0 && c.money + 1e-9 >= whole) { c.money = round2(c.money - whole); o.owed = round3(o.owed - whole); book(c, 'out', 'buildings', whole); }
+  o.unpaidMs = o.owed >= 0.05 - 1e-9 ? o.unpaidMs + run : 0;   // (a bill of $0.05M or more that the club could not pay)
+  const left = [];
+  while (o.unpaidMs >= OFFICE.QUIT && o.staff.length) { const g = o.staff.pop(); o.unpaidMs -= OFFICE.DAY; left.push(g.name); o.log = [...(o.log || []), { season: c.season, quit: g.name }].slice(-6); }
+  return { ms: run, left };
+}
+export function hireOfficer(c, role, cand = null) {
+  const o = office(c);
+  if (!OFFICERS[role]) return onno('No such officer');
+  if (o.staff.some(s => s.role === role)) return onno('You have one already');
+  if (o.staff.length >= officePlaces(c)) return onno(`The office has room for ${officePlaces(c)}: build it bigger for more`);
+  if (cand && (cand.kind !== 'office' || cand.role !== role)) return onno('He does not do that job');
+  if (cand && o.staff.some(s => s.cand === cand.id)) return onno('He is hired already');
+  if (cand && o.level < HIRE_AT[cand.rating]) return onno(`He joins when the office is level ${HIRE_AT[cand.rating]}`);
+  const id = o.nextId++;
+  o.staff.push(cand ? { id, role, lvl: cand.rating, name: cand.name, cand: cand.id } : { id, role, lvl: 1, name: `${role === 'agent' ? 'Ms' : 'Mr'} ${OFFICER_NAMES[(id * 3 + role.length) % OFFICER_NAMES.length]}` });
+  return onok;
+}
+export function fireOfficer(c, id) { const o = office(c), i = o.staff.findIndex(s => s.id === id); if (i < 0) return onno('Not on the staff'); o.staff.splice(i, 1); return onok; }
+export const officerTrainCost = s => round2(OFFICE.TRAIN * s.lvl / 1000);
+export const staffOf = c => office(c).staff;
+export function trainOfficer(c, id) {
+  const s = office(c).staff.find(x => x.id === id);
+  if (!s) return onno('Not on the staff');
+  if (s.lvl >= officerMax(c)) return onno(s.lvl >= OFFICE.STAFF_LVL_MAX ? 'Already the best' : 'Build the office bigger to train further');
+  const cost = officerTrainCost(s);
+  if (c.money < cost) return onno('Not enough money');
+  c.money = round2(c.money - cost); book(c, 'out', 'buildings', cost); s.lvl++;
+  return onok;
+}
+// the agent: a player in his last season can be kept for two more
+export const extensionsLeft = c => { const a = officer(c, 'agent'); return a ? Math.max(0, a.lvl - (office(c).ext[c.season] || 0)) : 0; };
+export const extendFee = (c, p) => { const a = office(c).staff.find(s => s.role === 'agent'); return Math.max(0.1, round2(value(p) * OFFICE.FEE * (1 - 0.1 * ((a?.lvl || 1) - 1)))); };
+export function extendContract(c, pid) {
+  const p = c.players[pid], o = office(c);
+  if (!p || p.team !== c.club) return onno('He is not in your squad');
+  if (p.contract > 1 || p.contract >= 50) return onno('Only a player in his last season can be extended');
+  if (!officer(c, 'agent')) return onno(o.staff.some(s => s.role === 'agent') ? 'The agent has not been paid' : 'You need an agent');
+  if (extensionsLeft(c) < 1) return onno('The agent has done all he can this season');
+  const fee = extendFee(c, p);
+  if (c.money < fee) return onno('Not enough money');
+  c.money = round2(c.money - fee); book(c, 'out', 'players', fee);
+  p.contract = Math.min(OFFICE.CONTRACT_MAX, p.contract + OFFICE.EXTEND); o.ext[c.season] = (o.ext[c.season] || 0) + 1;
+  return { ok: true, fee };
+}
+// what the season looks like at this rate (from the Money tab's level): the net so far, spread over the matches of the season
+export function forecast(c) {
+  if (office(c).level < OFFICE.FORECAST_LEVEL || !c.league || c.league.stage !== 'group') return null;
+  const per = c.league.rounds?.length || 14, played = c.league.round || 0;
+  if (played < 1) return null;
+  const b = seasonBooks(c), net = totalOf(b.in) - totalOf(b.out);
+  return { net: round2(net * per / played), played, per };
+}
+
+// ---------- the youth academy (js/academy.js): prospects raised over several seasons ----------
+const REGION_ROLES = {
+  africa: [['bat', 'Raw batting talent'], ['bowl', 'Raw pace talent'], ['all', 'Raw all-round talent']],
+  europe: [['bowl', 'Accurate seam prospect'], ['bowl', 'Swing prospect'], ['bat', 'Correct young batter']],
+  namerica: [['bat', 'Power-hitting prospect'], ['bat', 'Six-hitting kid'], ['all', 'Big-hitting all-rounder']],
+  samerica: [['bat', 'Unorthodox young batter'], ['bowl', 'Mystery spin prospect'], ['all', 'Maverick all-rounder']],
+  oceania: [['bowl', 'Tearaway quick prospect'], ['bowl', 'Left-arm quick prospect'], ['all', 'Athletic all-rounder']],
+};
+// a scout comes home: a 15 to 17-year-old nobody has heard of (his ceiling is hidden until a trial drill)
+export function makeProspect(c, trip) {
+  const rng = makeRng(hashStr(`${c.seed}-acad-${trip.id}-${trip.region}-${c.season}`));
+  const R = SCOUT_REGIONS[trip.region] || SCOUT_REGIONS.africa;
+  const used = new Set(Object.values(c.players).map(p => p.name));
+  let name, nation;
+  do { nation = rng.pick(R.nations); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+  const [role, label] = rng.pick(REGION_ROLES[trip.region] || REGION_ROLES.africa);
+  const tier = pickTier(trip.hours, rng.next()), [lo, hi] = POT_RANGE[tier], pot = rng.int(lo, hi);
+  const spin = trip.region === 'samerica' && role !== 'bat';
+  const bowl = role === 'bat' ? null : spin ? rng.pick(['offspin', 'legspin']) : trip.region === 'oceania' ? rng.pick(['express', 'leftpace']) : rng.pick(['express', 'swing', 'seam', 'leftpace']);
+  const base = rng.int(25, 40);
+  const bat = role === 'bowl' ? rng.int(8, 20) : role === 'all' ? base - 4 : base;
+  const bowlSkill = bowl ? (role === 'all' ? base - 4 : base) : 0;
+  const id = `a${c.season}-${trip.id}`;
+  const w = rng.int(0, WEAK.length - 1);
+  const p = newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), role, label, bat, bowl, bowlSkill,
+    trait: `Academy prospect from ${R.name}`, hero: false,
+    ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
+  { age: rng.int(15, 17), pot, team: null, contract: 0, prospect: true, youth: true, app: randomLook(nation, rng) });
+  p.academy = { region: trip.region, season: c.season, tier };
+  c.players[id] = p;
+  return id;
+}
+// the off-season: each prospect grows faster than the squad's youngsters, and faster still beside a veteran who mentors him
+export function academySeason(c, rng) {
+  const a = c.academy;
+  if (!a) return;
+  for (const id of a.prospects) {
+    const p = c.players[id];
+    if (!p) continue;
+    const mentor = c.players[a.mentors[id]];
+    const mentored = mentor && mentor.team === c.club && !mentor.retired && mentor.age >= ACAD.MENTOR_AGE;
+    grow(c, p, rng.int(ACAD.GROW[0], ACAD.GROW[1]) + (mentored ? ACAD.MENTOR_GROW : 0));
+  }
+}
+export const prospectsOf = c => (c.academy?.prospects || []).map(id => c.players[id]).filter(Boolean);
+export const veteransOf = c => clubPlayers(c, c.club).filter(p => p.age >= ACAD.MENTOR_AGE && !p.heroId);
+export const academyPrice = p => Math.max(0.05, round2(value(p) * 0.5));
+// to the squad (he must be 18 and there must be a place) ...
+export function promoteProspect(c, id) {
+  const p = c.players[id], a = c.academy;
+  if (!p?.prospect || !a?.prospects.includes(id)) return { ok: false, why: 'He is not in the academy' };
+  if (p.age < ACAD.PLAY_AGE) return { ok: false, why: `He cannot play until he is ${ACAD.PLAY_AGE}` };
+  if (clubPlayers(c, c.club).length >= MAX_SQUAD) return { ok: false, why: `Your squad is full (${MAX_SQUAD})` };
+  p.prospect = false; p.youth = false; p.team = c.club; p.contract = 3;
+  a.prospects = a.prospects.filter(x => x !== id); delete a.drills[id]; delete a.mentors[id]; a.revealed[id] = true;
+  chirpSigned(c, p, 0, 'academy');
+  return { ok: true };
+}
+// ... or sold: he goes onto the market, and you get half his worth
+export function sellProspect(c, id) {
+  const p = c.players[id], a = c.academy;
+  if (!p?.prospect || !a?.prospects.includes(id)) return { ok: false, why: 'He is not in the academy' };
+  const price = academyPrice(p);
+  c.money = round2(c.money + price); book(c, 'in', 'transfers', price);
+  p.prospect = false; p.team = null;
+  a.prospects = a.prospects.filter(x => x !== id); delete a.drills[id]; delete a.mentors[id];
+  return { ok: true, price };
+}
+
+// ---------- a club's standing: which players will sign for it ----------
+// The best players only sign for clubs with the standing: none rated 80 or more for a Division 3 club, a few for Division 2 (up to 84), any for the top division.
+// (players you already have stay, whatever happens)
+export const REP_CAP = { asl: 99, d2: 84, d3: 79 };
+export const repCap = c => Math.min(99, (REP_CAP[divisionOf(c, c.club)] ?? 99) + repBonus(c));
+export function repBlock(c, p) {
+  const cap = repCap(c);
+  return ovr(p) > cap ? `Players rated ${cap + 1} or more will not sign for a ${divisionName(divisionOf(c, c.club))} club` : null;
+}
+
+// ---------- the medical centre's view of the club (js/stamina.js) ----------
+export const fitnessOf = (c, id) => fitOf(c.medical, id);
+export const startEnergies = c => Object.fromEntries(clubPlayers(c, c.club).map(p => [p.id, fitnessOf(c, p.id)]).filter(([, f]) => f < 100));
+
+// ---------- the training ground's view of the club (js/training.js) ----------
+// the coaches a player can learn from: batters from a batting coach, bowlers from a pace or a spin coach, all-rounders from either
+function coachKinds(p) {
+  const k = [];
+  if (p.role === 'bat' || p.role === 'wk' || p.role === 'all') k.push('bat');
+  if (p.role === 'bowl' || p.role === 'all') k.push(bowlType(p.bowl).spin ? 'spin' : 'pace');
+  return k;
+}
+export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { name: p.name, ovr: ovr(p), age: p.age, pot: p.pot, kinds: coachKinds(p) }]));
+
+// ---------- the merchandise factory's view of the club (js/merch.js) ----------
+export const fameOf = p => p.fame ?? startFame(ovr(p));
+// the players under contract: id -> { fame, name }
+export const merchRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { fame: fameOf(p), name: p.name }]));
+// the jerseys a day the fans want, in all: the crowd your ground holds, how far the factory's name reaches, and a little for your followers on Chirp
+const CROWD_ROWS = [null, { n: 80 }, { n: 200 }, { n: 350 }], REACH_ROWS = [null, { n: 0.5 }, { n: 0.75 }, { n: 1 }];
+export const merchDemand = c => levelRow(CROWD_ROWS, Math.max(1, stadiumLvl(c))).n * levelRow(REACH_ROWS, c.merch?.level || 1).n * (1 + Math.min(0.15, (c.chirp?.fans || 0) / 100000 * 0.15)) * (1 + trophyBuffs(c).merch);
+// the league matches left in a player's contract (the season he is in, and the full seasons after it)
+export function matchesLeft(c, p) {
+  const per = c.league?.rounds?.length || 14, now = c.league && c.league.stage === 'group' ? Math.max(0, per - c.league.round) : 0;
+  return now + Math.max(0, (p.contract || 1) - 1) * per;
+}
+// After your league match: play the rest of the round, and close the season when it's over.
+export function afterLeagueMatch(c, summary) {
+  const f = nextFixture(c.league), home = f && f.home === c.club && stadiumLevel(c);
+  const notes = recordPlayerMatch(c, summary);
+  // your own ground's gate money
+  if (home) { const tk = ticketOf(c); c.money = round2(c.money + tk); book(c, 'in', 'tickets', tk); notes.push(`🎟️ ${STADIUMS[home].fans} fans at ${c.custom.ground}: +${money(tk)} in ticket money`); }
+  notes.push(...scoutReports(c));
+  notes.push(...groundWeek(c));
+  const result = playerResult(c.league, summary);
+  aptMatch(c, result.winner === c.club);
+  const lvUp = addXp(c, XP.MATCH + (result.winner === c.club ? XP.WIN : 0));
+  if (lvUp) notes.push(`⭐ Club level ${lvUp}: your buildings can grow bigger`);
+  notes.push(...advance(c.league, result, (a, b, rng) => simCareerMatch(c, a, b, rng)));
+  // the rivals have their say (a rival who beat you, or whom you beat; your nemesis, watching)
+  const top = table(c.league)[0]?.id === c.club ? 1 : 0;
+  notes.push(...afterMatch(c, summary.oppTeam.id, result.winner === c.club, id => clubRating(c, id), top).map(messageNote));
+  // Chirp: the press and a fan post about it, and your club's followers and buzz move
+  const mine = summary.innings.find(i => i.side === 'player'), theirs = summary.innings.find(i => i.side === 'ai'), won = result.winner === c.club, opp = summary.oppTeam.id;
+  const gained = afterMatchPopularity(c, { boost: 1 + trophyBuffs(c).fans, won, derby: !!rivalKind(c, opp), upset: clubRating(c, opp) > clubRating(c, c.club) + 3, bigWin: Math.abs(mine.runs - theirs.runs) >= 25 });
+  const story = storyOf(c, { won, first: summary.innings[0], second: summary.innings[1], tiebreak: summary.result.tiebreak });
+  chirpAfterMatch(c, summary, { won, opp, derby: !!rivalKind(c, opp), mine: `${mine.runs}/${mine.wkts}`, theirs: `${theirs.runs}/${theirs.wkts}`, story, journey: journeyOf(c) });
+  notes.push(`📈 ${gained >= 0 ? '+' : '−'}${compact(Math.abs(gained))} followers on Chirp`);
+  if (finish(c.league)) notes.push(...endSeason(c));
+  return notes;
+}
+
+// Final positions 1-8: champion, runner-up, the beaten semi-finalists, then the table.
+export function finalOrder(L) {
+  const t = table(L).map(r => r.id);
+  const final = L.ko.find(k => k.stage === 'final'), semi = L.ko.find(k => k.stage === 'semi');
+  const top2 = [L.champion, final.ties[0].find(x => x !== L.champion)];
+  const semis = semi.ties.flat().filter(x => !top2.includes(x)).sort((a, b) => t.indexOf(a) - t.indexOf(b));
+  return [...top2, ...semis, ...t.filter(x => !top2.includes(x) && !semis.includes(x))];
+}
+export function endSeason(c) {
+  const L = c.league, myDiv = divisionOf(c, c.club), order = finalOrder(L);
+  const notes = [];
+  // the other two divisions play their seasons too
+  const leagues = { [myDiv]: L };
+  for (const d of DIV_ORDER) if (d !== myDiv) leagues[d] = simLeague(c.divisions[d], hashStr(`${c.seed}-${d}-${c.season}`), d === 'asl' ? dynastyMatch(c) : (a, b, rng) => simCareerMatch(c, a, b, rng));
+  for (const d of DIV_ORDER) {
+    const ord = d === myDiv ? order : finalOrder(leagues[d]), k = DIV_MONEY[d];
+    ord.forEach((id, i) => {
+      const prize = round2(PRIZE[i] * k);
+      if (id === c.club) { const fans = sponsorBonus(c); c.money = round2(c.money + prize + SPONSOR + fans); book(c, 'in', 'prizes', prize + SPONSOR + fans); notes.push(`You finished ${i + 1}${['st', 'nd', 'rd'][i] || 'th'} in ${divisionName(d)}: ${money(prize)} prize money + ${money(SPONSOR)} sponsorship${fans > 0 ? ` + ${money(fans)} from your ${compact(c.chirp.fans)} fans` : ''}`); }
+      else c.budgets[id] = round2((c.budgets[id] || 0) + prize + AI_INCOME * k);
+    });
+  }
+  notes.push(...settleObjective(c, order.indexOf(c.club) + 1));
+  c.titles[leagues.asl.champion] = (c.titles[leagues.asl.champion] || 0) + 1;
+  if (myDiv !== 'asl' && leagues.asl.champion === DYNASTY) notes.push(`⚡ ${teamById(DYNASTY).name} win the Asian Super League again: title number ${c.titles[DYNASTY]}. They look unbeatable. Climb to the Super League and take them on!`);
+  const season = Object.values(c.players);
+  const top = (f) => season.filter(p => p.stats.season.m).sort((a, b) => f(b) - f(a))[0];
+  const orange = top(p => p.stats.season.runs), purple = top(p => p.stats.season.wkts * 1000 - p.stats.season.bruns);
+  c.history.push({ season: c.season, div: myDiv, champion: L.champion, runnerUp: order[1], club: c.club, pos: order.indexOf(c.club) + 1,
+    champions: Object.fromEntries(DIV_ORDER.map(d => [d, leagues[d].champion])),
+    orange: orange && { pid: orange.id, runs: orange.stats.season.runs }, purple: purple && { pid: purple.id, wkts: purple.stats.season.wkts } });
+  // promotion and relegation: Division 3's champion up and Division 2's bottom club down; Division 2's
+  // champion up and the loser of the Super League's play-off (7th v 8th) down
+  const groupTable = d => table(leagues[d]).map(r => r.id);
+  const asl = groupTable('asl');
+  c.moves = { d3up: leagues.d3.champion, d2down: groupTable('d2').at(-1), d2up: leagues.d2.champion, playoff: [asl[6], asl[7]], aslDown: null };
+  if (c.moves.playoff.includes(c.club)) {
+    // you're in it: the play-off is yours to play
+    const opp = c.moves.playoff.find(id => id !== c.club);
+    c.playoff = { opp, home: asl[6], label: 'Relegation play-off' };
+    c.phase = 'playoff';
+    notes.push(`You finished ${asl.indexOf(c.club) + 1}th: a play-off against ${teamById(opp).name} to stay in the Super League!`);
+  } else {
+    const m = simCareerMatch(c, asl[6], asl[7], makeRng(hashStr(`${c.seed}-playoff-${c.season}`)));
+    c.moves.aslDown = m.winner === asl[6] ? asl[7] : asl[6];
+    applyMoves(c, notes);
+  }
+  // a scout sent out late still comes home with two names
+  for (const [region, sc] of Object.entries(c.scouting || {})) {
+    if (sc.season !== c.season) continue;
+    while (sc.finds.length < 2) {
+      const p = findFor(c, region, sc.finds.length);
+      sc.finds.push(p.id);
+      notes.push(`🔎 Your scout in ${SCOUT_REGIONS[region].name} comes home with ${p.name}, ${p.label.toLowerCase()}`);
+    }
+  }
+  if (c.phase !== 'playoff') c.phase = 'done';
+  return notes;
+}
+
+// the season's movements between the divisions, and what they mean for you
+// what the fans remember when a big moment comes: the club's own seasons, from c.history (the last entry is the season just played)
+export function clubMemory(c, ev) {
+  const past = c.history.slice(0, -1), first = past[0], nth = n => `${n}${['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th'}`;
+  if (!first) return '';
+  if (ev === 'relegated' && past.at(-1)?.promoted) return ' They went up only a year ago.';
+  if (ev === 'champion' && first.div !== c.history.at(-1).div) return ` Remember when they started in ${divisionName(first.div)}, finishing ${nth(first.pos)}? Look at them now.`;
+  if (ev === 'champion' && first.pos > 4) return ` Their first season ended ${nth(first.pos)}. Look at them now.`;
+  if (ev === 'promoted' && past.length >= 2 && past.every(p => p.div === first.div)) return ` ${past.length + 1} seasons in the same division, and finally they are going up.`;
+  return '';
+}
+function applyMoves(c, notes) {
+  const M = c.moves, D = c.divisions;
+  const move = (id, from, to) => { D[from] = D[from].filter(x => x !== id); D[to] = [...D[to], id]; };
+  move(M.d3up, 'd3', 'd2'); move(M.d2down, 'd2', 'd3');
+  move(M.d2up, 'd2', 'asl'); move(M.aslDown, 'asl', 'd2');
+  const h = c.history.at(-1);
+  if (h.pos === 1) addXp(c, XP.CHAMPION);
+  if (M.d3up === c.club || M.d2up === c.club) addXp(c, XP.PROMOTED);
+  if (M.d3up === c.club || M.d2up === c.club) { h.promoted = divisionOf(c, c.club); notes.push(`⬆️ PROMOTED! Next season ${teamById(c.club).name} play in ${divisionName(h.promoted)}.`); }
+  if (M.d2down === c.club || M.aslDown === c.club) { h.relegated = divisionOf(c, c.club); notes.push(`⬇️ Relegated. Next season ${teamById(c.club).name} play in ${divisionName(h.relegated)}.`); }
+  // your nemesis has a word on where you are going
+  const ev = h.promoted ? 'promoted' : h.relegated ? 'relegated' : h.pos === 1 ? 'champion' : null;
+  if (ev) { const m = say(c, 'nemesis', ev, nemesisOf(c)); if (m) notes.push(messageNote(m)); }
+  if (ev) {
+    seasonPopularity(c, ev);
+    const club = teamById(c.club).name;
+    const text = (ev === 'promoted' ? `PROMOTED! ${club} are heading up to ${divisionName(h.promoted)} next season. 🎉` : ev === 'relegated' ? `${club} are relegated to ${divisionName(h.relegated)}. They will need a big rebuild. 💔` : `CHAMPIONS! ${club} win the title in ${divisionName(h.div)}! 🏆`) + clubMemory(c, ev);
+    chirpMilestone(c, text, ev, { div: divisionName(h.promoted || h.relegated || h.div), pos: `${h.pos}${['th', 'st', 'nd', 'rd'][h.pos % 100 > 10 && h.pos % 100 < 14 ? 0 : h.pos % 10] || 'th'}`, journey: journeyOf(c) });
+  }
+  c.moveNews = [
+    `⬆️ ${teamById(M.d2up).name} are promoted to the Asian Super League`, `⬇️ ${teamById(M.aslDown).name} lose the play-off and go down to Division 2`,
+    `⬆️ ${teamById(M.d3up).name} are promoted to Division 2`, `⬇️ ${teamById(M.d2down).name} finish bottom and go down to Division 3`,
+  ];
+}
+// your relegation play-off, played: the winner stays up
+export function afterPlayoff(c, summary) {
+  const notes = recordPlayerMatch(c, summary);
+  const r = playerResult({ team: c.club, stage: 'playoff' }, summary);
+  const won = r.winner === c.club;
+  c.moves.aslDown = won ? c.playoff.opp : c.club;
+  c.history.at(-1).playoff = { opp: c.playoff.opp, won };
+  notes.push(won ? `🛡️ You win the play-off: ${teamById(c.club).name} stay in the Super League!` : `The play-off is lost.`);
+  if (won) chirpMilestone(c, `SAFE! ${teamById(c.club).name} win the relegation play-off and stay in the Super League. 🛡️`, 'survivedPlayoff', { div: divisionName('asl'), journey: journeyOf(c) });
+  applyMoves(c, notes);
+  c.playoff = null;
+  c.phase = 'done';
+  return notes;
+}
+
+// The off-season: everyone a year older, the young grow, the old fade and retire,
+// contracts end (those players go into the auction), and new teenagers arrive.
+export function nextSeason(c) {
+  const rng = makeRng(hashStr(`${c.seed}-off-${c.season}`));
+  c.news = [...(c.moveNews || [])]; c.moveNews = null;
+  for (const p of Object.values(c.players)) {
+    if (p.retired) continue;
+    p.age++;
+    if (p.age < PEAK_AGE) grow(c, p, p.age <= 23 ? rng.int(1, 4) : p.age <= 28 ? rng.int(0, 2) : rng.int(0, 1));
+    else if (p.age >= 34 && !p.heroId) for (const k of primary(p)) p[k] = Math.max(30, p[k] - rng.int(0, 2));
+    const mine = p.team === c.club;
+    // the training ground: the points his coach earned him this season become rating (on top of the natural growth, up to his potential)
+    if (mine && c.training) {
+      const n = seasonGain(c.training, p.id, { ovr: ovr(p), age: p.age, pot: p.pot });
+      if (n && grow(c, p, n)) c.news.push(`💪 ${p.name} trained hard: +${n} rating`);
+    }
+    if (!p.heroId && p.age >= 36 && rng.chance(0.35 + (p.age - 36) * 0.3)) {
+      if (mine) chirpLeft(c, p, 'retired');
+      p.retired = true; p.team = null; p.retiredIn = c.season;
+      c.news.push(`👋 ${p.name} retires at ${p.age}`);
+      continue;
+    }
+    if (p.team && --p.contract <= 0) { if (mine) chirpLeft(c, p, 'contractEnd'); p.team = null; p.contract = 0; }
+    p.form = 0;
+  }
+  academySeason(c, rng);
+  const kids = youthIntake(c, rng, 7);
+  c.news.push(`🎓 ${kids.length} academy graduates join the auction`);
+  c.season++;
+  c.league = null; c.auction = null;
+  // you stay with your club: on to your scouts' finds, then the auction
+  if (c.club) { if (scoutFinds(c).length) c.phase = 'scouts'; else startAuction(c); } else c.phase = 'pick';
+}
+
+// ---------- leaderboards ----------
+export function leaders(c, scope = 'all', key = 'runs', n = 10) {
+  const val = {
+    runs: s => s.runs, wkts: s => s.wkts, sixes: s => s.sixes, hs: s => s.hs,
+    avg: s => (s.outs ? s.runs / s.outs : s.inns >= 3 ? s.runs : 0),
+  }[key];
+  return Object.values(c.players).filter(p => p.stats[scope].m).sort((a, b) => val(b.stats[scope]) - val(a.stats[scope])).slice(0, n);
+}
+export const playerName = (c, id) => c.players[id]?.name || id;

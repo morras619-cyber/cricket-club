@@ -1,0 +1,266 @@
+{
+ "_about": "Shirt print (last name + number) per frame of the bald back-view bowler sheet. Coordinates are in each frame tile: origin = frame bounding box left - 40 px, top. collar/waist = measured centre of the collar and waistband (the spine). print = [centre x, centre y, block width, x squash, y squash, tilt deg clockwise]. name/number = extra [dx, dy] nudge for that line only.",
+ "sheet": "back (img/people/bowler-back-bald.png when added)",
+ "frames": {
+  "1": {
+   "collar": [
+    147,
+    70
+   ],
+   "waist": [
+    146,
+    213
+   ],
+   "print": [
+    146.6,
+    130.1,
+    88.0,
+    1.0,
+    1.0,
+    0.4
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  },
+  "2": {
+   "collar": [
+    147,
+    62
+   ],
+   "waist": [
+    145,
+    200
+   ],
+   "print": [
+    146.2,
+    120.0,
+    88.0,
+    1.0,
+    1.0,
+    0.8
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  },
+  "3": {
+   "collar": [
+    154,
+    60
+   ],
+   "waist": [
+    154,
+    205
+   ],
+   "print": [
+    154.0,
+    120.9,
+    88.0,
+    1.0,
+    1.0,
+    0.0
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  },
+  "4": {
+   "collar": [
+    114,
+    60
+   ],
+   "waist": [
+    95,
+    208
+   ],
+   "print": [
+    104,
+    122.2,
+    84.5,
+    0.88,
+    1.0,
+    2
+   ],
+   "name": [
+    -4,
+    0
+   ],
+   "number": [
+    -2,
+    0
+   ]
+  },
+  "5": {
+   "collar": [
+    138,
+    152
+   ],
+   "waist": [
+    102,
+    285
+   ],
+   "print": [
+    125.9,
+    207.9,
+    81.0,
+    0.85,
+    0.95,
+    15.1
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  },
+  "6": {
+   "collar": [
+    170,
+    140
+   ],
+   "waist": [
+    145,
+    270
+   ],
+   "print": [
+    160.5,
+    194.6,
+    81.0,
+    0.85,
+    0.95,
+    10.9
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  },
+  "7": {
+   "collar": [
+    125,
+    50
+   ],
+   "waist": [
+    158,
+    148
+   ],
+   "print": [
+    139,
+    91.2,
+    86.2,
+    1.0,
+    0.75,
+    -6
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  },
+  "8": {
+   "collar": [
+    112,
+    48
+   ],
+   "waist": [
+    158,
+    152
+   ],
+   "print": [
+    134,
+    91.7,
+    86.2,
+    1.0,
+    0.75,
+    -6
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  },
+  "9": {
+   "collar": [
+    148,
+    62
+   ],
+   "waist": [
+    147,
+    203
+   ],
+   "print": [
+    147.6,
+    121.2,
+    88.0,
+    1.0,
+    1.0,
+    0.4
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  },
+  "10": {
+   "collar": [
+    145,
+    66
+   ],
+   "waist": [
+    143,
+    218
+   ],
+   "print": [
+    144.2,
+    129.8,
+    89.8,
+    1.0,
+    1.0,
+    0.8
+   ],
+   "name": [
+    0,
+    0
+   ],
+   "number": [
+    0,
+    0
+   ]
+  }
+ }
+}

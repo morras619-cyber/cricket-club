@@ -1,0 +1,16 @@
+{"_note": "The spinner's drawn back has a yoke across the shoulders; repainted to the fast bowler's design (main colour up to the collar, piping from each collar end down to the yoke corner). Per frame, in sheet pixels: the collar's bottom ends [left, right] and the drawn yoke's corners [left, right].",
+ "1": {"collar": [[85, 157], [142, 157]], "yoke": [[55, 182], [170, 183]]},
+ "2": {"collar": [[308, 160], [358, 160]], "yoke": [[273, 183], [390, 187]]},
+ "3": {"collar": [[518, 173], [572, 173]], "yoke": [[492, 190], [595, 188]]},
+ "4": {"collar": [[713, 167], [760, 168]], "yoke": [[680, 192], [785, 192]]},
+ "5": {"collar": [[940, 182], [980, 200]], "yoke": [[910, 195], [998, 235]]},
+ "6": {"collar": [[113, 735], [157, 745]], "yoke": [[80, 757], [178, 778]]},
+ "7": {"collar": [[322, 733], [367, 745]], "yoke": [[292, 760], [388, 775]]},
+ "8": {"collar": [[552, 753], [597, 773]], "yoke": [[520, 770], [603, 807]]},
+ "9": {"collar": [[722, 770], [768, 775]], "yoke": [[702, 790], [797, 820]]},
+ "10": {"collar": [[928, 770], [967, 780]], "yoke": [[892, 793], [983, 812]]},
+ "12": {"collar": [[287, 1198], [307, 1200]], "yoke": [[280, 1217], [390, 1233]]},
+ "13": {"collar": [[490, 1200], [533, 1195]], "yoke": [[480, 1223], [570, 1215]]},
+ "14": {"collar": [[700, 1203], [745, 1203]], "yoke": [[680, 1223], [775, 1225]]},
+ "15": {"collar": [[900, 1207], [948, 1207]], "yoke": [[870, 1232], [978, 1235]]}
+}
