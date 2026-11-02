@@ -1909,7 +1909,11 @@ export class Game {
       if (A && target) {
         const p = Math.min(1, Math.max(0, (t - 0.25) / Math.max(0.3, tArrive - 0.25)));
         A.x = lerp(start.x, target.x, p); A.y = lerp(start.y, target.y, p);
-        A.pose = p < 1 ? POSES.run(t * 14) : o.caught ? POSES.celebrate() : POSES.crouch();
+        const diveSave = sim.intercept?.action === 'dive' && A === fs.find(f => f.id === sim.intercept.fielder.id);
+        const diveWindow = diveSave && t >= tArrive - 0.38 && t <= tArrive + 0.48;
+        A.pose = diveWindow
+          ? POSES.dive(Math.sign(target.x - start.x) || 1)
+          : p < 1 ? POSES.run(t * 14) : o.caught ? POSES.celebrate() : POSES.crouch();
       }
       if (chaser) {
         // he sets off after it at full tilt but the ball beats him to the rope
