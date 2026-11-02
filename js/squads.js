@@ -244,7 +244,7 @@ function clubRoster(team) {
     const bat = role === 'bowl' ? rng.int(12, 24) : role === 'all' ? base - 6 + rng.int(-3, 4) : base + rng.int(-3, 6);
     return {
       id: `${team.id}-${i}`, name, nick: rng.pick(CLUB_NICKS), short: name.split(' ').slice(1).join(' '), role, label, team: team.id,
-      trait: rng.pick(CLUB_TRAITS[role]), hero: false, bowl, nation, bat, composure: composureFor(bat, role, rng.int(-7, 7)), bowlSkill: bowl ? base + (role === 'bowl' ? 3 : -2) + rng.int(-3, 5) : 0,
+      trait: rng.pick(CLUB_TRAITS[role]), hero: false, bowl, nation, bat, composure: composureFor(bat, role), bowlSkill: bowl ? base + (role === 'bowl' ? 3 : -2) + rng.int(-3, 5) : 0,
       ai: { ...WEAK[rng.int(0, WEAK.length - 1)], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) },
     };
   });
@@ -261,7 +261,7 @@ export function roster(teamId) {
   const off = TIER_OFFSET[teamById(teamId).tier] || 0;
   const list = (SQUADS[teamId] || SQUADS.thunder).map(([name, nick, role, label, bat, bowl, bowlSkill, trait, w, nation], i) => ({
     id: `${teamId}-${i}`, name, nick, short: name.split(' ').slice(1).join(' '), role, label, team: teamId, trait, hero: false, bowl, nation,
-    bat: role === 'bowl' ? bat : Math.min(95, bat + off), composure: composureFor(role === 'bowl' ? bat : Math.min(95, bat + off), role, rng.int(-7, 7)), bowlSkill: bowl ? Math.min(95, bowlSkill + off) : 0,
+    bat: role === 'bowl' ? bat : Math.min(95, bat + off), composure: composureFor(role === 'bowl' ? bat : Math.min(95, bat + off), role), bowlSkill: bowl ? Math.min(95, bowlSkill + off) : 0,
     ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.25, 0.5) },
   }));
   rosterCache.set(teamId, list);
