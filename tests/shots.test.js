@@ -19,10 +19,10 @@ test('swipe speed reads the fastest deliberate path segment', () => {
 });
 
 test('swipe power increases smoothly and stays within its bounds', () => {
-  assert.equal(swipePowerFromSpeed(0), 0.65);
+  assert.equal(swipePowerFromSpeed(0), 0.85);
   assert.ok(swipePowerFromSpeed(700) > swipePowerFromSpeed(300));
-  assert.equal(swipePowerFromSpeed(1500), 1.35);
-  assert.equal(swipePowerFromSpeed(5000), 1.35);
+  assert.equal(swipePowerFromSpeed(1500), 1.10);
+  assert.equal(swipePowerFromSpeed(5000), 1.10);
 });
 
 test('a faster swipe produces a faster ball off the bat', () => {
@@ -36,5 +36,5 @@ test('a faster swipe produces a faster ball off the bat', () => {
   const soft = resolveContact({ ...base, swipePower: swipePowerFromSpeed(250) });
   const hard = resolveContact({ ...base, swipePower: swipePowerFromSpeed(1500) });
   assert.ok(hard.v > soft.v);
-  assert.ok(Math.abs(hard.v / soft.v - (1.35 / 0.65)) < 1e-9);
+  assert.ok(Math.abs(hard.v / soft.v - (1.10 / 0.85)) < 1e-9);
 });
