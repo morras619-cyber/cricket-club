@@ -252,7 +252,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
       if (candidate && (!hit || candidate.arrival < hit.arrival)) hit = candidate;
     }
     if (hit) {
-      if (out.nearMiss?.fielder.id === hit.fielder.id && hit.action === 'pickup') out.nearMiss = null;
+      if (out.nearMiss?.fielder.id === hit.fielder.id) out.nearMiss = null;
       out.intercept = { fielder: hit.fielder, t, point: insideRope(p), action: hit.action, arrival: hit.arrival };
       out.runs = runsAfterCollect(t, p);
       if (res.forced?.cap != null) out.runs = Math.min(out.runs, res.forced.cap);
