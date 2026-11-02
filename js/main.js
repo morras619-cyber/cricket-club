@@ -338,6 +338,7 @@ $('setXp').addEventListener('click', () => { const c = career(); const up = PC.a
 $('setTrophies').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; renderTrophies(); });
 $('setStats').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; renderStats(); });
 $('setTutorial').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; showCover(); });
+$('setBowlingPrep').addEventListener('click', async () => { unlockAudio(); sfx.click(); await game.testBowlingPreparation(); });
 $('setStory').addEventListener('click', () => { unlockAudio(); careerOpening().then(renderSettings); });   // (the career's opening story again; it plays by itself only the first time)
 $('setStadiumTest').addEventListener('click', () => {   // (testing only: shows your own club's ground at level 1, 2 or 3 in your next match; the saved game is not touched)
   stadiumTest.level = (stadiumTest.level + 1) % 4;
