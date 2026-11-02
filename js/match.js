@@ -89,7 +89,6 @@ export class Innings {
 
   // A no-ball that is played (nbPlay): the runs off the bat count (the extra is already in) but it is not a legal ball, and only a run-out ends the batter's innings
   noBallPlay({ runs = 0, wicket = false, runOut = false }) {
-    this.updateBatterConfidence({ runs, wicket: wicket && runOut });
     this.runs += runs;
     const c = this.cur;
     c.runs += runs; c.balls++;
@@ -106,7 +105,6 @@ export class Innings {
   ball({ runs = 0, wicket = false, runOut = false, missed = false }) {
     if (this.nbPlay) return this.noBallPlay({ runs, wicket, runOut });
     if (this.sixes) wicket = false; // (out doesn't count in the shoot-out: the ball just isn't a six)
-    this.updateBatterConfidence({ runs, wicket, missed });
     this.balls++;
     this.runs += runs;
     if (wicket) this.wkts++;
