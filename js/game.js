@@ -1255,9 +1255,6 @@ export class Game {
         this.charge.wicketLost();
         if (opt.onOut) opt.onOut();
       }
-    } else if (res.outcome === 'wide') {
-      inn.extra(1);
-      this.fx.word('WIDE BALL!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs');
       this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
@@ -2334,7 +2331,10 @@ export class Game {
       this.addMoment(kind2, text, extra.word || text, hero, { ballNo, ...extra });
     };
 
-    if (res.outcome === 'bowled') {
+    if (res.outcome === 'wide') {
+      inn.extra(1);
+      this.fx.word('WIDE BALL!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
+    } else if (res.outcome === 'bowled') {
       S.stumps[0] = { dir: rng.range(-1, 1) };
       this.stumpsBurst(this.myTeam, 'bowl');
       const comboTag = mods?.tags.find(t => t.id === 'setup' || t.id === 'swingtrap' || t.id === 'changeup');
