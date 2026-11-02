@@ -508,9 +508,11 @@ function renderBackground(cam) {
   const G = groundOf(HOME), T = teamById(HOME);
   const night = NIGHT[G.time] ?? 1;
   const c = document.createElement('canvas');
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = quality.renderDpr(W, H);
   c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
   const g = c.getContext('2d');
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
   g.scale(dpr, dpr);
   const hi = quality.high;
   const rnd = seeded(7 + HOME.length * 13);
