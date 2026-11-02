@@ -204,7 +204,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
 
   // Ground (or after the bounce): the earliest realistic fielder arrival, else the ball reaches the rope.
   const t0 = path.lofted ? path.T : 0;
-  const diveCooldown = new Map();
+  const diveCooldown = new Map(), diveRecovery = new Map();
   for (let t = t0; t < 14; t += 0.05) {
     const p = path.ballAt(t);
     if (outside(p)) {
@@ -231,7 +231,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     for (const f of outfield) {
       if ((diveCooldown.get(f.id) ?? -Infinity) > t) continue;
       const distance = dist(f, p);
-      const elapsed = t - F.react;
+      const elapsed = t - F.react - (diveRecovery.get(f.id) || 0);
       const run = fielderRunDistance(elapsed, sp);
       const standingMargin = run + F.reach - distance;
       const diveMargin = run + F.reach + F.diveReach - distance;
@@ -246,6 +246,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
         if (rng.chance(chance)) candidate = { fielder: f, arrival: t, action: 'dive' };
         else {
           diveCooldown.set(f.id, t + 0.8);
+          diveRecovery.set(f.id, (diveRecovery.get(f.id) || 0) + 0.8);
           if (!out.nearMiss || diveMargin > out.nearMiss.margin) out.nearMiss = { fielder: f, point: p, t, short: 0.7, margin: diveMargin };
         }
       }
