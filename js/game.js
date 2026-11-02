@@ -6,7 +6,7 @@ import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
-import { gradeTiming, swipeToShot, resolveContact, aimVector } from './shots.js';
+import { gradeTiming, swipeToShot, resolveContact, aimVector, isBallReachableAtSwing } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
@@ -974,11 +974,13 @@ export class Game {
 
     // ----- resolve -----
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
-    let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
+    const swingElapsed = swing ? (swing.t - S.ballT0) / 1000 : null;
+    const physicallyReachable = !!swing && isBallReachableAtSwing(d, swingElapsed);
+    let grade = swing ? (physicallyReachable ? gradeTiming(err, w, d.xt > 0.08) : 'miss') : 'leave';
     if (swing && !swing.defend) { this.stats.swings++; if (grade === 'perfect' || grade === 'good') this.stats.swingGood++; }   // (what the AI learns your skill from)
-    if (fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
-    if (fx.match.edgeP && (grade === 'early' || grade === 'late') && rng.chance(fx.match.edgeP)) grade = 'edge';   // (an aggressive opener early on)
-    if (myC === 'steady' && swing && !swing.defend && grade !== 'perfect' && grade !== 'good') grade = 'good';   // Steady Hands: a Good timing, however he bowls it
+    if (physicallyReachable && fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
+    if (physicallyReachable && fx.match.edgeP && (grade === 'early' || grade === 'late') && rng.chance(fx.match.edgeP)) grade = 'edge';   // (an aggressive opener early on)
+    if (physicallyReachable && myC === 'steady' && swing && !swing.defend && grade !== 'perfect' && grade !== 'good') grade = 'good';   // Steady Hands only upgrades reachable contact
     // defending is forgiving: anywhere in the wide window keeps the ball out
     if (swing?.defend) grade = Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
     this.lastTiming = { err, grade };
