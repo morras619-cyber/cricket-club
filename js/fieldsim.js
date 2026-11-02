@@ -228,12 +228,28 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     // man in array order, making outcomes depend on list order instead of arrival time.
     let hit = null;
     for (const f of outfield) {
-      const need = Math.max(0, dist(f, p) - F.reach);
-      const arrival = F.react + fielderArrivalTime(need, sp);
-      if (arrival <= t + 0.025 && (!hit || arrival < hit.arrival)) hit = { fielder: f, arrival };
+      const distance = dist(f, p);
+      const elapsed = t - F.react;
+      const run = fielderRunDistance(elapsed, sp);
+      const standingMargin = run + F.reach - distance;
+      const diveMargin = run + F.reach + F.diveReach - distance;
+      let candidate = null;
+      if (standingMargin >= 0) {
+        const arrival = F.react + fielderArrivalTime(Math.max(0, distance - F.reach), sp);
+        if (arrival <= t + 0.025) candidate = { fielder: f, arrival, action: 'pickup' };
+      } else if (elapsed > 0 && diveMargin >= 0) {
+        // A dive is a genuine last-resort reach, not free extra running speed.
+        // The edge of the dive envelope is uncertain; exceptional fielders still won't save every ball.
+        const chance = sigmoid(diveMargin + 0.2);
+        if (rng.chance(chance)) candidate = { fielder: f, arrival: t, action: 'dive' };
+        else if (!out.nearMiss || diveMargin > out.nearMiss.margin) {
+          out.nearMiss = { fielder: f, point: p, t, short: 0.7, margin: diveMargin };
+        }
+      }
+      if (candidate && (!hit || candidate.arrival < hit.arrival)) hit = candidate;
     }
     if (hit) {
-      out.intercept = { fielder: hit.fielder, t, point: insideRope(p), action: 'pickup', arrival: hit.arrival };
+      out.intercept = { fielder: hit.fielder, t, point: insideRope(p), action: hit.action, arrival: hit.arrival };
       out.runs = runsAfterCollect(t, p);
       if (res.forced?.cap != null) out.runs = Math.min(out.runs, res.forced.cap);
       out.duration = Math.min(t + 0.8, 3.2);
