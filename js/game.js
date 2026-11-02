@@ -123,11 +123,9 @@ export class Game {
 
   // ---------- plumbing ----------
   resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     this.W = this.cv.clientWidth || innerWidth; this.H = this.cv.clientHeight || innerHeight;
-    const dpr = quality.renderDpr(this.W, this.H);
     this.cv.width = Math.round(this.W * dpr); this.cv.height = Math.round(this.H * dpr);
-    this.ctx.imageSmoothingEnabled = true;
-    this.ctx.imageSmoothingQuality = 'high';
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     for (const c of Object.values(this.cams)) c.resize(this.W, this.H);
     this.of.resize(this.W, this.H);
@@ -205,7 +203,7 @@ export class Game {
     const worst = sorted[sorted.length - 1] || 0;
     const spikes = samples.filter(item => item.frame > 25).length;
     const fps = avg('frame') > 0 ? 1000 / avg('frame') : 0;
-    const dpr = this.W ? this.cv.width / this.W : 1;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     const set = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
     set('profFps', fps.toFixed(0));
     set('profFrame', avg('frame').toFixed(1) + ' ms');

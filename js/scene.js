@@ -508,11 +508,9 @@ function renderBackground(cam) {
   const G = groundOf(HOME), T = teamById(HOME);
   const night = NIGHT[G.time] ?? 1;
   const c = document.createElement('canvas');
-  const dpr = quality.renderDpr(W, H);
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
   c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
   const g = c.getContext('2d');
-  g.imageSmoothingEnabled = true;
-  g.imageSmoothingQuality = 'high';
   g.scale(dpr, dpr);
   const hi = quality.high;
   const rnd = seeded(7 + HOME.length * 13);
@@ -617,46 +615,25 @@ function renderBackground(cam) {
   const towers = [W * 0.08, W * 0.92];
   const headY = Math.max(24, roofY - 46);
   if (hi && night >= 0.6) {
-    g.save();
-    g.globalCompositeOperation = 'screen';
+    g.save(); g.globalCompositeOperation = 'lighter';
     for (const lx of towers) {
       const dir = lx < W / 2 ? 1 : -1;
-      const targetX = W / 2 - dir * 20;
-      // A broad, feathered beam plus a narrow hot core reads as stadium light, not a flat triangle.
-      const beam = g.createLinearGradient(lx, headY + 12, targetX, H * 0.66);
-      beam.addColorStop(0, `rgba(205,222,255,${0.095 * night})`);
-      beam.addColorStop(0.55, `rgba(255,244,218,${0.042 * night})`);
-      beam.addColorStop(1, 'rgba(255,244,218,0)');
-      g.fillStyle = beam;
-      g.beginPath(); g.moveTo(lx - 5, headY + 12); g.lineTo(targetX - W * 0.34, H * 0.66);
-      g.lineTo(targetX + W * 0.34, H * 0.66); g.lineTo(lx + 5, headY + 12); g.closePath(); g.fill();
-      g.fillStyle = `rgba(255,244,218,${0.035 * night})`;
-      g.beginPath(); g.moveTo(lx, headY + 12); g.lineTo(targetX - W * 0.12, H * 0.62);
-      g.lineTo(targetX + W * 0.12, H * 0.62); g.closePath(); g.fill();
+      for (const [spread, a] of [[W * 0.38, 0.06], [W * 0.23, 0.06], [W * 0.1, 0.07]]) {
+        g.fillStyle = `rgba(255,236,190,${a * night})`;
+        g.beginPath(); g.moveTo(lx, headY + 12); g.lineTo(W / 2 - dir * 20 - spread, H * 0.64); g.lineTo(W / 2 - dir * 20 + spread, H * 0.64); g.closePath(); g.fill();
+      }
     }
     g.restore();
   }
   for (const lx of towers) {
     g.strokeStyle = INK; g.lineWidth = 4; g.beginPath(); g.moveTo(lx, headY + 20); g.lineTo(lx, standTop); g.stroke();
-    g.save();
-    if (hi && night >= 0.6) {
-      g.shadowColor = '#dce8ff'; g.shadowBlur = 24;
-      // Individual lamp cells create a crisp bright source inside the bloom.
-      for (let i = 0; i < 7; i++) {
-        g.fillStyle = i % 2 ? '#fffbe8' : '#dce8ff';
-        g.fillRect(lx - 17 + i * 5, headY + 5, 3.5, 7);
-      }
-    }
+    g.save(); if (hi && night >= 0.6) { g.shadowColor = '#fff3c4'; g.shadowBlur = 28; }
     g.fillStyle = night >= 0.6 ? '#fffbe8' : '#c9ccd6'; g.strokeStyle = INK; g.lineWidth = 2.5;
     if (G.landmark === 'bolts') {
       g.fillStyle = '#ffd23f';
       g.beginPath(); g.moveTo(lx + 4, headY - 30); g.lineTo(lx - 16, headY + 4); g.lineTo(lx - 2, headY + 4); g.lineTo(lx - 8, headY + 30); g.lineTo(lx + 16, headY - 6); g.lineTo(lx + 2, headY - 6); g.lineTo(lx + 10, headY - 30); g.closePath(); g.fill(); g.stroke();
     } else {
       g.beginPath(); g.moveTo(lx - 24, headY); g.lineTo(lx + 24, headY); g.lineTo(lx + 20, headY + 24); g.lineTo(lx - 20, headY + 24); g.closePath(); g.fill(); g.stroke();
-      if (hi && night >= 0.6) {
-        g.fillStyle = '#fffbe8';
-        for (let i = 0; i < 7; i++) g.fillRect(lx - 17 + i * 5, headY + 5, 3.5, 7);
-      }
     }
     g.restore();
   }
