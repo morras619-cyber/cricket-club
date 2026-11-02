@@ -224,6 +224,14 @@ export class Game {
     panel.hidden = false;
   }
   tick() {
+    // Smooth lateral footwork between deliveries; input only sets a target.
+    const batter = this.S?.batter, move = batter?.move;
+    if (move) {
+      const p = clamp((this.realTime - move.t0) / move.dur, 0, 1);
+      const eased = p * p * (3 - 2 * p);
+      batter.x = lerp(move.from, move.to, eased);
+      if (p >= 1) batter.move = null;
+    }
     const due = [];
     this.timers = this.timers.filter(tm => {
       const ok = tm.real ? this.realTime >= tm.at : this.gameTime >= tm.at;
@@ -1075,8 +1083,21 @@ export class Game {
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
     else if (aiPower) this.ui.hint('SPECIAL BALL! TAP TO DEFEND');
     else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('HOLD · SWIPE · LIFT ON THE RING · TAP TO DEFEND');
-    // before the delivery a tap on the field map enlarges it
-    this.onInput = (type, g) => { if (type === 'down' && this.inMap(g)) this.mapBig = !this.mapBig; };
+    // Before release, horizontal swipes move the striker across the crease.
+    // A map tap keeps its existing behaviour; vertical/diagonal gestures are ignored here.
+    this.onInput = (type, g) => {
+      if (type === 'down' && this.inMap(g)) { this.mapBig = !this.mapBig; return; }
+      if (type !== 'up' || this.inMap(g)) return;
+      const dx = g.ax ?? g.dx, dy = g.ay ?? g.dy;
+      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+      const b = S.batter;
+      const from = b.x;
+      const base = b.move?.to ?? from;
+      const to = clamp(base + Math.sign(dx) * 0.45, -1.1, 1.1);
+      if (Math.abs(to - base) < 0.01) return;
+      b.move = { from, to, t0: this.realTime, dur: 170 };
+      sfx.click();
+    };
     if (opt.waitPower) await opt.waitPower();
     if (opt.hand && !this.bot) handHint(document.getElementById('app')).show(opt.hand);   // (the tutorial: a hand shows what to do, until the player touches the screen or the ball is played)
     if (opt.noBall) {
