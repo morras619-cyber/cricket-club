@@ -54,15 +54,6 @@ export function lateralVelocityAtContact(d) {
   return (after.x - before.x) / (2 * dt);
 }
 
-// A swing can only connect while the ball is physically close to its ideal
-// contact point. This is a spatial reach check, not another timing-grade window.
-export function isBallReachableAtSwing(d, elapsed, maxDistance = 0.9) {
-  if (typeof d?.pos !== 'function' || !Number.isFinite(elapsed) || !d.atContact) return false;
-  const p = d.pos(elapsed), c = d.atContact;
-  if (![p?.x, p?.y, p?.z, c.x, c.y, c.z].every(Number.isFinite)) return false;
-  return Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z) <= maxDistance;
-}
-
 function isAgainstLine(angle, d) {
   const full = ['full', 'yorker', 'good', 'fulltoss'].includes(d.length);
   if (angle < -0.35 && d.xt > 0.15 && full) return true; // dragging a wide full ball to leg
