@@ -1,6 +1,5 @@
 import { CFG } from './config.js';
 import { FULL, batDrain, bowlDrain } from './stamina.js';
-import { confidenceStart, updateConfidence } from './ratings.js';
 
 const freshStint = (p = null) => ({ id: p?.id || null, name: p?.name || null, nation: p?.nation || null, runs: 0, balls: 0, fours: 0, sixes: 0 });
 const freshFig = p => ({ id: p.id, name: p.name, nation: p.nation || null, short: p.short || p.name.split(' ').slice(-1)[0], type: p.bowl || null, balls: 0, runs: 0, wkts: 0, dots: 0 });
@@ -38,22 +37,11 @@ export class Innings {
     // stamina (stamina.js): everyone starts on FULL; people keeps who each id is, for his type
     this.energy = {};
     this.people = {};
-    this.confidence = {};
     // every legal ball as it was played, for the stories told about the match afterwards (chirpfacts.js): who faced it, who bowled it, runs, wicket
     this.detail = [];
   }
 
   energyOf(id) { return id && this.energy[id] != null ? this.energy[id] : (id && START[id]) ?? FULL; }
-  confidenceOf(id) {
-    if (!id) return 50;
-    if (this.confidence[id] == null) this.confidence[id] = confidenceStart(this.people[id]?.composure);
-    return this.confidence[id];
-  }
-  updateBatterConfidence({ runs = 0, wicket = false, missed = false } = {}) {
-    const id = this.cur.id, player = id && this.people[id];
-    if (!id) return;
-    this.confidence[id] = updateConfidence(this.confidenceOf(id), { runs, wicket, missed }, player?.composure ?? 50);
-  }
   tire(id, amount) { if (id) this.energy[id] = Math.max(0, Math.min(FULL, this.energyOf(id) - amount)); }
   // one ball bowled: the man on strike and the bowler tire (or rest) by what happened; the rest of the attack rests a little
   tireBall({ runs = 0, extra = false, missed = false, batter = true }) {
