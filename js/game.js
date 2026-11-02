@@ -1241,7 +1241,17 @@ export class Game {
       if (swing) { sfx.thin(); this.timingBar(err, grade); }
       this.charge.timingStreak(false);
       // let the ball carry on to the stumps or the keeper
-      await this.until(() => this.gameTime - S.ballT0 >= (res.outcome === 'bowled' ? d.tStumps : d.tKeeper));
+      await this.until(() => {
+        if (this.gameTime - S.ballT0 < (res.outcome === 'bowled' ? d.tStumps : d.tKeeper)) return false;
+
+        // Apply the wicket impact during tick(), before this frame is rendered.
+        // Lucky Break is a free hit, so the ball reaches the stumps but does not break them.
+        if (res.outcome === 'bowled' && !fx.lucky) {
+          S.stumps[0] = { dir: rng.range(-1, 1) };
+          this.stumpsBurst(this.oppTeam, 'bat');
+        }
+        return true;
+      });
       S.delivery = null;
       // beaten or bowled: he turns to look back at the stumps
       if (res.outcome === 'bowled' || res.outcome === 'beaten') S.batter.shot = { anim: 'bowled', t0: this.realTime, from: batFrame(S.batter, this.realTime).f };
@@ -1254,8 +1264,6 @@ export class Game {
       inn.extra(1);
       this.fx.word('WIDE BALL!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
     } else if (res.outcome === 'bowled') {
-      S.stumps[0] = { dir: rng.range(-1, 1) };
-      this.stumpsBurst(this.oppTeam, 'bat');
       if (fx.lucky) {   // Lucky Break: a free hit, the stumps are spared
         this.fx.word('FREE HIT · NOT OUT', this.W / 2, this.H * 0.4, { size: 40 });
         inn.ball({ runs: 0 });
