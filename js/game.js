@@ -2203,7 +2203,6 @@ export class Game {
   // Settings-only playtest: opens the bowling preparation screen without starting a match or touching career data.
   async testBowlingPreparation() {
     this.cancelAll();
-    this.ui.hud(false);
     this.S = this.freshScene();
     this.view = 'bowl';
     this.phase = 'bowlprep-test';
