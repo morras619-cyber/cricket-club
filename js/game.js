@@ -1909,7 +1909,7 @@ export class Game {
       if (A && target) {
         const p = Math.min(1, Math.max(0, (t - 0.25) / Math.max(0.3, tArrive - 0.25)));
         A.x = lerp(start.x, target.x, p); A.y = lerp(start.y, target.y, p);
-        const diveSave = sim.intercept?.action === 'dive' && A === fs.find(f => f.id === sim.intercept.fielder.id);
+        const diveSave = (sim.intercept?.action === 'dive' && A.id === sim.intercept.fielder.id) || (sim.save?.action === 'dive' && A.id === sim.save.fielder.id);
         const diveWindow = diveSave && t >= tArrive - 0.38 && t <= tArrive + 0.48;
         A.pose = diveWindow
           ? POSES.dive(Math.sign(target.x - start.x) || 1)
