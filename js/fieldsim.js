@@ -204,6 +204,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
 
   // Ground (or after the bounce): first fielder to cut the ball off, else it reaches the rope.
   const t0 = path.lofted ? path.T : 0;
+  const diveCooldown = new Map();
   for (let t = t0; t < 14; t += 0.05) {
     const p = path.ballAt(t);
     if (outside(p)) {
@@ -228,6 +229,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     // man in array order, making outcomes depend on list order instead of arrival time.
     let hit = null;
     for (const f of outfield) {
+      if ((diveCooldown.get(f.id) ?? -Infinity) > t) continue;
       const distance = dist(f, p);
       const elapsed = t - F.react;
       const run = fielderRunDistance(elapsed, sp);
@@ -242,8 +244,9 @@ export function simulateHit(res, fielders, rng, opts = {}) {
         // The edge of the dive envelope is uncertain; exceptional fielders still won't save every ball.
         const chance = sigmoid(diveMargin + 0.2);
         if (rng.chance(chance)) candidate = { fielder: f, arrival: t, action: 'dive' };
-        else if (!out.nearMiss || diveMargin > out.nearMiss.margin) {
-          out.nearMiss = { fielder: f, point: p, t, short: 0.7, margin: diveMargin };
+        else {
+          diveCooldown.set(f.id, t + 0.8);
+          if (!out.nearMiss || diveMargin > out.nearMiss.margin) out.nearMiss = { fielder: f, point: p, t, short: 0.7, margin: diveMargin };
         }
       }
       if (candidate && (!hit || candidate.arrival < hit.arrival)) hit = candidate;
