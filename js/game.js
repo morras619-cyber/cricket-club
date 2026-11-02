@@ -1095,7 +1095,7 @@ export class Game {
       const base = b.move?.to ?? from;
       const to = clamp(base + Math.sign(dx) * 0.45, -1.1, 1.1);
       if (Math.abs(to - base) < 0.01) return;
-      b.move = { from, to, t0: this.realTime, dur: 170 };
+      b.move = { from, to, dir: Math.sign(to - from), t0: this.realTime, dur: 360 };
       sfx.click();
     };
     if (opt.waitPower) await opt.waitPower();
@@ -3676,7 +3676,7 @@ export class Game {
       const p = batterBack && cam.project(b.x + BAT_BACK_DX, 0, b.z);
       const aura = p && kind === 'bat' && (this.armed.thunder || b.glow === '#5fc8ff') && this.fxSet(this.myTeam);
       if (aura) this.thunderAura(ctx, aura, p, 'back');
-      if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) { if (aura) this.thunderAura(ctx, aura, p, 'front'); return; }
+      if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow, move: b.move })) { if (aura) this.thunderAura(ctx, aura, p, 'front'); return; }
       // from the bowling camera, the opposing batter's hand-drawn front view
       const q = !batterBack && cam.project(b.x, 0, b.z);
       if (q && drawBowlSprite(ctx, q.x, q.y, q.k, batFrame(b, this.realTime).f, this.oppTeam, false, 'batfront', b.people)) return;
