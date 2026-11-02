@@ -27,6 +27,7 @@ test('ground-ball interception selects the earliest-arriving fielder, not array 
 
   assert.equal(first.intercept?.fielder.id, 'near');
   assert.equal(reversed.intercept?.fielder.id, 'near');
+  assert.equal(first.intercept?.action, 'dive');
 });
 
 test('a fast straight ground shot can beat fielders who are too far away', () => {
@@ -40,4 +41,13 @@ test('a fast straight ground shot can beat fielders who are too far away', () =>
   assert.equal(result.kind, 'four');
   assert.equal(result.intercept, null);
   assert.equal(result.save, null);
+});
+
+test('a failed dive can let a fast ground shot escape', () => {
+  const fielder = { id: 'only', name: 'Only', x: 0, y: 15 };
+  const shot = { angle: 0, v: 30, loft: false };
+  const result = simulateHit(shot, [fielder], { chance: () => false });
+
+  assert.ok(result.nearMiss);
+  assert.equal(result.intercept, null);
 });
