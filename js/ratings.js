@@ -6,6 +6,16 @@ import { staminaEffect } from './stamina.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+// Confidence is match state; composure sets a player's starting point and resilience.
+export const confidenceStart = composure => clamp(42 + (composure ?? 50) * 0.16, 42, 58);
+export const confidenceEffect = confidence => clamp(1 + ((confidence ?? 50) - 50) / 1000, 0.95, 1.05);
+export function updateConfidence(current, { runs = 0, wicket = false, missed = false } = {}, composure = 50) {
+  const base = wicket ? -12 : missed ? -4 : runs >= 6 ? 5 : runs >= 4 ? 3 : runs >= 2 ? 2 : runs === 1 ? 1 : -1;
+  const resilience = 1.25 - clamp(composure ?? 50, 0, 100) / 200;
+  const response = base < 0 ? resilience : 0.9 + clamp(composure ?? 50, 0, 100) / 500;
+  return clamp((current ?? confidenceStart(composure)) + base * response, 0, 100);
+}
+
 // how hard he hits: the ball's speed off the bat, 1 for a 75. A perfect loft carries about 62 m
 // for a 64 (a six only over the short side), 71 m for a 75 and 100 m and more for a 94 (carry
 // grows with the square of the speed)
@@ -17,7 +27,7 @@ export const bowlerSqueeze = bowlSkill => clamp(1 - ((bowlSkill ?? 75) - 75) / 3
 
 // the computer batting: how widely his timing strays (bigger = more mistimed). A 94 is
 // clean almost every ball, a 64 mistimes plenty; a good bowler (yours) makes him mistime more
-export const aiSpread = skill => clamp(1 + (75 - (skill ?? 75)) / 90, 0.9, 1.45);
+export const aiSpread = (skill, confidence = 50) => clamp((1 + (75 - (skill ?? 75)) / 90) / confidenceEffect(confidence), 0.9, 1.5);
 export const bowlerTrouble = bowlSkill => clamp(1 + ((bowlSkill ?? 75) - 75) / 150, 0.85, 1.15);
 
 // your bowler: a better one moves it more and bowls quicker
