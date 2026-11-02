@@ -38,33 +38,6 @@ export function aimVector(path, x0, y0, x, y, tUp, minPx = 28) {
   return { dx: best.dx / best.len * wl, dy: best.dy / best.len * wl };
 }
 
-// Fastest deliberate flick speed, in CSS pixels per second. Uses the same qualifying
-// path segment as aimVector; falls back to the whole gesture when the path is too short.
-export function swipeSpeed(path, x0, y0, x, y, t0, tUp, minPx = 28) {
-  const whole = Math.hypot(x - x0, y - y0);
-  if (path && path.length >= 3) {
-    let best = 0;
-    for (let i = 0; i < path.length - 1; i++) {
-      for (let j = i + 1; j < path.length; j++) {
-        const dt = path[j].t - path[i].t;
-        const len = Math.hypot(path[j].x - path[i].x, path[j].y - path[i].y);
-        if (dt >= 24 && len >= 12) { best = Math.max(best, len / dt); break; }
-      }
-    }
-    if (best > 0) return best * 1000;
-  }
-  const duration = Math.max(1, tUp - t0);
-  return whole < minPx ? 0 : whole / duration * 1000;
-}
-
-// Converts physical gesture speed into a bounded launch-speed multiplier.
-// The soft end still produces a playable contact; a fast flick adds meaningful carry.
-export function swipePowerFromSpeed(speedPxPerSec) {
-  const t = Math.max(0, Math.min(1, (speedPxPerSec - 250) / (1500 - 250)));
-  const eased = t * t * (3 - 2 * t);
-  return 0.85 + eased * 0.25;
-}
-
 const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };
 // how far the ball strays from the swipe's direction (a standard deviation, radians), by the timing grade: a clean contact goes where the finger went
 const SPREAD = { perfect: 0.025, good: 0.07, early: 0.16, late: 0.16 };
@@ -78,7 +51,7 @@ function isAgainstLine(angle, d) {
 
 // fx: { thunder, mirror, tornado, shatter }
 // strength: how hard the batter hits (ratings.js hitStrength), scales the ball's speed off the bat
-export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, strength = 1, swipePower = 1 }) {
+export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, strength = 1 }) {
   if (!shot || shot.kind === 'leave') {
     return { outcome: d.onStumps ? 'bowled' : 'leave', grade: 'leave' };
   }
@@ -145,7 +118,7 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   } else if (fx.mirror && !loft && powerOk) {
     forced = { four: true, uncatchable: true };
   }
-  let v = (14 + 20 * power) * (1 + rng.range(-0.04, 0.04)) * strength * swipePower * (fx.pitch?.carry || 1);   // (the pitch: shots carry on a flat deck, die on a slow one)
+  let v = (14 + 20 * power) * (1 + rng.range(-0.04, 0.04)) * strength * (fx.pitch?.carry || 1);   // (the pitch: shots carry on a flat deck, die on a slow one)
   if (fx.tornado) {
     v = Math.min(v, 15); loft = false; launchDeg = 0; forced = { cap: 2 };
   }
