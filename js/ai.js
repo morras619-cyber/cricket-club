@@ -31,6 +31,12 @@ export function typeParams(kind, type, rng) {
   }
 }
 
+// After conceding a wide, the AI moves its next line back towards the stumps.
+// The correction is applied to the replacement delivery, not the legal-ball count.
+export function correctAfterWide(spec) {
+  return { ...spec, x: Math.min(0.15, (spec.x ?? 0) + 0.35) };
+}
+
 // The AI's 30 deliveries for one innings, fixed by the seed so challenges replay exactly.
 // kind is either 'pace' | 'spin' (one bowler all innings) or the over plan: one bowler
 // (a squads.js player) per over, each bowling his own type, speeds and variations.
