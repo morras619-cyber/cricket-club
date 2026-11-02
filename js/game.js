@@ -982,7 +982,7 @@ export class Game {
     if (physicallyReachable && fx.match.edgeP && (grade === 'early' || grade === 'late') && rng.chance(fx.match.edgeP)) grade = 'edge';   // (an aggressive opener early on)
     if (physicallyReachable && myC === 'steady' && swing && !swing.defend && grade !== 'perfect' && grade !== 'good') grade = 'good';   // Steady Hands only upgrades reachable contact
     // defending is forgiving: anywhere in the wide window keeps the ball out
-    if (swing?.defend) grade = Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
+    if (swing?.defend) grade = physicallyReachable && Math.abs(err) <= CFG.timing.defend + (w.okay - CFG.timing.okay) ? 'defend' : 'miss';
     this.lastTiming = { err, grade };
     let res;
     if (fx.meteor) {
