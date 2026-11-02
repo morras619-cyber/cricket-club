@@ -8,7 +8,7 @@ import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './tea
 import { makeDelivery, lengthById, isWideDelivery } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
-import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
+import { aiBowlingScript, aiBat, aiStance, applyPower, correctAfterWide } from './ai.js';
 import { gestureToDelivery, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
@@ -949,7 +949,7 @@ export class Game {
     this.fillCrease(inn);
     this.hud(inn);
     this.ui.shotButton(true, this.shotLoft, () => { this.shotLoft = !this.shotLoft; sfx.click(); return this.shotLoft; });
-    let redo = null;
+    let redo = null, wideRedo = null;
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
       if (inn.balls % 6 === 0 && this.overStarted !== inn.balls) { this.overStarted = inn.balls; await this.startOver(inn); }
@@ -958,9 +958,17 @@ export class Game {
       const wk = inn.wkts;
       // a no-ball from the AI's bowler (now and then an overstep): +1 run, the ball is played as a free hit,
       // and the replacement ball is a free hit too
-      const spec = redo?.spec || script[ballNo - 1];
+      const spec = redo?.spec || wideRedo || script[ballNo - 1];
       const nb = redo || spec.power || this.mode === 'tutorial' ? null : makeRng((this.seed * 977 + ballNo * 131 + (this.rebowls || 0) * 7) >>> 0).chance(0.025) ? 'step' : null;
       await this.batBall(inn, ballNo, spec, { noBall: nb, freeHit: !!nb || !!redo });
+      if (this.lastWide) {
+        this.lastWide = false;
+        wideRedo = correctAfterWide(spec);
+        this.rebowls = (this.rebowls || 0) + 1;
+        await this.sleepReal(this.bot ? 50 : 250);
+        continue; // a wide adds a run but does not use a legal ball
+      }
+      wideRedo = null;
       if (nb) { inn.nbPlay = false; this.rebowls = (this.rebowls || 0) + 1; }
       if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
@@ -1240,6 +1248,7 @@ export class Game {
 
     // ----- outcomes -----
     if (res.outcome === 'wide') {
+      this.lastWide = true;
       inn.extra(1);
       this.fx.word('WIDE BALL!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });
     } else if (res.outcome === 'bowled') {
