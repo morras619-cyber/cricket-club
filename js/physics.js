@@ -9,15 +9,13 @@ export const KEEPER_Z = -3;
 export const STUMP_HALF = 0.15; // stump half-width plus ball radius
 export const STUMP_TOP = 0.72;
 
-// Arcade wide envelope at the batter's contact plane. The thresholds leave the normal
-// off/leg-stump lanes playable while classifying the two outer bowling lanes as wides.
-export const WIDE_OFF_X = 0.48;
+// Arcade wide limit on the batter's leg side only. The same world-space side appears
+// on the left in the batting view and on the right in the bowling view.
 export const WIDE_LEG_X = -0.43;
-export const WIDE_HEIGHT = 2.05;
 
 export function isWideDelivery(delivery) {
   const p = delivery.atContact || delivery.pos(delivery.tContact);
-  return p.x > WIDE_OFF_X || p.x < WIDE_LEG_X || p.y > WIDE_HEIGHT;
+  return p.x < WIDE_LEG_X;
 }
 
 export const LANES = [
