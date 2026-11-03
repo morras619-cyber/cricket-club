@@ -3072,7 +3072,7 @@ function careerAuction(c, body) {
       t.append(el('small', '', title), el('b', '', rep[k].label), el('span', '', rep[k].detail));
       report.append(t);
     }
-    stage.append(report);
+    // Keep the scouting verdict beneath the live bid controls in the featured-player layout.
     const row = el('div', 'menu row auc-btns');
     const pass = el('button', 'bigbtn auc-pass');
     pass.append(el('b', '', 'Pass'), el('small', '', 'Save your budget'));
@@ -3097,7 +3097,7 @@ function careerAuction(c, body) {
       saveProfile(profile); renderCareer();
     });
     row.append(pass, bidBtn);
-    main.append(row);
+    main.append(row, report);
     stage.append(main);
     const skip = el('button', 'chipbtn ghostchip', 'Skip the rest of the auction');
     skip.addEventListener('click', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
