@@ -3003,7 +3003,7 @@ function careerAuction(c, body) {
     head.append(crest, who, squad, budget);
     stage.append(head);
     const shown = Math.min(A.lots.length, 16);
-    stage.append(el('div', 'auc-lot', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
+    const lotMarker = el('div', 'auc-lot auc-lot-footer', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`);
     const last = A.results.at(-1);
     if (last) stage.append(el('div', 'auc-last' + (last.team === c.club ? ' mine' : ''), last.team ? `Last: ${c.players[last.pid].name} → ${last.team === c.club ? 'YOU' : teamById(last.team).name} · ${money(last.price)}` : `Last: ${c.players[last.pid].name} went unsold`));
     // the player, and what he costs
@@ -3098,7 +3098,7 @@ function careerAuction(c, body) {
     });
     row.append(pass, bidBtn);
     main.append(row, report);
-    stage.append(main);
+    stage.append(main, lotMarker);
     const skip = el('button', 'chipbtn ghostchip', 'Skip the rest of the auction');
     skip.addEventListener('click', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
     skip.classList.add('auc-skip-top');
