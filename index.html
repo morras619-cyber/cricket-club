@@ -11,7 +11,117 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Baloo+2:wght@500;600;700;800&family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&display=swap">
 <link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/auction-mobile.css?v=auction-showcase-1">
+<link rel="stylesheet" href="css/auction-mobile.css?v=auction-layout-2">
+
+<style id="auction-layout-refinement">
+/* Full-width auction profile: keep the portrait, valuation and scouting details in one coherent column. */
+@media (max-width:700px) and (orientation:portrait) {
+  #career .screen-inner.wide {
+    height:100%;
+    min-height:0;
+    box-sizing:border-box;
+    overflow-y:auto !important;
+    overflow-x:hidden;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:calc(22px + env(safe-area-inset-bottom)) !important;
+  }
+  #careerBody { min-width:0; padding-bottom:12px; }
+  .auction-mobile > .auc-main {
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:stretch !important;
+    width:100% !important;
+    gap:10px !important;
+    padding:10px !important;
+    box-sizing:border-box !important;
+  }
+  .auction-mobile .auc-player {
+    width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+    grid-template-columns:minmax(86px,28%) minmax(0,1fr) 54px !important;
+    gap:9px !important;
+    padding:10px !important;
+    border-radius:14px !important;
+    background:
+      radial-gradient(ellipse at 0% 0%,rgba(49,129,255,.24),transparent 58%),
+      linear-gradient(115deg,rgba(28,51,111,.98),rgba(7,15,43,.98)) !important;
+    border-color:rgba(255,211,89,.42) !important;
+  }
+  .auction-mobile .auc-player-art {
+    width:100% !important;
+    height:116px !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+  }
+  .auction-mobile .auc-player-art canvas,
+  .auction-mobile .auc-player-art img,
+  .auction-mobile .auc-player-face {
+    width:100% !important;
+    height:108px !important;
+    object-fit:contain !important;
+  }
+  .auction-mobile .auc-player-copy { gap:6px !important; }
+  .auction-mobile .auc-player-kicker { font-size:9px !important; }
+  .auction-mobile .auc-player-name {
+    font-size:clamp(19px,5.5vw,26px) !important;
+    line-height:1 !important;
+  }
+  .auction-mobile .auc-player-origin { font-size:11px !important; }
+  .auction-mobile .auc-player-tags span { font-size:9px !important; padding:4px 7px !important; }
+  .auction-mobile .auc-player-rating { width:52px !important; min-height:64px !important; }
+  .auction-mobile .auc-side {
+    width:100% !important;
+    min-width:0 !important;
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    align-items:stretch !important;
+    gap:8px !important;
+  }
+  .auction-mobile .auc-price {
+    grid-column:1 / -1 !important;
+    min-width:0 !important;
+    min-height:78px;
+    box-sizing:border-box !important;
+  }
+  .auction-mobile .auc-rivals {
+    grid-column:1 / -1 !important;
+    min-width:0 !important;
+    align-content:center !important;
+    min-height:44px;
+  }
+  .auction-mobile .auc-facts {
+    grid-column:1 / -1 !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    padding:10px !important;
+    gap:9px 12px !important;
+  }
+  .auction-mobile .auc-facts > div {
+    padding-bottom:5px;
+    border-bottom:1px solid rgba(151,179,235,.14);
+    font-size:11px !important;
+  }
+  .auction-mobile .auc-note { grid-column:1 / -1 !important; padding:2px 3px; }
+  #careerNav {
+    position:relative !important;
+    z-index:2;
+    margin-top:8px;
+  }
+}
+@media (max-width:390px) and (orientation:portrait) {
+  .auction-mobile .auc-player {
+    grid-template-columns:78px minmax(0,1fr) 46px !important;
+    gap:7px !important;
+    padding:8px !important;
+  }
+  .auction-mobile .auc-player-art { height:104px !important; }
+  .auction-mobile .auc-player-art canvas,
+  .auction-mobile .auc-player-art img,
+  .auction-mobile .auc-player-face { height:96px !important; }
+  .auction-mobile .auc-player-rating { width:44px !important; }
+}
+</style>
 </head>
 <body>
 <!--APP-->
