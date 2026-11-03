@@ -3072,11 +3072,11 @@ function careerAuction(c, body) {
       saveProfile(profile); renderCareer();
     });
     row.append(pass, bidBtn);
-    stage.insertBefore(row, main);
     const skip = el('button', 'chipbtn ghostchip', 'Skip the rest of the auction');
     skip.addEventListener('click', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
     skip.classList.add('auc-skip-top');
     stage.insertBefore(skip, stage.children[1] || null);
+    stage.insertBefore(row, skip.nextSibling);
     body.append(stage);
   }
   if (lot) {

@@ -181,3 +181,152 @@
     position: static;
   }
 }
+
+
+/* Mobile auction rebuild: force a real vertical flow so action controls can never
+   overlay the player card, regardless of the desktop career-panel layout rules. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .lotcard.auction.auction-mobile {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 9px !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    position: relative !important;
+    padding: 10px !important;
+  }
+
+  .auction-mobile > .auc-club,
+  .auction-mobile > .auc-skip-top,
+  .auction-mobile > .auc-lot,
+  .auction-mobile > .auc-last,
+  .auction-mobile > .auc-btns,
+  .auction-mobile > .auc-main,
+  .auction-mobile > .auc-power,
+  .auction-mobile > .auc-report {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    float: none !important;
+    transform: none !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    order: initial !important;
+  }
+
+  .auction-mobile > .auc-skip-top {
+    order: 2 !important;
+    margin: 0 !important;
+  }
+
+  .auction-mobile > .auc-btns {
+    order: 3 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    padding: 7px !important;
+    z-index: 1 !important;
+    border: 1px solid rgba(255, 221, 100, .55) !important;
+    border-radius: 13px !important;
+    background: linear-gradient(180deg, rgba(10, 20, 51, .98), rgba(4, 9, 29, .98)) !important;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, .28) !important;
+  }
+
+  .auction-mobile > .auc-btns > button {
+    position: relative !important;
+    inset: auto !important;
+    flex: 1 1 0 !important;
+    width: 50% !important;
+    min-width: 0 !important;
+    min-height: 58px !important;
+    margin: 0 !important;
+    padding: 8px 5px !important;
+    transform: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    white-space: normal !important;
+    line-height: 1.05 !important;
+  }
+
+  .auction-mobile > .auc-btns > button b {
+    display: block !important;
+    font-size: clamp(17px, 4.7vw, 21px) !important;
+  }
+
+  .auction-mobile > .auc-btns > button small {
+    display: block !important;
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+  }
+
+  .auction-mobile > .auc-main {
+    order: 4 !important;
+    display: grid !important;
+    grid-template-columns: minmax(112px, 39%) minmax(0, 1fr) !important;
+    align-items: start !important;
+    gap: 9px !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  .auction-mobile > .auc-main > .auc-card,
+  .auction-mobile > .auc-main > .auc-side {
+    position: relative !important;
+    inset: auto !important;
+    float: none !important;
+    transform: none !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .auction-mobile > .auc-main > .auc-card {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+    overflow: visible !important;
+  }
+
+  .auction-mobile > .auc-main > .auc-card canvas,
+  .auction-mobile > .auc-main > .auc-card img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .auction-mobile > .auc-main > .auc-side {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 7px !important;
+  }
+
+  .auction-mobile > .auc-lot { order: 5 !important; }
+  .auction-mobile > .auc-last { order: 6 !important; }
+  .auction-mobile > .auc-power { order: 7 !important; }
+  .auction-mobile > .auc-report { order: 8 !important; }
+}
+
+@media (max-width: 390px) and (orientation: portrait) {
+  .auction-mobile > .auc-main {
+    grid-template-columns: minmax(100px, 36%) minmax(0, 1fr) !important;
+    gap: 7px !important;
+  }
+  .auction-mobile > .auc-btns > button {
+    min-height: 54px !important;
+  }
+}
