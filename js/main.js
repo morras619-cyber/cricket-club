@@ -319,25 +319,17 @@ function renderSettings() {
   $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 4 hours)' : 'Match limit: OFF (play freely)';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
   $('setProfiler').textContent = `Performance profiler: ${game.profilerEnabled ? 'on' : 'off'}`;
-  // Keep the auction shortcut in Settings without adding another permanent screen element to the HTML.
-  if (!$('setAuctionTest')) {
-    const testAuction = document.createElement('button');
-    testAuction.id = 'setAuctionTest';
-    testAuction.className = 'bigbtn';
-    testAuction.textContent = 'Test the auction screen';
-    $('setOffice').after(testAuction);
-    testAuction.addEventListener('click', () => {
-      unlockAudio(); sfx.click();
-      const test = newCareer(randomSeed());
-      const clubId = test.divisions?.d3?.[0];
-      if (!clubId || !chooseClub(test, clubId)) { ui.toast('Could not prepare the auction test'); return; }
-      startAuction(test);
-      auctionTestCareer = test;
-      careerView = 'hub';
-      renderCareer();
-    });
-  }
 }
+$('setAuctionTest').addEventListener('click', () => {
+  unlockAudio(); sfx.click();
+  const test = newCareer(randomSeed());
+  const clubId = test.divisions?.d3?.[0];
+  if (!clubId || !chooseClub(test, clubId)) { ui.toast('Could not prepare the auction test'); return; }
+  startAuction(test);
+  auctionTestCareer = test;
+  careerView = 'hub';
+  renderCareer();
+});
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });
 $('settingsBack').addEventListener('click', () => { const f = settingsFrom; settingsFrom = null; (f || renderHome)(); });
 $('setClubMap').addEventListener('click', () => { unlockAudio(); sfx.click(); renderClubMap(true); });
