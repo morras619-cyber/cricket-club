@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Baloo+2:wght@500;600;700;800&family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&display=swap">
 <link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/auction-mobile.css?v=auction-hero-3">
+<link rel="stylesheet" href="css/auction-mobile.css?v=auction-premium-4">
 
 <style id="auction-layout-refinement">
 /* Full-width auction profile: keep the portrait, valuation and scouting details in one coherent column. */
@@ -254,6 +254,291 @@
   .auction-mobile .auc-player-rating b { font-size:30px !important; }
   .auction-mobile .auc-player-rating small { font-size:9px !important; }
   .auction-mobile .auc-side { margin-top:1px !important; }
+}
+</style>
+
+<style id="auction-premium-showcase">
+@media (max-width:700px) and (orientation:portrait) {
+  .auction-mobile { gap:10px !important; padding:10px !important; }
+  .auction-mobile .auc-club {
+    display:grid !important;
+    grid-template-columns:42px minmax(0,1fr) auto !important;
+    grid-template-areas:"crest who budget" "crest squad budget" !important;
+    gap:5px 9px !important;
+    align-items:center !important;
+    padding:10px !important;
+    border:1px solid rgba(92,171,255,.55) !important;
+    border-radius:13px !important;
+    background:linear-gradient(105deg,rgba(8,24,65,.98),rgba(3,11,36,.98)) !important;
+    box-shadow:inset 0 1px rgba(255,255,255,.1),0 4px 12px rgba(0,0,0,.25) !important;
+  }
+  .auction-mobile .auc-crest { grid-area:crest !important; width:40px !important; height:40px !important; object-fit:contain !important; }
+  .auction-mobile .auc-who { grid-area:who !important; min-width:0 !important; }
+  .auction-mobile .auc-who b { font-size:clamp(14px,4vw,18px) !important; }
+  .auction-mobile .auc-who small { font-size:10px !important; }
+  .auction-mobile .auc-squad { grid-area:squad !important; display:flex !important; align-items:center !important; gap:7px !important; min-width:0 !important; }
+  .auction-mobile .auc-squad small { white-space:nowrap !important; font-size:8px !important; }
+  .auction-mobile .auc-pips { flex:1 !important; min-width:0 !important; }
+  .auction-mobile .auc-budget { grid-area:budget !important; min-width:72px !important; }
+  .auction-mobile .auc-main {
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:stretch !important;
+    gap:9px !important;
+    width:100% !important;
+    padding:0 !important;
+    border:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+  }
+  .auction-mobile .auc-player.auc-player-feature {
+    position:relative !important;
+    display:block !important;
+    width:100% !important;
+    height:clamp(285px,42vh,365px) !important;
+    min-height:285px !important;
+    padding:0 !important;
+    overflow:hidden !important;
+    isolation:isolate !important;
+    border:2px solid #e9b942 !important;
+    border-radius:15px !important;
+    background:
+      radial-gradient(ellipse at 50% 30%,rgba(30,119,255,.72),transparent 54%),
+      linear-gradient(180deg,#1b4a9c 0%,#10295f 54%,#07152f 100%) !important;
+    box-shadow:inset 0 1px rgba(255,255,255,.32),0 0 0 3px rgba(255,199,65,.11),0 8px 18px rgba(0,0,0,.42) !important;
+  }
+  .auction-mobile .auc-player-feature::before {
+    content:"";
+    position:absolute;
+    inset:0;
+    z-index:1;
+    pointer-events:none;
+    background:
+      radial-gradient(ellipse at 50% 43%,transparent 18%,rgba(2,9,28,.08) 61%,rgba(2,8,24,.42) 100%),
+      linear-gradient(180deg,rgba(4,11,31,.02) 42%,rgba(4,10,28,.2) 65%,rgba(3,8,24,.98) 100%);
+  }
+  .auction-mobile .auc-player-feature::after {
+    content:"";
+    position:absolute;
+    z-index:1;
+    top:0; left:0; right:0;
+    height:5px;
+    background:linear-gradient(90deg,#f6b92f,#fff0a0,#e9a22b);
+    box-shadow:0 2px 12px rgba(255,195,55,.55);
+    pointer-events:none;
+  }
+  .auction-mobile .auc-player-feature .auc-player-art {
+    position:absolute !important;
+    inset:0 !important;
+    z-index:0 !important;
+    display:flex !important;
+    align-items:flex-end !important;
+    justify-content:center !important;
+    width:100% !important;
+    height:100% !important;
+    margin:0 !important;
+    padding:0 !important;
+    overflow:hidden !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:
+      radial-gradient(ellipse at 50% 42%,rgba(49,143,255,.22),transparent 62%),
+      linear-gradient(180deg,transparent 55%,rgba(2,8,25,.25)) !important;
+    box-shadow:none !important;
+  }
+  .auction-mobile .auc-player-feature .auc-player-art > *,
+  .auction-mobile .auc-player-feature .auc-player-art .fut-pic,
+  .auction-mobile .auc-player-feature .auc-player-art .fut-paint {
+    position:absolute !important;
+    left:50% !important;
+    bottom:0 !important;
+    display:flex !important;
+    align-items:flex-end !important;
+    justify-content:center !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:none !important;
+    max-height:none !important;
+    transform:translateX(-50%) !important;
+    background:transparent !important;
+  }
+  .auction-mobile .auc-player-feature .auc-player-art canvas,
+  .auction-mobile .auc-player-feature .auc-player-art img {
+    display:block !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:none !important;
+    max-height:none !important;
+    object-fit:contain !important;
+    object-position:center bottom !important;
+    border:0 !important;
+    border-radius:0 !important;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.55)) !important;
+  }
+  .auction-mobile .auc-player-feature .auc-player-copy {
+    position:absolute !important;
+    z-index:2 !important;
+    left:0 !important;
+    right:0 !important;
+    bottom:0 !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    gap:5px !important;
+    min-width:0 !important;
+    padding:48px 13px 13px !important;
+    background:linear-gradient(0deg,rgba(2,8,24,.99),rgba(2,8,24,.86) 54%,transparent) !important;
+  }
+  .auction-mobile .auc-player-feature .auc-player-kicker {
+    color:#ffe28a !important;
+    font-size:9px !important;
+    letter-spacing:.18em !important;
+    text-shadow:0 1px 4px #000 !important;
+  }
+  .auction-mobile .auc-player-feature .auc-player-name {
+    color:#fff !important;
+    font-size:clamp(27px,7.5vw,38px) !important;
+    line-height:.96 !important;
+    letter-spacing:.025em !important;
+    text-shadow:0 3px 9px rgba(0,0,0,.95),0 0 15px rgba(30,120,255,.4) !important;
+  }
+  .auction-mobile .auc-player-feature .auc-player-origin { color:#e5edff !important; font-size:11px !important; }
+  .auction-mobile .auc-player-feature .auc-player-tags { display:flex !important; flex-wrap:wrap !important; gap:6px !important; }
+  .auction-mobile .auc-player-feature .auc-player-tags span {
+    padding:4px 9px !important;
+    color:#fff !important;
+    background:rgba(16,39,87,.9) !important;
+    border:1px solid rgba(177,205,255,.45) !important;
+    font-size:9px !important;
+  }
+  .auction-mobile .auc-player-feature .auc-player-rating {
+    position:absolute !important;
+    z-index:3 !important;
+    top:15px !important;
+    left:15px !important;
+    right:auto !important;
+    width:74px !important;
+    min-height:86px !important;
+    border:2px solid #ffe58a !important;
+    border-radius:12px 12px 18px 18px !important;
+    background:linear-gradient(155deg,#fff09a 0%,#f2bd42 55%,#a85e17 100%) !important;
+    color:#1b1830 !important;
+    box-shadow:0 5px 14px rgba(0,0,0,.48),inset 0 1px rgba(255,255,255,.8) !important;
+  }
+  .auction-mobile .auc-player-feature .auc-player-rating b { font-size:37px !important; }
+  .auction-mobile .auc-player-feature .auc-player-rating small { font-size:10px !important; }
+  .auction-mobile .auc-player-stats {
+    display:grid !important;
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    width:100% !important;
+    padding:10px 5px !important;
+    border:1px solid rgba(148,182,244,.65) !important;
+    border-radius:12px !important;
+    background:linear-gradient(100deg,#06132f,#10264d,#06132f) !important;
+    box-shadow:inset 0 1px rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.28) !important;
+  }
+  .auction-mobile .auc-player-stat {
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:4px !important;
+    min-width:0 !important;
+    padding:2px 3px !important;
+    border-right:1px solid rgba(211,222,255,.24) !important;
+  }
+  .auction-mobile .auc-player-stat:last-child { border:0 !important; }
+  .auction-mobile .auc-player-stat small { color:#e5edff !important; font-size:8px !important; font-weight:900 !important; letter-spacing:.08em !important; }
+  .auction-mobile .auc-player-stat b { color:#ffda55 !important; font:900 clamp(19px,5vw,26px)/1 'Barlow Condensed',sans-serif !important; text-shadow:0 2px 8px rgba(255,191,47,.2) !important; }
+  .auction-mobile .auc-side {
+    display:grid !important;
+    grid-template-columns:minmax(0,1.4fr) minmax(100px,.9fr) !important;
+    gap:8px !important;
+    width:100% !important;
+    margin:0 !important;
+  }
+  .auction-mobile .auc-price {
+    grid-column:1 !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:center !important;
+    min-height:76px !important;
+    padding:8px !important;
+    border:1px solid #e6b94b !important;
+    border-radius:12px !important;
+    background:linear-gradient(105deg,rgba(49,38,42,.98),rgba(7,16,42,.98)) !important;
+    text-align:center !important;
+  }
+  .auction-mobile .auc-price > small { color:#fff !important; font-size:9px !important; letter-spacing:.08em !important; }
+  .auction-mobile .auc-price > b { color:#ffe16a !important; font:900 clamp(27px,7vw,35px)/1 'Barlow Condensed',sans-serif !important; }
+  .auction-mobile .auc-price > span { color:#fff !important; font-size:11px !important; text-align:center !important; }
+  .auction-mobile .auc-price > em { color:#cbd9fb !important; font-size:9px !important; }
+  .auction-mobile .auc-rivals {
+    grid-column:2 !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:5px !important;
+    min-width:0 !important;
+    padding:8px !important;
+    border:1px solid rgba(148,182,244,.55) !important;
+    border-radius:12px !important;
+    background:linear-gradient(145deg,#0c214b,#050d25) !important;
+  }
+  .auction-mobile .auc-rivals .rv-count { margin:0 !important; color:#fff !important; font-size:11px !important; font-weight:900 !important; text-align:center !important; }
+  .auction-mobile .auc-rivals .rv { width:28px !important; height:28px !important; }
+  .auction-mobile .auc-facts { grid-column:1 / -1 !important; }
+  .auction-mobile .auc-note { grid-column:1 / -1 !important; }
+  .auction-mobile .auc-btns {
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:9px !important;
+    width:100% !important;
+    margin:0 !important;
+  }
+  .auction-mobile .auc-btns .bigbtn {
+    min-width:0 !important;
+    min-height:72px !important;
+    padding:10px 5px !important;
+    border-radius:13px !important;
+    box-shadow:0 5px 0 rgba(0,0,0,.35),inset 0 1px rgba(255,255,255,.48) !important;
+  }
+  .auction-mobile .auc-btns .auc-pass {
+    border:2px solid #7fd0ff !important;
+    background:linear-gradient(180deg,#1db5ff,#0060d9) !important;
+    color:#fff !important;
+  }
+  .auction-mobile .auc-btns .auc-bid {
+    border:2px solid #ffe58a !important;
+    background:linear-gradient(180deg,#ffe26b,#e59b16) !important;
+    color:#20152a !important;
+  }
+  .auction-mobile .auc-btns .bigbtn b { font-size:clamp(19px,5.4vw,26px) !important; }
+  .auction-mobile .auc-btns .bigbtn small { font-size:10px !important; }
+  .auction-mobile .auc-report { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:6px !important; }
+  .auction-mobile .auc-report > div { min-width:0 !important; padding:7px !important; border-radius:8px !important; }
+  .auction-mobile .auc-lot-footer {
+    align-self:center !important;
+    min-width:150px !important;
+    margin:1px auto 0 !important;
+    padding:8px 22px !important;
+    border:2px solid #f0c14b !important;
+    border-radius:999px !important;
+    background:linear-gradient(180deg,#172d60,#080f2d) !important;
+    color:#ffe16a !important;
+    font:italic 900 16px/1 'Barlow Condensed',sans-serif !important;
+    text-align:center !important;
+    box-shadow:0 4px 10px rgba(0,0,0,.3) !important;
+  }
+}
+@media (max-width:390px) and (orientation:portrait) {
+  .auction-mobile .auc-player-feature { height:clamp(265px,39vh,320px) !important; min-height:265px !important; }
+  .auction-mobile .auc-player-feature .auc-player-rating { width:64px !important; min-height:76px !important; }
+  .auction-mobile .auc-player-stat small { font-size:7px !important; }
+  .auction-mobile .auc-side { grid-template-columns:minmax(0,1.25fr) minmax(92px,.85fr) !important; }
+  .auction-mobile .auc-btns .bigbtn { min-height:66px !important; }
 }
 </style>
 </head>
