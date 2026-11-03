@@ -224,13 +224,16 @@
     order: initial !important;
   }
 
+  .auction-mobile > .auc-last { order: 1 !important; }
+  .auction-mobile > .auc-lot { order: 2 !important; }
+
   .auction-mobile > .auc-skip-top {
-    order: 2 !important;
+    order: 3 !important;
     margin: 0 !important;
   }
 
   .auction-mobile > .auc-btns {
-    order: 3 !important;
+    order: 4 !important;
     display: flex !important;
     flex-direction: row !important;
     align-items: stretch !important;
@@ -275,7 +278,7 @@
   }
 
   .auction-mobile > .auc-main {
-    order: 4 !important;
+    order: 5 !important;
     display: grid !important;
     grid-template-columns: minmax(112px, 39%) minmax(0, 1fr) !important;
     align-items: start !important;
@@ -315,10 +318,8 @@
     gap: 7px !important;
   }
 
-  .auction-mobile > .auc-lot { order: 5 !important; }
-  .auction-mobile > .auc-last { order: 6 !important; }
-  .auction-mobile > .auc-power { order: 7 !important; }
-  .auction-mobile > .auc-report { order: 8 !important; }
+  .auction-mobile > .auc-power { order: 6 !important; }
+  .auction-mobile > .auc-report { order: 7 !important; }
 }
 
 @media (max-width: 390px) and (orientation: portrait) {
@@ -328,5 +329,90 @@
   }
   .auction-mobile > .auc-btns > button {
     min-height: 54px !important;
+  }
+}
+
+
+/* Premium live-lot treatment: clear hierarchy, stronger auction energy, and readable
+   player/price panels while keeping Sixcharge's comic-book stadium identity. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .lotcard.auction.auction-mobile::before {
+    content: "●  LIVE AUCTION  /  PLAYER ON THE BLOCK";
+    display: block;
+    order: -1;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 5px 10px;
+    border: 1px solid rgba(255, 210, 63, .55);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(108, 22, 31, .96), rgba(24, 30, 69, .96));
+    color: #fff2bd;
+    font: 800 10px/1.2 system-ui, sans-serif;
+    letter-spacing: .12em;
+    text-shadow: 0 1px 3px #000;
+    box-shadow: 0 0 12px rgba(255, 190, 42, .15);
+  }
+
+  .auction-mobile > .auc-club {
+    padding: 9px 10px !important;
+    border: 1px solid rgba(112, 190, 255, .35);
+    border-radius: 12px;
+    background: linear-gradient(110deg, rgba(15, 32, 78, .96), rgba(5, 12, 37, .96));
+    box-shadow: inset 0 1px rgba(255,255,255,.08);
+  }
+
+  .auction-mobile > .auc-lot {
+    align-self: center !important;
+    width: fit-content !important;
+    min-width: 112px;
+    padding: 6px 15px !important;
+    border: 1px solid rgba(255, 210, 63, .85);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #283d82, #111b49);
+    color: #ffe16b;
+    font-weight: 900;
+    letter-spacing: .1em;
+    text-align: center;
+    box-shadow: 0 3px 0 rgba(0,0,0,.35), 0 0 14px rgba(255,198,48,.12);
+  }
+
+  .auction-mobile > .auc-skip-top {
+    border: 1px solid rgba(158, 180, 255, .35) !important;
+    border-radius: 9px !important;
+    background: rgba(8, 16, 43, .9) !important;
+    color: #dce7ff !important;
+    font-weight: 800;
+  }
+
+  .auction-mobile > .auc-main {
+    padding: 9px !important;
+    border: 1px solid rgba(106, 168, 255, .32);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(13, 24, 61, .94), rgba(4, 9, 29, .96));
+    box-shadow: inset 0 1px rgba(255,255,255,.06), 0 5px 16px rgba(0,0,0,.18);
+  }
+
+  .auction-mobile .auc-price {
+    border: 1px solid rgba(255, 210, 63, .55) !important;
+    border-radius: 11px !important;
+    background: linear-gradient(145deg, rgba(39, 34, 73, .98), rgba(8, 13, 38, .98)) !important;
+    box-shadow: inset 0 1px rgba(255,255,255,.08);
+  }
+
+  .auction-mobile .auc-price > b {
+    color: #ffe36c !important;
+    text-shadow: 0 2px 8px rgba(255, 188, 35, .35);
+  }
+
+  .auction-mobile > .auc-power {
+    border: 1px solid rgba(255, 210, 63, .48) !important;
+    border-radius: 11px !important;
+    background: linear-gradient(100deg, rgba(49, 38, 70, .96), rgba(8, 14, 40, .96)) !important;
+  }
+
+  .auction-mobile > .auc-report > div {
+    border-radius: 10px !important;
+    box-shadow: inset 0 1px rgba(255,255,255,.05);
   }
 }
