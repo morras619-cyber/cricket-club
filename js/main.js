@@ -3012,8 +3012,12 @@ function careerAuction(c, body) {
     const player = el('div', 'auc-player');
     const playerArt = el('div', 'auc-player-art');
     const kitTeam = p.team ? teamById(p.team) : me;
-    const face = portraitFace(p, kitTeam, 96) || faceEl(p, kitTeam, 112, 'auc-player-face', true);
-    playerArt.append(face);
+    // Use the full painted character artwork where available; a square face crop made the player feel like a thumbnail.
+    const painted = paintedPortrait(p, kitTeam);
+    const artwork = painted || (p.heroId
+      ? portrait(heroById(p.heroId), 280, 'celebrate')
+      : faceEl(p, kitTeam, 260, 'auc-player-face', true));
+    playerArt.append(artwork);
     const playerCopy = el('div', 'auc-player-copy');
     playerCopy.append(el('small', 'auc-player-kicker', 'PLAYER ON THE BLOCK'));
     playerCopy.append(el('b', 'auc-player-name', p.name));
