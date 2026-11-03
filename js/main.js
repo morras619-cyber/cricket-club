@@ -2963,7 +2963,7 @@ function careerAuction(c, body) {
     body.append(done);
   } else {
     const p = c.players[lot.pid], A = c.auction, me = teamById(c.club);
-    const stage = el('div', 'lotcard auction');
+    const stage = el('div', 'lotcard auction auction-mobile');
     // your franchise: crest, division and rating, squad places, money left
     const head = el('div', 'auc-club');
     const crest = el('img', 'auc-crest'); crest.src = logoSrc(c.club); crest.alt = '';
@@ -2984,7 +2984,7 @@ function careerAuction(c, body) {
     // the player, and what he costs
     const main = el('div', 'auc-main');
     const cardBox = el('div', 'auc-card');
-    cardBox.append(futCard(p, { size: Math.max(120, Math.min(210, window.innerWidth * 0.5, window.innerHeight * (window.innerHeight < 700 ? 0.24 : 0.3))) }));
+    cardBox.append(futCard(p, { size: Math.max(112, Math.min(164, window.innerWidth * 0.38, window.innerHeight * 0.21)) }));
     const side = el('div', 'auc-side');
     const price = el('div', 'auc-price');
     price.append(el('small', '', lot.leader ? 'CURRENT BID' : 'OPENING PRICE'), el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'No bids yet'));
@@ -3050,7 +3050,8 @@ function careerAuction(c, body) {
     stage.append(row);
     const skip = el('button', 'chipbtn ghostchip', 'Skip the rest of the auction');
     skip.addEventListener('click', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
-    stage.append(skip);
+    skip.classList.add('auc-skip-top');
+    stage.insertBefore(skip, stage.children[1] || null);
     body.append(stage);
   }
   if (lot) {
