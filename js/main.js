@@ -3009,7 +3009,7 @@ function careerAuction(c, body) {
     // the player, and what he costs
     const main = el('div', 'auc-main');
     // Replace the oversized collectible card with a clean player showcase.
-    const player = el('div', 'auc-player');
+    const player = el('div', 'auc-player auc-player-feature');
     const playerArt = el('div', 'auc-player-art');
     const kitTeam = p.team ? teamById(p.team) : me;
     // Use the full painted character artwork where available; a square face crop made the player feel like a thumbnail.
@@ -3030,7 +3030,13 @@ function careerAuction(c, body) {
     const rating = el('div', 'auc-player-rating');
     rating.append(el('b', '', String(ovr(p))), el('small', '', (p.role || 'BAT').toUpperCase()));
     player.append(playerArt, playerCopy, rating);
-    const side = el('div', 'auc-side');
+    const statStrip = el('div', 'auc-player-stats');
+    for (const [label, val] of [['BATTING', p.bat ?? '—'], ['BOWLING', p.bowlSkill ?? '—'], ['POTENTIAL', p.pot ?? '—'], ['AGE', p.age ?? '—']]) {
+      const stat = el('div', 'auc-player-stat');
+      stat.append(el('small', '', label), el('b', '', String(val)));
+      statStrip.append(stat);
+    }
+    const side = el('div', 'auc-side auc-market-row');
     const price = el('div', 'auc-price');
     price.append(el('small', '', lot.leader ? 'CURRENT BID' : 'OPENING PRICE'), el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'No bids yet'));
     if (lot.leader) price.append(el('em', '', `Opened ${money(openingPrice(p))} · next ${money(nextBid(lot))}`));
@@ -3053,8 +3059,7 @@ function careerAuction(c, body) {
     const stillIn = all.filter(r => r.state === 'in').length;
     rivals.append(el('p', 'rv-count', stillIn ? `${stillIn} club${stillIn > 1 ? 's' : ''} still in` : lead && lead.team === c.club ? 'No club can raise' : 'No one else in'));
     side.append(price, rivals, facts, el('p', 'auc-note', ageNote(p)));
-    main.append(player, side);
-    stage.append(main);
+    main.append(player, statStrip, side);
     if (p.heroId) {
       const pw = el('div', 'auc-power');
       pw.append(el('b', '', heroById(p.heroId).power.name), el('span', '', heroById(p.heroId).power.desc));
@@ -3092,11 +3097,12 @@ function careerAuction(c, body) {
       saveProfile(profile); renderCareer();
     });
     row.append(pass, bidBtn);
+    main.append(row);
+    stage.append(main);
     const skip = el('button', 'chipbtn ghostchip', 'Skip the rest of the auction');
     skip.addEventListener('click', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
     skip.classList.add('auc-skip-top');
     stage.insertBefore(skip, stage.children[1] || null);
-    stage.insertBefore(row, skip.nextSibling);
     body.append(stage);
   }
   if (lot) {
