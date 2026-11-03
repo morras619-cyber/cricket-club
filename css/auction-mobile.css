@@ -1,0 +1,183 @@
+/* Sixcharge auction: compact portrait layout and reachable controls. Scoped to the career auction only. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .lotcard.auction.auction-mobile {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding: clamp(8px, 2.2vw, 12px);
+    gap: 7px;
+  }
+
+  .auction-mobile .auc-club {
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .auction-mobile .auc-crest {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+  }
+
+  .auction-mobile .auc-who {
+    min-width: 0;
+    flex: 1 1 110px;
+  }
+
+  .auction-mobile .auc-squad,
+  .auction-mobile .auc-budget {
+    margin: 0;
+  }
+
+  .auction-mobile .auc-lot,
+  .auction-mobile .auc-last {
+    margin-block: 2px;
+    padding-block: 4px;
+  }
+
+  .auction-mobile .auc-skip-top {
+    display: block;
+    width: 100%;
+    min-height: 32px;
+    margin: 2px 0 4px;
+    padding: 5px 10px;
+    font-size: 12px;
+    line-height: 1.15;
+  }
+
+  .auction-mobile .auc-main {
+    display: grid;
+    grid-template-columns: minmax(104px, 38%) minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .auction-mobile .auc-card,
+  .auction-mobile .auc-side {
+    min-width: 0;
+    margin: 0;
+  }
+
+  .auction-mobile .auc-side {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .auction-mobile .auc-price {
+    padding: 6px 8px;
+  }
+
+  .auction-mobile .auc-price > b {
+    font-size: clamp(21px, 6vw, 30px);
+    line-height: 1;
+  }
+
+  .auction-mobile .auc-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px 7px;
+  }
+
+  .auction-mobile .auc-facts > div {
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+  }
+
+  .auction-mobile .auc-rivals {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .auction-mobile .auc-note {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .auction-mobile .auc-power {
+    margin-block: 2px;
+    padding: 6px 8px;
+  }
+
+  .auction-mobile .auc-report {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    margin-block: 2px;
+  }
+
+  .auction-mobile .auc-report > div {
+    min-width: 0;
+    padding: 5px 7px;
+  }
+
+  .auction-mobile .auc-report > div > span {
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  .auction-mobile .auc-btns {
+    position: sticky;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 5px);
+    z-index: 30;
+    display: flex;
+    gap: 8px;
+    margin: 4px -2px 0;
+    padding: 7px;
+    border: 1px solid rgba(255, 244, 218, .22);
+    border-radius: 12px;
+    background: rgba(16, 22, 50, .96);
+    box-shadow: 0 -5px 18px rgba(0, 0, 0, .28);
+    backdrop-filter: blur(8px);
+  }
+
+  .auction-mobile .auc-btns > button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 46px;
+    margin: 0;
+    padding: 6px 8px;
+  }
+
+  .auction-mobile .auc-btns > button b {
+    font-size: clamp(15px, 4vw, 19px);
+  }
+
+  .auction-mobile .auc-btns > button small {
+    font-size: 10px;
+    line-height: 1.1;
+  }
+}
+
+@media (max-width: 380px) and (orientation: portrait) {
+  .auction-mobile .auc-main {
+    grid-template-columns: minmax(96px, 35%) minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .auction-mobile .auc-report > div > span {
+    display: none;
+  }
+}
+
+@media (max-height: 700px) and (max-width: 700px) and (orientation: portrait) {
+  .auction-mobile .auc-last,
+  .auction-mobile .auc-note {
+    display: none;
+  }
+
+  .auction-mobile .auc-report {
+    gap: 4px;
+  }
+
+  .auction-mobile .auc-btns {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 2px);
+  }
+}
