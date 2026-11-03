@@ -124,9 +124,7 @@
   }
 
   .auction-mobile .auc-btns {
-    position: sticky;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 5px);
-    z-index: 30;
+    position: static;
     display: flex;
     gap: 8px;
     margin: 4px -2px 0;
@@ -135,7 +133,7 @@
     border-radius: 12px;
     background: rgba(16, 22, 50, .96);
     box-shadow: 0 -5px 18px rgba(0, 0, 0, .28);
-    backdrop-filter: blur(8px);
+    backdrop-filter: none;
   }
 
   .auction-mobile .auc-btns > button {
@@ -180,6 +178,6 @@
   }
 
   .auction-mobile .auc-btns {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 2px);
+    position: static;
   }
 }
