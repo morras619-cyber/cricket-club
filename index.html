@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Baloo+2:wght@500;600;700;800&family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&display=swap">
 <link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/auction-mobile.css?v=auction-layout-2">
+<link rel="stylesheet" href="css/auction-mobile.css?v=auction-hero-3">
 
 <style id="auction-layout-refinement">
 /* Full-width auction profile: keep the portrait, valuation and scouting details in one coherent column. */
@@ -120,6 +120,140 @@
   .auction-mobile .auc-player-art img,
   .auction-mobile .auc-player-face { height:96px !important; }
   .auction-mobile .auc-player-rating { width:44px !important; }
+}
+</style>
+
+<style id="auction-hero-artwork">
+/* Auction hero: let the full character artwork dominate instead of presenting another small portrait tile. */
+@media (max-width:700px) and (orientation:portrait) {
+  .auction-mobile > .auc-main { gap:9px !important; padding:8px !important; }
+  .auction-mobile .auc-player {
+    position:relative !important;
+    display:block !important;
+    width:100% !important;
+    height:clamp(245px,39vh,330px) !important;
+    min-height:245px !important;
+    padding:0 !important;
+    overflow:hidden !important;
+    isolation:isolate;
+    border:1px solid rgba(255,211,89,.78) !important;
+    border-radius:15px !important;
+    background:
+      radial-gradient(ellipse at 50% 18%,rgba(36,135,255,.44),transparent 52%),
+      linear-gradient(180deg,#183b82 0%,#091638 75%,#050b20 100%) !important;
+    box-shadow:inset 0 1px rgba(255,255,255,.24),0 7px 18px rgba(0,0,0,.42),0 0 18px rgba(38,124,255,.16) !important;
+  }
+  .auction-mobile .auc-player::before {
+    content:"";
+    position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:
+      radial-gradient(ellipse at 50% 28%,transparent 18%,rgba(3,9,28,.08) 58%,rgba(3,8,25,.6) 100%),
+      linear-gradient(180deg,rgba(4,12,34,.04) 35%,rgba(4,10,29,.24) 58%,rgba(3,8,25,.98) 100%);
+  }
+  .auction-mobile .auc-player::after {
+    content:"";
+    position:absolute; z-index:1; pointer-events:none;
+    left:0; right:0; top:0; height:4px;
+    background:linear-gradient(90deg,#f9d45f,#fff0a7,#f9a928);
+    box-shadow:0 2px 12px rgba(255,202,69,.45);
+  }
+  .auction-mobile .auc-player-art {
+    position:absolute !important;
+    inset:0 !important;
+    z-index:0;
+    display:flex !important;
+    align-items:flex-end !important;
+    justify-content:center !important;
+    width:100% !important;
+    height:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    overflow:hidden !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:
+      radial-gradient(ellipse at 50% 38%,rgba(52,139,255,.26),transparent 60%),
+      linear-gradient(180deg,rgba(10,31,76,.1),rgba(4,10,28,.12)) !important;
+    box-shadow:none !important;
+  }
+  .auction-mobile .auc-player-art > *,
+  .auction-mobile .auc-player-art .fut-pic,
+  .auction-mobile .auc-player-art .fut-paint {
+    position:absolute !important;
+    left:50% !important;
+    bottom:0 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:none !important;
+    max-height:none !important;
+    transform:translateX(-50%) !important;
+    display:flex !important;
+    align-items:flex-end !important;
+    justify-content:center !important;
+    overflow:hidden !important;
+    background:transparent !important;
+  }
+  .auction-mobile .auc-player-art canvas,
+  .auction-mobile .auc-player-art img {
+    display:block !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:none !important;
+    max-height:none !important;
+    object-fit:contain !important;
+    object-position:center bottom !important;
+    border:0 !important;
+    border-radius:0 !important;
+    filter:drop-shadow(0 5px 9px rgba(0,0,0,.48));
+  }
+  .auction-mobile .auc-player-copy {
+    position:absolute !important;
+    z-index:2 !important;
+    left:0 !important; right:66px !important; bottom:0 !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    justify-content:flex-end !important;
+    gap:5px !important;
+    min-width:0 !important;
+    padding:42px 12px 13px !important;
+    background:linear-gradient(0deg,rgba(3,8,25,.98),rgba(3,8,25,.76) 68%,transparent) !important;
+  }
+  .auction-mobile .auc-player-kicker {
+    color:#ffe28a !important;
+    font-size:9px !important;
+    letter-spacing:.17em !important;
+    text-shadow:0 1px 4px #000;
+  }
+  .auction-mobile .auc-player-name {
+    color:#fff !important;
+    font-size:clamp(25px,7vw,34px) !important;
+    line-height:.98 !important;
+    letter-spacing:.025em !important;
+    text-shadow:0 2px 8px rgba(0,0,0,.9),0 0 14px rgba(38,126,255,.3) !important;
+  }
+  .auction-mobile .auc-player-origin { color:#e5edff !important; font-size:11px !important; }
+  .auction-mobile .auc-player-tags { gap:5px !important; }
+  .auction-mobile .auc-player-tags span {
+    padding:4px 7px !important;
+    color:#fff !important;
+    background:rgba(16,39,87,.88) !important;
+    border-color:rgba(177,205,255,.42) !important;
+    font-size:9px !important;
+  }
+  .auction-mobile .auc-player-rating {
+    position:absolute !important;
+    z-index:3 !important;
+    top:12px !important; right:12px !important;
+    width:58px !important; min-height:66px !important;
+    border:1px solid #ffe28a !important;
+    background:linear-gradient(155deg,#ffe98c 0%,#e4a72e 56%,#98531a 100%) !important;
+    box-shadow:0 4px 12px rgba(0,0,0,.48),inset 0 1px rgba(255,255,255,.72) !important;
+  }
+  .auction-mobile .auc-player-rating b { font-size:30px !important; }
+  .auction-mobile .auc-player-rating small { font-size:9px !important; }
+  .auction-mobile .auc-side { margin-top:1px !important; }
 }
 </style>
 </head>
@@ -718,6 +852,6 @@ vs a random team</small></button>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </div>
 <!--/APP-->
-<script type="module" src="js/main.js?v=auction-showcase-1"></script>
+<script type="module" src="js/main.js?v=auction-hero-3"></script>
 </body>
 </html>
