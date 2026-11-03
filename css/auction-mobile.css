@@ -163,7 +163,9 @@
   }
 
   .auction-mobile .auc-report > div > span {
-    display: none;
+    display: block;
+    font-size: 9px;
+    line-height: 1.1;
   }
 }
 
