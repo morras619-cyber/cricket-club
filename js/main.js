@@ -11,7 +11,7 @@ import { futCard, portraitFace, paintedPortrait } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds.js';
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
-import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
+import { newCareer, chooseClub, startAuction, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
   value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, CANDIDATES, HIRE_AT, FLAGS, candidatesOf, candidateById, wageText, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
@@ -319,6 +319,24 @@ function renderSettings() {
   $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 4 hours)' : 'Match limit: OFF (play freely)';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
   $('setProfiler').textContent = `Performance profiler: ${game.profilerEnabled ? 'on' : 'off'}`;
+  // Keep the auction shortcut in Settings without adding another permanent screen element to the HTML.
+  if (!$('setAuctionTest')) {
+    const testAuction = document.createElement('button');
+    testAuction.id = 'setAuctionTest';
+    testAuction.className = 'bigbtn';
+    testAuction.textContent = 'Test the auction screen';
+    $('setOffice').after(testAuction);
+    testAuction.addEventListener('click', () => {
+      unlockAudio(); sfx.click();
+      const test = newCareer(randomSeed());
+      const clubId = test.divisions?.d3?.[0];
+      if (!clubId || !chooseClub(test, clubId)) { ui.toast('Could not prepare the auction test'); return; }
+      startAuction(test);
+      auctionTestCareer = test;
+      careerView = 'hub';
+      renderCareer();
+    });
+  }
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });
 $('settingsBack').addEventListener('click', () => { const f = settingsFrom; settingsFrom = null; (f || renderHome)(); });
@@ -1297,7 +1315,13 @@ async function careerOpening() {
 // ---------- career: the Super League ----------
 let careerView = 'hub'; // 'hub' | 'squad'
 let careerNotes = [];
+let auctionTestCareer = null; // temporary career used only by the Settings auction test
 function career() {
+  if (auctionTestCareer) {
+    ensureBuild(auctionTestCareer);
+    syncMine(auctionTestCareer);
+    return auctionTestCareer;
+  }
   if (!profile.career) { profile.career = newCareer(randomSeed()); saveProfile(profile); }
   ensureBuild(profile.career);
   syncMine(profile.career);
@@ -2664,6 +2688,7 @@ function renderCareer(notes = careerNotes) {
   $('career').classList.toggle('is-auction', bidding);
   $('career').classList.toggle('in-auction', c.phase === 'auction' && careerView !== 'squad'); // the auction's own backdrop (css), also on its closing card
   $('careerTitle').textContent = bidding ? `Season ${c.season} auction` : `Season ${c.season}`;
+  $('careerHome').textContent = auctionTestCareer ? 'Settings' : 'Home';
   const club = c.club ? teamById(c.club) : null;
   $('careerLede').textContent = club && c.phase === 'trials' ? `${club.name} · ${divisionName(divisionOf(c, c.club))} · picking the first squad`
     : club
@@ -2695,6 +2720,14 @@ async function enterCareer() {
 }
 $('btnLeague').addEventListener('click', enterCareer);
 $('careerHome').addEventListener('click', () => {
+  if (auctionTestCareer) {
+    auctionTestCareer = null;
+    careerView = 'hub';
+    if (profile.career) { ensureBuild(profile.career); syncMine(profile.career); }
+    else { mineOf = undefined; setMyClub(null); }
+    renderSettings();
+    return;
+  }
   const c = career(), was = careerView;
   careerView = 'hub';
   if (mapReady(c)) renderClubMap(); else if (was === 'squad') renderCareer(); else renderTitle();
@@ -2949,7 +2982,7 @@ function careerTrials(c, body) {
 function careerAuction(c, body) {
   const lot = currentLot(c);
   const mine = clubPlayers(c, c.club);
-  coachOnce('auction', DEV.auction).then(shown => {
+  if (!auctionTestCareer) coachOnce('auction', DEV.auction).then(shown => {
     // short of players with the money running out: once a season
     if (!shown && lot && mine.length < MIN_SQUAD - 2 && c.money < 0.8) coachOnce(`auctionLow-${c.season}`, DEV.auctionLow);
   });
