@@ -1774,6 +1774,13 @@ export class Game {
     if ((sim.kind === 'six' && !o.caught) || (sim.kind === 'four' && !o.saved)) await this.sleepReal(this.bot ? 0 : 1100);
   }
 
+  // a no-ball that was bowled and played is over: it is not a legal ball, so the next ball is bowled in its place. True if there was one.
+  endNoBall(inn) {
+    if (!this.nbBall) return false;
+    this.nbBall = null; inn.nbPlay = false;
+    return true;
+  }
+
   // ---------- bowling innings ----------
   async bowlingInnings(inn) {
     this.phase = 'bowl';
@@ -1799,7 +1806,7 @@ export class Game {
       }
       const wk = inn.wkts;
       let r = await this.bowlBall(inn, ballNo);
-      if (this.nbBall) { this.nbBall = null; inn.nbPlay = false; r = { rebowl: true }; }   // (a no-ball was bowled and played: it does not count, bowl it again)
+      if (this.endNoBall(inn)) r = { rebowl: true };   // (a no-ball was bowled and played: it does not count, bowl it again)
       if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
       if (!inn.done()) this.prepPlayers(inn); // the pair after any change of strike, before the next ball
@@ -3041,7 +3048,8 @@ export class Game {
       await this.sleepReal(this.bot ? 100 : 2300);
       while (inn.balls < N) {
         const wk = inn.wkts;
-        const r = await this.bowlBall(inn, inn.balls + 1, { hint: inn.balls === 0 ? 'SWIPE FROM YOUR BOWLER UP THE PITCH' : undefined });
+        let r = await this.bowlBall(inn, inn.balls + 1, { hint: inn.balls === 0 ? 'SWIPE FROM YOUR BOWLER UP THE PITCH' : undefined });
+        if (this.endNoBall(inn)) { r = { rebowl: true }; this.rebowls = (this.rebowls || 0) + 1; }   // (a no-ball in the nets does not count either: without this every ball after it was played as a no-ball, and the six never ended)
         if (!inn.cur.id) inn.setBatter(netBat);
         if (inn.wkts > wk) inn.setPartner(netMate);
         this.hud(inn);

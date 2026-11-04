@@ -39,11 +39,14 @@ await page.evaluate(() => document.getElementById('coachSkip').click()); await p
 check(await page.evaluate(() => window.__sixcharge.profile.tutorialOffered === true && window.__sixcharge.profile.tutorialDone === false && document.getElementById('coach').hidden), 'a "Later" is remembered: he does not ask again');
 check(/Go to the nets/.test(await page.textContent('#careerBody')), 'a new club goes to the nets, with nobody signed');
 check(await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('sixcharge.profile.v1')).career; return c.custom.chant === 'vipers' && c.custom.pitch === 'turner'; }), 'the chant and the pitch chosen are the club\'s');
+// (the third ball bowled in the nets is an overstep, a no-ball: it must not count, and the next balls must count as usual)
+await page.evaluate(() => { const g = window.__sixcharge.game, cap = g.captureBowlGesture.bind(g); let n = 0; window.__nbForced = 0; g.captureBowlGesture = async (...a) => { const G = await cap(...a); if (++n === 3) { G.grade = 'bad'; G.hesitated = false; window.__nbForced++; } return G; }; });
 await page.evaluate(() => [...document.querySelectorAll('#careerBody button')].find(b => /Go to the nets/.test(b.textContent)).click());
 await page.waitForFunction(() => document.querySelectorAll('.tcard').length === 12, null, { timeout: 240000 });
 check(true, 'twelve candidates were tried and the pick screen is up');
 if (process.env.SHOTS_DIR) { await page.waitForTimeout(500); await page.screenshot({ path: join(process.env.SHOTS_DIR, 'trials-pick.png') }); }
 for (const k of ['bat', 'bowl']) check(await page.evaluate(kind => { const pg = [...document.querySelectorAll('#careerBody .pages > .page')].find(p => p.querySelector(`.tcard[data-k="${kind}"]`)); pg.scrollTop = pg.scrollHeight; const cards = [...pg.querySelectorAll('.tcard')], last = cards.at(-1).getBoundingClientRect(), r = pg.getBoundingClientRect(); const ok = cards.length === 6 && last.bottom <= r.bottom + 1 && last.top >= r.top; pg.scrollTop = 0; return ok; }, k), `the last ${k === 'bat' ? 'batter' : 'bowler'} of the six can be reached on the list (it scrolls when the screen is short)`);
+check(await page.evaluate(() => window.__nbForced === 1 && Object.values(window.__sixcharge.profile.career.trial.results.bowls).length === 6 && Object.values(window.__sixcharge.profile.career.trial.results.bowls).every(r => r.balls === 4)), 'a no-ball bowled in the nets does not count, and every bowler still bowls exactly four balls');
 const lines = await page.evaluate(() => [...document.querySelectorAll('.tcard .tr')].map(e => e.textContent));
 check(lines.length === 12 && lines.every(l => /^Nets: /.test(l)), `every candidate has a net result (${lines[0]} | ${lines[6]})`);
 await page.evaluate(() => {
