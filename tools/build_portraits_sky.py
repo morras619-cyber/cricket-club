@@ -145,16 +145,17 @@ def cut_out(tile, inset=9):
 
 
 def face_square(p):
-    """[x, y, size] of the square of the picture that holds his head and shoulders (the squad photos)."""
+    """[x, y, size] of the square of the picture that holds his whole head and neck (the squad photos). These cut-outs end at the
+    shoulders and are taller than wide, so the square is as tall as the picture, centred on the face; what falls beside the picture
+    is filled by the photo's colour backdrop."""
     a = np.array(p).astype(np.float32)
-    H = a.shape[0]
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     skin = (a[..., 3] > 200) & (r > g) & (g > b) & (r > 90) & (r - b > 35) & (r < 250)
-    skin[int(H * 0.42):] = False
+    skin[int(a.shape[0] * 0.55):] = False
     xs = np.nonzero(skin)[1]
     cx = float(np.median(xs)) if xs.size > 50 else p.width / 2
-    s = round(0.65 * H)
-    return [round(cx - s / 2), -round(0.065 * H), s]
+    s = p.height
+    return [round(min(max(cx - s / 2, min(0, p.width - s)), max(0, p.width - s))), 0, s]
 
 
 def main():
