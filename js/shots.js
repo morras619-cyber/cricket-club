@@ -54,11 +54,28 @@ export function lateralVelocityAtContact(d) {
   return (after.x - before.x) / (2 * dt);
 }
 
-function isAgainstLine(angle, d) {
-  const full = ['full', 'yorker', 'good', 'fulltoss'].includes(d.length);
-  if (angle < -0.35 && d.xt > 0.15 && full) return true; // dragging a wide full ball to leg
-  if (angle > 0.6 && d.xt < 0.05 && (d.length === 'full' || d.length === 'yorker')) return true; // cutting a straight full ball
-  return false;
+// ---------- the line of the ball, and the shot that goes with it ----------
+// Every ball has a way it is best played. A ball outside off is driven or cut to the off side, a straight one goes down the ground, one on the pads is flicked
+// to leg; a ball still swinging or turning across is played where it is heading; a short one is cut if it is wide and pulled if it is not. A shot that goes
+// the way the ball goes is struck cleanly and runs away; a shot against the line loses its power, strays, and is the one that finds the edge or the stumps.
+// How much a mistake costs depends on how good the ball is: the more it moves and the faster it comes, the harder it is to play against its line.
+export function idealAngle(d) {
+  const x = (d.atContact?.x ?? d.xt ?? 0) + 0.08 * lateralVelocityAtContact(d);
+  if (d.length === 'short' || d.length === 'bouncer') return x > 0.22 ? 1.2 : x < -0.05 ? -1.15 : -0.9;
+  return Math.max(-1.15, Math.min(1.15, x * 1.9));
+}
+const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+// q: 1 = with the line, 0 = right against it; mis = 1 - q. A clean zone of 0.45 rad (about 26 degrees) either side, and none past 1.2.
+export function lineMatch(angle, d) {
+  const ideal = idealAngle(d), diff = Math.abs(wrap(angle - ideal));
+  const q = Math.max(0, Math.min(1, 1 - (diff - 0.45) / 0.75));
+  return { ideal, diff, q, mis: 1 - q };
+}
+// 0.7 (a gentle ball) to 1.7 (a swinging or turning one, quick): how hard the ball is to play against its line
+export function ballDifficulty(d) {
+  const mv = Math.max(0, Math.min(1, ((Math.abs(d.swing) || 0) + 1.5 * (Math.abs(d.move) || 0)) / 0.7));
+  const pace = Math.max(0, Math.min(1, ((d.kmh || 120) - 105) / 50));
+  return 0.7 + 0.7 * mv + 0.3 * pace;
 }
 
 // fx: { thunder, mirror, tornado, shatter }
@@ -88,8 +105,28 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   }
 
   let power = POWER[grade];
-  let angle = shot.angle + errMs * 0.0035 + rng.normal() * SPREAD[grade];
+  // with the line or against it: the shot's direction against the way the ball is going (the powers that force their own result are not judged)
+  const judged = !fx.thunder && !fx.mirror && !fx.tornado;
+  const lm = judged ? lineMatch(shot.angle, d) : { ideal: shot.angle, diff: 0, q: 1, mis: 0 };
+  if (judged && shot.loft) { lm.mis = Math.min(1, lm.mis * 1.2); lm.q = 1 - lm.mis; }   // (lofting against the line is worse still)
+  if (judged && lm.mis > 0.3) {
+    // a good ball played against its line: beaten (and bowled if it was on the stumps) or edged. A well-timed shot is spared more often.
+    const k = (lm.mis - 0.3) / 0.7, spare = grade === 'perfect' ? 0.45 : grade === 'good' ? 0.75 : 1;
+    const p = Math.min(0.7, k * 0.5 * ballDifficulty(d) * spare);
+    if (rng.chance(p)) {
+      if (rng.chance(d.onStumps ? 0.7 : 0.45)) return { outcome: d.onStumps ? 'bowled' : 'beaten', grade, line: lm, label: 'BEATEN BY THE LINE' };
+      return { outcome: 'edge', grade: 'edge', label: 'AGAINST THE LINE', line: lm, offset: { x: rng.range(-0.25, 1.5), y: rng.range(0.35, 1.25) } };
+    }
+  }
+  // through the gate: a mistimed swing at a full or good ball on the stumps can miss it altogether (a yorker is the hardest to keep out); against the line, more so.
+  // (the AI batters have this check of their own, in ai.js, and ask for none here)
+  if (!fx.noGate && (grade === 'early' || grade === 'late') && d.onStumps && ['good', 'full', 'yorker', 'fulltoss'].includes(d.length)) {
+    const pg = (d.length === 'yorker' ? 0.4 : d.length === 'fulltoss' ? 0.08 : 0.2) * (fx.gateK ?? 1) * (0.8 + 0.8 * lm.mis);
+    if (rng.chance(pg)) return { outcome: 'bowled', grade: 'miss', line: lm, label: 'THROUGH THE GATE' };
+  }
+  let angle = shot.angle + errMs * 0.0035 + rng.normal() * SPREAD[grade] * (1.6 - 0.8 * lm.q);
   let loft = shot.loft;
+  power *= 0.6 + 0.5 * lm.q;   // (with the line: struck cleanly; against it: it dies off the bat)
 
   // The ball carries lateral momentum into the bat. Playing with that movement
   // adds a little power; playing against it costs power and makes redirection harder.
@@ -119,15 +156,8 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
       if (loft) power *= 0.93; // the rope is closer behind square
     }
   }
-  if (isAgainstLine(shot.angle, d)) {
-    power *= 0.7;
-    label = 'AGAINST THE LINE';
-    if (grade !== 'perfect' && rng.chance(0.5)) {
-      loft = true; power = 0.42; launchDeg = 55 + rng.range(0, 15);
-      angle = (rng.chance(0.5) ? -1 : 1) * rng.range(1.6, 2.6);
-      label = 'TOP EDGE';
-    }
-  }
+  if (judged && lm.mis > 0.55) label = 'AGAINST THE LINE';
+  else if (judged && lm.q > 0.9 && grade === 'perfect' && !label) label = 'WITH THE LINE';
 
   let forced = null;
   const good = grade === 'perfect' || grade === 'good';
@@ -142,5 +172,5 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   if (fx.tornado) {
     v = Math.min(v, 15); loft = false; launchDeg = 0; forced = { cap: 2 };
   }
-  return { outcome: 'hit', grade, angle, loft, launchDeg, v, forced, label, roll: fx.pitch?.roll || 1 };
+  return { outcome: 'hit', grade, angle, loft, launchDeg, v, forced, label, roll: fx.pitch?.roll || 1, line: lm };
 }

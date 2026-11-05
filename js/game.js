@@ -866,7 +866,7 @@ export class Game {
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
     else if (aiPower) this.ui.hint('SPECIAL BALL! TAP TO DEFEND');
-    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('HOLD · SWIPE · LIFT ON THE RING · TAP TO DEFEND');
+    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND');
     // before the delivery a tap on the field map enlarges it
     this.onInput = (type, g) => { if (type === 'down' && !this.nets && this.inMap(g)) this.mapBig = !this.mapBig; };
     if (opt.waitPower) await opt.waitPower();
@@ -1025,6 +1025,7 @@ export class Game {
       await this.sleep(res.outcome === 'edge' ? 350 : 520);
     } else {
       if (swing) { sfx.thin(); this.timingBar(err, grade); }
+      if (res.label && swing) this.fx.word(res.label, this.W / 2, this.H * 0.4, { size: 30, color: '#ff8a8a', stroke: INK, rot: 0, dur: 1200 });   // (beaten by the line, or through the gate)
       this.charge.timingStreak(false);
       // let the ball carry on to the stumps or the keeper
       await this.until(() => this.gameTime - S.ballT0 >= (res.outcome === 'bowled' ? d.tStumps : d.tKeeper));
@@ -3043,7 +3044,7 @@ export class Game {
       await this.sleepReal(this.bot ? 100 : 2300);
       for (let k = 0; k < N; k++) {
         const spec = script[(bi * N + k) % script.length];
-        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? 'HOLD · SWIPE · LIFT ON THE RING · TAP TO DEFEND' : undefined, extra: 25 });
+        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND' : undefined, extra: 25 });
         if (!inn.cur.id) inn.setBatter(cand);   // (bowled in the nets: back to the crease)
         this.hud(inn);
         await this.sleepReal(this.bot ? 60 : 450);

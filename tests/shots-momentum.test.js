@@ -8,21 +8,21 @@ const rng = {
   chance: () => false,
 };
 
-function delivery(vx) {
+function delivery(vx, length = 'short') {
   return {
     tContact: 1,
-    length: 'short',
+    length,
     xt: 0,
     onStumps: false,
     pos: t => ({ x: vx * t, y: 0.5, z: 1.3 }),
   };
 }
 
-function hit(vx, angle) {
+function hit(vx, angle, length = 'short') {
   return resolveContact({
     grade: 'perfect',
     shot: { kind: 'drive', angle, loft: false },
-    d: delivery(vx),
+    d: delivery(vx, length),
     rng,
   });
 }
@@ -46,9 +46,10 @@ test('playing with rightward ball movement improves power and carries trajectory
   assert.ok(aligned.angle > against.angle);
 });
 
+// (a good-length ball straight at the stumps: square on either side is equally against its line; a short straight ball is a pull shot, which has its own side)
 test('straight delivery has no artificial left-right momentum advantage', () => {
-  const left = hit(0, -Math.PI / 2);
-  const right = hit(0, Math.PI / 2);
+  const left = hit(0, -Math.PI / 2, 'good');
+  const right = hit(0, Math.PI / 2, 'good');
   assert.equal(left.v, right.v);
   assert.ok(Math.abs(left.angle + right.angle) < 1e-12);
 });

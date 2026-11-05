@@ -1,7 +1,7 @@
 import { CFG } from './config.js';
 import { makeRng } from './rng.js';
 import { LANES } from './physics.js';
-import { gradeTiming, resolveContact } from './shots.js';
+import { idealAngle, gradeTiming, resolveContact } from './shots.js';
 import { bowlType, deliveryParams } from './squads.js';
 import { aiSpread, bowlerTrouble, hitStrength, movementFor } from './ratings.js';
 import { HOT_BAT } from './heat.js';
@@ -110,13 +110,10 @@ export function aiIntent(ctx) {
 
 // How the AI batter picks a shot direction for a delivery.
 function chooseShot(d, ctx, rng) {
-  const short = d.length === 'short' || d.length === 'bouncer';
-  let angle;
-  if (short) angle = d.xt > 0.15 && rng.chance(0.45) ? 1.3 : -1.2;
-  else if (d.xt > 0.15) angle = rng.chance(0.7) ? 0.75 : 0.3;
-  else if (d.xt < -0.05) angle = rng.chance(0.6) ? -0.4 : -0.95;
-  else angle = rng.range(-0.15, 0.15);
-  angle += rng.range(-0.15, 0.15);
+  // he plays the ball by its line (shots.js idealAngle), as well as his skill lets him read it: a good batter goes with the line nearly every time, a weak one
+  // is often a long way off it (a slogger swings at everything the same way), and against a ball that is moving a lot even the best are caught out now and then
+  const sk = Math.max(0, Math.min(1, ((ctx.skill ?? 75) - 40) / 55)), move = Math.max(0, Math.min(1, (Math.abs(d.swing) || 0) / 0.5 + (Math.abs(d.move) || 0) / 0.3));
+  let angle = idealAngle(d) + rng.normal() * (0.5 - 0.37 * sk + 0.12 * move) + rng.range(-0.08, 0.08);
 
   let loftP = ctx.ballNo <= 12 ? 0.35 : ctx.ballNo >= 25 ? 0.55 : 0.25;
   // the batting team's style: Thunder slog, Titans block, Phoenix wait for the death
@@ -186,7 +183,7 @@ export function aiBat(d, ctx, rng) {
   let grade = gradeTiming(errMs, w, d.xt > 0.08);
   if (ctx.steady && grade !== 'perfect') grade = 'good';   // his Steady Hands: a Good timing, however it is bowled
   if (mods.edgeBoost && ['good', 'early', 'late'].includes(grade) && d.xt > -0.05 && rng.chance(mods.edgeBoost)) grade = 'edge';
-  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, thunder: ctx.power === 'thunder', braced: !!ctx.brace }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) * (ctx.powerMul || 1) });
+  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, noGate: true, thunder: ctx.power === 'thunder', braced: !!ctx.brace }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) * (ctx.powerMul || 1) });
   // through the gate: a mistimed swing at a full, straight ball can miss it and lose the stumps.
   // A weaker batter is beaten more often; a yorker on the stumps is the hardest to keep out.
   if ((grade === 'early' || grade === 'late' || grade === 'edge') && !ctx.freeHit && d.onStumps && ['good', 'full', 'yorker', 'fulltoss'].includes(d.length)) {

@@ -280,7 +280,7 @@ test('a Perfect and a Good contact go close to the swipe, a Late or Early one a 
   const d = makeDelivery({ x: 0.1, length: 'good', kmh: 130 });
   const sd = grade => {
     const rng = makeRng(11), xs = [];
-    for (let i = 0; i < 400; i++) { const r = resolveContact({ grade, errMs: 0, shot: { kind: 'drive', angle: 0.3, loft: false, len: 150 }, d, rng }); if (r.outcome === 'hit' && !r.label) xs.push(r.angle - 0.3); }
+    for (let i = 0; i < 400; i++) { const r = resolveContact({ grade, errMs: 0, shot: { kind: 'drive', angle: 0.3, loft: false, len: 150 }, d, rng }); if (r.outcome === 'hit' && (!r.label || r.label === 'WITH THE LINE')) xs.push(r.angle - 0.3); }
     const m = xs.reduce((a, b) => a + b, 0) / xs.length; return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length);
   };
   const p = sd('perfect'), g = sd('good'), l = sd('late');
