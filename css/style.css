@@ -1847,13 +1847,11 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 /* ---- feel: buttons squash under the thumb, the main action breathes, numbers tick, pages slide in ---- */
 .mf button, .mf .mf-card.fc, .mf .mf-card.stack, .bigbtn, .chipbtn, .tab, .tile, .hubbtn { transition: transform .12s ease, filter .12s ease; -webkit-tap-highlight-color: transparent; }
 .mf button:active:not(:disabled), .mf .mf-card.fc:active, .mf .mf-card.stack:active, .bigbtn:active:not(:disabled), .chipbtn:active, .tab:active, .tile:active, .hubbtn:active { transform: scale(.955); filter: brightness(1.08); }
-.mf .mf-big:not(:disabled):not(.alt) { animation: mfBreathe 2.6s ease-in-out infinite; }
-@keyframes mfBreathe { 0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 210, 63, 0)); } 50% { filter: drop-shadow(0 0 9px rgba(255, 210, 63, .85)); } }
 .tb-pill .tick { color: #ffe27a; text-shadow: 0 0 8px rgba(255, 210, 63, .8); }
 .mf-body.enter > *, .mf-body.enter .cand-row > * { animation: mfPop .34s cubic-bezier(.2, .9, .3, 1.15) both; }
 .mf-body.enter > *:nth-child(2) { animation-delay: .04s; } .mf-body.enter > *:nth-child(3) { animation-delay: .08s; } .mf-body.enter > *:nth-child(4) { animation-delay: .12s; } .mf-body.enter > *:nth-child(5) { animation-delay: .16s; } .mf-body.enter > *:nth-child(n+6) { animation-delay: .2s; }
 @keyframes mfPop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .mf .mf-big, .mf-body.enter > * { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .mf-body.enter > * { animation: none !important; } }
 /* the card that needs you most glows (medical: the most tired player) */
 .mf .fc.pick { animation: mfNeed 1.8s ease-in-out infinite; }
 @keyframes mfNeed { 0%, 100% { filter: brightness(1.05) saturate(1.1) drop-shadow(0 0 3px rgba(255, 90, 60, .5)); } 50% { filter: brightness(1.12) saturate(1.2) drop-shadow(0 0 12px rgba(255, 90, 60, .95)); } }
@@ -1914,27 +1912,15 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 @keyframes netGlow { 0%, 100% { filter: drop-shadow(0 0 3px rgba(255, 90, 60, .6)); } 50% { filter: drop-shadow(0 0 10px rgba(255, 120, 60, 1)); } }
 .mf .mf-big.nets-go { min-height: 60px; font-size: 22px; width: 100%; }
 .mf .mf-big.nets-go:disabled { animation: none; }
-/* ---- the main action button: a glossy 3D slab with an outline, a heavy base, a ball badge, a two-line label and a shine that sweeps across ---- */
-.cta { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; padding: 8px 18px 8px 10px; margin: 6px 0 10px; border: 0; border-radius: 22px; cursor: pointer; overflow: hidden; color: #3b1f00; text-align: left; isolation: isolate;
-  background: linear-gradient(180deg, #fff39a 0%, #ffd83f 34%, #ffb300 66%, #ff9100 100%);
-  box-shadow: 0 0 0 3px #3a1d00, 0 7px 0 3px #8a4700, 0 14px 22px rgba(0, 0, 0, .5), inset 0 3px 0 rgba(255, 255, 255, .9), inset 0 -5px 0 rgba(160, 70, 0, .35);
-  transition: transform .1s ease, box-shadow .1s ease, filter .15s ease; animation: ctaPulse 2.4s ease-in-out infinite; }
-.cta::before { content: ''; position: absolute; left: 6px; right: 6px; top: 4px; height: 46%; border-radius: 18px 18px 40px 40px / 18px 18px 14px 14px; background: linear-gradient(180deg, rgba(255, 255, 255, .75), rgba(255, 255, 255, .05)); z-index: -1; pointer-events: none; }
-.cta::after { content: ''; position: absolute; top: -20%; bottom: -20%; width: 34%; left: -50%; transform: skewX(-22deg); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent); animation: ctaShine 3.2s ease-in-out infinite; pointer-events: none; }
-@keyframes ctaShine { 0%, 55% { left: -50%; } 100% { left: 130%; } }
-@keyframes ctaPulse { 0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 200, 40, 0)); } 50% { filter: drop-shadow(0 0 12px rgba(255, 200, 40, .75)); } }
-.cta:active:not(:disabled) { transform: translateY(5px); box-shadow: 0 0 0 3px #3a1d00, 0 2px 0 3px #8a4700, 0 6px 12px rgba(0, 0, 0, .5), inset 0 3px 0 rgba(255, 255, 255, .9), inset 0 -5px 0 rgba(160, 70, 0, .35); }
-.cta-orb { flex: none; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5a3a1c, #2a1200 75%); box-shadow: 0 0 0 3px #3a1d00, inset 0 2px 0 rgba(255, 255, 255, .25), 0 3px 0 rgba(0, 0, 0, .3); }
-.cta-orb .ico { width: 34px; height: 34px; display: inline-flex; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .6)); }
-.cta-orb .ico svg { width: 100%; height: 100%; }
-.cta-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.cta-txt b { font: italic 400 34px/.95 var(--display, Bangers, Impact, sans-serif); letter-spacing: 1.5px; text-transform: uppercase; color: #3b1f00; text-shadow: 0 2px 0 rgba(255, 255, 255, .6); }
-.cta-txt small { font: 800 14px/1 'Baloo 2', sans-serif; color: rgba(59, 31, 0, .75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cta-arrow { flex: none; font: 900 46px/1 'Baloo 2', sans-serif; color: #3b1f00; text-shadow: 0 2px 0 rgba(255, 255, 255, .6); margin-top: -6px; animation: ctaNudge 1.3s ease-in-out infinite; }
-@keyframes ctaNudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
-.cta:disabled { animation: none; filter: grayscale(.9) brightness(.8); cursor: default; } .cta:disabled::after { display: none; }
-@media (prefers-reduced-motion: reduce) { .cta, .cta::after, .cta-arrow { animation: none; } }
-
+/* ---- the main action (Pad up): your painted yellow button, with a ball badge, a two-line label and an arrow laid out inside it ---- */
+.mf .mf-big.cta { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 76px; margin: 6px 0 10px; text-align: left; }
+.cta-orb { flex: none; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5a3a1c, #2a1200 75%); box-shadow: 0 0 0 3px #3a1d00, 0 3px 0 rgba(0, 0, 0, .3); }
+.cta-orb .ico { width: 32px; height: 32px; display: inline-flex; } .cta-orb .ico svg { width: 100%; height: 100%; }
+.cta-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cta-txt b { font: italic 400 32px/.95 var(--display, Bangers, Impact, sans-serif); letter-spacing: 1.2px; text-transform: uppercase; color: #3b1f00; }
+.cta-txt small { font: 800 14px/1 var(--body); color: rgba(59, 31, 0, .75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cta-arrow { flex: none; font: 900 40px/1 var(--body); color: #3b1f00; margin-top: -4px; }
+.cta:disabled { filter: grayscale(.9) brightness(.8); }
 /* ---- tile lists (training players, academy prospects, medical squad): three across ---- */
 .mf .ptile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: auto; gap: 12px 10px; padding: 8px 4px 6px; flex: 0 0 auto; align-content: start; }
 .mf .ptile-grid .ptile { flex: none; width: 100%; }
@@ -1947,33 +1933,6 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .pt-bar i.red { background: linear-gradient(90deg, #b3261e, #ff5a4a); } .pt-bar i.amber { background: linear-gradient(90deg, #d98a00, #ffd23f); } .pt-bar i.green { background: linear-gradient(90deg, #14892f, #5cf08a); }
 .ptile.need { animation: mfNeed 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .ptile.need { animation: none; } }
-/* ---- every main action button gets the premium slab: yellow for the main one, blue for the second, red for the dangerous one ---- */
-.mf .mf-big:not(.cand-hire):not(.nets-go) { position: relative; overflow: hidden; isolation: isolate; border: 0; border-image: none; border-radius: 20px; min-height: 58px; padding: 8px 18px; margin: 4px 0 8px; font-family: var(--display, Bangers, Impact, sans-serif); font-style: italic; font-weight: 400; font-size: 24px; letter-spacing: 1.2px; text-transform: uppercase; line-height: 1; gap: 10px;
-  transition: transform .1s ease, box-shadow .1s ease; }
-.mf .mf-big:not(.alt):not(.red):not(.cand-hire):not(.nets-go) { color: #3b1f00; text-shadow: 0 2px 0 rgba(255, 255, 255, .6); background: linear-gradient(180deg, #fff39a 0%, #ffd83f 34%, #ffb300 66%, #ff9100 100%); box-shadow: 0 0 0 3px #3a1d00, 0 6px 0 3px #8a4700, 0 12px 18px rgba(0, 0, 0, .45), inset 0 3px 0 rgba(255, 255, 255, .9), inset 0 -4px 0 rgba(160, 70, 0, .35); }
-.mf .mf-big.alt:not(.cand-hire) { color: #fff; text-shadow: 0 2px 0 rgba(0, 20, 90, .7); background: linear-gradient(180deg, #8cc8ff 0%, #3d8bf0 38%, #1f62d8 68%, #1648b0 100%); box-shadow: 0 0 0 3px #0a1d5a, 0 6px 0 3px #0a2a82, 0 12px 18px rgba(0, 0, 0, .45), inset 0 3px 0 rgba(255, 255, 255, .6), inset 0 -4px 0 rgba(0, 20, 110, .4); }
-.mf .mf-big.red:not(.cand-hire) { color: #fff; text-shadow: 0 2px 0 rgba(80, 0, 0, .7); background: linear-gradient(180deg, #ff9d8f 0%, #f0483f 38%, #d02424 68%, #a8141a 100%); box-shadow: 0 0 0 3px #4a0508, 0 6px 0 3px #7a0d12, 0 12px 18px rgba(0, 0, 0, .45), inset 0 3px 0 rgba(255, 255, 255, .55), inset 0 -4px 0 rgba(90, 0, 10, .4); }
-.mf .mf-big:not(.cand-hire):not(.nets-go)::before { content: ''; position: absolute; left: 6px; right: 6px; top: 4px; height: 44%; border-radius: 16px 16px 34px 34px / 16px 16px 12px 12px; background: linear-gradient(180deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, .03)); z-index: -1; pointer-events: none; }
-.mf .mf-big:not(.alt):not(.red):not(.cand-hire):not(.nets-go):not(:disabled)::after { content: ''; position: absolute; top: -20%; bottom: -20%; width: 30%; left: -50%; transform: skewX(-22deg); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .8), transparent); animation: ctaShine 3.6s ease-in-out infinite; pointer-events: none; }
-.mf .mf-big:not(.cand-hire):not(.nets-go):active:not(:disabled) { transform: translateY(4px); }
-.mf .mf-big:not(.cand-hire):not(.nets-go):disabled { filter: grayscale(.85) brightness(.82); animation: none; box-shadow: 0 0 0 3px #222, 0 3px 0 3px #444, inset 0 2px 0 rgba(255, 255, 255, .3); }
-.mf .mf-big:not(.cand-hire):not(.nets-go) .ico { flex: none; width: 28px; height: 28px; display: inline-flex; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .4)); }
-.mf .mf-big:not(.cand-hire):not(.nets-go) .ico svg { width: 100%; height: 100%; }
-@media (prefers-reduced-motion: reduce) { .mf .mf-big::after { animation: none !important; } }
-/* ---- the tabs of the building screens: dark glossy glass, and the selected one the same raised gold slab as the main buttons ---- */
-.mf .mf-tab { position: relative; border: 0 !important; border-image: none !important; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #cfe2ff; font-family: var(--display, Bangers, Impact, sans-serif); font-style: italic; font-weight: 400; font-size: 15px; letter-spacing: .9px; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0, 0, 0, .6);
-  background: linear-gradient(180deg, #3a58ad 0%, #1f3482 52%, #14235f 100%);
-  box-shadow: 0 0 0 2px #070b24, 0 4px 0 2px #070b24, inset 0 2px 0 rgba(255, 255, 255, .3), inset 0 -3px 0 rgba(0, 0, 20, .4);
-  transition: transform .1s ease, box-shadow .1s ease, filter .12s ease; }
-.mf .mf-tab::before { content: ''; position: absolute; left: 5px; right: 5px; top: 3px; height: 42%; border-radius: 12px 12px 26px 26px / 12px 12px 10px 10px; background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0)); pointer-events: none; }
-.mf .mf-tab.on { color: #3b1f00; text-shadow: 0 1px 0 rgba(255, 255, 255, .65); transform: translateY(-2px);
-  background: linear-gradient(180deg, #fff39a 0%, #ffd83f 36%, #ffb300 68%, #ff9100 100%);
-  box-shadow: 0 0 0 3px #3a1d00, 0 5px 0 3px #8a4700, 0 9px 14px rgba(0, 0, 0, .4), inset 0 3px 0 rgba(255, 255, 255, .9), inset 0 -4px 0 rgba(160, 70, 0, .35); }
-.mf .mf-tab.on::before { background: linear-gradient(180deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, 0)); }
-.mf .mf-tab:active { transform: translateY(3px); }
-.mf .mf-tab .ico { width: 26px; height: 26px; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .45)); }
-.mf-tabs { gap: 8px; padding: 2px 3px 8px; }
-.mf .mf-tab.on { border: 0 !important; border-image: none !important; border-radius: 16px; min-height: 44px; }
 /* ---- the office's money tab as a dashboard ---- */
 .fin-wrap { display: flex; flex-direction: column; gap: 12px; }
 .fin-hero { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 14px 10px; border-radius: 20px; background: linear-gradient(180deg, rgba(34, 58, 150, .95), rgba(10, 18, 70, .97)); border: 3px solid #ffd23f; box-shadow: 0 0 0 3px #070b24, 0 6px 0 3px #070b24, inset 0 2px 0 rgba(255, 255, 255, .25); overflow: hidden; }
@@ -1999,12 +1958,6 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mf[data-tight="1"] .fin-tile, .mf[data-tight="2"] .fin-tile { padding: 6px 10px 6px 8px; } .mf[data-tight="1"] .fin-orb, .mf[data-tight="2"] .fin-orb { width: 38px; height: 38px; } .mf[data-tight="1"] .fin-orb .ico, .mf[data-tight="2"] .fin-orb .ico { width: 23px; height: 23px; }
 .mf[data-tight="3"] .fin-wrap, .mf[data-tight="4"] .fin-wrap { gap: 6px; } .mf[data-tight="3"] .fin-hero, .mf[data-tight="4"] .fin-hero { padding: 6px 12px 6px; gap: 2px; } .mf[data-tight="3"] .fin-hero b, .mf[data-tight="4"] .fin-hero b { font-size: 34px; } .mf[data-tight="3"] .fin-hero small, .mf[data-tight="4"] .fin-hero small { display: none; } .mf[data-tight="3"] .fin-legend, .mf[data-tight="4"] .fin-legend { font-size: 12px; }
 .mf[data-tight="3"] .fin-grid, .mf[data-tight="4"] .fin-grid { gap: 5px; } .mf[data-tight="3"] .fin-tile, .mf[data-tight="4"] .fin-tile { padding: 4px 8px 4px 6px; grid-template-rows: auto auto; } .mf[data-tight="3"] .fin-bar, .mf[data-tight="4"] .fin-bar { display: none; } .mf[data-tight="3"] .fin-orb, .mf[data-tight="4"] .fin-orb { grid-row: 1 / 3; width: 32px; height: 32px; } .mf[data-tight="3"] .fin-orb .ico, .mf[data-tight="4"] .fin-orb .ico { width: 20px; height: 20px; } .mf[data-tight="3"] .fin-tile b, .mf[data-tight="4"] .fin-tile b { font-size: 17px; } .mf[data-tight="3"] .fin-tile small, .mf[data-tight="4"] .fin-tile small { font-size: 10px; }
-/* the page tabs of the career screens (Players / Line-up, Now / Sold ...): the same glass and gold slab as the building screens' tabs */
-.tabs .tab { border: 0 !important; border-image: none !important; border-radius: 16px; min-height: 46px; color: #cfe2ff; font-family: var(--display); font-style: italic; font-size: 17px; letter-spacing: .9px; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0, 0, 0, .6);
-  background: linear-gradient(180deg, #3a58ad 0%, #1f3482 52%, #14235f 100%); box-shadow: 0 0 0 2px #070b24, 0 4px 0 2px #070b24, inset 0 2px 0 rgba(255, 255, 255, .3), inset 0 -3px 0 rgba(0, 0, 20, .4); transition: transform .1s ease; }
-.tabs .tab.on { color: #3b1f00; text-shadow: 0 1px 0 rgba(255, 255, 255, .65); transform: translateY(-2px); background: linear-gradient(180deg, #fff39a 0%, #ffd83f 36%, #ffb300 68%, #ff9100 100%); box-shadow: 0 0 0 3px #3a1d00, 0 5px 0 3px #8a4700, 0 9px 14px rgba(0, 0, 0, .4), inset 0 3px 0 rgba(255, 255, 255, .9), inset 0 -4px 0 rgba(160, 70, 0, .35); }
-.tabs .tab:active { transform: translateY(3px); }
-.tabs { gap: 8px; padding: 2px 3px 8px; }
 /* ---- the office's sponsor slots and board target ---- */
 .spon-wrap { display: flex; flex-direction: column; gap: 12px; }
 .spon-card { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; padding: 12px 14px 12px 12px; border-radius: 18px; background: linear-gradient(180deg, rgba(34, 58, 150, .95), rgba(10, 18, 70, .97)); border: 3px solid #ffd23f; box-shadow: 0 0 0 3px #070b24, 0 5px 0 3px #070b24, inset 0 2px 0 rgba(255, 255, 255, .22); color: #fff; overflow: hidden; }
@@ -2035,12 +1988,3 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mf[data-tight="3"] .spon-wrap, .mf[data-tight="4"] .spon-wrap { gap: 6px; } .mf[data-tight="3"] .spon-card, .mf[data-tight="4"] .spon-card { padding: 5px 10px 5px 8px; gap: 8px; } .mf[data-tight="3"] .spon-orb, .mf[data-tight="4"] .spon-orb { width: 38px; height: 38px; } .mf[data-tight="3"] .spon-orb .ico, .mf[data-tight="4"] .spon-orb .ico { width: 24px; height: 24px; } .mf[data-tight="3"] .spon-mid b, .mf[data-tight="4"] .spon-mid b { font-size: 18px; } .mf[data-tight="3"] .spon-mid small, .mf[data-tight="4"] .spon-mid small { display: none; }
 .mf[data-tight="3"] .spon-card .mf-big, .mf[data-tight="4"] .spon-card .mf-big { min-height: 40px; font-size: 19px; margin: 2px 0 0; padding: 4px 14px; }
 .mf[data-tight="3"] .board-hero > b, .mf[data-tight="4"] .board-hero > b { font-size: 38px; } .mf[data-tight="3"] .board-hero, .mf[data-tight="4"] .board-hero { padding: 8px 12px 8px; gap: 3px; } .mf[data-tight="3"] .board-chip small, .mf[data-tight="4"] .board-chip small { display: none; }
-/* ONE lettering across every menu screen: the match's own heavy, narrow italic face (the scoreboard's), not a second rounded or comic one. The match HUD, the banners and the
-   scoreboard are outside .screen and keep it as it always was. */
-.screen :not(svg):not(svg *) { font-family: var(--ui) !important; font-weight: 800; letter-spacing: .3px; }
-.screen input, .screen textarea { font-weight: 700; }
-.screen .mf-tab, .screen .tabs .tab, .screen .mf-big, .screen .cta, .screen .chipbtn, .screen .bigbtn, .screen .coachbtn, .screen .mf-title b, .screen .mf-lvl, .screen .cta-txt b, .screen .spon-mid b, .screen .board-hero > b, .screen .fin-hero b, .screen .nets-hero b, .screen .today-chip { font-style: italic; text-transform: uppercase; letter-spacing: .8px; }
-.screen .mf-tab, .screen .tabs .tab { font-size: 17px; } .screen .mf-big:not(.cta) { font-size: 25px; } .screen .cta-txt b { font-size: 38px; } .screen .spon-mid b { font-size: 27px; } .screen .board-hero > b { font-size: 60px; } .screen .fin-hero b { font-size: 56px; } .screen .nets-hero b { font-size: 30px; }
-.screen .mf-card, .screen .mf-card *, .screen .fin-tile small, .screen .spon-chip, .screen .pt-plate small, .screen .pt-chip { text-transform: none; }
-.screen .pt-plate b, .screen .fin-tile b, .screen .board-chip b { text-transform: none; font-style: normal; }
-

@@ -1983,7 +1983,7 @@ function paintTraining(c) {
       const row = el('div', 'ptile-row');
       for (const [pid, p] of list) row.append(playerTile(c.players[pid], club, { ovr: p.ovr, sub: `XP ${Math.round(p.xp)} / ${p.cost}`, bar: p.xp / p.cost * 100, tone: 'green', selected: pid === netPick, onClick: () => { netPick = pid; sfx.click(); paintTraining(c); } }));
       body.append(row);
-      const who = c.players[netPick], go = el('button', 'cta nets-go'), txt = el('span', 'cta-txt'), orb = el('span', 'cta-orb');
+      const who = c.players[netPick], go = el('button', 'mf-big cta nets-go'), txt = el('span', 'cta-txt'), orb = el('span', 'cta-orb');
       orb.append(ico('ball')); txt.append(el('b', '', 'Pad up'), el('small', '', `${lastName(who.name)} · ${left} left`));
       go.append(orb, txt, el('span', 'cta-arrow', '›'));
       go.addEventListener('click', () => { if (trainTest) return ui.toast('The nets are for your real club, not the practice one'); if (clock.state !== 'ok') return ui.toast('The nets need the server clock: try again when you are online'); if (left < 1) return ui.toast('The nets are closed for today. They open again at midnight (UTC)'); runDrill(c, netPick); });
