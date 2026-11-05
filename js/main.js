@@ -395,26 +395,19 @@ function paintShop(c) {
   const deals = trusted ? dealsToday(c, now) : null;
   if (shopTab === 'gear') {
     { const bn = el('div', 'mf-card mf-agent'), tx = el('div', 'mf-info'); tx.append(el('b', '', 'Daily deals'), el('small', '', deals ? `${Math.round(row.off * 100)}% off · new at midnight` : 'The deals need the server clock: try again when you are online.')); bn.append(el('span', 'stf stf-s1 mf-agent-art'), tx, ico('clock')); body.append(bn); }
-    const grid = el('div', 'mf-grid three');
+    const grid = el('div', 'item-grid');
     for (const [id, G] of Object.entries(SHOP.GEAR)) {
-      const sale = !!deals && deals.ids.includes(id) && !deals.taken[id], card = el('button', `mf-card stack${sale ? ' pick' : ''}`), r = el('div', 'mf-row');
-      r.append(ico(GEAR_ICON[G.kind]), el('span', '', gearText(G)));
-      card.append(el('b', '', G.name), r, el('small', '', sale ? `${money(gearPrice(c, id, true))} (was ${money(G.cost)})` : money(G.cost)));
-      if (sale) card.append(el('i', 'mf-badge', 'SALE'));
-      card.addEventListener('click', () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); });
-      grid.append(card);
+      const sale = !!deals && deals.ids.includes(id) && !deals.taken[id];
+      grid.append(itemTile(GEAR_ICON[G.kind], G.name, gearText(G), sale ? money(gearPrice(c, id, true)) : money(G.cost), { sale, old: sale ? money(G.cost) : '', onClick: () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); } }));
     }
     body.append(grid);
   } else if (shopTab === 'armoury') {
-    const grid = el('div', 'mf-grid three');
+    const grid = el('div', 'item-grid');
     for (let i = 0; i < armourySlots(c); i++) {
       const g = h.gear[i];
       if (!g) { const card = el('div', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Empty')); grid.append(card); continue; }
-      const G = SHOP.GEAR[g.item], card = el('button', 'mf-card stack'), bar = el('div', 'mf-bar green'), f = el('i'); f.style.width = `${Math.max(4, Math.round(g.uses / SHOP.USES * 100))}%`; bar.append(f);
-      const who = g.on && c.players[g.on];
-      card.append(who ? frameOf(playerFace(who, 44)) : ico(GEAR_ICON[G.kind]), el('b', '', G.name), bar, el('small', '', who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`));
-      card.addEventListener('click', () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); });
-      grid.append(card);
+      const G = SHOP.GEAR[g.item], who = g.on && c.players[g.on];
+      grid.append(itemTile(who ? frameOf(playerFace(who, 44)) : ico(GEAR_ICON[G.kind]), G.name, who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`, '', { bar: g.uses / SHOP.USES * 100, onClick: () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); } }));
     }
     body.append(grid);
     body.append(info('warn', `A player carries one thing. It wears out after ${SHOP.USES} of your matches that he plays in. The armoury holds ${armourySlots(c)}.`));
@@ -433,9 +426,11 @@ function paintShop(c) {
     body.append(info('star', 'Looks change how the game looks, never how it plays.'));
   } else if (shopTab === 'diamonds') {
     const col = el('div', 'mf-col'), big = el('div', 'mf-card col');
-    big.append(el('b', '', `You have ${dm} 💎`), el('p', 'sheetnote', 'Diamonds buy looks and a second builder.'));
+    big.className = 'fin-hero'; big.append(el('small', '', 'Your diamonds'), el('b', 'up', String(dm)));
     col.append(big);
-    for (const pk of SHOP.PACKS) { const card = el('div', 'mf-card'), inf = el('div', 'mf-info'); inf.append(el('b', '', `${pk.diamonds} 💎`), el('small', '', pk.price)); const b = mfBtn('chipbtn', [el('span', '', 'Soon')], () => {}); b.disabled = true; card.append(ico('coin'), inf, b); col.append(card); }
+    const pg = el('div', 'item-grid');
+    for (const pk of SHOP.PACKS) pg.append(itemTile('diamond', `${pk.diamonds} diamonds`, 'Coming soon', pk.price, { onClick: () => ui.toast('Buying diamonds needs the server, which is not ready yet') }));
+    col.append(pg);
     col.append(info('warn', 'Buying diamonds needs the server, which is not ready yet. For now diamonds come from the Settings test button.'));
     body.append(col);
   } else {
@@ -1644,6 +1639,17 @@ const ICON = {
 const ICON_COLOUR = { coin: '#ffd23f', clock: '#ffffff', heart: '#ff4d5e', ball: '#ff4d5e', jersey: '#3b82f6', pencil: '#ffb800', printer: '#8fa0b8', box: '#c98a4b', gear: '#9aa6b2', users: '#5aa0ff', factory: '#ffb800', trophy: '#ffd23f', search: '#5aa0ff', star: '#ffd23f', chart: '#5aa0ff', warn: '#ffd23f', up: '#34c759' };
 const ico = (name, cls = '') => { const sp = el('span', `ico ${cls}`.trim()); sp.dataset.n = name; if (ICON_COLOUR[name]) sp.style.setProperty('--ic', ICON_COLOUR[name]); sp.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`; return sp; };
 const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...content); if (fn) b.addEventListener('click', fn); return b; };
+// a thing you can buy, win or own, as a tall tile: a big round icon, its name, what it does, and its price (or "yours"). opts: { sale, old, have, bar, onClick }
+function itemTile(icon, name, what, price, { sale = false, old = '', have = false, bar = null, onClick } = {}) {
+  const t = el('button', `item-tile${have ? ' have' : ''}${sale ? ' sale' : ''}`), orb = el('span', 'item-orb');
+  orb.append(typeof icon === 'string' ? ico(icon, have ? 'on' : '') : icon);
+  const pr = el('span', 'item-price'); if (price) pr.append(old ? el('s', '', old) : '', el('b', '', price));
+  t.append(orb, el('b', 'item-name', name), el('small', '', what));
+  if (bar != null) { const m = el('span', 'pt-bar item-bar'), f = el('i', 'green'); f.style.width = `${Math.max(6, Math.min(100, Math.round(bar)))}%`; m.append(f); t.append(m); }
+  t.append(pr); if (sale) t.append(el('i', 'item-sale', 'SALE'));
+  if (onClick) t.addEventListener('click', onClick);
+  return t;
+}
 // an explanation as a small "i" button: the text opens when it is tapped (and stays open through repaints), so a screen shows the game, not a manual
 const openHints = new Set();
 function hint(icon, text) {
@@ -2393,13 +2399,10 @@ function paintApartment(c) {
     if (!log.length) col.append(info('clock', 'Your story starts when your first season ends.'));
     body.append(col);
   } else if (aptTab === 'decor') {
-    const own = Object.keys(a.decor).length, grid = el('div', 'mf-grid three');
+    const own = Object.keys(a.decor).length, grid = el('div', 'item-grid');
     for (const [id, D] of Object.entries(APT.DECOR)) {
-      const have = !!a.decor[id], card = el('button', `mf-card stack${have ? ' pick' : ''}`), r = el('div', 'mf-row');
-      r.append(ico(DECOR_ICON[id], have ? 'on' : ''), el('span', '', `+${D.mp} pts`));
-      card.append(el('b', '', D.name), r, el('small', '', have ? 'Yours' : money(D.cost)));
-      card.addEventListener('click', () => { if (!have) { aptSheet = { type: 'decor', id }; sfx.click(); paintApartment(c); } });
-      grid.append(card);
+      const have = !!a.decor[id];
+      grid.append(itemTile(DECOR_ICON[id], D.name, `+${D.mp} pts`, have ? 'Yours' : money(D.cost), { have, onClick: () => { if (!have) { aptSheet = { type: 'decor', id }; sfx.click(); paintApartment(c); } } }));
     }
     body.append(info('heart', `Furnish your place with your salary: ${own} of ${decorSlots(c)} places used.`), grid);
   } else {
