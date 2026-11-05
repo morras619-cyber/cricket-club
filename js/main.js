@@ -492,7 +492,7 @@ function paintShop(c) {
     const grid = el('div', 'item-grid');
     for (let i = 0; i < armourySlots(c); i++) {
       const g = h.gear[i];
-      if (!g) { const card = el('div', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Empty')); grid.append(card); continue; }
+      if (!g) { const card = el('div', 'item-tile ghost'); const orb = el('span', 'item-orb'); orb.append(ico('plus')); card.append(orb, el('b', 'item-name', 'Empty slot'), el('small', '', 'Buy gear in the Gear tab')); grid.append(card); continue; }
       const G = SHOP.GEAR[g.item], who = g.on && c.players[g.on];
       grid.append(itemTile(TILES[g.item] || GEAR_ICON[G.kind], G.name, who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`, '', { bar: g.uses / SHOP.USES * 100, face: who ? frameOf(playerFace(who, 44)) : null, onClick: () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); } }));
     }
@@ -2453,13 +2453,15 @@ function paintApartment(c) {
   body.replaceChildren();
   const info = (icon, text) => { if (text.length > 48) return hint(icon, text); const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
   if (aptTab === 'cabinet') {
-    const col = el('div', 'mf-col');
+    // the trophy shelf: a tile for each kind, gold when won (and how many times), a lock when not; the bonus under the name
+    const col = el('div', 'mf-col'), shelf = el('div', 'item-grid trophy-shelf');
     for (const [id, T] of Object.entries(APT.TROPHIES)) {
-      const won = trophies.find(t => t.id === id), card = el('div', `mf-card${won ? '' : ' empty'}`), inf = el('div', 'mf-info');
-      inf.append(el('b', '', won ? `${T.name}${won.count > 1 ? ` ×${won.count}` : ''}` : T.name), won ? el('small', '', `Season ${won.last}`) : el('small', '', T.text.replace(/^Not won yet · /, '')));
-      card.append(ico(won ? 'trophy' : 'lock', won ? 'on' : ''), inf);
-      col.append(card);
+      const won = trophies.find(t => t.id === id);
+      const t = itemTile(won ? 'trophy' : 'lock', T.name, T.text.replace(/^Not won yet · /, ''), won ? `Season ${won.last}${won.count > 1 ? ` · ×${won.count}` : ''}` : '', { have: !!won, onClick: () => ui.toast(won ? `${T.name}: ${T.text}` : `Win it to earn: ${T.text}`) });
+      if (!won) t.classList.add('locked');
+      shelf.append(t);
     }
+    col.append(shelf);
     col.append(info('star', 'Each kind of trophy gives its bonus once, for good. A second title of the same kind is for the pride.'));
     body.append(col);
   } else if (aptTab === 'manager') {
@@ -2477,7 +2479,11 @@ function paintApartment(c) {
   } else if (aptTab === 'story') {
     const col = el('div', 'mf-col'), log = storyLog(c);
     for (const l of log) { const card = el('div', 'mf-card'); card.append(ico(l.title ? 'trophy' : l.promoted ? 'up' : 'check', l.title || l.promoted ? 'on' : ''), el('span', 'mf-row', `Season ${l.season}: ${l.text}`)); col.append(card); }
-    if (!log.length) col.append(info('clock', 'Your story starts when your first season ends.'));
+    if (!log.length) {
+      const e = el('div', 'empty-state'), orb = el('span', 'es-orb'); orb.append(ico('chart'));
+      e.append(orb, el('b', '', 'Your story starts here'), el('small', '', 'Every season you finish is written into your club\'s story: titles, promotions and the years in between.'));
+      col.append(e);
+    }
     body.append(col);
   } else if (aptTab === 'decor') {
     const own = Object.keys(a.decor).length, grid = el('div', 'item-grid');

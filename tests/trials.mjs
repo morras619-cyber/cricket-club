@@ -300,8 +300,8 @@ await page.evaluate(() => [...document.querySelectorAll('#shopBody .item-tile')]
 await page.evaluate(() => [...document.querySelectorAll('#shopSheet button')].find(b => /Buy/.test(b.textContent)).click()); await page.waitForTimeout(400);
 check(await page.evaluate(() => window.__sixcharge.demo.shop.gear.length === 1 && window.__sixcharge.demo.shop.gear[0].item === 'blaster'), 'a Willow Blaster is bought with club cash and goes in the armoury');
 await shopTab('Armoury');
-check(await page.evaluate(() => document.querySelectorAll('#shopBody .item-tile').length === 1 && document.querySelectorAll('#shopBody .mf-card.empty').length === 2) && await shopFits(), 'the armoury shows it with its matches left, and two empty places');
-await page.evaluate(() => document.querySelector('#shopBody .item-tile').click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => document.querySelectorAll('#shopBody .item-tile:not(.ghost)').length === 1 && document.querySelectorAll('#shopBody .item-tile.ghost').length === 2) && await shopFits(), 'the armoury shows it with its matches left, and two empty places');
+await page.evaluate(() => document.querySelector('#shopBody .item-tile:not(.ghost)').click()); await page.waitForTimeout(300);
 await page.evaluate(() => document.querySelector('#shopSheet .mf-grid .mf-card').click()); await page.waitForTimeout(400);
 check(await page.evaluate(() => !!window.__sixcharge.demo.shop.gear[0].on && document.querySelectorAll('#shopBody .item-tile .mf-frame canvas').length === 1), 'the gear is given to a player, whose portrait shows on it');
 await shopTab('Style');
@@ -320,10 +320,10 @@ await page.evaluate(() => document.getElementById('setApartment').click()); awai
 const aptTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#apartmentTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(300); };
 const aptNoClip = async () => page.evaluate(() => { const m = document.querySelector('#apartment .mf'); return m.scrollHeight <= m.clientHeight + 1; });
 const aptFits = async () => page.evaluate(() => { const m = document.querySelector('#apartment .mf'), b = document.getElementById('apartmentBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
-check(await page.evaluate(() => !document.getElementById('apartment').hidden && document.querySelectorAll('#apartmentTabs .mf-tab').length === 5 && document.querySelectorAll('#apartmentBody .mf-card.empty').length === 5) && await aptFits(), 'the settings open the apartment: five tabs and an empty cabinet with five kinds of trophy to win');
+check(await page.evaluate(() => !document.getElementById('apartment').hidden && document.querySelectorAll('#apartmentTabs .mf-tab').length === 5 && document.querySelectorAll('#apartmentBody .trophy-shelf .item-tile.locked').length === 5) && await aptFits(), 'the settings open the apartment: five tabs and an empty cabinet with five kinds of trophy to win');
 for (const t of ['D3 title', 'Promoted', 'League title']) await page.evaluate(t => [...document.querySelectorAll('#apartmentTest .chipbtn')].find(b => b.textContent === t).click(), t);
 await page.waitForTimeout(300);
-check(await page.evaluate(() => document.querySelectorAll('#apartmentBody .mf-card.empty').length === 2 && document.querySelectorAll('#apartmentBody .ico.on').length === 3) && await aptFits(), 'three trophies are won: they light up in the cabinet');
+check(await page.evaluate(() => document.querySelectorAll('#apartmentBody .trophy-shelf .item-tile.locked').length === 2 && document.querySelectorAll('#apartmentBody .trophy-shelf .item-tile.have').length === 3) && await aptFits(), 'three trophies are won: they light up in the cabinet');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'apartment-cabinet.png') });
 await aptTab('Manager');
 check(await page.evaluate(() => /Manager level [2-9]/.test(document.getElementById('apartmentBody').textContent) && /Sponsors pay/.test(document.getElementById('apartmentBody').textContent)) && await aptFits(), 'the manager has a level and what it gives, and it fits');
