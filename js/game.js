@@ -615,7 +615,7 @@ export class Game {
     this.ui.charge(ev.value);
     if (ev.type === 'gain' && ev.amount > 0) {
       sfx.zing(ev.value);
-      this.fx.word(`+${ev.amount}${ev.label ? ' ' + ev.label : ''}`, this.W * 0.5, this.H - 150 - Math.random() * 30, { size: 22, color: '#fff4da', stroke: '#141018', dur: 900, rot: 0 });
+      this.fx.word(`+${ev.amount}`, this.W * 0.5, this.H - 150 - Math.random() * 30, { size: 20, color: '#fff4da', stroke: '#141018', dur: 900, rot: 0 });
       if (ev.crossed) {
         sfx[ev.crossed === 100 ? 'full' : 'dhol']();
         buzz(ev.crossed === 100 ? 120 : [30, 40, 30]);
@@ -1010,7 +1010,7 @@ export class Game {
     const cs = this.cams.bat.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 2 };
     if (res.outcome === 'hit' || res.outcome === 'edge') {
       this.contactFeedback(grade, cs, err);
-      if (res.label) this.fx.word(res.label, this.W / 2, this.H * 0.4, { size: 30, color: '#fff4da', stroke: INK, rot: 0, dur: 1100 });
+      if (res.label && grade !== 'perfect') this.fx.word(res.label, this.W / 2, this.H * 0.4, { size: 26, color: '#fff4da', stroke: INK, rot: 0, dur: 900 });   // (one big callout per ball; a perfect has its own)
       if (res.outcome === 'hit') this.hitBlast(cs, fx.meteor ? 'meteor' : fx.thunder ? 'thunder' : fx.mirror ? 'mirror' : null, grade);
       if (res.outcome === 'hit' && (grade === 'perfect' || grade === 'good')) {
         this.charge.award(grade === 'perfect' ? 'perfectBat' : 'goodBat', grade.toUpperCase());
@@ -1025,7 +1025,6 @@ export class Game {
       await this.sleep(res.outcome === 'edge' ? 350 : 520);
     } else {
       if (swing) { sfx.thin(); this.timingBar(err, grade); }
-      if (res.label && swing) this.fx.word(res.label, this.W / 2, this.H * 0.4, { size: 30, color: '#ff8a8a', stroke: INK, rot: 0, dur: 1200 });   // (beaten by the line, or through the gate)
       this.charge.timingStreak(false);
       // let the ball carry on to the stumps or the keeper
       await this.until(() => this.gameTime - S.ballT0 >= (res.outcome === 'bowled' ? d.tStumps : d.tKeeper));
@@ -1330,7 +1329,7 @@ export class Game {
       const set = this.fxSet(this.myTeam);
       this.hitStop(80); this.fx.flash(set ? '#cfeeff' : '#fff', 0.55);
       if (set) this.electricHit(set, at); else this.fx.burst(at.x, at.y, { color: '#ffd23f' });
-      this.fx.word('PERFECT!', this.W / 2, this.H * 0.3, { size: 54 });
+      this.fx.word('PERFECT', this.W / 2, this.H * 0.3, { size: 24, color: '#ffd23f', stroke: INK, rot: 0, dur: 900 });
       this.fx.word(SHOT_WORDS[Math.floor(Math.random() * SHOT_WORDS.length)], at.x, at.y - 30, { size: 64, color: '#fff4da', stroke: '#e8343b' });
       this.fx.shake(10); sfx.bat('perfect'); buzz(45);
     } else if (grade === 'defend') {
@@ -2073,13 +2072,14 @@ export class Game {
     shape.weak = !!mods?.weak;
     this.bowlHistory.push(shape);
     if (mods) {
-      let y = this.H * 0.24;
+      // one callout for the ball (the tag worth the most charge), the rest as a single small line
+      const top = mods.tags.reduce((a, t) => (!a || t.charge > a.charge ? t : a), null);
+      const rest = mods.tags.filter(t => t !== top);
+      if (top) this.fx.word(top.label, this.W / 2, this.H * 0.26, { size: top.charge ? 40 : 32, color: top.charge ? '#ffd23f' : '#fff4da', stroke: top.charge ? '#e8343b' : INK, dur: 1200 });
+      if (rest.length) this.fx.word(rest.map(t => t.label.replace(/!$/, '')).join(' · '), this.W / 2, this.H * 0.26 + 44, { size: 20, color: '#fff4da', stroke: INK, rot: 0, dur: 1100 });
       for (const t of mods.tags) {
-        const meh = !t.charge;
-        this.fx.word(t.label, this.W / 2, y, { size: meh ? 34 : 44, color: meh ? '#fff4da' : '#ffd23f', stroke: meh ? INK : '#e8343b', dur: 1200 });
         if (t.charge) this.charge.add(t.charge, t.label.replace('!', ''));
         if (t.id === 'weak' && !this.scouted) this.scouted = true;
-        y += 46;
       }
       if (mods.tags.some(t => t.id === 'setup' || t.id === 'swingtrap' || t.id === 'changeup')) sfx.dhol();
     }

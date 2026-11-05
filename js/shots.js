@@ -114,15 +114,15 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
     const k = (lm.mis - 0.3) / 0.7, spare = grade === 'perfect' ? 0.45 : grade === 'good' ? 0.75 : 1;
     const p = Math.min(0.7, k * 0.5 * ballDifficulty(d) * spare);
     if (rng.chance(p)) {
-      if (rng.chance(d.onStumps ? 0.7 : 0.45)) return { outcome: d.onStumps ? 'bowled' : 'beaten', grade, line: lm, label: 'BEATEN BY THE LINE' };
-      return { outcome: 'edge', grade: 'edge', label: 'AGAINST THE LINE', line: lm, offset: { x: rng.range(-0.25, 1.5), y: rng.range(0.35, 1.25) } };
+      if (rng.chance(d.onStumps ? 0.7 : 0.45)) return { outcome: d.onStumps ? 'bowled' : 'beaten', grade, line: lm };
+      return { outcome: 'edge', grade: 'edge', line: lm, offset: { x: rng.range(-0.25, 1.5), y: rng.range(0.35, 1.25) } };
     }
   }
   // through the gate: a mistimed swing at a full or good ball on the stumps can miss it altogether (a yorker is the hardest to keep out); against the line, more so.
   // (the AI batters have this check of their own, in ai.js, and ask for none here)
   if (!fx.noGate && (grade === 'early' || grade === 'late') && d.onStumps && ['good', 'full', 'yorker', 'fulltoss'].includes(d.length)) {
     const pg = (d.length === 'yorker' ? 0.4 : d.length === 'fulltoss' ? 0.08 : 0.2) * (fx.gateK ?? 1) * (0.8 + 0.8 * lm.mis);
-    if (rng.chance(pg)) return { outcome: 'bowled', grade: 'miss', line: lm, label: 'THROUGH THE GATE' };
+    if (rng.chance(pg)) return { outcome: 'bowled', grade: 'miss', line: lm };
   }
   let angle = shot.angle + errMs * 0.0035 + rng.normal() * SPREAD[grade] * (1.6 - 0.8 * lm.q);
   let loft = shot.loft;
@@ -156,8 +156,6 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
       if (loft) power *= 0.93; // the rope is closer behind square
     }
   }
-  if (judged && lm.mis > 0.55) label = 'AGAINST THE LINE';
-  else if (judged && lm.q > 0.9 && grade === 'perfect' && !label) label = 'WITH THE LINE';
 
   let forced = null;
   const good = grade === 'perfect' || grade === 'good';
