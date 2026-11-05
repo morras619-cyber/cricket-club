@@ -1711,12 +1711,10 @@ export class Game {
       if (word) this.fx.word(word, this.W / 2, this.H * 0.3, { size: sim.kind === 'six' || sim.kind === 'four' ? 64 : 44, color: '#fff4da', stroke: INK });
     }
     await this.sleepReal(this.bot ? 0 : 500);
-    // the cut to the next ball: a quick dip to dark, and while it is dark the bowler is back at his mark and the batter in his stance, the ball gone
+    // back to the next ball: the bowler is at his mark and the batter in his plain stance (not the raised bat of the backlift), the ball gone
     if (!this.bot) {
-      this.fx.dip(); await this.sleepReal(130);
       const S = this.S;
-      if (S) { S.flight = null; S.ball = null; S.bowler.spr = null; if (S.batter) S.batter.shot = null; }
-      await this.sleepReal(240);
+      if (S) { S.flight = null; S.ball = null; S.bowler.spr = null; if (S.batter) { S.batter.shot = null; S.batter.angle = -0.4; } }
     }
   }
   async showAutoPlay(sim, fielders, o = {}) {
