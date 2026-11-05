@@ -169,7 +169,8 @@ export class UI {
   // list: [{ key, name, cost, hero, pose, state: 'ready'|'armed'|'off', onTap }]
   powers(list) {
     const box = $('powers');
-    const keys = list.map(p => p.key).join('|');
+    // (the player on each card is part of its identity: when the batter or bowler changes, the cards are drawn again with his face and not the last one's)
+    const keys = list.map(p => `${p.key}:${p.player?.id || p.hero?.id || ''}`).join('|');
     if (keys !== this.powerKeys) {
       this.powerKeys = keys;
       box.innerHTML = '';

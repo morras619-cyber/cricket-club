@@ -867,7 +867,7 @@ export class Game {
     else if (aiPower) this.ui.hint('SPECIAL BALL! TAP TO DEFEND');
     else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('HOLD · SWIPE · LIFT ON THE RING · TAP TO DEFEND');
     // before the delivery a tap on the field map enlarges it
-    this.onInput = (type, g) => { if (type === 'down' && this.inMap(g)) this.mapBig = !this.mapBig; };
+    this.onInput = (type, g) => { if (type === 'down' && !this.nets && this.inMap(g)) this.mapBig = !this.mapBig; };
     if (opt.waitPower) await opt.waitPower();
     if (opt.hand && !this.bot) handHint(document.getElementById('app')).show(opt.hand);   // (the tutorial: a hand shows what to do, until the player touches the screen or the ball is played)
     if (opt.noBall) {
@@ -1478,15 +1478,18 @@ export class Game {
       caught = !fx.lucky && rng.chance(sim.catch.p * 0.92);   // (Lucky Break: a free hit, so it drops)
       dropped = !caught && sim.catch.p >= 0.3;
     }
+    // the nets: nobody is out caught there. It scores nothing, and says it could have been
+    let netCatch = false;
+    if (this.nets && caught) { caught = false; dropped = false; netCatch = true; }
     if (!caught && sim.save) saved = rng.chance(sim.save.p * 0.5);
-    await this.showAutoPlay(sim, aiField, { side: 'ai', caught, saved, dropped });
+    await this.showAutoPlay(sim, aiField, { side: 'ai', caught, saved, dropped, netCatch });
 
     if (caught) {
       this.wicketFx('CAUGHT!', { x: this.W / 2, y: this.H / 2 });
       inn.ball({ wicket: true }); this.charge.wicketLost();
       return;
     }
-    let runs = saved ? 2 : sim.runs;
+    let runs = netCatch ? 0 : saved ? 2 : sim.runs;
     if (dropped) runs = Math.max(runs, runsAfterCollect(sim.catch.t + 1.0, sim.catch.point));
     if (saved) this.fx.word('SAVED!', this.W / 2, this.H * 0.35, { size: 48, color: '#fff4da', stroke: '#3ec6ff' });
     inn.ball({ runs });
@@ -1584,11 +1587,12 @@ export class Game {
   }
 
   // A shot in the nets: the ball hits the net and drops (js/game.js netBall), so there is no field to watch. The runs it was worth are still said
-  // (the trial counts them), and a catch still counts as out.
+  // (the trial counts them). Nobody is out caught in the nets: a ball that would have been caught scores nothing and says so.
   async netPlay(sim, o) {
-    const runs = o.caught ? 0 : sim.runs;
+    const runs = o.caught || o.netCatch ? 0 : sim.runs;
     await this.sleepReal(this.bot ? 0 : 700);
-    if (!o.caught) {
+    if (o.netCatch) this.fx.word('COULD HAVE BEEN CAUGHT', this.W / 2, this.H * 0.3, { size: 34, color: '#fff4da', stroke: INK, dur: 1500 });
+    else if (!o.caught) {
       const word = sim.kind === 'six' ? 'SIX!' : sim.kind === 'four' && !o.saved ? 'FOUR!' : runs > 0 ? `${runs} RUN${runs === 1 ? '' : 'S'}` : null;
       if (word) this.fx.word(word, this.W / 2, this.H * 0.3, { size: sim.kind === 'six' || sim.kind === 'four' ? 64 : 44, color: '#fff4da', stroke: INK });
     }
@@ -3485,7 +3489,7 @@ export class Game {
     if (kind === 'bat' && S.read && !S.read.none && (S.readPre || (S.delivery && this.gameTime - S.ballT0 < (S.delivery.bounceT ?? 0) + 0.05))) this.drawReadMark(cam);
     // timing ring (batting)
     if (kind === 'bat' && S.ring && S.delivery) this.drawTimingRing(cam, bp);
-    if ((kind === 'bat' || kind === 'bowl') && S.field3d && !S.delivery && !S.flight) this.drawFieldMap(S.field3d, kind);
+    if ((kind === 'bat' || kind === 'bowl') && S.field3d && !S.delivery && !S.flight && !this.nets) this.drawFieldMap(S.field3d, kind);   // (the nets: no fielders to map)
     if (kind === 'keeper' && S.reticle) this.drawReticle(cam);
     if (S.frozen) { ctx.fillStyle = 'rgba(62,198,255,0.15)'; ctx.fillRect(0, 0, this.W, this.H); }
   }
