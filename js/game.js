@@ -109,6 +109,7 @@ export class Game {
     this.settings = { fielding: 'key' };
     this.armed = {};
     this.charge = new Charge();
+    this.showFps = /[?&]fps=1/.test(location.search);
     this.resize();
     addEventListener('resize', () => this.resize());
     this.bindInput();
@@ -116,8 +117,40 @@ export class Game {
   }
 
   // ---------- plumbing ----------
+  // The canvas is drawn at the screen's pixel density, up to 2x. A phone that cannot keep up (frames slower than 22 ms for a couple of seconds of play) steps the
+  // density down (2, 1.5, 1.25, 1): every step is far fewer pixels to paint each frame, so it runs cooler and smoother, a little softer. It never steps back up in the
+  // session (no flicker between the two), and the level is remembered for a day (sixcharge.dpr).
+  dprNow() {
+    if (this.dprCap == null) {   // (remembered for a day: a phone that was only hot for a while gets its sharp picture back)
+      this.dprCap = 2;
+      try { const [v, t] = (localStorage.getItem('sixcharge.dpr') || '').split('|'); if (+v >= 1 && +v < 2 && Date.now() - +t < 864e5) this.dprCap = +v; } catch { /* from 2 */ }
+    }
+    return Math.min(this.dprCap, window.devicePixelRatio || 1);
+  }
+  // ?fps=1 in the address: the frame rate and the picture density, small in the corner (to read what a real phone is doing)
+  drawFps(raw) {
+    this.fpsAvg = (this.fpsAvg || 16.7) * 0.95 + raw * 0.05;
+    const g = this.ctx;
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(4, 4, 112, 20);
+    g.fillStyle = this.fpsAvg > 22 ? '#ff8a8a' : '#9be7a1'; g.font = '12px monospace'; g.textBaseline = 'middle';
+    g.fillText(`${Math.round(1000 / this.fpsAvg)} fps · ${this.fpsAvg.toFixed(0)} ms · ${this.dprNow()}x`, 8, 14);
+    g.restore();
+  }
+  watchSpeed(raw) {   // (raw: the real time since the last frame)
+    if (this.view === 'idle' || this.paused || this.warming || document.hidden || raw > 250) { this.slowMs = Math.max(0, (this.slowMs || 0) - 4); return; }
+    // (milliseconds over the 22 ms mark add up; fast frames let them drain: sustained slowness, not one hitch, is what steps it down)
+    this.slowMs = Math.max(0, (this.slowMs || 0) + (raw > 22 ? raw - 16 : -8));
+    if (this.slowMs > 1800 && this.dprNow() > 1 && !this.fixedDpr) {
+      const steps = [2, 1.5, 1.25, 1], cur = this.dprCap;
+      this.dprCap = steps.find(v => v < cur - 0.01) ?? 1;
+      this.slowMs = 0;
+      try { localStorage.setItem('sixcharge.dpr', `${this.dprCap}|${Date.now()}`); } catch { /* the next session starts again from 2 */ }
+      this.resize();
+    }
+  }
   resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = this.dprNow();
     this.W = this.cv.clientWidth || innerWidth; this.H = this.cv.clientHeight || innerHeight;
     this.cv.width = Math.round(this.W * dpr); this.cv.height = Math.round(this.H * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -128,8 +161,9 @@ export class Game {
   }
 
   frame(now) {
-    const raw = Math.min(50, now - this.lastNow);
+    const gap = now - this.lastNow, raw = Math.min(50, gap);
     this.lastNow = now;
+    this.watchSpeed(gap);
     if (!this.paused) {
       const dt = raw * this.speed;
       this.realTime += dt;
@@ -139,6 +173,7 @@ export class Game {
       try { this.tick(); this.fx.update(dt); this.of.update(dt); } catch (e) { this.loopError = e; console.error('frame update', e); }
     }
     try { this.render(); } catch (e) { console.error(e); }
+    if (this.showFps) this.drawFps(raw);
     requestAnimationFrame(t => this.frame(t));
   }
 
@@ -591,7 +626,7 @@ export class Game {
     job('Crests', async () => {
       for (const id of [this.myTeam.id, this.oppTeam.id]) { const im = new Image(); im.src = logoSrc(id); try { await im.decode(); } catch { /* shown when it comes */ } }
     });
-    el.hidden = false;
+    el.hidden = false; this.warming = true;
     try {
       const n = jobs.length;
       for (let i = 0; i < n; i++) {
@@ -604,7 +639,7 @@ export class Game {
       }
       if (fill) fill.style.width = '100%';
       await breathe();
-    } finally { el.hidden = true; this.warmMs = Math.round(performance.now() - t0); }
+    } finally { el.hidden = true; this.warming = false; this.slowMs = 0; this.warmMs = Math.round(performance.now() - t0); }
   }
 
   // Repaint the players about to be seen (batter on strike, his partner, the bowler) off screen,
