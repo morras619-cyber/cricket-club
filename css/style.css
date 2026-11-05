@@ -1840,3 +1840,7 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mf .mf-i { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 2px solid #0a1448; background: radial-gradient(circle at 35% 30%, #6fb0ff, #1f5fd6 70%); color: #fff; font: normal 900 18px/1 'Baloo 2', sans-serif; text-shadow: 0 1px 0 #0a1448; box-shadow: 0 2px 0 rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(255, 255, 255, .35); cursor: pointer; }
 .mf .mf-i:active { transform: translateY(1px); }
 
+/* the staff cards: the row has equal space either side, so the first and last card sit in the middle of the screen (a card is 90% of the row) */
+.mf .cand-row { padding-left: 5%; padding-right: 5%; scroll-padding: 0 5%; }
+.mf .mf-card.cand { flex: 0 0 100%; }
+.mf .cand-row > .mf-card.cand { max-width: 100%; }
