@@ -19,7 +19,7 @@ const HAS_PORTRAIT = new Set(PORTRAIT_KEYS);
 // (a stand-in club captain, or a hero not in the list, has no name here: so no painted portrait, and the drawn figure is used)
 const keyOf = p => ((p.heroId && heroById(p.heroId)?.name) || p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const srcs = new Map(), kits = new Map();
-const FRAME_FACE = 0.66;   // the face's width, as a share of a squad tile's
+const FRAME_FACE = 0.62;   // the face's width, as a share of a squad tile's
 // the last batches of portraits are a few pictures (PORTRAIT_FILES); each is cut out of its picture onto a canvas that stands in
 // for its own image (the same size and 'load' as an image has)
 const PORTRAIT_FILES = ['img/cards/portraits-more.webp', 'img/cards/portraits-more2.webp'];
@@ -77,8 +77,8 @@ export function paintedPortrait(p, kitTeam = null, { framed = false } = {}) {
   if (framed && PORTRAIT_FRAMES[key]) {
     // every face the same size: the picture is scaled so the face is FRAME_FACE of the tile wide, and centred (the pictures are cut out to
     // their hair, so a close-cropped man would otherwise fill the tile and a man with big hair would not)
-    const [cx, fw] = PORTRAIT_FRAMES[key], u = FRAME_FACE / Math.min(0.82, Math.max(0.55, fw));
-    holder.dataset.framed = '1'; holder.style.setProperty('--u', u.toFixed(3)); holder.style.setProperty('--l', (0.5 - u * cx).toFixed(3));
+    const [cx, fw] = PORTRAIT_FRAMES[key], u = Math.min(1, FRAME_FACE / Math.min(0.82, Math.max(0.55, fw)));   // (never wider than the tile: no hair or shoulder cut at the sides)
+    holder.dataset.framed = '1'; holder.style.setProperty('--u', u.toFixed(3)); holder.style.setProperty('--l', Math.max(0, Math.min(1 - u, 0.5 - u * cx)).toFixed(3));
   }
   const put = () => { if (!kits.has(ck)) kits.set(ck, recolour(srcs.get(key), team)); const src = kits.get(ck), c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); holder.append(c); };
   const im = portraitSrc(key);
