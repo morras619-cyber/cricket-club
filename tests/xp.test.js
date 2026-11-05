@@ -62,7 +62,7 @@ test('XP from a match: playing, a good innings, wickets, an economical spell and
 });
 
 test('the training ground\'s points are handed over as XP, and its books stay sealed', () => {
-  const c = career(), p = C.clubPlayers(c, c.club).find(x => x.age < 30 && x.pot > ovr(x) + 6);
+  const c = career(), squad = C.clubPlayers(c, c.club), p = squad.find(x => x.age < 30 && x.pot > ovr(x) + 6) || squad.find(x => C.canGrow(x));   // (any player who can still grow)
   p.xp = 0; p.xpSeason = 0;
   c.training = TG.freshTraining(0); c.training.tp[p.id] = 50; TG.seal(c.training);
   const got = C.absorbTraining(c);
