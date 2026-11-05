@@ -2083,3 +2083,7 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .hub-enter .hubrow > * { animation: hubRise .5s cubic-bezier(.2, .8, .3, 1) backwards; }
 .hub-enter .hubrow > :nth-child(1) { animation-delay: .5s; } .hub-enter .hubrow > :nth-child(2) { animation-delay: .57s; } .hub-enter .hubrow > :nth-child(3) { animation-delay: .64s; } .hub-enter .hubrow > :nth-child(4) { animation-delay: .71s; }
 @media (prefers-reduced-motion: reduce) { .hub-enter * { animation: none !important; } }
+/* player lists that used to be a grid (training players, contracts, academy prospects, medical squad) slide along like the nets' row: three show, the next peeks in */
+.mf .ptile-row.ptile-slide { padding: 14px 6px 12px; margin: 0 -6px; align-items: flex-start; flex: 0 0 auto; }
+.mf .ptile-row.ptile-slide .mf-card.empty { flex: 0 0 31%; aspect-ratio: 3 / 4.25; min-height: 0; scroll-snap-align: center; }
+.mf .ptile-row.ptile-slide .ptile { flex: 0 0 31%; }

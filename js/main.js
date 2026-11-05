@@ -2009,7 +2009,7 @@ function paintTraining(c) {
   const body = $('trainBody');
   body.replaceChildren();
   if (trainTab === 'players') {
-    const grid = el('div', 'mf-grid ptile-grid');
+    const grid = el('div', 'ptile-row ptile-slide');
     t.slots.forEach((pid, i) => {
       const info = pid && roster.get(pid), p = pid && c.players[pid];
       if (!info) {
@@ -2216,7 +2216,7 @@ function paintOffice(c) {
     if (past.length) { const row = el('div', 'board-past'); for (const b of past) { const chip = el('div', `board-chip ${b.met ? 'ok' : 'no'}`); chip.append(ico(b.met ? 'check' : 'cross'), el('b', '', `Season ${b.season}`), el('small', '', `Top ${b.target} · ${ord(b.pos)}${b.met ? ` · +${money(b.reward)}` : ''}`)); row.append(chip); } col.append(row); }
     body.append(col);
   } else if (officeTab === 'contracts') {
-    const list = contractList(c).slice(0, 6), grid = el('div', 'mf-grid ptile-grid');
+    const list = contractList(c).slice(0, 6), grid = el('div', 'ptile-row ptile-slide');
     for (const p of list) {
       const left = p.contract, last = left <= 1;
       grid.append(playerTile(p, club, { ovr: ovr(p), sub: last ? 'Last season' : `${left} seasons left`, bar: Math.min(100, left / 3 * 100), tone: last ? 'red' : left === 2 ? 'amber' : 'green', need: last, chips: last ? [{ t: 'RENEW', tone: 'red' }] : [], onClick: () => { officeSheet = { type: 'extend', pid: p.id }; sfx.click(); paintOffice(c); } }));
@@ -2530,7 +2530,7 @@ function paintAcademy(c) {
   body.replaceChildren();
   const left = ms => durfmt(Math.max(0, ms));
   if (acadTab === 'prospects') {
-    const grid = el('div', 'mf-grid ptile-grid'), list = prospectsOf(c);
+    const grid = el('div', 'ptile-row ptile-slide'), list = prospectsOf(c);
     for (const p of list) {
       const rev = a.revealed[p.id], tier = p.academy?.tier ?? 0, drill = a.drills[p.id], TL = ['C', 'R', 'E', 'S'];
       const card = playerTile(p, teamById(c.club), { ovr: ovr(p), sub: rev ? `${ovr(p)} ▸ ${p.pot}` : `${ovr(p)} ▸ ?`, bar: rev ? ovr(p) / Math.max(1, p.pot) * 100 : ovr(p), tier: rev ? ['common', 'rare', 'epic', 'legendary'][tier] : 'unknown', chips: drill ? [{ t: left(drill - now), tone: 'blue' }] : [{ t: `AGE ${p.age}`, tone: p.age >= AC.ACAD.PLAY_AGE ? 'green' : '' }], onClick: () => { acadSheet = { type: 'prospect', id: p.id }; sfx.click(); paintAcademy(c); } });
@@ -2696,7 +2696,7 @@ function paintMedical(c) {
   const hoursToFull = id => { const sp = MD.bedSpeed(m), need = MD.fitCap(m, id) - MD.fitOf(m, id); return sp ? need / (MD.MED.BED * sp) * 3600000 : need / MD.MED.REST * 3600000; };
   const bar = id => { const f = MD.fitOf(m, id), b = el('div', `mf-bar ${fitColour(f)}`), i = el('i'); i.style.width = `${Math.max(3, Math.round(f))}%`; b.append(i); return b; };
   if (medTab === 'squad') {
-    const grid = el('div', 'mf-grid ptile-grid'), list = [...squad].sort((a, b) => MD.fitOf(m, a.id) - MD.fitOf(m, b.id)).slice(0, 6);
+    const grid = el('div', 'ptile-row ptile-slide'), list = [...squad].sort((a, b) => MD.fitOf(m, a.id) - MD.fitOf(m, b.id)).slice(0, 6);
     for (const p of list) {
       const f = Math.round(MD.fitOf(m, p.id)), kn = MD.isKnocked(m, p.id), bed = m.beds.includes(p.id);
       const card = playerTile(p, club, { ovr: ovr(p), sub: `Fit ${f}`, bar: f, tone: f < 40 ? 'red' : f < 80 ? 'amber' : 'green', need: p === list[0] && f < 90, chips: [...(kn ? [{ t: 'KNOCK', tone: 'red' }] : []), ...(bed ? [{ t: 'IN BED', tone: 'blue' }] : [])], onClick: () => { medSheet = { type: 'player', id: p.id }; sfx.click(); paintMedical(c); } });
