@@ -1468,14 +1468,35 @@ function buildTick(c) {
 }
 const canBuild = (c, id) => !PC.whyNot(c, id, buildCtx(c)) && c.money >= PC.costOf(id, levelOfBuilding(c, id) + 1);
 // ---------- the shell of a building's screen: the top bar (club level, cash, diamonds) and the hero picture of the building ----------
+// a number that ticks up (or down) to its new value instead of jumping: the top bar's cash and diamonds
+const lastCount = {};
+function tickUp(node, { key, to, fmt }) {
+  const from = lastCount[key]; lastCount[key] = to;
+  if (from == null || from === to || window.__SIXCHARGE_BOT || matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const t0 = performance.now(), ms = 650;
+  node.classList.add('tick');
+  const step = now => {
+    const k = Math.min(1, (now - t0) / ms), e = 1 - (1 - k) ** 3;
+    node.textContent = fmt(from + (to - from) * e);
+    if (k < 1 && node.isConnected) requestAnimationFrame(step); else { node.textContent = fmt(to); node.classList.remove('tick'); }
+  };
+  requestAnimationFrame(step);
+}
+// a tap on a tab: the cards of its page slide in (only then, so the timers' repaints never replay it)
+document.addEventListener('click', e => {
+  const t = e.target.closest?.('.mf-tab'); if (!t) return;
+  const body = t.closest('.mf')?.querySelector('.mf-body'); if (!body) return;
+  body.classList.remove('enter'); void body.offsetWidth; body.classList.add('enter');
+  setTimeout(() => body.classList.remove('enter'), 700);
+});
 function fillTopbar(host, c, back = null) {
   const b = PC.buildOf(c), lv = PC.clubLevel(b.xp), base = PC.XP_AT[lv], next = PC.XP_AT[lv + 1];
   const shield = el('div', 'tb-shield'); shield.append(el('span', '', String(lv)));
   const bar = el('div', 'tb-xp'), fill = el('i'); fill.style.width = `${Math.max(3, Math.round(PC.levelShare(b.xp) * 100))}%`; bar.append(fill, el('span', '', lv >= PC.MAX_LEVEL ? 'MAX' : `${Math.round(b.xp - base)}/${next - base}`));
-  const pill = (icon, text, go) => { const d = el('div', 'tb-pill'); d.append(ico(icon), el('span', '', text), mfBtn('tb-plus', [ico('plus')], go)); return d; };
+  const pill = (icon, text, go, count) => { const d = el('div', 'tb-pill'), t = el('span', '', text); d.append(ico(icon), t, mfBtn('tb-plus', [ico('plus')], go)); if (count) tickUp(t, count); return d; };
   host.replaceChildren(shield, bar,
-    pill('coin', money(c.money), () => { sfx.click(); fromMap = true; renderOffice(false); }),
-    pill('diamond', String(b.diamonds), () => { sfx.click(); fromMap = true; shopTab = 'diamonds'; renderShop(); }),
+    pill('coin', money(c.money), () => { sfx.click(); fromMap = true; renderOffice(false); }, { key: 'money', to: c.money, fmt: money }),
+    pill('diamond', String(b.diamonds), () => { sfx.click(); fromMap = true; shopTab = 'diamonds'; renderShop(); }, { key: 'dia', to: b.diamonds, fmt: v => String(Math.round(v)) }),
     mfBtn('tb-gear', [ico('gear')], () => { sfx.click(); if (back) { if (!$('clubmap').hidden) clubMap.close(); settingsFrom = back; } renderSettings(); }));
 }
 // a building screen whose content does not fit takes tighter steps (the skin's data-tight 1-4) until it does; at the last the body scrolls
@@ -2561,7 +2582,7 @@ function paintMedical(c) {
     const grid = el('div', 'mf-grid fc-grid'), list = [...squad].sort((a, b) => MD.fitOf(m, a.id) - MD.fitOf(m, b.id)).slice(0, 6);
     for (const p of list) {
       const f = Math.round(MD.fitOf(m, p.id)), kn = MD.isKnocked(m, p.id), bed = m.beds.includes(p.id);
-      const card = fanCard(p, club, { name: lastName(p.name), variant: 'med', fill: f, barClass: f < 40 ? 'red' : f < 80 ? '' : 'green', onClick: () => { medSheet = { type: 'player', id: p.id }; sfx.click(); paintMedical(c); },
+      const card = fanCard(p, club, { name: lastName(p.name), variant: 'med', pick: p === list[0] && f < 90, fill: f, barClass: f < 40 ? 'red' : f < 80 ? '' : 'green', onClick: () => { medSheet = { type: 'player', id: p.id }; sfx.click(); paintMedical(c); },
         vals: [{ t: String(f), title: 'Fitness: how fresh he starts the next match' }, { t: bed ? '✓' : '–', dim: !bed, title: bed ? 'In a bed' : 'Not in a bed' }, { t: kn ? '!' : '–', dim: !kn, title: kn ? 'Has a knock: his fitness stops at 50 until he is treated' : 'No knock' }, { t: String(ovr(p)), title: 'Rating' }] });
       grid.append(card);
     }

@@ -1844,3 +1844,18 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mf .cand-row { padding-left: 5%; padding-right: 5%; scroll-padding: 0 5%; }
 .mf .mf-card.cand { flex: 0 0 100%; }
 .mf .cand-row > .mf-card.cand { max-width: 100%; }
+/* ---- feel: buttons squash under the thumb, the main action breathes, numbers tick, pages slide in ---- */
+.mf button, .mf .mf-card.fc, .mf .mf-card.stack, .bigbtn, .chipbtn, .tab, .tile, .hubbtn { transition: transform .12s ease, filter .12s ease; -webkit-tap-highlight-color: transparent; }
+.mf button:active:not(:disabled), .mf .mf-card.fc:active, .mf .mf-card.stack:active, .bigbtn:active:not(:disabled), .chipbtn:active, .tab:active, .tile:active, .hubbtn:active { transform: scale(.955); filter: brightness(1.08); }
+.mf .mf-big:not(:disabled):not(.alt) { animation: mfBreathe 2.6s ease-in-out infinite; }
+@keyframes mfBreathe { 0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 210, 63, 0)); } 50% { filter: drop-shadow(0 0 9px rgba(255, 210, 63, .85)); } }
+.tb-pill .tick { color: #ffe27a; text-shadow: 0 0 8px rgba(255, 210, 63, .8); }
+.mf-body.enter > *, .mf-body.enter .cand-row > * { animation: mfPop .34s cubic-bezier(.2, .9, .3, 1.15) both; }
+.mf-body.enter > *:nth-child(2) { animation-delay: .04s; } .mf-body.enter > *:nth-child(3) { animation-delay: .08s; } .mf-body.enter > *:nth-child(4) { animation-delay: .12s; } .mf-body.enter > *:nth-child(5) { animation-delay: .16s; } .mf-body.enter > *:nth-child(n+6) { animation-delay: .2s; }
+@keyframes mfPop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mf .mf-big, .mf-body.enter > * { animation: none !important; } }
+/* the card that needs you most glows (medical: the most tired player) */
+.mf .fc.pick { animation: mfNeed 1.8s ease-in-out infinite; }
+@keyframes mfNeed { 0%, 100% { filter: brightness(1.05) saturate(1.1) drop-shadow(0 0 3px rgba(255, 90, 60, .5)); } 50% { filter: brightness(1.12) saturate(1.2) drop-shadow(0 0 12px rgba(255, 90, 60, .95)); } }
+@media (prefers-reduced-motion: reduce) { .mf .fc.pick { animation: none; } }
+
