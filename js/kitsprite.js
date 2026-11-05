@@ -204,6 +204,9 @@ function smoothSkin(src, mask, W, H) {
   return smoothField(val, cnt, W, H, 2, () => [12, 34]);
 }
 
+// The tone pictures of these views arrive already smoothed (tools/bake_tone_smoothing.py: the same masked blur as smoothTone / smoothWeights below, done once
+// when the art is built, not on every phone at the first match). smoothTone and smoothWeights stay for a sheet that is not baked.
+const BAKED_TONES = new Set(['front', 'back', 'spin-front', 'spin-back', 'bat-back', 'field']);
 // (the smoothed brightness is the same for every club: made once for each sheet)
 const smoothed = new Map();
 const smoothTones = (view, tn, m, W, H) => { if (!smoothed.has(view)) smoothed.set(view, smoothTone(tn, m, W, H, KIT_SHEETS[view].frames)); return smoothed.get(view); };
@@ -229,7 +232,7 @@ function teamSheet(view, team) {
   if (data.tone) {
     // each colour shaded by the cloth's brightness against that colour's drawn brightness, then
     // mixed by the soft weights (so panel edges and piping blend, no patches)
-    const tgt0 = !!meta.hsv, tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0], luts = pal.map(shades), sm = tgt0 ? null : smoothTones(view, tn, m, c.width, c.height), hm = view === 'bat-back' ? helmetOf(view, c.width, c.height) : null, sw = tgt0 ? null : weightsOf(view, tn, m, c.width, c.height);
+    const tgt0 = !!meta.hsv, tn = data.tone, pal = premiumOf(team), ref = meta.tones.map(x => x * 255), w = [0, 0, 0], luts = pal.map(shades), sm = tgt0 || BAKED_TONES.has(view) ? null : smoothTones(view, tn, m, c.width, c.height), hm = view === 'bat-back' ? helmetOf(view, c.width, c.height) : null, sw = tgt0 || BAKED_TONES.has(view) ? null : weightsOf(view, tn, m, c.width, c.height);
     // (a painted sheet: the hue becomes the club's, the colour's depth and light stay as painted;
     // the club's colours are worked out once, not per pixel)
     const tgt = meta.hsv && pal.map((t, k) => { const [th, ts, tv] = TARGET_HSV(t), [, rs, rv] = meta.hsv[k]; return [th, ts / Math.max(rs, 0.05), tv / Math.max(rv, 0.05)]; });
