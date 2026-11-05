@@ -1704,13 +1704,20 @@ export class Game {
   // (the trial counts them). Nobody is out caught in the nets: a ball that would have been caught scores nothing and says so.
   async netPlay(sim, o) {
     const runs = o.caught || o.netCatch ? 0 : sim.runs;
-    await this.sleepReal(this.bot ? 0 : 700);
+    await this.sleepReal(this.bot ? 0 : 350);
     if (o.netCatch) this.fx.word('COULD HAVE BEEN CAUGHT', this.W / 2, this.H * 0.3, { size: 34, color: '#fff4da', stroke: INK, dur: 1500 });
     else if (!o.caught) {
       const word = sim.kind === 'six' ? 'SIX!' : sim.kind === 'four' && !o.saved ? 'FOUR!' : runs > 0 ? `${runs} RUN${runs === 1 ? '' : 'S'}` : null;
       if (word) this.fx.word(word, this.W / 2, this.H * 0.3, { size: sim.kind === 'six' || sim.kind === 'four' ? 64 : 44, color: '#fff4da', stroke: INK });
     }
-    await this.sleepReal(this.bot ? 0 : 700);
+    await this.sleepReal(this.bot ? 0 : 500);
+    // the cut to the next ball: a quick dip to dark, and while it is dark the bowler is back at his mark and the batter in his stance, the ball gone
+    if (!this.bot) {
+      this.fx.dip(); await this.sleepReal(130);
+      const S = this.S;
+      if (S) { S.flight = null; S.ball = null; S.bowler.spr = null; if (S.batter) S.batter.shot = null; }
+      await this.sleepReal(240);
+    }
   }
   async showAutoPlay(sim, fielders, o = {}) {
     if (this.nets) return this.netPlay(sim, o);   // (the nets: the ball stays in the cage)
@@ -3438,7 +3445,7 @@ export class Game {
     }
     if (S.flight) {
       const t = this.gameTime - S.flight.t0, f = S.flight;
-      if (this.nets) return netBall(f, t);   // (a ball hit in the nets hits the net and drops)
+      if (this.nets) return t > 1.7 ? null : netBall(f, t);   // (a ball hit in the nets hits the net and drops; it is picked up after that, not left lying in the cage)
       const y = f.p0.y + f.vy * t - 4.9 * t * t;
       return { x: f.p0.x + f.vx * t, y: Math.max(0.03, y), z: f.p0.z + f.vz * t };
     }

@@ -98,6 +98,8 @@ export class FX {
   ripple(x, y, { colors = ['#fff4da', '#ffd23f'], r = 90, dur = 700, squash = 0.78 } = {}) {
     colors.forEach((c, i) => this.ripples.push({ x, y, color: c, r, dur, squash, t: -i * 110 }));
   }
+  // a dip to dark and back over about 370 ms (a cut between balls: whatever is reset at the peak, around 120 ms in, is not seen)
+  dip(color = '#070b1e') { this.dipColor = color; this.dipT = 0; }
   flash(color = '#fff', a = 0.9) { this.flashColor = color; this.flashA = a; }
   shake(a = 10) { this.shakeA = Math.max(this.shakeA, a); }
   burst(x, y, { color = '#ffd23f', dur = 260, rays = 18, r = 300 } = {}) { this.bursts.push({ x, y, color, dur, rays, r, t: 0 }); }
@@ -125,6 +127,7 @@ export class FX {
     for (const p of this.parts) { p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.25 * k; p.life -= k; }
     this.parts = this.parts.filter(p => p.life > 0);
     this.flashA = Math.max(0, this.flashA - 0.006 * dtMs);
+    if (this.dipT != null) { this.dipT += dtMs; if (this.dipT > 370) this.dipT = null; }
     this.shakeA = Math.max(0, this.shakeA - 0.04 * dtMs);
   }
 
@@ -165,6 +168,10 @@ export class FX {
     const taken = [];
     for (const b of this.bubbles) taken.push(drawBubble(ctx, b, W, taken, H));
     for (const w of this.words) taken.push(drawWord(ctx, w, W, H, taken));
+    if (this.dipT != null) {
+      const d = this.dipT < 120 ? this.dipT / 120 : 1 - (this.dipT - 120) / 250;
+      ctx.globalAlpha = Math.max(0, Math.min(1, d)); ctx.fillStyle = this.dipColor; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+    }
     if (this.flashA > 0) {
       ctx.globalAlpha = Math.min(1, this.flashA);
       ctx.fillStyle = this.flashColor; ctx.fillRect(0, 0, W, H);

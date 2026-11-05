@@ -49,6 +49,7 @@ export const SEQ = {
   leave: [['leave1', 170], ['leave2', Infinity]],
   bowled: [['bowled', Infinity]], // beaten: looking back at the stumps
 };
+const FINISH_HOLD_MS = 420, SETTLE_MS = 380;   // (how long the finish is held, and how long the walk back to the stance takes)
 const BLEND_MS = 70;   // (how long the frame before is faded out under the next: longer, so the poses flow into each other)
 
 // Which animation a swipe plays: each direction its own shot, so the bat goes where the ball goes.
@@ -117,6 +118,8 @@ export function batFrame(b, now) {
     const seq = SEQ[b.shot.anim] || SEQ.drive;
     let t = now - b.shot.t0, prev = b.shot.from || 'backlift';
     for (const [f, ms] of seq) {
+      // (the last pose of a shot is held a moment, then he settles back to his stance: a batter never stands frozen in his follow-through while the next ball is waited for)
+      if (ms === Infinity && t >= FINISH_HOLD_MS && b.shot.anim !== 'bowled') return { f: 'ready', prev: f, a: Math.min(1, (t - FINISH_HOLD_MS) / SETTLE_MS) };
       if (t < ms) return { f, prev, a: Math.min(1, t / BLEND_MS) };
       t -= ms; prev = f;
     }
