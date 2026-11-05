@@ -6,7 +6,7 @@ import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
-import { gradeTiming, swipeToShot, resolveContact, aimVector } from './shots.js';
+import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
@@ -106,7 +106,7 @@ export class Game {
     this.onInput = null;
     this.bot = !!window.__SIXCHARGE_BOT;
     this.speed = window.__SIXCHARGE_SPEED || 1;
-    this.settings = { fielding: 'key' };
+    this.settings = { fielding: 'key', batNew: false };
     this.armed = {};
     this.charge = new Charge();
     this.showFps = /[?&]fps=1/.test(location.search);
@@ -979,7 +979,7 @@ export class Game {
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
     else if (aiPower) this.ui.hint('SPECIAL BALL! TAP TO DEFEND');
-    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint('SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND');
+    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint(this.settings.batNew && !this.bot ? 'THUMB ON THE DOTTED CIRCLE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND');
     // before the delivery a tap on the field map enlarges it
     this.onInput = (type, g) => { if (type === 'down' && !this.nets && this.inMap(g)) this.mapBig = !this.mapBig; };
     if (opt.waitPower) await opt.waitPower();
@@ -1040,6 +1040,16 @@ export class Game {
     fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
+    // Batting 2.0 (a test, in Settings): the swipe carries the decisions; see shots.js batNewSize
+    const bn = !!this.settings.batNew && !this.bot && !opt.assist && !opt.hand && !fx.meteor;
+    document.getElementById('hud')?.classList.toggle('bn', bn);
+    if (bn) {
+      if (this.rhythmInn !== inn) { this.rhythmInn = inn; this.rhythm = 0; }
+      const cp = this.cams.bat.project(d.atContact.x, d.atContact.y, d.atContact.z);
+      S.bnZone = cp ? { x: cp.x, y: cp.y, r: Math.max(46, Math.max(16, 0.22 * cp.k) * 2.4) } : null;
+      S.bnLive = null;
+      this.batNewHud(true);
+    } else this.batNewHud(false);
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor, perfectMs: w.perfect };
     S.readPre = false;
     if (fx.read && S.read === undefined) S.read = d.bounce ? { x: d.bounce.x, z: d.bounce.z, name: LENGTH_LABEL[lengthForBounce(d.bounce.z)] } : { none: true };
@@ -1060,15 +1070,17 @@ export class Game {
         }
         if (fx.meteor) { if (!tap && tb > 0) tap = { t: this.realToGame(g.t) }; return; }
         if (!swing) S.batter.angle = -2.2;
+      } else if (type === 'move' && bn && !swing && g.x0 != null) {
+        S.bnLive = batNewSize(Math.hypot(g.x - g.x0, g.y - g.y0) / this.loftPx);   // (the ring tightens as the swipe gets longer)
       } else if (type === 'up' && !fx.meteor && !swing) {
         // a quick tap with no swipe = defend, timed from the touch
         const tap = Math.hypot(g.dx, g.dy) < 28 && g.t - g.t0 < 320;
         const tg = this.realToGame(tap ? g.t0 : g.t);
         if (tg < S.ballT0 + 0.15) { S.batter.angle = -0.4; return; }
-        swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, defend: tap };
+        swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, defend: tap, x0: g.x0, y0: g.y0 };
         S.batter.swingT0 = this.realTime;
         if (!tap) this.swingArc(this.myTeam, 'bat');
-        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.ax ?? g.dx, g.ay ?? g.dy, this.loftPx, this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
+        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.ax ?? g.dx, g.ay ?? g.dy, this.loftPx, bn ? null : this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
     if (this.bot) this.botBat(d, S, fx, rng);
@@ -1088,7 +1100,17 @@ export class Game {
 
     // ----- resolve -----
     const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
-    let grade = swing ? gradeTiming(err, w, d.xt > 0.08) : 'leave';
+    // Batting 2.0: the windows and the power come from the swipe's length, where the finger came down, and the rhythm
+    let bnPower = 1, bnInfo = null, wUse = w;
+    if (bn && swing && !swing.defend) {
+      const len = Math.hypot(swing.dx, swing.dy), sz = batNewSize(len / this.loftPx);
+      const off = S.bnZone && swing.x0 != null ? Math.hypot(swing.x0 - S.bnZone.x, swing.y0 - S.bnZone.y) / S.bnZone.r : 0, zn = batNewZone(off), rf = rhythmFx(this.rhythm || 0);
+      const wf = sz.win * zn.win * rf.win;
+      wUse = { ...w, perfect: w.perfect * wf, good: w.good * wf, okay: w.okay * (1 + (wf - 1) * 0.5) };
+      bnPower = sz.power * zn.power * rf.power;
+      bnInfo = { band: sz.band, near: zn.near, stage: rf.stage };
+    }
+    let grade = swing ? gradeTiming(err, wUse, d.xt > 0.08) : 'leave';
     if (swing && !swing.defend) { this.stats.swings++; if (grade === 'perfect' || grade === 'good') this.stats.swingGood++; }   // (what the AI learns your skill from)
     if (swing && fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
     if (swing && fx.match.edgeP && (grade === 'early' || grade === 'late') && rng.chance(fx.match.edgeP)) grade = 'edge';   // (an aggressive opener early on)
@@ -1109,8 +1131,8 @@ export class Game {
       // ball, or swing without picking one, and the real one goes through you
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
-      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
-      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * fx.match.power * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
+      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, bn ? null : this.shotLoft)) : null;
+      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * fx.match.power * bnPower * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
       if (aiPower === 'tornado' && myC !== 'brace' && grade === 'miss') res.outcome = 'bowled';
       if (fx.gap && swing && !swing.defend && res.outcome === 'hit') res = this.gapShot(res, grade, aiField, fx.counter === 'brace', rng);
       // his Bouncer Barrage: a hit short of a Perfect (a braced one spares a Good) goes up in the air, a catch chance every time
@@ -1118,6 +1140,15 @@ export class Game {
     }
     if (opt.assist) res = opt.assist(res, grade) || res;
     this.timeScale = 1;
+    S.bnZone = null; S.bnLive = null;
+    if (bn) {
+      const before = rhythmStage(this.rhythm || 0);
+      this.rhythm = rhythmNext(this.rhythm || 0, res.outcome === 'hit' || res.outcome === 'edge' ? grade : res.outcome === 'leave' ? 'leave' : 'miss');
+      const after = rhythmStage(this.rhythm);
+      this.batNewPaint();
+      if (after > before) { this.fx.word(RHYTHM_NAMES[after] + '!', this.W / 2, this.H * 0.2, { size: 34, color: after === 2 ? '#ff9f1c' : '#ffe45c', stroke: INK, rot: 0, dur: 1100 }); sfx.zing(60 + after * 20); }
+      if (bnInfo) this.batNewReport(bnInfo, err, grade, res);
+    }
 
     const contact = d.pos(d.tContact);
     const cs = this.cams.bat.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 2 };
@@ -3162,7 +3193,7 @@ export class Game {
       await this.sleepReal(this.bot ? 100 : 2300);
       for (let k = 0; k < N; k++) {
         const spec = script[(bi * N + k) % script.length];
-        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND' : undefined, extra: 25 });
+        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? (this.settings.batNew && !this.bot ? 'THUMB ON THE DOTTED CIRCLE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND') : undefined, extra: 25 });
         if (!inn.cur.id) inn.setBatter(cand);   // (bowled in the nets: back to the crease)
         this.hud(inn);
         await this.sleepReal(this.bot ? 60 : 450);
@@ -3757,6 +3788,34 @@ export class Game {
     ctx.restore();
   }
 
+  // ---------- Batting 2.0 ----------
+  // the rhythm bar, small, under the over's balls at the top right
+  batNewHud(on) {
+    let box = document.getElementById('bnRhythm');
+    if (!on) { if (box) box.hidden = true; return; }
+    if (!box) {
+      box = document.createElement('div'); box.id = 'bnRhythm'; box.className = 'bn-rhythm';
+      box.innerHTML = '<b id="bnName">SETTLED</b><div class="bn-bar"><i></i><i></i><i></i></div>';
+      document.getElementById('hud').append(box);
+    }
+    box.hidden = false; this.batNewPaint();
+  }
+  batNewPaint() {
+    const box = document.getElementById('bnRhythm');
+    if (!box) return;
+    const v = this.rhythm || 0, st = rhythmStage(v);
+    box.dataset.stage = st; document.getElementById('bnName').textContent = RHYTHM_NAMES[st];
+    const segs = box.querySelectorAll('.bn-bar i');
+    const edges = [0, 30, 66, 100];
+    segs.forEach((el, i) => { el.style.setProperty('--f', `${Math.round(100 * Math.max(0, Math.min(1, (v - edges[i]) / (edges[i + 1] - edges[i]))))}%`); });
+  }
+  batNewReport({ band, near, stage }, err, grade, res) {
+    const bits = [band === 'push' ? 'PUSH' : band === 'drive' ? 'DRIVE' : 'BIG SWING', near === 'on the line' ? 'ON THE LINE' : near === 'close' ? 'CLOSE TO THE LINE' : 'REACHING'];
+    if (err != null) bits.push(Math.abs(err) <= 25 ? 'PERFECT TIMING' : `${err < 0 ? 'EARLY' : 'LATE'} ${Math.round(Math.abs(err))}MS`);
+    bits.push(res.outcome === 'hit' ? String(grade).toUpperCase() : String(res.outcome).toUpperCase());
+    this.ui.hint(bits.join(' · '));
+    clearTimeout(this.bnHintT); this.bnHintT = setTimeout(() => this.ui.hint(null), 2400);
+  }
   drawTimingRing(cam, movingBall = null) {
     const ctx = this.ctx, S = this.S, d = S.delivery;
     const t = this.gameTime - S.ballT0;
@@ -3765,7 +3824,7 @@ export class Game {
     const c = movingBall || d.atContact;
     const s = cam.project(c.x, c.y, c.z);
     if (!s) return;
-    const r0 = Math.max(16, 0.22 * s.k);
+    const r0 = Math.max(16, 0.22 * s.k) * (S.bnLive ? Math.max(0.7, Math.min(1.3, S.bnLive.win)) : 1);
     const left = d.tContact - t;
     if (left < -0.3) return;
     const r = r0 * (1 + Math.max(0, left) / 0.45);
@@ -3777,6 +3836,8 @@ export class Game {
     ctx.strokeStyle = S.ring.meteor ? '#ff7a1a' : near ? '#2ecc71' : '#fff4da';
     ctx.lineWidth = near ? 5 : 3;
     ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.stroke();
+    const z = S.bnZone;   // (Batting 2.0: where the finger should come down)
+    if (z) { ctx.setLineDash([9, 7]); ctx.strokeStyle = 'rgba(255, 228, 92, .8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     ctx.restore();
   }
 
