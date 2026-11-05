@@ -1209,8 +1209,8 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .newsmsg p { margin: 0; font-weight: 800; font-style: italic; font-size: 14px; line-height: 1.35; }
 .newsmsg small { opacity: .65; font-weight: 700; }
 /* Chirp: a dark social feed (js/main.js chirpPanel, img/chirp/) */
-.page.scrolls { overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; touch-action: pan-x pan-y; }
-.page.scrolls::-webkit-scrollbar { display: none; }
+.page.scrolls, .page.fitscroll { overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; touch-action: pan-x pan-y; }
+.page.scrolls::-webkit-scrollbar, .page.fitscroll::-webkit-scrollbar { display: none; }
 .chirp { --cb: #0b1c55; --cb2: #10286b; --cline: #1f45a8; --ctext: #f4f7ff; --cmuted: #8ea6e6; color: var(--ctext); padding: 4px 2px 12px; }
 .chirpbar { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 12px; padding: 6px 8px 10px; margin-bottom: 4px; background: linear-gradient(#0a1a52f5, #0a1a52e0); border-radius: 0 0 18px 18px; box-shadow: 0 6px 12px rgba(0, 0, 25, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .chirplogo { width: 54px; height: 54px; border-radius: 15px; box-shadow: 0 0 0 2px #1b9bff, 0 4px 0 rgba(0, 0, 20, .45); flex: none; }
@@ -2145,3 +2145,8 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .ml-bar { width: 100%; height: 12px; border-radius: 8px; background: rgba(255, 255, 255, .12); box-shadow: inset 0 0 0 2px rgba(7, 11, 36, .9); overflow: hidden; }
 .ml-bar i { display: block; height: 100%; width: 0; border-radius: 8px; background: linear-gradient(90deg, #ffb52e, #ffe45c); transition: width .18s ease-out; }
 .ml-card small { font: 700 12px/1.2 var(--body); color: rgba(255, 255, 255, .7); min-height: 14px; }
+
+/* a note over the auction (the first eleven is signed, ...) shows for a few seconds on top of the lot instead of taking room from it: the lot's card and its buttons are never squeezed */
+#career.in-auction #careerBody { position: relative; }
+#career.in-auction .notecard { position: absolute; left: 4px; right: 4px; margin: 0; z-index: 6; pointer-events: none; animation: noteaway 4.2s ease forwards; }
+@keyframes noteaway { 0%, 78% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-8px); } }

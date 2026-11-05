@@ -109,13 +109,18 @@ function fitPage(pg) {
     if (pg.classList.contains('futpage')) box.classList.add('futpage');
     box.append(...pg.childNodes); pg.append(box);
   }
-  box.style.width = ''; box.style.transform = '';
+  box.style.width = ''; box.style.transform = ''; pg.classList.remove('fitscroll');
   const avail = pg.clientHeight - 12;
   if (avail <= 40) return;                                  // (hidden for now: it is fitted when it is shown)
   let h = box.offsetHeight;
   if (h <= avail) return;
   let s = Math.max(0.6, avail / h);
   for (let i = 0; i < 2; i++) { box.style.width = `${100 / s}%`; h = box.offsetHeight; s = Math.max(0.6, Math.min(1, avail / h)); }
+  // (a page that is still too tall at the smallest size, on a short screen or with a note above it, scrolls at its natural size: its last button is never out of reach)
+  if (h * s > avail + 1) { box.style.width = ''; box.style.transform = ''; pg.classList.add('fitscroll');
+    // (and when the page has a Play button, it opens scrolled to it, once: the way into the match is the first thing in reach)
+    if (!pg.dataset.opened && pg.querySelector('.playbtn')) { pg.dataset.opened = '1'; requestAnimationFrame(() => { pg.scrollTop = pg.scrollHeight; }); }
+    return; }
   box.style.width = `${100 / s}%`; box.style.transformOrigin = '0 0'; box.style.transform = `scale(${s})`;
 }
 const watchFit = pg => { fitWatch?.observe(pg); requestAnimationFrame(() => fitPage(pg)); };
