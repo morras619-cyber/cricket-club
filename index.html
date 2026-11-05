@@ -147,35 +147,44 @@ vs a random team</small></button>
   </section>
 
   <section id="settings" class="screen" hidden>
-    <div class="screen-inner">
-      <h2 class="title">Settings</h2>
-      <div class="setrow">
+    <div class="mf set-mf">
+      <header class="mf-head set-head"><b>Settings</b></header>
+      <nav class="mf-tabs" id="setTabs"></nav>
+      <div class="mf-body" id="setBody">
+        <div class="set-pane" data-pane="game">
+          <div class="setrow">
         <button class="setcard" id="setSound"><img src="img/menu/icon-sound.webp" alt=""><b>Sound</b><span>On</span></button>
         <button class="setcard" id="setHaptics"><img src="img/menu/icon-haptics.webp" alt=""><b>Vibration</b><span>On</span></button>
         <button class="setcard" id="setField"><img src="img/menu/icon-fielding.webp" alt=""><b>Fielding</b><span>Key moments</span></button>
         <button class="setcard" id="setUnits"><img src="img/menu/icon-fielding.webp" alt=""><b>Ball speed</b><span>km/h</span></button>
       </div>
-      <div class="panel paper profile"><label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label></div>
-      <button class="bigbtn" id="setTrophies">Trophies</button>
-      <button class="bigbtn" id="setStats">Stats</button>
-      <button class="bigbtn" id="setTutorial">Tutorial</button>
-      <button class="bigbtn" id="setPitches">Pitch guide</button>
-      <button class="bigbtn" id="setStory">Watch the story</button>
-      <button class="bigbtn" id="setTokens">Match limit</button>
-      <button class="bigbtn" id="setDiamonds">Test: +100 diamonds</button>
-      <button class="bigbtn" id="setXp">Test: +500 club XP</button>
-      <button class="bigbtn" id="setMapLevel">Club map level</button>
-      <button class="bigbtn" id="setMedical">Test the medical centre</button>
-      <button class="bigbtn" id="setAcademy">Test the youth academy</button>
-      <button class="bigbtn" id="setOffice">Test the club office</button>
-      <button class="bigbtn" id="setClubhouse">Test the clubhouse</button>
-      <button class="bigbtn" id="setShop">Test the club shop</button>
-      <button class="bigbtn" id="setApartment">Test the apartment</button>
-      <button class="bigbtn" id="setTraining">Test the training ground</button>
-      <button class="bigbtn" id="setMerch">Test the merch factory</button>
-      <button class="bigbtn" id="setClubMap">Test the club map</button>
-      <button class="bigbtn" id="setStadiumTest">Test stadium: off</button>
-      <button class="bigbtn primary" id="settingsBack">Done</button>
+          <div class="panel paper profile"><label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label></div>
+        </div>
+        <div class="set-pane set-grid" data-pane="more" hidden>
+          <button class="mf-big" id="setTrophies">Trophies</button>
+          <button class="mf-big" id="setStats">Stats</button>
+          <button class="mf-big" id="setTutorial">Tutorial</button>
+          <button class="mf-big" id="setPitches">Pitch guide</button>
+          <button class="mf-big" id="setStory">Watch the story</button>
+          <button class="mf-big" id="setTokens">Match limit</button>
+        </div>
+        <div class="set-pane set-grid tools" data-pane="tools" hidden>
+          <button class="mf-big" id="setDiamonds">Test: +100 diamonds</button>
+          <button class="mf-big" id="setXp">Test: +500 club XP</button>
+          <button class="mf-big" id="setMapLevel">Club map level</button>
+          <button class="mf-big" id="setMedical">Test the medical centre</button>
+          <button class="mf-big" id="setAcademy">Test the youth academy</button>
+          <button class="mf-big" id="setOffice">Test the club office</button>
+          <button class="mf-big" id="setClubhouse">Test the clubhouse</button>
+          <button class="mf-big" id="setShop">Test the club shop</button>
+          <button class="mf-big" id="setApartment">Test the apartment</button>
+          <button class="mf-big" id="setTraining">Test the training ground</button>
+          <button class="mf-big" id="setMerch">Test the merch factory</button>
+          <button class="mf-big" id="setClubMap">Test the club map</button>
+          <button class="mf-big" id="setStadiumTest">Test stadium: off</button>
+        </div>
+      </div>
+      <button class="mf-big" id="settingsBack">Done</button>
       <p class="fineprint">Playtest build · v0.3</p>
     </div>
   </section>

@@ -107,7 +107,7 @@ export const sfx = {
   whoosh() { noise(0.35, { gain: 0.4, freq: 600, q: 0.6, type: 'lowpass', attack: 0.1 }); },
   boom() { tone(70, 0.8, { gain: 0.9, to: 30 }); noise(0.6, { gain: 0.6, freq: 200, q: 0.5, type: 'lowpass' }); },
   zap() { tone(1400, 0.18, { type: 'sawtooth', gain: 0.18, to: 200 }); noise(0.15, { gain: 0.3, freq: 4000, q: 3 }); },
-  click() { tone(800, 0.04, { type: 'square', gain: 0.08 }); },
+  click() { if (performance.now() - lastTap < 700) return; tone(800, 0.04, { type: 'square', gain: 0.08 }); },   // (a menu button already clicked when it was pressed)
   coin() { [988, 1319].forEach((f, i) => tone(f, 0.09, { type: 'triangle', gain: 0.1, delay: i * 0.06 })); },            // (cash ticking up)
   chime() { [659, 880, 1175].forEach((f, i) => tone(f, 0.16, { type: 'triangle', gain: 0.13, delay: i * 0.07 })); },     // (someone hired, something bought)
   hammer() { const hit = f => { tone(f, 0.09, { type: 'square', gain: 0.2, to: f / 2 }); noise(0.06, { gain: 0.28, freq: 1500, q: 2 }); }; hit(180); setTimeout(() => hit(150), 170); },   // (a building starts)
@@ -426,6 +426,9 @@ export function stopAmbience() {
   setTimeout(() => bus.disconnect(), 700);
 }
 
+// a menu button was just pressed (it has clicked and buzzed): the click its handler asks for a moment later is the same tap
+let lastTap = -1e9;
+export const markTap = () => { sfx.click(); lastTap = performance.now(); };
 export function buzz(pattern) {
   if (!sound.haptics) return;
   try {

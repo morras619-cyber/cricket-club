@@ -27,7 +27,7 @@ import { preMatch } from './rivals.js';
 import { ensureChirp, faceOfPress, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
-import { sound, unlockAudio, sfx, buzz, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute, CHANTS, previewChant } from './audio.js';
+import { sound, unlockAudio, sfx, buzz, markTap, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute, CHANTS, previewChant } from './audio.js';
 import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
 import { units } from './config.js';
@@ -308,8 +308,34 @@ function renderHub() {
 }
 
 // ---------- settings ----------
+// the settings' three pages (painted tabs, and a swipe sideways turns the page, like the training ground's)
+let setPane = 'game';
+const SET_PANES = [['game', 'gear', 'Game'], ['more', 'star', 'More'], ['tools', 'pencil', 'Tools']];
+function showSetPane(id, dir = 0) {
+  setPane = id;
+  for (const p of document.querySelectorAll('#setBody .set-pane')) p.hidden = p.dataset.pane !== id;
+  for (const t of $('setTabs').children) t.classList.toggle('on', t.dataset.pane === id);
+  const body = $('setBody'); body.classList.remove('enter'); void body.offsetWidth; body.classList.add('enter'); setTimeout(() => body.classList.remove('enter'), 700);
+}
+let setTabsMade = false;
+function makeSetTabs() {
+  if (setTabsMade) return; setTabsMade = true;
+  const tabs = $('setTabs');
+  for (const [id, icon, name] of SET_PANES) { const b = mfBtn('mf-tab', [ico(icon), el('span', '', name)], () => { sfx.click(); showSetPane(id); }); b.dataset.pane = id; tabs.append(b); }
+  let x0 = null, y0 = 0;
+  const body = $('setBody');
+  body.addEventListener('pointerdown', e => { x0 = e.clientX; y0 = e.clientY; });
+  body.addEventListener('pointerup', e => {
+    if (x0 == null) return; const dx = e.clientX - x0, dy = e.clientY - y0; x0 = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const i = SET_PANES.findIndex(p => p[0] === setPane), n = SET_PANES[i + (dx < 0 ? 1 : -1)];
+    if (n) { sfx.click(); showSetPane(n[0]); }
+  });
+  body.addEventListener('pointercancel', () => { x0 = null; });
+}
 function renderSettings() {
   ui.show('settings');
+  makeSetTabs(); showSetPane(setPane);
   $('playerName').value = profile.name;
   const state = (id, text, on) => { const b = $(id); b.querySelector('span').textContent = text; b.classList.toggle('off', !on); };
   state('setSound', sound.on ? 'On' : 'Off', sound.on);
@@ -1520,6 +1546,17 @@ function tickUp(node, { key, to, fmt }) {
     if (k < 1 && node.isConnected) requestAnimationFrame(step); else { node.textContent = fmt(to); node.classList.remove('tick'); }
   };
   requestAnimationFrame(step);
+}
+// every button in a menu screen: it sinks when pressed, clicks, and buzzes lightly (the match's own controls are not .screen buttons)
+{
+  let held = null;
+  const release = () => { held?.classList.remove('pressing'); held = null; };
+  document.addEventListener('pointerdown', e => {
+    const b = e.target.closest?.('.screen button:not(:disabled), .screen .tile, .screen [role="button"]');
+    if (!b || b.closest('#toss, #pause')) return;
+    release(); held = b; b.classList.add('pressing'); unlockAudio(); markTap(); buzz(8);
+  }, { passive: true });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave', 'dragstart', 'scroll']) document.addEventListener(ev, release, { passive: true, capture: true });
 }
 // a tap on a tab: the cards of its page slide in (only then, so the timers' repaints never replay it)
 document.addEventListener('click', e => {
