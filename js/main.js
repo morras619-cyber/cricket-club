@@ -27,6 +27,7 @@ import { preMatch } from './rivals.js';
 import { ensureChirp, faceOfPress, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
+import { xpPop, warmXpArt } from './xppop.js';
 import { sound, unlockAudio, sfx, buzz, markTap, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute, CHANTS, previewChant } from './audio.js';
 import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
@@ -1978,6 +1979,7 @@ addEventListener('visibilitychange', () => { if (!document.hidden && !$('merch')
 $('setMerch').addEventListener('click', () => { unlockAudio(); sfx.click(); renderMerch(true); });
 
 // ---------- the training ground (js/training.js): coaches train the players in its places, on real time ----------
+const trainSeen = new Map();   // (club|player -> his XP and rating when the training screen last showed him: a rise since then pops)
 let netPick = null;
 let trainTab = 'players', trainSheet = null, trainTimer = 0, trainReport = null, trainTest = false;
 const trainCtx = c => ({ now: serverNow(), trusted: clock.state === 'ok', squad: trainingRoster(c), bank: merchBank(c) });
@@ -2036,7 +2038,10 @@ function paintTraining(c) {
   const tb = $('trainTest'); tb.hidden = !trainTest;
   if (trainTest) {
     const chip = (label, fn) => mfBtn('chipbtn', [el('span', '', label)], () => { fn(); sfx.click(); saveProfile(profile); trainReport = trainTick(c) || trainReport; paintTraining(c); });
-    tb.replaceChildren(el('b', '', 'TEST'), chip('+1 hour', () => { t.last -= 3600000; TG.seal(t); }), chip('+10 hours', () => { t.last -= 10 * 3600000; TG.seal(t); }), chip('+$1M', () => { c.money += 1; }), chip('Season ends', () => { c.news = []; const n = {}; for (const [pid, p] of roster) { const g = TG.seasonGain(t, pid, p); if (g) { n[pid] = g; c.players[pid].bat += g; c.players[pid].bowlSkill += g; } } ui.toast(Object.keys(n).length ? `${Object.keys(n).length} trained: +${Object.values(n).join(', +')}` : 'Nobody gained a point yet'); }));
+    tb.replaceChildren(el('b', '', 'TEST'), chip('+1 hour', () => { t.last -= 3600000; TG.seal(t); }), chip('+10 hours', () => { t.last -= 10 * 3600000; TG.seal(t); }), chip('+$1M', () => { c.money += 1; }), chip('+XP', () => {   // (puts players in the empty places, then gives every trained player a little XP: the burst on his tile)
+      const free = [...roster.keys()].filter(id => !t.slots.includes(id)); t.slots.forEach((id, i) => { if (!id && free.length) t.slots[i] = free.shift(); }); TG.seal(t);
+      for (const id of t.slots) if (id && c.players[id]) c.players[id].xp = (c.players[id].xp || 0) + 1.5 + Math.random() * 2;
+    }), chip('+1 rating', () => { for (const id of t.slots) if (id && c.players[id]) { const p = c.players[id]; p.bat += 1; p.bowlSkill += 1; p.xp = 0; } }), chip('Season ends', () => { c.news = []; const n = {}; for (const [pid, p] of roster) { const g = TG.seasonGain(t, pid, p); if (g) { n[pid] = g; c.players[pid].bat += g; c.players[pid].bowlSkill += g; } } ui.toast(Object.keys(n).length ? `${Object.keys(n).length} trained: +${Object.values(n).join(', +')}` : 'Nobody gained a point yet'); }));
   }
   const note = $('trainNote'), bad = t.unpaidMs > 0 || trainReport?.tampered;
   const gainedTxt = trainReport && trainReport.away > 2 * 60000 && trainReport.gained > 0 ? `Away${trainReport.capped ? ' (ten hours count)' : ''}: your players earned ${trainReport.gained} training points.` : '';
@@ -2050,7 +2055,7 @@ function paintTraining(c) {
   const body = $('trainBody');
   body.replaceChildren();
   if (trainTab === 'players') {
-    const grid = el('div', 'ptile-row ptile-slide');
+    const grid = el('div', 'ptile-row ptile-slide'), pops = [];
     t.slots.forEach((pid, i) => {
       const info = pid && roster.get(pid), p = pid && c.players[pid];
       if (!info) {
@@ -2061,8 +2066,16 @@ function paintTraining(c) {
       const learn = TG.canLearn(info), coach = who.get(pid);
       const card = playerTile(p, club, { ovr: info.ovr, sub: learn ? `XP ${Math.round(info.xp)} / ${info.cost}` : (info.age >= TG.TRAIN.PEAK_AGE ? 'Prime years over' : 'At his best'), bar: learn ? info.xp / info.cost * 100 : 100, tone: 'green', chips: !learn ? [{ t: 'MAXED', tone: 'blue' }] : !coach ? [{ t: 'NEEDS COACH', tone: 'amber' }] : [{ t: 'TRAINING', tone: 'green' }], onClick: () => { trainSheet = { type: 'slot', index: i }; sfx.click(); paintTraining(c); } });
       grid.append(card);
+      // (XP gained since the screen last showed him, whether in the coaches' hours away or just now)
+      const key = `${c.club}|${pid}`, was = trainSeen.get(key);
+      if (was && (info.ovr > was.ovr || info.xp > was.xp + 0.05)) {
+        const up = info.ovr > was.ovr, gain = up ? 1 : info.xp - was.xp;
+        pops.push([card, up ? `+${info.ovr - was.ovr} RATING` : `+${gain >= 1 ? Math.round(gain) : gain.toFixed(1)} XP`, up]);
+      }
+      trainSeen.set(key, { xp: info.xp, ovr: info.ovr });
     });
     body.append(grid);
+    if (pops.length) { warmXpArt(); requestAnimationFrame(() => pops.forEach(([card, text, big], k) => setTimeout(() => xpPop(card, text, { big }), k * 220))); }
     body.append(hint('clock', `Every player has an XP bar: a full bar is one rating point. Coaches, net drills, good innings, wickets and wins all fill it. The better and older he is, the more a point costs. A player who has already gained a few points this season finds the next one a little harder.`));
   } else if (trainTab === 'nets') {
     const list = [...roster].filter(([, p]) => TG.canLearn(p)).sort((a, b) => (b[1].cost - b[1].xp) - (a[1].cost - a[1].xp) || (b[1].pot - b[1].ovr) - (a[1].pot - a[1].ovr)).slice(0, 8);

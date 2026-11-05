@@ -2150,3 +2150,15 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 #career.in-auction #careerBody { position: relative; }
 #career.in-auction .notecard { position: absolute; left: 4px; right: 4px; margin: 0; z-index: 6; pointer-events: none; animation: noteaway 4.2s ease forwards; }
 @keyframes noteaway { 0%, 78% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-8px); } }
+
+/* the XP burst (js/xppop.js): a layer of its own over the page, centred on the tile that gained */
+.xp-fx { position: fixed; z-index: 9500; width: 0; height: 0; pointer-events: none; }
+.xp-burst { position: absolute; left: calc(var(--w) / -2); top: calc(var(--w) / -2); width: var(--w); height: var(--w); background: url(../img/fx/xp-burst.webp) 0 0 / 400% 200% no-repeat; animation: xpPop .8s cubic-bezier(.2, .9, .3, 1.2) forwards; filter: drop-shadow(0 0 10px rgba(255, 200, 40, .55)); }
+.xp-fx.big .xp-burst { filter: drop-shadow(0 0 16px rgba(255, 210, 60, .85)); animation-duration: 1s; }
+.xp-num { position: absolute; left: 0; top: calc(var(--w) * .16); translate: -50% 0; white-space: nowrap; font: 400 22px/1 var(--display); letter-spacing: .5px; color: #fff4a8; text-shadow: 0 2px 0 #14102a, 0 0 8px rgba(255, 190, 40, .9); animation: xpRise 1.35s ease-out forwards; }
+.xp-fx.big .xp-num { font-size: 26px; color: #ffe45c; }
+@keyframes xpPop { 0% { scale: .45; } 28% { scale: 1.12; } 100% { scale: 1; } }
+@keyframes xpRise { 0% { opacity: 0; transform: translateY(8px) scale(.7); } 18% { opacity: 1; transform: translateY(0) scale(1.15); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px) scale(1); } }
+.xp-bump { animation: xpBump .45s ease-out; }
+@keyframes xpBump { 0% { transform: scale(1); } 30% { transform: scale(1.06); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .xp-bump { animation: none; } }
