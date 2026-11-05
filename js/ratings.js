@@ -76,7 +76,7 @@ export function matchup(batter, bowler, ctx = {}) {
     case 'swing': out.win *= exploit(f.swing ?? 1, ws, ww); break;
     case 'seam': out.win *= exploit(f.seam ?? 1, ws, ww); break;
     case 'leftpace': out.win *= 1 - 0.08 * ws; break;
-    case 'offspin': out.win *= exploit(f.turn ?? 1, ws, ww); break;
+    case 'offspin': case 'leftspin': out.win *= exploit(f.turn ?? 1, ws, ww); break;
     case 'legspin': out.win *= exploit(f.turn ?? 1, ws, ww) * (1 - 0.06 * ws); break;
     default: break;
   }

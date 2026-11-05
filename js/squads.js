@@ -19,6 +19,8 @@ export const BOWL_TYPES = {
     stock: ['Angled across', 'Inswinger'], variation: 'Slower ball' },
   offspin: { id: 'offspin', name: 'Off-spin', short: 'Off-spin', spin: true, kmh: [80, 90], turn: -0.27, runup: 0.35,
     stock: ['Off-break'], variation: 'Arm ball' },
+  leftspin: { id: 'leftspin', name: 'Left-arm spin', short: 'Left-arm spin', spin: true, left: true, kmh: [76, 88], turn: 0.3, runup: 0.35,
+    stock: ['Orthodox'], variation: 'Arm ball' },
   legspin: { id: 'legspin', name: 'Leg-spin', short: 'Leg-spin', spin: true, kmh: [74, 86], turn: 0.34, runup: 0.35,
     stock: ['Leg-break'], variation: 'Googly' },
 };
@@ -27,7 +29,7 @@ export const bowlType = id => BOWL_TYPES[id] || BOWL_TYPES.swing;
 // A bowler's run-up as the batting view shows it (the bowler at the far end): how far back he starts and how long he takes. A fast bowler
 // starts a long way back and runs in at a steady pace; a spinner takes a short run, more slowly. `runup` (above) is the share of the longest run.
 // PACE_RUNUP and SPIN_RUNUP: how many times as long the run takes as the basic 0.85 s. PACE_STEPS: the running frames in a pace bowler's run.
-export const RUNUP_M = 9.5, PACE_RUNUP = 1.45, SPIN_RUNUP = 1.5, PACE_STEPS = 16;
+export const RUNUP_M = 13, PACE_RUNUP = 1.75, SPIN_RUNUP = 1.5, PACE_STEPS = 18;
 export const runUp = type => ({ m: RUNUP_M * type.runup, ms: 850 * (0.55 + 0.45 * type.runup) * (type.spin ? SPIN_RUNUP : PACE_RUNUP) });
 
 // Physics for a named delivery of a bowler type. k (0..1) picks a speed within the range.
@@ -44,7 +46,7 @@ export function deliveryParams(typeId, name, k = 0.6, rng = null) {
     case 'Seam up': p.move = (rng ? rng.range(-1, 1) : 0) * T.seam; break;
     case 'Leg-cutter': p.move = T.seam * j(); break;
     case 'Off-cutter': p.move = -T.seam * j(); break;
-    case 'Off-break': case 'Leg-break': p.move = T.turn * j(); break;
+    case 'Off-break': case 'Leg-break': case 'Orthodox': p.move = T.turn * j(); break;
     case 'Arm ball': p.move = 0.02; p.kmh = T.kmh[1] + 4; p.loop = 0.9; break;
     case 'Googly': p.move = -T.turn * 0.8 * j(); p.loop = 1.5; break;
     case 'Slower bouncer': case 'Slower ball': case 'Knuckle ball':
@@ -82,7 +84,7 @@ const SQUADS = {
     ['Varun Gill', 'Viper', 'all', 'Spin all-rounder', 52, 'legspin', 68, 'Googly he hides well', 2, 'IN'],
     ['Oliver Hartley', 'Gale', 'bowl', 'Swing bowler', 24, 'swing', 82, 'Swings it both ways', 1, 'EN'],
     ['Jaspreet Dhillon', 'Jassi', 'bowl', 'Left-arm quick', 20, 'leftpace', 80, 'Yorkers at the end', 3, 'IN'],
-    ['Mahfuz Rahman', 'Breeze', 'bowl', 'Off-spinner', 15, 'offspin', 70, 'Tidy and patient', 4, 'BD'],
+    ['Mahfuz Rahman', 'Breeze', 'bowl', 'Left-arm spinner', 15, 'leftspin', 70, 'Tidy and patient', 4, 'BD'],
   ],
   vipers: [
     ['Kunal Saini', 'Snake', 'bat', 'Opener', 72, null, 0, 'Nudges and nurdles', 3, 'IN'],
@@ -106,7 +108,7 @@ const SQUADS = {
     ['Rizwan Akram', 'Falcon', 'bowl', 'Left-arm quick', 24, 'leftpace', 76, 'Swings it into the pads', 0, 'PK'],
     ['Priyank Yadav', 'Feather', 'bowl', 'Swing bowler', 20, 'swing', 72, 'Away swing on a cloudy day', 2, 'IN'],
     ['Liam Buckley', 'Glide', 'bowl', 'Leg-spinner', 18, 'legspin', 70, 'Loops it high', 1, 'IE'],
-    ['Nadir Sheikh', 'Nest', 'bowl', 'Off-spinner', 15, 'offspin', 66, 'Bowls dry in the middle overs', 4, 'PK'],
+    ['Nadir Sheikh', 'Nest', 'bowl', 'Left-arm spinner', 15, 'leftspin', 66, 'Bowls dry in the middle overs', 4, 'PK'],
   ],
   phoenix: [
     ['Bilal Akhtar', 'Spark', 'bat', 'Opener', 73, null, 0, 'Quick starts, quick exits', 1, 'PK'],
@@ -130,7 +132,7 @@ const SQUADS = {
     ['Craig Lockhart', 'Steel', 'all', 'Seam all-rounder', 56, 'seam', 74, 'Line and length all day', 0, 'NZ'],
     ['Sipho Nkosi', 'Crane', 'bowl', 'Fast bowler', 22, 'express', 78, 'Short ball specialist', 1, 'ZA'],
     ['Rizwan Khan', 'Weld', 'bowl', 'Swing bowler', 18, 'swing', 74, 'Inswinger to the pads', 2, 'PK'],
-    ['Manish Gupta', 'Lathe', 'bowl', 'Off-spinner', 15, 'offspin', 70, 'Darts it in at the stumps', 4, 'IN'],
+    ['Manish Gupta', 'Lathe', 'bowl', 'Left-arm spinner', 15, 'leftspin', 70, 'Darts it in at the stumps', 4, 'IN'],
   ],
   storm: [
     ['Ravi Malik', 'Wrist', 'bat', 'Opener', 77, null, 0, 'Flicks off the pads with a flourish', 3, 'IN'],
@@ -151,7 +153,7 @@ const SQUADS = {
     ['Corbin Hayes', 'Baron', 'bat', 'Middle order', 70, null, 0, 'Dives to save every run', 1, 'NZ'],
     ['Danish Iqbal', 'Count', 'wk', 'Keeper-batter', 65, null, 0, 'Direct hits from anywhere', 3, 'PK'],
     ['Ethan van der Berg', 'Knight', 'all', 'Pace all-rounder', 62, 'express', 72, 'Fast, and fast in the field', 1, 'ZA'],
-    ['Dev Pillai', 'Squire', 'all', 'Spin all-rounder', 58, 'offspin', 72, 'Off-spin and a rocket arm', 4, 'IN'],
+    ['Dev Pillai', 'Squire', 'all', 'Left-arm spin all-rounder', 58, 'leftspin', 72, 'Left-arm spin and a rocket arm', 4, 'IN'],
     ['Jermaine Alleyne', 'Jester', 'bowl', 'Left-arm quick', 22, 'leftpace', 78, 'Left-arm swing, both ways', 2, 'WI'],
     ['Zain Mirza', 'Sceptre', 'bowl', 'Seam bowler', 20, 'seam', 76, 'Cutters that stop on you', 0, 'PK'],
     ['Hamid Usmani', 'Bishop', 'bowl', 'Leg-spinner', 16, 'legspin', 74, 'Flighted leg-breaks', 3, 'PK'],
@@ -234,7 +236,7 @@ function clubRoster(team) {
     } while (used.has(name));
     name = uniqueClubPlayerName(name, nation, team.id, i);
     used.add(name);
-    const bowl = kind === 'pace' ? rng.pick(['express', 'swing', 'leftpace']) : kind === 'seam' ? 'seam' : kind === 'spin' ? rng.pick(['offspin', 'legspin']) : null;
+    const bowl = kind === 'pace' ? rng.pick(['express', 'swing', 'leftpace']) : kind === 'seam' ? 'seam' : kind === 'spin' ? rng.pick(['offspin', 'legspin', 'leftspin']) : null;
     const bat = role === 'bowl' ? rng.int(12, 24) : role === 'all' ? base - 6 + rng.int(-3, 4) : base + rng.int(-3, 6);
     return {
       id: `${team.id}-${i}`, name, nick: rng.pick(CLUB_NICKS), short: name.split(' ').slice(1).join(' '), role, label, team: team.id,

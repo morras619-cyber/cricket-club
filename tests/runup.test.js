@@ -7,7 +7,7 @@ test('a fast bowler starts a long way back; a spinner takes a short run', () => 
   const spin = ['offspin', 'legspin'].map(id => runUp(BOWL_TYPES[id]));
   assert.ok(Math.min(...fast.map(r => r.m)) > 2 * Math.max(...spin.map(r => r.m)));
   assert.ok(runUp(BOWL_TYPES.express).m > runUp(BOWL_TYPES.seam).m);
-  assert.ok(runUp(BOWL_TYPES.express).m <= 10 && runUp(BOWL_TYPES.offspin).m >= 2);
+  assert.ok(runUp(BOWL_TYPES.express).m <= 14 && runUp(BOWL_TYPES.offspin).m >= 2);
 });
 
 test('a spinner runs more slowly than a quick, even though his run is shorter', () => {
@@ -20,8 +20,8 @@ test('a spinner runs more slowly than a quick, even though his run is shorter', 
 
 test('a fast bowler takes a run you can follow: a longer run, no faster than 9 m/s, and more running frames than before', () => {
   const express = runUp(BOWL_TYPES.express);
-  assert.ok(express.m >= 9 && express.m <= 10);
+  assert.ok(express.m >= 12 && express.m <= 14);   // (a fast bowler starts well back)
   assert.ok(express.m / (express.ms / 1000) < 9, 'under 9 m/s');
-  assert.ok(express.ms > 850 && express.ms < 1300);
+  assert.ok(express.ms > 850 && express.ms < 1600);   // (a longer run takes a little longer: still under 9 m/s)
   assert.ok(PACE_STEPS > 14, 'more steps than the old 14');
 });

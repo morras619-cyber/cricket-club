@@ -55,7 +55,7 @@ const CATCH_SLOW = 1.1, PICK_SLOW = 1.1;
 // run-ups: a fast bowler starts a long way back and comes in quickly; a spinner takes a short, slower, easy run. A type's own length is
 // the longest run-up times its `runup` (squads.js: express 1 down to a spinner's 0.35); runUp (squads.js) is the batting view (the bowler at the far end),
 // BOWL_RUNUP_M the bowling view (my bowler, drawn from behind). The batting view's numbers are squads.js runUp.
-const BOWL_RUNUP_M = 7.5, SPIN_BOWL_RUN_MS = 900, BOWL_RUN_MS = 930;
+const BOWL_RUNUP_M = 8.6, SPIN_BOWL_RUN_MS = 900, BOWL_RUN_MS = 930;
 // and its ball through the air, quicker than its km/h alone would make it (the speed shown stays)
 const SPIN_FLIGHT = 1.3;
 const SHOT_WORDS = ['THWACK!', 'DHOOM!', 'KRAK!', 'BLAM!', 'SMASH!'];

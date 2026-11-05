@@ -130,7 +130,7 @@ export const BAT_TYPES = {
   keeper: { id: 'keeper', name: 'Keeper-batter', power: 'readbowler', strong: 'Reads the bowler', weak: 'Lighter hitter' },
 };
 // a bowler's power, by his bowling type (seam splits: the cutter men and the hit-the-deck men)
-export const BOWL_POWERS = { express: 'tornado', swing: 'storm', seam: 'shatter', leftpace: 'bouncer', offspin: 'maya', legspin: 'googly' };
+export const BOWL_POWERS = { express: 'tornado', swing: 'storm', seam: 'shatter', leftpace: 'bouncer', offspin: 'maya', leftspin: 'maya', legspin: 'googly' };
 
 const TRAIT_RULES = [
   ['finisher', /death|big swings|finish/i],

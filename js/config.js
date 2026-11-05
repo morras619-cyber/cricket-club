@@ -46,7 +46,7 @@ export const CFG = {
     bat: { six: 16, four: 7, miss: 3, single: -4, dot: -2, overRest: -6 },   // (drain per ball; a negative number is a rest)
     bowl: { ball: 4, six: 6, four: 3, extra: 3, rest: -1.5 },                // (rest: what a bowler gets back for each ball the others bowl)
     batMul: { power: 1.3, finisher: 1.15, opener: 1, tactical: 0.9, keeper: 0.9, touch: 0.8, anchor: 0.7 },
-    bowlMul: { express: 1.3, leftpace: 1.1, swing: 1, seam: 0.95, offspin: 0.6, legspin: 0.6 },
+    bowlMul: { express: 1.3, leftpace: 1.1, swing: 1, seam: 0.95, offspin: 0.6, leftspin: 0.6, legspin: 0.6 },
     effect: { batPower: 0.3, batWin: 0.18, batEdge: 0.1, bowlWin: 0.15, bowlPower: 0.08, bowlPace: 0.05 },
   },
 
