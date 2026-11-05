@@ -31,6 +31,10 @@ def drop_sky(p):
     gone = np.isin(lab, list(edge))
     gone = ndi.binary_dilation(gone, iterations=2) & blue
     a[..., 3][gone] = 0
+    # blue left inside the hair (gaps between curls) would be recoloured with the shirt: it becomes dark hair
+    rest = blue & ~gone & (a[..., 3] > 0)
+    rest = ndi.binary_dilation(rest, iterations=1) & (a[..., 2] > a[..., 0] + 25) & (a[..., 3] > 0)
+    a[..., 0][rest], a[..., 1][rest], a[..., 2][rest] = 38, 26, 22
     out = Image.fromarray(a.astype(np.uint8), 'RGBA')
     return out.crop(out.getbbox())
 
