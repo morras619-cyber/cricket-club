@@ -1101,7 +1101,7 @@ export function drawBall3D(ctx, cam, p, { trail = [], glow = null, ghost = false
   const s = cam.project(p.x, p.y, p.z);
   if (!s) return null;
   const sh = cam.project(p.x, 0, p.z);
-  const r = Math.min(NETS ? 9 : 1e9, Math.max(2.8, BALL_R * s.k));   // (the nets: the cage is close, and a ball hit back past the camera grew as big as a fist: it stays a ball)
+  const r = Math.min(NETS ? 9 : 1e9, Math.max(3.2, BALL_R * s.k));   // (the nets: the cage is close, and a ball hit back past the camera grew as big as a fist: it stays a ball)
   if (sh) { ctx.fillStyle = 'rgba(10,8,20,0.35)'; ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); }
   if (trail.length > 1) {
     ctx.strokeStyle = glow || cosmetics.trail || 'rgba(255,244,218,0.5)'; ctx.lineCap = 'round';
@@ -1316,7 +1316,7 @@ export class OutfieldView {
   ball(ctx, b) {
     const sh = this.to(b.x, b.y), p = this.to(b.x, b.y, b.h);
     // from up here a real ball would be a speck: drawn a little bigger (about a fielder's fist), a shadow under it
-    const r = Math.max(2.8, 0.07 * this.k);
+    const r = Math.max(3.2, 0.07 * this.k);
     ctx.fillStyle = 'rgba(10,8,20,0.4)';
     ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
     paintBall(ctx, p.x, p.y, r * (1 + Math.min(0.12, (b.h || 0) * 0.01)), ballSpin(b.x, b.y * 1.1, (b.h || 0) * 0.5));
