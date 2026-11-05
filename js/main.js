@@ -391,10 +391,10 @@ function paintShop(c) {
   $('shopTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${shopTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { shopTab = id; shopSheet = null; sfx.click(); paintShop(c); }); if (n && id !== 'gear') b.append(el('i', 'mf-badge', String(n))); return b; }));
   const body = $('shopBody');
   body.replaceChildren();
-  const info = (icon, text) => { const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
+  const info = (icon, text) => { if (text.length > 48) return hint(icon, text); const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
   const deals = trusted ? dealsToday(c, now) : null;
   if (shopTab === 'gear') {
-    { const bn = el('div', 'mf-card mf-agent'), tx = el('div', 'mf-info'); tx.append(el('b', '', 'Daily deals'), el('small', '', deals ? `${Math.round(row.off * 100)}% off, one of each. New ones at midnight (UTC).` : 'The deals need the server clock: try again when you are online.')); bn.append(el('span', 'stf stf-s1 mf-agent-art'), tx, ico('clock')); body.append(bn); }
+    { const bn = el('div', 'mf-card mf-agent'), tx = el('div', 'mf-info'); tx.append(el('b', '', 'Daily deals'), el('small', '', deals ? `${Math.round(row.off * 100)}% off · new at midnight` : 'The deals need the server clock: try again when you are online.')); bn.append(el('span', 'stf stf-s1 mf-agent-art'), tx, ico('clock')); body.append(bn); }
     const grid = el('div', 'mf-grid three');
     for (const [id, G] of Object.entries(SHOP.GEAR)) {
       const sale = !!deals && deals.ids.includes(id) && !deals.taken[id], card = el('button', `mf-card stack${sale ? ' pick' : ''}`), r = el('div', 'mf-row');
@@ -1578,6 +1578,14 @@ const ICON = {
 const ICON_COLOUR = { coin: '#ffd23f', clock: '#ffffff', heart: '#ff4d5e', ball: '#ff4d5e', jersey: '#3b82f6', pencil: '#ffb800', printer: '#8fa0b8', box: '#c98a4b', gear: '#9aa6b2', users: '#5aa0ff', factory: '#ffb800', trophy: '#ffd23f', search: '#5aa0ff', star: '#ffd23f', chart: '#5aa0ff', warn: '#ffd23f', up: '#34c759' };
 const ico = (name, cls = '') => { const sp = el('span', `ico ${cls}`.trim()); sp.dataset.n = name; if (ICON_COLOUR[name]) sp.style.setProperty('--ic', ICON_COLOUR[name]); sp.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`; return sp; };
 const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...content); if (fn) b.addEventListener('click', fn); return b; };
+// an explanation as a small "i" button: the text opens when it is tapped (and stays open through repaints), so a screen shows the game, not a manual
+const openHints = new Set();
+function hint(icon, text) {
+  const w = el('div', 'mf-hint'), b = el('button', 'mf-i', 'i'), card = el('div', 'mf-card');
+  b.setAttribute('aria-label', 'More info'); card.append(ico(icon), el('span', 'mf-row', text)); card.hidden = !openHints.has(text);
+  b.addEventListener('click', () => { if (openHints.has(text)) openHints.delete(text); else openHints.add(text); card.hidden = !card.hidden; sfx.click(); });
+  w.append(b, card); return w;
+}
 const frameOf = (node, big = false) => { const f = el('span', `mf-frame${big ? ' big' : ''}`); f.append(node); return f; };
 const playerFace = (p, size = 64) => (p.heroId ? portrait(heroById(p.heroId), size, 'celebrate') : portraitFace(p, p.team ? teamById(p.team) : null, size) || faceEl(p, kitOf(p), size));
 // staff with a job have a painted portrait (the skin's .stf-NAME classes): the factory's designers, printers and packers, the physios, the agent
@@ -1743,7 +1751,7 @@ function paintMerch(c) {
   } else if (merchTab === 'staff') {
     const grid = staffRow('merch', m.staff.map(q => ({ s: q, face: staffFace(q, club, 120), job: q.role, base: MF.ROLES[q.role].wage, onOpen: () => { merchSheet = { type: 'staff', id: q.id }; sfx.click(); paintMerch(c); } })), L.staff - m.staff.length, () => { merchSheet = { type: 'hire' }; sfx.click(); paintMerch(c); });
     body.append(grid);
-    const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${m.staff.length} of ${L.staff} places used · ${kfmt(MF.wagePerDay(m))} a day${m.level < PC.MAX_LEVEL ? ' · upgrade the factory for more places' : ''}`)); body.append(foot);
+    const foot = hint('users', `${m.staff.length} of ${L.staff} places used · ${kfmt(MF.wagePerDay(m))} a day${m.level < PC.MAX_LEVEL ? ' · upgrade the factory for more places' : ''}`); body.append(foot);
   } else {
     const grid = el('div', 'mf-col');
     const lvl = el('div', 'mf-card col');
@@ -1883,8 +1891,7 @@ function paintTraining(c) {
       grid.append(card);
     });
     body.append(grid);
-    body.append(Object.assign(el('div', 'mf-card'), {}));
-    body.lastChild.append(ico('clock'), el('span', 'mf-row', `Each point of rating takes about ${durfmt(TG.tpCost(60, 20) / TG.TRAIN.TP_HOUR * 3600000)} of coaching for a young player, more for a better or older one. At most ${L.cap} a season.`));
+    body.append(hint('clock', `Each point of rating takes about ${durfmt(TG.tpCost(60, 20) / TG.TRAIN.TP_HOUR * 3600000)} of coaching for a young player, more for a better or older one. At most ${L.cap} a season.`));
   } else if (trainTab === 'nets') {
     const pips = el('div', 'mf-pips');
     for (let i = 0; i < TG.TRAIN.DRILLS_DAY; i++) pips.append(ico('ball', i < left ? 'on' : ''));
@@ -1905,7 +1912,7 @@ function paintTraining(c) {
   } else if (trainTab === 'coaches') {
     const grid = staffRow('training', t.coaches.map(k => ({ s: k, face: staffFace(k, club, 120), job: k.kind, base: TG.TRAIN.WAGE, onOpen: () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); } })), L.coaches - t.coaches.length, () => { trainSheet = { type: 'hire' }; sfx.click(); paintTraining(c); });
     body.append(grid);
-    const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${t.coaches.length} of ${L.coaches} coaches · ${kfmt(TG.wagePerDay(t))} a day · each coach teaches two players at a time`)); body.append(foot);
+    const foot = hint('users', `${t.coaches.length} of ${L.coaches} coaches · ${kfmt(TG.wagePerDay(t))} a day · each coach teaches two players at a time`); body.append(foot);
   } else {
     const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
     hd.append(ico('factory'), el('b', '', `Training ground level ${t.level}`), el('span', 'mf-stars', '★'.repeat(PC.lookOf(t.level))));
@@ -2028,7 +2035,7 @@ function paintOffice(c) {
     body.append(rows);
     const lastNet = Math.round((totalOf(last.in) - totalOf(last.out)) * 100) / 100;
     const fc = forecast(c);
-    const foot = el('div', 'mf-card'); foot.append(ico('clock'), el('span', 'mf-row', fc ? `At this rate the season ends ${fc.net >= 0 ? '+' : '−'}${money(Math.abs(fc.net))} (${fc.played} of ${fc.per} matches played)` : c.season > 1 || totalOf(last.in) ? `Last season: ${money(totalOf(last.in))} in, ${money(totalOf(last.out))} out (${lastNet >= 0 ? '+' : '−'}${money(Math.abs(lastNet))})` : 'This is your first season: the books start here.')); body.append(foot);
+    const foot = hint('clock', fc ? `At this rate the season ends ${fc.net >= 0 ? '+' : '−'}${money(Math.abs(fc.net))} (${fc.played} of ${fc.per} matches played)` : c.season > 1 || totalOf(last.in) ? `Last season: ${money(totalOf(last.in))} in, ${money(totalOf(last.out))} out (${lastNet >= 0 ? '+' : '−'}${money(Math.abs(lastNet))})` : 'This is your first season: the books start here.'); body.append(foot);
   } else if (officeTab === 'sponsors') {
     const col = el('div', 'mf-col'), SLOT = { shirt: ['jersey', 'Shirt'], ground: ['users', 'Ground'], kit: ['box', 'Kit'] }, opens = ['', 5, 10];
     for (const [i, slot] of OFFICE.SLOTS.entries()) {
@@ -2049,7 +2056,7 @@ function paintOffice(c) {
       }
       col.append(card);
     }
-    const note = el('div', 'mf-card'); note.append(ico('clock'), el('span', 'mf-row', `Each deal runs for ${DEAL.MATCHES} of your league matches. A sponsor can be in one slot at a time.`)); col.append(note);
+    const note = hint('clock', `Each deal runs for ${DEAL.MATCHES} of your league matches. A sponsor can be in one slot at a time.`); col.append(note);
     body.append(col);
   } else if (officeTab === 'board') {
     const col = el('div', 'mf-col'), ob = objectiveOf(c), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
@@ -2174,7 +2181,7 @@ function paintClubhouse(c) {
   $('clubhouseTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${clubTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { clubTab = id; clubSheet = null; sfx.click(); paintClubhouse(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
   const body = $('clubhouseBody');
   body.replaceChildren();
-  const info = (icon, text) => { const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
+  const info = (icon, text) => { if (text.length > 48) return hint(icon, text); const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
   if (clubTab === 'chem') {
     const bonus = chemBonus(c), col = el('div', 'mf-col');
     col.append(info('heart', links.length ? `${bonus.size} of your players get extra rating from their links: half a point for a link, a whole point for a strong one, up to ${row.cap}.` : 'No links yet. Players of one nation link at once; others link after 10 matches together.'));
@@ -2265,13 +2272,13 @@ function paintApartment(c) {
   $('apartmentTabs').replaceChildren(...tabs.map(([id, ic, label, n]) => { const b = mfBtn(`mf-tab${aptTab === id ? ' on' : ''}`, [ico(ic), el('span', '', label)], () => { aptTab = id; aptSheet = null; sfx.click(); paintApartment(c); }); if (n) b.append(el('i', 'mf-badge', String(n))); return b; }));
   const body = $('apartmentBody');
   body.replaceChildren();
-  const info = (icon, text) => { const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
+  const info = (icon, text) => { if (text.length > 48) return hint(icon, text); const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
   if (aptTab === 'cabinet') {
     const col = el('div', 'mf-col');
     for (const [id, T] of Object.entries(APT.TROPHIES)) {
       const won = trophies.find(t => t.id === id), card = el('div', `mf-card${won ? '' : ' empty'}`), inf = el('div', 'mf-info');
-      inf.append(el('b', '', won ? `${T.name}${won.count > 1 ? ` ×${won.count}` : ''}` : T.name), el('small', '', won ? `${T.text} · last in season ${won.last}` : `Not won yet · ${T.text}`));
-      card.append(ico(won ? 'trophy' : 'warn', won ? 'on' : ''), inf);
+      inf.append(el('b', '', won ? `${T.name}${won.count > 1 ? ` ×${won.count}` : ''}` : T.name), won ? el('small', '', `Season ${won.last}`) : el('small', '', T.text.replace(/^Not won yet · /, '')));
+      card.append(ico(won ? 'trophy' : 'lock', won ? 'on' : ''), inf);
       col.append(card);
     }
     col.append(info('star', 'Each kind of trophy gives its bonus once, for good. A second title of the same kind is for the pride.'));
@@ -2398,7 +2405,7 @@ function paintAcademy(c) {
       grid.append(card);
     }
     body.append(grid);
-    const foot = el('div', 'mf-card'); foot.append(ico('clock'), el('span', 'mf-row', `Prospects cannot play until they are ${AC.ACAD.PLAY_AGE}. They grow ${AC.ACAD.GROW[0]} to ${AC.ACAD.GROW[1]} rating a season. They are not part of your squad of ${MAX_SQUAD}.`)); body.append(foot);
+    const foot = hint('clock', `Prospects cannot play until they are ${AC.ACAD.PLAY_AGE}. They grow ${AC.ACAD.GROW[0]} to ${AC.ACAD.GROW[1]} rating a season. They are not part of your squad of ${MAX_SQUAD}.`); body.append(foot);
   } else if (acadTab === 'trips') {
     const col = el('div', 'mf-col');
     for (const t of a.trips) {
@@ -2413,7 +2420,7 @@ function paintAcademy(c) {
       go.addEventListener('click', () => { if (AC.placesUsed(a) >= L.slots) return ui.toast('The academy is full: promote or sell a prospect first'); acadSheet = { type: 'trip' }; sfx.click(); paintAcademy(c); });
       col.append(go);
     }
-    const foot = el('div', 'mf-card'); foot.append(ico('warn'), el('span', 'mf-row', `${a.trips.length} of ${L.trips} scout${L.trips > 1 ? 's' : ''} away. A scout holds a place for his find. Longer trips find better prospects.`)); col.append(foot);
+    const foot = hint('warn', `${a.trips.length} of ${L.trips} scout${L.trips > 1 ? 's' : ''} away. A scout holds a place for his find. Longer trips find better prospects.`); col.append(foot);
     body.append(col);
   } else if (acadTab === 'seniors') {
     const col = el('div', 'mf-col');
@@ -2421,7 +2428,7 @@ function paintAcademy(c) {
       const sg = mfBtn('mf-big', [ico('star'), el('span', '', 'Your scouts are home: sign their finds')], () => { clearInterval(acadTimer); fromMap = false; careerView = 'hub'; renderCareer(); });
       col.append(sg);
     }
-    const note2 = el('div', 'mf-card'); note2.append(ico('warn'), el('span', 'mf-row', `A senior scout works a whole season (${money(SCOUT_FEE)}) and finds up to 3 ready players. You sign them before next season's auction.`)); col.append(note2);
+    const note2 = hint('warn', `A senior scout works a whole season (${money(SCOUT_FEE)}) and finds up to 3 ready players. You sign them before next season's auction.`); col.append(note2);
     for (const [id, R] of Object.entries(SCOUT_REGIONS)) {
       const out = scoutOut(c, id), finds = out ? c.scouting[id].finds.length : 0, card = el('div', 'mf-card compact'), info = el('div', 'mf-info');
       const im = document.createElement('img'); im.src = `img/region/card-${id}.webp`; im.alt = '';
@@ -2559,7 +2566,7 @@ function paintMedical(c) {
       grid.append(card);
     }
     body.append(grid);
-    const foot = el('div', 'mf-card'); foot.append(ico('warn'), el('span', 'mf-row', 'Your most tired players. Anyone under 40 fitness who plays risks a knock. Fitness is how fresh he starts the next match.')); body.append(foot);
+    const foot = hint('warn', 'Your most tired players. Anyone under 40 fitness who plays risks a knock. Fitness is how fresh he starts the next match.'); body.append(foot);
   } else if (medTab === 'beds') {
     const grid = el('div', 'mf-grid'), work = new Set(MD.workingBeds(m));
     m.beds.forEach((id, i) => {
@@ -2575,11 +2582,11 @@ function paintMedical(c) {
       grid.append(card);
     });
     body.append(grid);
-    const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${inBed} of ${m.beds.length} beds in use. Each physio looks after two beds, so ${m.physios.length} physio${m.physios.length === 1 ? '' : 's'} can treat ${m.physios.length * 2}. A bed heals 4 times as fast as resting.`)); body.append(foot);
+    const foot = hint('users', `${inBed} of ${m.beds.length} beds in use. Each physio looks after two beds, so ${m.physios.length} physio${m.physios.length === 1 ? '' : 's'} can treat ${m.physios.length * 2}. A bed heals 4 times as fast as resting.`); body.append(foot);
   } else if (medTab === 'staff') {
     const grid = staffRow('medical', m.physios.map(ph => ({ s: ph, face: staffFace({ id: `phys-${ph.id}`, name: ph.name, cand: ph.cand }, club, 120), job: 'physio', base: MD.MED.WAGE, onOpen: () => { medSheet = { type: 'physio', id: ph.id }; sfx.click(); paintMedical(c); } })), L.physios - m.physios.length, () => { medSheet = { type: 'hire' }; sfx.click(); paintMedical(c); }, 'Hire a physio');
     body.append(grid);
-    const foot = el('div', 'mf-card'); foot.append(ico('users'), el('span', 'mf-row', `${m.physios.length} of ${L.physios} physios · ${kfmt(MD.medWagePerDay(m))} a day. Without a physio the beds do nothing.`)); body.append(foot);
+    const foot = hint('users', `${m.physios.length} of ${L.physios} physios · ${kfmt(MD.medWagePerDay(m))} a day. Without a physio the beds do nothing.`); body.append(foot);
   } else {
     const col = el('div', 'mf-col'), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
     hd.append(ico('factory'), el('b', '', `Medical centre level ${m.level}`), el('span', 'mf-stars', '★'.repeat(PC.lookOf(m.level))));
