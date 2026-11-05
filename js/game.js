@@ -38,7 +38,7 @@ import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { handHint } from './handhint.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
-import { drawKitFielder, loadKitSprites } from './kitsprite.js';
+import { drawKitFielder, loadKitSprites, warmHair } from './kitsprite.js';
 import { loadHair } from './hair.js';
 
 const F = CFG.fielding;
@@ -311,7 +311,7 @@ export class Game {
     this.adapt = opts.level != null ? dialsFor(opts.level, adaptScale(mode)) : NO_DIALS;
     this.mindOn = this.heatOn; this.mind = this.mindOn ? new Mind(makeRng((this.seed ^ 0x5bd1e995) >>> 0), { gain: this.adapt.mind }) : null; this.myCounter = null; this.aiCounterNow = null;
     try {
-      await this.warmUp();
+      await this.warmUp(opts);
       if (mode === 'tutorial' && opts.trial) return await this.runTrial(opts.trial);
       if (mode === 'tutorial') return opts.opening ? await this.runOpening() : await this.runTutorial(!!opts.story);
       await this.pitchReport();
@@ -536,7 +536,7 @@ export class Game {
   // players' own sheets, every fielder's standing frames, the crests and the portraits. Each piece is made through the very function the match draws it with
   // (off screen, once), so what the match asks for later is already in hand and no frame has to load or build a picture. It never holds the match for long:
   // a piece that will not come is left to the old lazy path after its time is up.
-  async warmUp() {
+  async warmUp(opts = {}) {
     const el = typeof document !== 'undefined' && document.getElementById('matchLoad');
     if (!el || !this.myTeam || !this.oppTeam) return;
     const fill = document.getElementById('mlFill'), sub = document.getElementById('mlSub'), t0 = performance.now(), budget = 22000;
@@ -554,15 +554,23 @@ export class Game {
       loadKitSprites(this.myTeam.id, this.oppTeam.id); loadHair();
       await masksReady(1500);
     });
+    job('Hair', () => until(() => warmHair(sides.flatMap(sd => sd.pool.map(p => lookOf(p)))), 8000));
     const [mine, opp] = sides;
     // the first bowlers, batters and non-striker, in the views the match shows them in (my side bats against his bowler seen from the front; bowling, from behind)
     const spinOf = p => p && p.bowl && bowlType(p.bowl).spin;
-    const firstBowl = (sd, view) => { const p = (sd.s?.attack || sd.pool)[0]; if (p) job(`${sd.team.name || ''} bowler`, () => until(() => drawBowlSprite(g, 2, 2, 1, 'start', sd.team, false, spinOf(p) ? 'spin-' + view : view, lookOf(p)), 6000)); };
-    firstBowl(opp, 'front'); firstBowl(mine, 'back');
+    // (the cache keeps only four whole-player sheets, so the innings that comes second is made first and the innings that starts the match last: it is still there at the first ball)
+    const bowlerJob = (sd, view) => { const p = (sd.s?.attack || sd.pool)[0]; if (p) job(`${sd.team.name || ''} bowler`, () => until(() => drawBowlSprite(g, 2, 2, 1, 'start', sd.team, false, spinOf(p) ? 'spin-' + view : view, lookOf(p)), 6000)); };
     const mo = mine.s?.order || mine.pool, oo = opp.s?.order || opp.pool;
-    if (mo[0]) job('Batter', () => until(() => drawBatSprite(g, 2, 2, 1, { team: mine.team.id, people: lookOf(mo[0]), angle: 0 }, this.realTime), 6000));
-    if (mo[1]) job('Partner', () => until(() => drawBowlSprite(g, 2, 2, 1, 'ns1', mine.team, false, 'nonstriker', lookOf(mo[1])), 6000));
-    if (oo[0]) job('Opening batter', () => until(() => drawBowlSprite(g, 2, 2, 1, 'ready', opp.team, false, 'batfront', lookOf(oo[0])), 6000));
+    const batFirst = () => {   // (I bat first: my batter and his partner, and their bowler seen from the front)
+      bowlerJob(opp, 'front');
+      if (mo[1]) job('Partner', () => until(() => drawBowlSprite(g, 2, 2, 1, 'ns1', mine.team, false, 'nonstriker', lookOf(mo[1])), 6000));
+      if (mo[0]) job('Batter', () => until(() => drawBatSprite(g, 2, 2, 1, { team: mine.team.id, people: lookOf(mo[0]), angle: 0 }, this.realTime), 6000));
+    };
+    const bowlFirst = () => {   // (I bowl first: their opening batter, and my bowler seen from behind)
+      if (oo[0]) job('Opening batter', () => until(() => drawBowlSprite(g, 2, 2, 1, 'ready', opp.team, false, 'batfront', lookOf(oo[0])), 6000));
+      bowlerJob(mine, 'back');
+    };
+    if (opts.order === 'bowl') { batFirst(); bowlFirst(); } else { bowlFirst(); batFirst(); }
     // the fielders' standing frames (both ways round: flipped or not) and the keepers' stances
     for (const sd of sides) {
       const keeper = sd.pool.find(p => p.role === 'wk'), field = sd.pool.filter(p => p !== keeper).slice(0, 11);

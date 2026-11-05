@@ -95,6 +95,21 @@ function hairData(view, style) {
   return (d.hair[style] = pixels(v.hair[style]));
 }
 
+// Have the hair, beard and headwear layers of these players' looks come in and been read (the loading cover waits on this, so a player's first
+// appearance in the match never fetches or decodes a layer). True when every one is in.
+export function warmHair(looks) {
+  let done = true;
+  for (const view of ['front', 'back']) {
+    if (!viewData(view)) { done = false; continue; }
+    const meta = KIT_SHEETS[view];
+    for (const look of looks) {
+      if (!look) continue;
+      for (const n of [hairStyleOf(look), view.endsWith('front') ? beardOf(look) : null, wearOf(look)]) if (n && meta.hair?.[n] && hairData(view, n) === undefined) done = false;
+    }
+  }
+  return done;
+}
+
 // The player's hairstyle: from his portrait (tools: js/portrait-styles.js), else from his look.
 // His beard (front views only: from behind there's nothing of it to see) and a backwards cap.
 const CHIN = { full: 'beard_full', beard: 'beard_full', stubble: 'beard_stubble', moustache: 'beard_moustache', goatee: 'beard_goatee', long: 'beard_long' };

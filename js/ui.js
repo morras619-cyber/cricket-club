@@ -10,11 +10,19 @@ const $ = id => document.getElementById(id);
 
 // Sets text and shrinks the font until it fits its box, so nothing gets cut off.
 function setFit(el, text) {
+  const cw = el.clientWidth, key = `${text}|${cw}`;
   if (el.textContent !== text) el.textContent = text;
+  else if (el._fit === key) return;   // (the same words in the same box: already fitted, and nothing to measure again)
   el.style.fontSize = '';
-  if (!el.clientWidth) return;
+  el._fit = key;
+  if (!cw) return;
   let size = parseFloat(getComputedStyle(el).fontSize);
-  while (el.scrollWidth > el.clientWidth + 0.5 && size > 8) { size -= 0.5; el.style.fontSize = `${size}px`; }
+  if (el.scrollWidth > cw + 0.5) {
+    // (one jump to about the right size, then the half-pixel steps that settle it: each step used to measure the whole page again)
+    size = Math.max(8, Math.floor(size * cw / el.scrollWidth * 2) / 2);
+    el.style.fontSize = `${size}px`;
+    while (el.scrollWidth > cw + 0.5 && size > 8) { size -= 0.5; el.style.fontSize = `${size}px`; }
+  }
 }
 
 export class UI {

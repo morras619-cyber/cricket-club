@@ -175,7 +175,10 @@ function fetchImg(im, src, ok, fail, tries = 0) {
   im.src = tries ? `${src}${src.includes('?') ? '&' : '?'}retry=${tries}` : src;
 }
 // the strip halved again and again until it is just over the size it is drawn at (cached for the current wear and size)
+// (the size is taken in steps of a third of an octave, rounded up: the top-down view zooms smoothly, and a new strip for every pixel of zoom cost a frame each time)
+const sizeStep = v => 2 ** (Math.ceil(Math.log2(Math.max(1, v)) * 3) / 3);
 function shrunk(art, pt, w, h) {
+  w = sizeStep(w); h = sizeStep(h);
   const key = `${art.pitchQ}:${Math.round(w)}x${Math.round(h)}`;
   if (art.shrunkKey === key) return art.shrunkImg;
   let src = pt;
