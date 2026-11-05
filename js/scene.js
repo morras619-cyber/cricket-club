@@ -207,6 +207,8 @@ function stripOnly(team) {
 // the strip that is laid for the home ground: its own, or the one that suits its pitch
 const stripFor = art => (art?.pitchFresh ? art : stripOnly(HOME));
 const pw = p => p.naturalWidth || p.width, ph = p => p.naturalHeight || p.height;
+// whether the home ground's pictures are all in (the match waits for this before the first ball: game.js warmUp)
+export const groundReady = () => { const a = ART[artKey(HOME)]; return !a || a.ready || !!a.failed; };
 function loadArt(team) {
   const T = teamById(team), key = artKey(team), dir = T.custom ? (NETS ? 'nets1' : `own${levelOf(T)}`) : team;
   const meta = GROUND_ART[dir];

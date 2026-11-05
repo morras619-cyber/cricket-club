@@ -16,14 +16,14 @@ import { lookOf, faceCanvas, masksReady, colourLook } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
-import { portraitFace } from './futcard.js';
+import { portraitFace, paintedPortrait } from './futcard.js';
 import { paceTired, tiredness } from './stamina.js';
 import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, runUp, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './config.js';
-import { paintBall, Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES } from './scene.js';
+import { paintBall, Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES, groundReady } from './scene.js';
 import { netBall } from './nets.js';
 import { adaptScale, NO_DIALS, dialsFor } from './adapt.js';
 import { CROWD_TIMING } from './chirp.js';
@@ -38,7 +38,8 @@ import { CutIn } from './cutin.js';
 import { loadBatSprites, drawBatSprite, shotAnim, batFrame } from './batsprite.js';
 import { handHint } from './handhint.js';
 import { loadBowlSprites, drawBowlSprite, bowlFrame, drawKeeperSprite, drawTopSprite } from './bowlsprite.js';
-import { drawKitFielder } from './kitsprite.js';
+import { drawKitFielder, loadKitSprites } from './kitsprite.js';
+import { loadHair } from './hair.js';
 
 const F = CFG.fielding;
 class Cancel extends Error {}
@@ -310,6 +311,7 @@ export class Game {
     this.adapt = opts.level != null ? dialsFor(opts.level, adaptScale(mode)) : NO_DIALS;
     this.mindOn = this.heatOn; this.mind = this.mindOn ? new Mind(makeRng((this.seed ^ 0x5bd1e995) >>> 0), { gain: this.adapt.mind }) : null; this.myCounter = null; this.aiCounterNow = null;
     try {
+      await this.warmUp();
       if (mode === 'tutorial' && opts.trial) return await this.runTrial(opts.trial);
       if (mode === 'tutorial') return opts.opening ? await this.runOpening() : await this.runTutorial(!!opts.story);
       await this.pitchReport();
@@ -527,6 +529,74 @@ export class Game {
     sfx.crowd(0.8);
     // the skin maps arrive while the banner is up, so nobody is ever shown in the drawing's own colours
     await Promise.all([this.sleepReal(this.bot ? 200 : 1700), masksReady(4000)]);
+  }
+
+
+  // Everything the match will show is made here, behind a loading cover, before the first ball: the ground's pictures, both clubs' kit sheets, the first
+  // players' own sheets, every fielder's standing frames, the crests and the portraits. Each piece is made through the very function the match draws it with
+  // (off screen, once), so what the match asks for later is already in hand and no frame has to load or build a picture. It never holds the match for long:
+  // a piece that will not come is left to the old lazy path after its time is up.
+  async warmUp() {
+    const el = typeof document !== 'undefined' && document.getElementById('matchLoad');
+    if (!el || !this.myTeam || !this.oppTeam) return;
+    const fill = document.getElementById('mlFill'), sub = document.getElementById('mlSub'), t0 = performance.now(), budget = 22000;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const breathe = () => Promise.race([new Promise(r => requestAnimationFrame(() => r())), sleep(60)]);
+    const until = async (fn, ms) => { const end = performance.now() + ms; for (;;) { let ok = false; try { ok = fn(); } catch { ok = true; } if (ok || performance.now() > end || performance.now() - t0 > budget) return ok; await sleep(40); } };
+    const uniq = list => { const seen = new Set(), out = []; for (const p of list) if (p && !seen.has(p.id)) { seen.add(p.id); out.push(p); } return out; };
+    const sides = [[this.myTeam, this.mySide], [this.oppTeam, this.oppSide]].map(([team, s]) => ({ team, s, pool: uniq([...(s?.order || []), ...(s?.attack || []), ...roster(team.id)]).slice(0, 16) }));
+    const g = (this.prepCanvas || (this.prepCanvas = Object.assign(document.createElement('canvas'), { width: 4, height: 4 }))).getContext('2d');
+    const jobs = [];
+    const job = (label, fn) => jobs.push({ label, fn });
+    job('Stadium', () => until(groundReady, 15000));
+    job('Faces', () => masksReady(6000));
+    job('Kits', async () => {
+      loadKitSprites(this.myTeam.id, this.oppTeam.id); loadHair();
+      await masksReady(1500);
+    });
+    const [mine, opp] = sides;
+    // the first bowlers, batters and non-striker, in the views the match shows them in (my side bats against his bowler seen from the front; bowling, from behind)
+    const spinOf = p => p && p.bowl && bowlType(p.bowl).spin;
+    const firstBowl = (sd, view) => { const p = (sd.s?.attack || sd.pool)[0]; if (p) job(`${sd.team.name || ''} bowler`, () => until(() => drawBowlSprite(g, 2, 2, 1, 'start', sd.team, false, spinOf(p) ? 'spin-' + view : view, lookOf(p)), 6000)); };
+    firstBowl(opp, 'front'); firstBowl(mine, 'back');
+    const mo = mine.s?.order || mine.pool, oo = opp.s?.order || opp.pool;
+    if (mo[0]) job('Batter', () => until(() => drawBatSprite(g, 2, 2, 1, { team: mine.team.id, people: lookOf(mo[0]), angle: 0 }, this.realTime), 6000));
+    if (mo[1]) job('Partner', () => until(() => drawBowlSprite(g, 2, 2, 1, 'ns1', mine.team, false, 'nonstriker', lookOf(mo[1])), 6000));
+    if (oo[0]) job('Opening batter', () => until(() => drawBowlSprite(g, 2, 2, 1, 'ready', opp.team, false, 'batfront', lookOf(oo[0])), 6000));
+    // the fielders' standing frames (both ways round: flipped or not) and the keepers' stances
+    for (const sd of sides) {
+      const keeper = sd.pool.find(p => p.role === 'wk'), field = sd.pool.filter(p => p !== keeper).slice(0, 11);
+      job('Fielders', async () => {
+        for (const p of field) {
+          for (const pose of ['ready_front', 'ready_back', 'ready_side']) for (const flip of [false, true]) { const lk = lookOf(p); if (lk) await until(() => drawKitFielder(g, 2, 2, 1, pose, sd.team, lk, flip), 3000); }
+          await breathe();
+        }
+      });
+      if (keeper) job('Keeper', async () => { const lk = lookOf(keeper); for (const f of ['kf_ready', 'kf_hands', 'kb_ready', 'kb_rise']) await until(() => drawKitFielder(g, 2, 2, 1, f, sd.team, lk, false), 3000); });
+    }
+    job('Portraits', async () => {
+      for (const sd of sides) for (const p of sd.pool) {   // (the whole squad: any of them can be the next batter or bowler)
+        let pic = null; try { pic = paintedPortrait(p, sd.team); } catch { /* a missing face is drawn the old way */ }
+        if (pic) await until(() => pic.complete !== false, 2500);
+      }
+    });
+    job('Crests', async () => {
+      for (const id of [this.myTeam.id, this.oppTeam.id]) { const im = new Image(); im.src = logoSrc(id); try { await im.decode(); } catch { /* shown when it comes */ } }
+    });
+    el.hidden = false;
+    try {
+      const n = jobs.length;
+      for (let i = 0; i < n; i++) {
+        if (this.cancelled) break;
+        if (sub) sub.textContent = jobs[i].label.toUpperCase();
+        if (fill) fill.style.width = `${Math.round(i / n * 100)}%`;
+        await breathe();
+        try { await jobs[i].fn(); } catch { /* only a warm-up */ }
+        if (performance.now() - t0 > budget) break;
+      }
+      if (fill) fill.style.width = '100%';
+      await breathe();
+    } finally { el.hidden = true; this.warmMs = Math.round(performance.now() - t0); }
   }
 
   // Repaint the players about to be seen (batter on strike, his partner, the bowler) off screen,
