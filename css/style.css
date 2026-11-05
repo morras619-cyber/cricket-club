@@ -2162,3 +2162,10 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .xp-bump { animation: xpBump .45s ease-out; }
 @keyframes xpBump { 0% { transform: scale(1); } 30% { transform: scale(1.06); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .xp-bump { animation: none; } }
+
+/* the Effects tab of the settings */
+.fxpane { display: flex; flex-direction: column; gap: 10px; align-content: start; }
+.fx-stage { display: flex; gap: 8px; justify-content: center; padding: 14px 6px 10px; overflow: visible; }
+.fx-stage .ptile { flex: 0 0 31%; }
+.fx-note { margin: 0; text-align: center; font: 700 13px/1.2 var(--body); color: rgba(255, 255, 255, .78); }
+.fx-btns .mf-big { min-height: 48px; }

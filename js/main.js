@@ -364,12 +364,28 @@ function renderHub() {
 // ---------- settings ----------
 // the settings' three pages (painted tabs, and a swipe sideways turns the page, like the training ground's)
 let setPane = 'game';
-const SET_PANES = [['game', 'gear', 'Game'], ['more', 'star', 'More'], ['tools', 'pencil', 'Tools']];
+const SET_PANES = [['game', 'gear', 'Game'], ['more', 'star', 'More'], ['tools', 'pencil', 'Tools'], ['fx', 'up', 'Effects']];
 function showSetPane(id, dir = 0) {
   setPane = id;
+  if (id === 'fx') buildFxStage();
   for (const p of document.querySelectorAll('#setBody .set-pane')) p.hidden = p.dataset.pane !== id;
   for (const t of $('setTabs').children) t.classList.toggle('on', t.dataset.pane === id);
   const body = $('setBody'); body.classList.remove('enter'); void body.offsetWidth; body.classList.add('enter'); setTimeout(() => body.classList.remove('enter'), 700);
+}
+// the Effects tab: three players of the practice club to pop the XP burst on (js/xppop.js), to see and tune it without waiting for training
+function buildFxStage() {
+  const c = demoCareer(), club = teamById(c.club), stage = $('fxStage');
+  warmXpArt();
+  const ids = [...trainingRoster(c).keys()].slice(0, 3);
+  const tiles = ids.map(id => { const p = c.players[id], info = trainingRoster(c).get(id); return playerTile(p, club, { ovr: info.ovr, sub: `XP ${Math.round(info.xp)} / ${info.cost}`, bar: info.xp / info.cost * 100, tone: 'green', onClick: () => {} }); });
+  stage.replaceChildren(...tiles);
+  const gain = (t, text, big) => xpPop(t, text, { big });
+  tiles.forEach(t => t.addEventListener('click', () => gain(t, `+${1 + Math.floor(Math.random() * 9)} XP`, false)));
+  const run = (kind, list = tiles) => { sfx.click(); list.forEach((t, k) => setTimeout(() => gain(t, kind === 'rating' ? '+1 RATING' : kind === 'big' ? '+25 XP' : '+3 XP', kind === 'rating'), k * 200)); };
+  $('fxSmall').onclick = () => run('small', [tiles[1]]);
+  $('fxBig').onclick = () => run('big', [tiles[1]]);
+  $('fxRating').onclick = () => run('rating', [tiles[1]]);
+  $('fxAll').onclick = () => { sfx.click(); gain(tiles[0], '+3 XP', false); setTimeout(() => gain(tiles[1], '+25 XP', false), 350); setTimeout(() => gain(tiles[2], '+1 RATING', true), 700); };
 }
 let setTabsMade = false;
 function makeSetTabs() {

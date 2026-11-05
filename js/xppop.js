@@ -18,7 +18,8 @@ export function xpPop(host, text, { big = false } = {}) {
   const layer = document.createElement('div');
   layer.className = `xp-fx${big ? ' big' : ''}`;
   const size = Math.round(Math.min(230, r.width * (big ? 1.9 : 1.5)));
-  Object.assign(layer.style, { left: `${r.left + r.width / 2}px`, top: `${r.top + r.height * 0.4}px` });
+  const cx = Math.max(size / 2 + 4, Math.min(innerWidth - size / 2 - 4, r.left + r.width / 2));   // (kept on the screen: a tile at the edge pops inward)
+  Object.assign(layer.style, { left: `${cx}px`, top: `${r.top + r.height * 0.4}px` });
   layer.style.setProperty('--w', `${size}px`);
   const burst = document.createElement('i'); burst.className = 'xp-burst';
   const num = document.createElement('b'); num.className = 'xp-num'; num.textContent = text;
