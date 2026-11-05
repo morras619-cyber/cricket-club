@@ -2125,39 +2125,44 @@ function paintOffice(c) {
     const fc = forecast(c);
     const foot = hint('clock', fc ? `At this rate the season ends ${fc.net >= 0 ? '+' : '−'}${money(Math.abs(fc.net))} (${fc.played} of ${fc.per} matches played)` : c.season > 1 || totalOf(last.in) ? `Last season: ${money(totalOf(last.in))} in, ${money(totalOf(last.out))} out (${lastNet >= 0 ? '+' : '−'}${money(Math.abs(lastNet))})` : 'This is your first season: the books start here.'); body.append(foot);
   } else if (officeTab === 'sponsors') {
-    const col = el('div', 'mf-col'), SLOT = { shirt: ['jersey', 'Shirt'], ground: ['users', 'Ground'], kit: ['box', 'Kit'] }, opens = ['', 5, 10];
+    const col = el('div', 'spon-wrap'), SLOT = { shirt: ['jersey', 'Shirt'], ground: ['users', 'Ground'], kit: ['box', 'Kit'] }, opens = ['', 5, 10];
     for (const [i, slot] of OFFICE.SLOTS.entries()) {
-      const d = o.deals[slot], [ic, label] = SLOT[slot], card = el('div', 'mf-card'), info = el('div', 'mf-info');
+      const d = o.deals[slot], [ic, label] = SLOT[slot], card = el('div', 'spon-card'), orb = el('span', 'spon-orb'), mid = el('div', 'spon-mid');
       if (i >= officeSlots(c)) {
-        card.classList.add('empty'); info.append(el('b', '', `${label} sponsor`), el('small', '', `Opens at office level ${opens[i]}`));
-        card.append(ico('warn'), info);
+        card.classList.add('locked'); orb.append(ico('lock'));
+        mid.append(el('small', '', `${label} sponsor`), el('b', '', `Opens at office level ${opens[i]}`));
+        card.append(orb, mid);
       } else if (d) {
-        const S = SPONSORS[d.id], pips = el('div', 'mf-pips');
-        for (let k = 0; k < DEAL.MATCHES; k++) pips.append(ico('ball', k < d.played ? 'on' : ''));
-        const goal = S.goal ? `${S.goal.kind === 'wins' ? d.wins : d.sixes}/${S.goal.n} ${S.goal.kind}` : 'no goal';
-        info.append(el('b', '', `${label}: ${S.name}`), pips, el('small', '', `${money(d.paid)} paid · ${goal}`));
-        card.append(ico(ic), info);
+        const S = SPONSORS[d.id], seg = el('span', 'spon-seg');
+        for (let k = 0; k < DEAL.MATCHES; k++) seg.append(el('i', k < d.played ? 'on' : ''));
+        const goalTxt = S.goal ? `${S.goal.kind === 'wins' ? d.wins : d.sixes} / ${S.goal.n} ${S.goal.kind}` : 'No goal', chips = el('div', 'spon-chips');
+        chips.append(el('span', 'spon-chip gold', `${money(d.paid)} paid`), el('span', 'spon-chip', goalTxt));
+        orb.append(ico(ic)); mid.append(el('small', '', `${label} sponsor`), el('b', '', S.name), seg, chips);
+        card.append(orb, mid);
       } else {
-        info.append(el('b', '', `${label} sponsor`), el('small', '', 'Free: pick a deal'));
-        const go = mfBtn('chipbtn', [el('span', '', 'Sign')], () => { officeSheet = { type: 'sign', slot }; sfx.click(); paintOffice(c); });
-        card.append(ico(ic), info, go);
+        orb.append(ico(ic)); mid.append(el('small', '', `${label} sponsor`), el('b', '', 'Free place'));
+        card.classList.add('free'); card.append(orb, mid);
+        card.append(mfBtn('mf-big spon-sign', [ico('plus'), el('span', '', 'Sign a deal')], () => { officeSheet = { type: 'sign', slot }; sfx.click(); paintOffice(c); }));
       }
       col.append(card);
     }
     const note = hint('clock', `Each deal runs for ${DEAL.MATCHES} of your league matches. A sponsor can be in one slot at a time.`); col.append(note);
     body.append(col);
   } else if (officeTab === 'board') {
-    const col = el('div', 'mf-col'), ob = objectiveOf(c), card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head');
-    hd.append(ico('trophy'), el('b', '', ob ? `Finish in the top ${ob.target}` : 'No target right now'));
-    card.append(hd);
+    const col = el('div', 'spon-wrap'), ob = objectiveOf(c), hero = el('div', 'board-hero');
+    const ord = n => `${n}${['st', 'nd', 'rd'][n - 1] || 'th'}`;
     if (ob) {
       const pos = c.league && c.league.stage ? (table(c.league).findIndex(r => r.id === c.club) + 1 || null) : null;
-      card.append(el('div', 'mf-row', `You are rated ${ob.rank}${['st', 'nd', 'rd'][ob.rank - 1] || 'th'} of 8 in ${divisionName(ob.div)}. The board asks for ${ob.target}${['st', 'nd', 'rd'][ob.target - 1] || 'th'} or better.`));
-      if (pos) card.append(el('div', `mf-row ${pos <= ob.target ? 'ok' : 'no'}`, `In the table now: ${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}`));
-      card.append(el('p', 'sheetnote', `Reach it and the board pays ${money(ob.reward)} at the end of the season. Miss it and you just lose the bonus.`));
-    } else card.append(el('p', 'sheetnote', 'The board sets its target when a season begins.'));
-    col.append(card);
-    for (const b of [...(o.board || [])].reverse().slice(0, 3)) { const r = el('div', 'mf-card'); r.append(ico(b.met ? 'check' : 'cross'), el('span', 'mf-row', `Season ${b.season}: wanted top ${b.target}, finished ${b.pos}${b.met ? ` · +${money(b.reward)}` : ''}`)); col.append(r); }
+      hero.append(el('small', '', 'The board wants'), el('b', '', `TOP ${ob.target}`));
+      const track = el('div', 'board-track');
+      for (let n = 1; n <= 8; n++) track.append(el('i', `${n <= ob.target ? 'goal' : ''}${n === pos ? ' me' : ''}${n === ob.rank && !pos ? ' me' : ''}`, String(n)));
+      hero.append(track);
+      hero.append(el('div', `board-now ${pos ? (pos <= ob.target ? 'ok' : 'no') : ''}`, pos ? `Table now: ${ord(pos)}` : `Rated ${ord(ob.rank)} of 8 in ${divisionName(ob.div)}`));
+      const rw = el('div', 'board-reward'); rw.append(ico('coin'), el('span', '', `${money(ob.reward)} if you make it`)); hero.append(rw);
+      col.append(hero, hint('trophy', `You are rated ${ord(ob.rank)} of 8 in ${divisionName(ob.div)}. Reach the target and the board pays ${money(ob.reward)} at the end of the season. Miss it and you just lose the bonus.`));
+    } else { hero.append(el('small', '', 'The board'), el('b', 'wait', 'NO TARGET YET')); hero.append(el('div', 'board-now', 'It sets one when a season begins')); col.append(hero); }
+    const past = [...(o.board || [])].reverse().slice(0, 3);
+    if (past.length) { const row = el('div', 'board-past'); for (const b of past) { const chip = el('div', `board-chip ${b.met ? 'ok' : 'no'}`); chip.append(ico(b.met ? 'check' : 'cross'), el('b', '', `Season ${b.season}`), el('small', '', `Top ${b.target} · ${ord(b.pos)}${b.met ? ` · +${money(b.reward)}` : ''}`)); row.append(chip); } col.append(row); }
     body.append(col);
   } else if (officeTab === 'contracts') {
     const list = contractList(c).slice(0, 6), grid = el('div', 'mf-grid cc-grid');
