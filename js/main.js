@@ -1,4 +1,5 @@
 import { UI } from './ui.js';
+import { TILES, BANNERS } from './shoparts.js';
 import { Game } from './game.js';
 import { HEROES, heroById, heroesFor, BAT_TYPES, POWERS, batTypeOf, bowlPowerOf } from './heroes.js';
 import { TEAMS, CLUBS, teamById, rivalTeam, teamOfHero, logoSrc, setMyClub, setLogo, stadiumTest, cosmetics } from './teams.js';
@@ -398,7 +399,7 @@ function paintShop(c) {
     const grid = el('div', 'item-grid');
     for (const [id, G] of Object.entries(SHOP.GEAR)) {
       const sale = !!deals && deals.ids.includes(id) && !deals.taken[id];
-      grid.append(itemTile(`img/shop/${id}.webp`, G.name, gearText(G), sale ? money(gearPrice(c, id, true)) : money(G.cost), { sale, old: sale ? money(G.cost) : '', onClick: () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); } }));
+      grid.append(itemTile(TILES[id], G.name, gearText(G), sale ? money(gearPrice(c, id, true)) : money(G.cost), { sale, old: sale ? money(G.cost) : '', onClick: () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); } }));
     }
     body.append(grid);
   } else if (shopTab === 'armoury') {
@@ -407,7 +408,7 @@ function paintShop(c) {
       const g = h.gear[i];
       if (!g) { const card = el('div', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Empty')); grid.append(card); continue; }
       const G = SHOP.GEAR[g.item], who = g.on && c.players[g.on];
-      grid.append(itemTile(`img/shop/${g.item}.webp`, G.name, who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`, '', { bar: g.uses / SHOP.USES * 100, face: who ? frameOf(playerFace(who, 44)) : null, onClick: () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); } }));
+      grid.append(itemTile(TILES[g.item], G.name, who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`, '', { bar: g.uses / SHOP.USES * 100, face: who ? frameOf(playerFace(who, 44)) : null, onClick: () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); } }));
     }
     body.append(grid);
     body.append(info('warn', `A player carries one thing. It wears out after ${SHOP.USES} of your matches that he plays in. The armoury holds ${armourySlots(c)}.`));
@@ -417,7 +418,7 @@ function paintShop(c) {
       const grid = el('div', 'item-grid four');
       for (const [id, L] of Object.entries(SHOP.LOOKS[kind])) {
         const owned = !!h.owned[kind][id], on = h.look[kind] === id;
-        grid.append(itemTile(`img/shop/${kind === 'lights' ? 'lights' : 'trail'}-${id}.webp`, L.name.split(' ')[0], on ? 'On' : owned ? 'Owned' : '', on || owned ? '' : `${L.cost} 💎`, { have: on || owned, onClick: () => { if (owned) done(setLook(c, kind, on ? null : id)); else { shopSheet = { type: 'look', kind, id }; sfx.click(); paintShop(c); } } }));
+        grid.append(itemTile(TILES[`${kind === 'lights' ? 'lights' : 'trail'}-${id}`], L.name.split(' ')[0], on ? 'On' : owned ? 'Owned' : '', on || owned ? '' : `${L.cost} 💎`, { have: on || owned, onClick: () => { if (owned) done(setLook(c, kind, on ? null : id)); else { shopSheet = { type: 'look', kind, id }; sfx.click(); paintShop(c); } } }));
       }
       body.append(grid);
     }
@@ -427,7 +428,7 @@ function paintShop(c) {
     big.className = 'fin-hero'; big.append(el('small', '', 'Your diamonds'), el('b', 'up', String(dm)));
     col.append(big);
     const pg = el('div', 'item-grid');
-    for (const pk of SHOP.PACKS) pg.append(itemTile(`img/shop/diamonds-${pk.diamonds}.webp`, `${pk.diamonds} diamonds`, 'Coming soon', pk.price, { onClick: () => ui.toast('Buying diamonds needs the server, which is not ready yet') }));
+    for (const pk of SHOP.PACKS) pg.append(itemTile(TILES[`diamonds-${pk.diamonds}`], `${pk.diamonds} diamonds`, 'Coming soon', pk.price, { onClick: () => ui.toast('Buying diamonds needs the server, which is not ready yet') }));
     col.append(pg);
     col.append(info('warn', 'Buying diamonds needs the server, which is not ready yet. For now diamonds come from the Settings test button.'));
     body.append(col);
@@ -1559,12 +1560,11 @@ function paintShell(c, prefix, id, size = 'mid') {
   paintHero(hero, c, id);
 }
 // the building's own picture (the map's, painted in the club's colours) behind the screen's title
-const BANNER = { shop: 'img/banner/shop.webp', apartment: 'img/banner/apartment.webp', office: 'img/banner/office.webp', clubhouse: 'img/banner/clubhouse.webp', medical: 'img/banner/medical.webp', academy: 'img/banner/academy.webp', merch: 'img/banner/merch.webp', training: 'img/banner/training.webp' };   // painted scenes, one per building
 async function paintHero(host, c, id) {
   const club = teamById(c.club), look = PC.lookOf(levelOfBuilding(c, id) || 1), key = `${id}|${club.suit}|${club.trim}|${look}`;
   if (host.dataset.key === key) return;
   host.dataset.key = key; host.querySelector('.bhero-art')?.remove();
-  const banner = BANNER[id];
+  const banner = BANNERS[id];
   if (banner) { const im = document.createElement('img'); im.className = 'bhero-art bhero-pic'; im.src = banner; im.alt = ''; im.draggable = false; host.prepend(im); return; }
   try {
     const src = await buildingPicture(id, club, look);
@@ -1642,7 +1642,7 @@ const ico = (name, cls = '') => { const sp = el('span', `ico ${cls}`.trim()); sp
 const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...content); if (fn) b.addEventListener('click', fn); return b; };
 // a thing you can buy, win or own, as a tall tile: a big round icon, its name, what it does, and its price (or "yours"). opts: { sale, old, have, bar, onClick }
 function itemTile(icon, name, what, price, { sale = false, old = '', have = false, bar = null, face = null, onClick } = {}) {
-  const art = typeof icon === 'string' && icon.startsWith('img/'), t = el('button', `item-tile${art ? ' art' : ''}${have ? ' have' : ''}${sale ? ' sale' : ''}`), orb = el('span', 'item-orb');
+  const art = typeof icon === 'string' && icon.startsWith('data:image'), t = el('button', `item-tile${art ? ' art' : ''}${have ? ' have' : ''}${sale ? ' sale' : ''}`), orb = el('span', 'item-orb');
   if (art) { const im = el('img'); im.src = icon; im.alt = ''; im.draggable = false; orb.append(im); if (face) orb.append(face); }
   else orb.append(typeof icon === 'string' ? ico(icon, have ? 'on' : '') : icon);
   const pr = el('span', 'item-price'); if (price) pr.append(old ? el('s', '', old) : '', el('b', '', price));
@@ -2404,7 +2404,7 @@ function paintApartment(c) {
     const own = Object.keys(a.decor).length, grid = el('div', 'item-grid');
     for (const [id, D] of Object.entries(APT.DECOR)) {
       const have = !!a.decor[id];
-      grid.append(itemTile(`img/shop/${id}.webp`, D.name, `+${D.mp} pts`, have ? 'Yours' : money(D.cost), { have, onClick: () => { if (!have) { aptSheet = { type: 'decor', id }; sfx.click(); paintApartment(c); } } }));
+      grid.append(itemTile(TILES[id], D.name, `+${D.mp} pts`, have ? 'Yours' : money(D.cost), { have, onClick: () => { if (!have) { aptSheet = { type: 'decor', id }; sfx.click(); paintApartment(c); } } }));
     }
     body.append(info('heart', `Furnish your place with your salary: ${own} of ${decorSlots(c)} places used.`), grid);
   } else {
