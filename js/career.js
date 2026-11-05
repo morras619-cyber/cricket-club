@@ -364,6 +364,7 @@ const round3 = x => Math.round(x * 1000) / 1000;
 // spec: { name, short, suit, trim, emblem, ground, crest (an image URL) }
 export function createClub(c, spec, { trials = false } = {}) {
   if (c.club) return false;
+  c.gates = 'on';   // a new club opens its buildings one by one as the club levels up (main.js UNLOCK_AT); a career saved before this has no gates: everything stays open
   const base = [...c.divisions.d3].sort((a, b) => clubRating(c, a) - clubRating(c, b))[0];
   const rng = makeRng(hashStr(`mine-${c.seed}`));
   if (trials) {

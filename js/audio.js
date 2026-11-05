@@ -108,6 +108,10 @@ export const sfx = {
   boom() { tone(70, 0.8, { gain: 0.9, to: 30 }); noise(0.6, { gain: 0.6, freq: 200, q: 0.5, type: 'lowpass' }); },
   zap() { tone(1400, 0.18, { type: 'sawtooth', gain: 0.18, to: 200 }); noise(0.15, { gain: 0.3, freq: 4000, q: 3 }); },
   click() { tone(800, 0.04, { type: 'square', gain: 0.08 }); },
+  coin() { [988, 1319].forEach((f, i) => tone(f, 0.09, { type: 'triangle', gain: 0.1, delay: i * 0.06 })); },            // (cash ticking up)
+  chime() { [659, 880, 1175].forEach((f, i) => tone(f, 0.16, { type: 'triangle', gain: 0.13, delay: i * 0.07 })); },     // (someone hired, something bought)
+  hammer() { const hit = f => { tone(f, 0.09, { type: 'square', gain: 0.2, to: f / 2 }); noise(0.06, { gain: 0.28, freq: 1500, q: 2 }); }; hit(180); setTimeout(() => hit(150), 170); },   // (a building starts)
+  fanfare() { this.dhol(); [392, 523, 659, 784, 1046].forEach((f, i) => tone(f, 0.3, { type: 'sawtooth', gain: 0.1, delay: 0.1 * i })); tone(1046, 0.7, { type: 'triangle', gain: 0.12, delay: 0.55 }); },   // (a level, a promotion, a title)
   sizzle() { noise(0.3, { gain: 0.15, freq: 5000, q: 2 }); },
   wicket() { this.stumps(); [659, 784, 988].forEach((f, i) => tone(f, 0.18, { type: 'square', gain: 0.1, delay: 0.15 + i * 0.1 })); },
 };

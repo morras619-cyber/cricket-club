@@ -84,7 +84,7 @@ sound.on = profile.settings.sound;
 sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
 units.speed = profile.settings.units === 'mph' ? 'mph' : 'kmh';
-window.__sixcharge = { game, ui, profile };
+window.__sixcharge = { game, ui, profile, moment: m => { queueMoment(m); flushMoments(); } };
 game.onFieldSaved = choice => { profile.field = { preset: choice.field, custom: choice.custom }; saveProfile(profile); };
 
 let challenge = decodeChallenge(location.hash.slice(1));
@@ -377,7 +377,7 @@ async function renderShop(test = false) {
 function paintShop(c) {
   buildTick(c);
   const h = shopOf(c), trusted = clock.state === 'ok', now = serverNow() + shopDay * 86400000, row = shopRow(c), dm = PC.buildOf(c).diamonds;
-  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) shopSheet = null; } saveProfile(profile); paintShop(c); };
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) shopSheet = null; } saveProfile(profile); paintShop(c); };
   paintShell(c, 'shop', 'shop', shopTab === 'gear' || shopTab === 'style' ? 'small' : 'mid'); $('shopLede').textContent = shopTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
   $('shopLvl').replaceChildren(ico('factory'), el('span', '', `LV ${h.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
@@ -1359,15 +1359,19 @@ const BUILDINGS = {
   clubhouse: { name: 'Clubhouse', desc: 'Chemistry, rivals and supporter events', open: () => renderClubhouse(false) },
   merch: { name: 'Merchandise factory', desc: 'Make jerseys the fans want', open: () => renderMerch(false) },
 };
+// a new club opens its buildings as the club levels up (a career saved before this has no gates: everything stays open)
+const UNLOCK_AT = { stadium: 1, training: 1, office: 1, merch: 2, medical: 2, academy: 3, clubhouse: 3, shop: 4, apartment: 4 };
+const buildingOpen = (c, id) => mapTest || !c.club || c.gates !== 'on' || PC.clubLevel(PC.buildOf(c).xp) >= (UNLOCK_AT[id] || 1);
 let mapPick = null, mapPaceTimer = 0;
 const clubMap = createClubMap($('mapCanvas'), {
   onSelect: id => {
     mapPick = id;
     $('mapSheet').hidden = !id;
-    if (!id) return;
-    const b = BUILDINGS[id];
-    $('mapName').textContent = b.name; $('mapDesc').textContent = b.desc;
-    $('mapOpen').hidden = !!b.soon;
+    if (!id) { const t = $('mapToday'); if (t) t.hidden = !t.childElementCount; return; }
+    const b = BUILDINGS[id], c = career(), open = buildingOpen(c, id);
+    $('mapName').textContent = open ? b.name : `🔒 ${b.name}`; $('mapDesc').textContent = open ? b.desc : `Opens at club level ${UNLOCK_AT[id]}. Win matches to level up.`;
+    $('mapOpen').hidden = !!b.soon || !open;
+    $('mapToday')?.setAttribute('hidden', '');
     sfx.click();
   },
 });
@@ -1392,7 +1396,8 @@ function renderClubMap(test = false) {
   $('mapSub').textContent = test ? `Test view · level ${levelOfMap(c)} · nothing opens` : `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)}`;
   const info = () => {
     const act = test ? {} : { stadium: ['season', 'playoff', 'auction'].includes(c.phase), academy: c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE), medical: !!c.medical && (Object.keys(c.medical.knocked).length > 0 || Object.values(c.medical.fit).some(f => f < 50)), merch: (c.merch?.till || 0) >= 100, training: clock.state === 'ok' && TG.drillsLeft(c.training || {}, serverNow()) > 0, clubhouse: !!c.history?.length && paradeDue(c) };   // (a red dot: something to do there)
-    clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: b.name, soon: !!b.soon, badge: !!act[id] }])));
+    clubMap.setInfo(Object.fromEntries(Object.entries(BUILDINGS).map(([id, b]) => [id, { name: buildingOpen(c, id) ? b.name : `🔒 ${b.name}`, soon: !!b.soon || !buildingOpen(c, id), badge: !!act[id] && buildingOpen(c, id) }])));
+    paintToday(c, test);
   };
   info();
   paintMapTabs(test);
@@ -1400,6 +1405,46 @@ function renderClubMap(test = false) {
   if (!test && c.merch) syncClock().then(() => { if (merchTick(c)) info(); });   // (the factory has been working while you were away)
   clubMap.open(club, mapLevels(c));
   if (!test) coachOnce('clubMap', DEV.clubMap);
+}
+// a big moment (a club level, a promotion, a title): a full-screen burst with a fanfare; tap to go on. They queue, so two never overlap.
+const moments = [];
+function queueMoment(m) { moments.push(m); }
+function flushMoments() {
+  if (window.__SIXCHARGE_BOT) { moments.length = 0; return; }   // (the bot plays through them)
+  if (document.getElementById('moment') || !moments.length) return;
+  const { icon, title, sub, tone = '' } = moments.shift();
+  const o = el('div', `moment ${tone}`); o.id = 'moment';
+  const conf = el('div', 'mo-conf'); for (let i = 0; i < 26; i++) { const k = el('i'); k.style.cssText = `left:${(i * 37) % 100}%;animation-delay:${((i * 53) % 90) / 100}s;background:${['#ffd23f', '#ff5a3c', '#3ec6ff', '#7cf08a', '#ff8ad8'][i % 5]};--dx:${((i * 29) % 60) - 30}px`; conf.append(k); }
+  const card = el('div', 'mo-card'); card.append(ico(icon, 'on'), el('b', '', title), el('span', '', sub), el('small', '', 'Tap to continue'));
+  o.append(el('div', 'mo-rays'), conf, card);
+  $('app').append(o); sfx.fanfare(); buzz([30, 40, 30]);
+  const close = () => { if (!o.isConnected || o.classList.contains('out')) return; o.classList.add('out'); setTimeout(() => { o.remove(); flushMoments(); }, 260); };
+  o.addEventListener('click', close); setTimeout(close, 5200);
+}
+const noteMoments = notes => {
+  const c = career();
+  for (const n of notes) {
+    const lv = /Club level (\d+)/.exec(n);
+    if (lv) { const opened = Object.entries(UNLOCK_AT).filter(([, v]) => v === +lv[1]).map(([id]) => BUILD_NAME[id]); queueMoment({ icon: 'star', title: `Club level ${lv[1]}!`, sub: c.gates === 'on' && opened.length ? `Unlocked: ${opened.join(', ')}` : 'Your buildings can grow bigger', tone: 'gold' }); }
+    if (/PROMOTED!/.test(n)) queueMoment({ icon: 'up', title: 'PROMOTED!', sub: n.replace(/^.*?PROMOTED!\s*/, '').replace(/\s*🎉.*$/, ''), tone: 'green' });
+  }
+  if (moments.length) setTimeout(flushMoments, 400);
+};
+// the strip above the map's tabs: only what is waiting for you, as small tappable chips (nothing waiting, no strip)
+function paintToday(c, test) {
+  let t = $('mapToday');
+  if (!t) { t = el('div', 'map-today'); t.id = 'mapToday'; $('mapTabs').before(t); }
+  const chips = [];
+  if (!test) {
+    const season = ['season', 'playoff'].includes(c.phase);
+    if (season && (c.pace?.tokens || 0) >= 1) chips.push(['ball', 'Match', () => { careerView = 'hub'; renderCareer(); }]);
+    if ((c.merch?.till || 0) >= 100) chips.push(['coin', money((c.merch.till || 0) / 1000), () => renderMerch(false)]);
+    const hurt = c.medical ? Object.keys(c.medical.knocked).length : 0;
+    if (hurt) chips.push(['heart', `${hurt} hurt`, () => renderMedical(false)]);
+    if (c.academy && (c.phase === 'scouts' || prospectsOf(c).some(p => p.age >= AC.ACAD.PLAY_AGE))) chips.push(['users', 'Academy', () => renderAcademy(false)]);
+  }
+  t.replaceChildren(...chips.map(([icon, label, fn]) => { const b = mfBtn('today-chip', [ico(icon), el('span', '', label), el('i', 'today-dot')], () => { unlockAudio(); sfx.click(); clubMap.close(); fromMap = true; fn(); }); return b; }));
+  t.hidden = !chips.length || !!mapPick;
 }
 $('mapBack').addEventListener('click', () => { sfx.click(); clubMap.close(); if (mapTest) renderSettings(); else renderTitle(); });
 $('mapCoach').addEventListener('click', () => coachSay(DEV.clubMap));
@@ -1416,7 +1461,7 @@ function paintMapTabs(test) {
   }));
 }
 $('mapSettings').addEventListener('click', () => { unlockAudio(); sfx.click(); clubMap.close(); settingsFrom = () => renderClubMap(); renderSettings(); });
-$('mapOpen').addEventListener('click', () => { const b = BUILDINGS[mapPick]; if (!b || b.soon) return; if (mapTest) return ui.toast(`${b.name}: test view only`); sfx.click(); clubMap.close(); fromMap = true; b.open(); });
+$('mapOpen').addEventListener('click', () => { const b = BUILDINGS[mapPick]; if (!b || b.soon || !buildingOpen(career(), mapPick)) return; if (mapTest) return ui.toast(`${b.name}: test view only`); sfx.click(); clubMap.close(); fromMap = true; b.open(); });
 
 // ---------- the merchandise factory (js/merch.js): a real business, on the server's time, also while you are away ----------
 // The time is the server's (the Date of a request to this page), never the phone's clock: changing the clock gets you nothing. With no
@@ -1474,7 +1519,7 @@ function tickUp(node, { key, to, fmt }) {
   const from = lastCount[key]; lastCount[key] = to;
   if (from == null || from === to || window.__SIXCHARGE_BOT || matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
   const t0 = performance.now(), ms = 650;
-  node.classList.add('tick');
+  node.classList.add('tick'); if (to > from) sfx.coin();
   const step = now => {
     const k = Math.min(1, (now - t0) / ms), e = 1 - (1 - k) ** 3;
     node.textContent = fmt(from + (to - from) * e);
@@ -1545,7 +1590,7 @@ function buildBlock(c, id, after) {
   if (lv >= PC.MAX_LEVEL) { out.push(el('p', 'sheetnote', `The best ${BUILD_NAME[id].toLowerCase()} there is.`)); return out; }
   const to = lv + 1, cost = PC.costOf(id, to), why = PC.whyNot(c, id, buildCtx(c));
   const r = el('div', 'mf-row'); r.append(ico('upgrade'), el('span', '', `Level ${to}${PC.lookOf(to) > PC.lookOf(lv) ? ' (a new look)' : ''} · ${money(cost)} · ${PC.hoursOf(to)} h to build`));
-  const btn = mfBtn('mf-big', [ico('upgrade', 'big'), el('span', '', `Build level ${to}`)], () => { const res = PC.startBuild(c, id, buildCtx(c)); if (!res.ok) { ui.toast(res.why); return; } sfx.dhol(); saveProfile(profile); after(); });
+  const btn = mfBtn('mf-big', [ico('upgrade', 'big'), el('span', '', `Build level ${to}`)], () => { const res = PC.startBuild(c, id, buildCtx(c)); if (!res.ok) { ui.toast(res.why); return; } sfx.hammer(); saveProfile(profile); after(); });
   btn.disabled = !!why || c.money < cost;
   out.push(r, btn);
   if (why) out.push(el('p', 'sheetnote', why === `Needs club level ${to}` ? `Needs club level ${to}: ${Math.round(b.xp)} of ${PC.XP_AT[to]} XP` : why));
@@ -1709,7 +1754,7 @@ async function renderMerch(test = false) {
 function paintMerch(c) {
   const m = c.merch, club = teamById(c.club), roster = merchRoster(c), dmap = MF.demandMap(m, merchCtx(c)), L = PC.levelRow(MF.MERCH.LEVELS, m.level);
   const ctx = () => merchCtx(c);
-  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) merchSheet = null; } saveProfile(profile); merchTick(c); paintMerch(c); };
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) merchSheet = null; } saveProfile(profile); merchTick(c); paintMerch(c); };
   paintShell(c, 'merch', 'merch', 'big');
   // the top: the till, what it earns and costs, and the button to collect
   $('merchLede').textContent = merchTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
@@ -1874,7 +1919,7 @@ const KIND_ICON = { bat: 'star', pace: 'ball', spin: 'gear' };
 function paintTraining(c) {
   const t = c.training, club = teamById(c.club), roster = trainingRoster(c), L = PC.levelRow(TG.TRAIN.LEVELS, t.level);
   const ctx = () => trainCtx(c), who = TG.assignments(t, ctx());
-  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) trainSheet = null; } saveProfile(profile); trainTick(c); paintTraining(c); };
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) trainSheet = null; } saveProfile(profile); trainTick(c); paintTraining(c); };
   paintShell(c, 'train', 'training'); $('trainLede').textContent = trainTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   $('trainLvl').replaceChildren(ico('factory'), el('span', '', `LV ${t.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
@@ -2023,7 +2068,7 @@ function renderOffice(test = false) {
 function paintOffice(c) {
   const club = teamById(c.club), o = office(c), books = seasonBooks(c), last = seasonBooks(c, c.season - 1);
   buildTick(c);
-  const done = (r, close = false) => { if (r === false || r?.ok === false) ui.toast(r?.why || 'Not now'); else { sfx.click(); if (close) officeSheet = null; } saveProfile(profile); paintOffice(c); };
+  const done = (r, close = false) => { if (r === false || r?.ok === false) ui.toast(r?.why || 'Not now'); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) officeSheet = null; } saveProfile(profile); paintOffice(c); };
   paintShell(c, 'office', 'office', officeTab === 'money' ? 'tiny' : 'mid'); $('officeLede').textContent = officeTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · season ${c.season} · club ${money(c.money)}`;
   $('officeLvl').replaceChildren(ico('factory'), el('span', '', `LV ${o.level}`));
   const inn = totalOf(books.in), out = totalOf(books.out), net = Math.round((inn - out) * 100) / 100;
@@ -2184,7 +2229,7 @@ async function renderClubhouse(test = false) {
 function paintClubhouse(c) {
   buildTick(c);
   const h = clubhouse(c), club = teamById(c.club), now = serverNow(), trusted = clock.state === 'ok', P = ensureChirp(c);
-  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) clubSheet = null; } saveProfile(profile); paintClubhouse(c); };
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) clubSheet = null; } saveProfile(profile); paintClubhouse(c); };
   const links = chemLinks(c), row = clubhouseRow(c);
   paintShell(c, 'clubhouse', 'clubhouse', clubTab === 'chem' ? 'small' : 'mid'); $('clubhouseLede').textContent = clubTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   $('clubhouseLvl').replaceChildren(ico('factory'), el('span', '', `LV ${h.level}`));
@@ -2278,7 +2323,7 @@ const DECOR_ICON = { lamp: 'star', plant: 'heart', sofa: 'users', rug: 'box', po
 function paintApartment(c) {
   buildTick(c);
   const a = apartment(c), row = aptRow(c), lvl = mgrLevel(c), trophies = trophiesOf(c);
-  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) aptSheet = null; } saveProfile(profile); paintApartment(c); };
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) aptSheet = null; } saveProfile(profile); paintApartment(c); };
   paintShell(c, 'apartment', 'apartment', aptTab === 'decor' || aptTab === 'cabinet' ? 'small' : 'mid'); $('apartmentLede').textContent = aptTest ? `Practice club (nothing is saved) · salary ${money(salaryCash(c))}` : `${teamById(c.club).name} · salary ${money(salaryCash(c))}`;
   $('apartmentLvl').replaceChildren(ico('factory'), el('span', '', `LV ${a.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
@@ -2389,7 +2434,7 @@ async function renderAcademy(test = false) {
 const TIER_CLS = ['common', 'rare', 'epic', 'super'];
 function paintAcademy(c) {
   const a = c.academy, L = PC.levelRow(AC.ACAD.LEVELS, a.level), now = serverNow(), ctx = () => acadCtx(c);
-  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) acadSheet = null; } saveProfile(profile); acadTick(c); paintAcademy(c); };
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) acadSheet = null; } saveProfile(profile); acadTick(c); paintAcademy(c); };
   paintShell(c, 'acad', 'academy', acadTab === 'seniors' ? 'tiny' : acadTab === 'trips' ? 'small' : 'mid'); $('acadLede').textContent = acadTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${teamById(c.club).name} · club ${money(c.money)}`;
   $('acadLvl').replaceChildren(ico('factory'), el('span', '', `LV ${a.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
@@ -2556,7 +2601,7 @@ async function renderMedical(test = false) {
 const fitColour = f => (f >= 70 ? 'green' : f >= 40 ? 'amber' : 'red');
 function paintMedical(c) {
   const m = c.medical, L = PC.levelRow(MD.MED.LEVELS, m.level), club = teamById(c.club), squad = clubPlayers(c, c.club), ctx = () => medCtx(c);
-  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { sfx.click(); if (close) medSheet = null; } saveProfile(profile); medTickC(c); paintMedical(c); };
+  const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) medSheet = null; } saveProfile(profile); medTickC(c); paintMedical(c); };
   paintShell(c, 'med', 'medical'); $('medLede').textContent = medTest ? `Practice club (nothing is saved) · club ${money(c.money)}` : `${club.name} · club ${money(c.money)}`;
   $('medLvl').replaceChildren(ico('factory'), el('span', '', `LV ${m.level}`));
   const avg = squad.length ? Math.round(squad.reduce((a, p) => a + MD.fitOf(m, p.id), 0) / squad.length) : 100, hurt = squad.filter(p => MD.isKnocked(m, p.id)).length;
@@ -2676,6 +2721,7 @@ $('setMedical').addEventListener('click', () => { unlockAudio(); sfx.click(); re
 function renderCareer(notes = careerNotes) {
   const c = career();
   careerNotes = [];
+  noteMoments(notes);
   ui.show('career');
   if (c.club) { fillTopbar($('careerTop'), c, () => renderCareer()); $('careerTop').hidden = false; } else $('careerTop').hidden = true;
   const bidding = c.phase === 'auction' && careerView !== 'squad' && !!currentLot(c); // the lot on the block: the auction stage's look (css .is-auction)
@@ -3576,6 +3622,7 @@ function showResult(summary) {
     careerNotes = notes;
     if (c.phase === 'done' && c.league.champion === c.club && !c.history.at(-1).trophy) {
       c.history.at(-1).trophy = true;
+      queueMoment({ icon: 'trophy', title: 'CHAMPIONS!', sub: `${teamById(c.club).name} win ${divisionName(c.league.div || 'asl')}`, tone: 'gold' });
       profile.trophies = [...(profile.trophies || []), { kind: 'league', div: c.league.div || 'asl', team: c.club, season: c.season, date: new Date().toISOString().slice(0, 10), unbeaten: unbeaten(c.league) }];
       events.push('league');
       if (unbeaten(c.league)) events.push('unbeaten');

@@ -68,6 +68,18 @@ if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_
 const tapAt = async (fx, fy) => { const r = await page.evaluate(([fx, fy]) => { const b = document.getElementById('mapCanvas').getBoundingClientRect(), sc = b.width / 1536; return { x: b.left + b.width / 2 + (fx - 0.5) * 1536 * sc, y: b.top + b.height / 2 + (fy - 0.5) * 2304 * sc }; }, [fx, fy]); await page.mouse.click(r.x, r.y); await page.waitForTimeout(300); };
 await tapAt(0.504, 0.446);
 check(await page.evaluate(() => !document.getElementById('mapSheet').hidden && document.getElementById('mapName').textContent === 'Stadium'), 'tapping the stadium selects it');
+// a new club's buildings open as the club levels up: the clubhouse (club level 3) is locked at first, and the strip over the tabs shows the match that is ready
+await tapAt(0.766, 0.592);
+check(await page.evaluate(() => /^🔒 Clubhouse/.test(document.getElementById('mapName').textContent) && document.getElementById('mapOpen').hidden && /club level 3/.test(document.getElementById('mapDesc').textContent)), 'a new club\'s clubhouse is locked until club level 3, and has no Open button');
+await page.evaluate(() => document.getElementById('mapBack').click()); await page.waitForTimeout(300);   // (leave the map and come back: the strip is drawn on the way in)
+await page.evaluate(() => { document.getElementById('tPlay').click(); }); await page.waitForTimeout(1800);
+check(await page.evaluate(() => /Match/.test(document.getElementById('mapToday')?.textContent || '')), 'the strip over the map\'s tabs shows that a match is ready');
+// (a big moment: the milestone screen comes up, with its fanfare, and goes on a tap)
+await page.evaluate(() => { window.__SIXCHARGE_BOT = false; window.__sixcharge.moment({ icon: 'star', title: 'Club level 3!', sub: 'Unlocked: Youth academy, Clubhouse', tone: 'gold' }); }); await page.waitForTimeout(600);
+check(await page.evaluate(() => !!document.getElementById('moment') && /Club level 3/.test(document.getElementById('moment').textContent)), 'a big moment fills the screen');
+await page.evaluate(() => document.getElementById('moment').click()); await page.waitForTimeout(700);
+check(await page.evaluate(() => !document.getElementById('moment')), 'a tap sends the moment away');
+await page.evaluate(() => { window.__SIXCHARGE_BOT = true; window.__sixcharge.profile.career.gates = undefined; });   // (a career saved before the gates: every building is open, at club level 1, for the rest of the run)
 await tapAt(0.766, 0.592);
 check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Clubhouse' && !document.getElementById('mapOpen').hidden), 'the clubhouse opens from the map');
 // the merchandise factory: open it from the map, hire, order, be away for three hours, and a tampered till is noticed
