@@ -22,18 +22,20 @@ Y0, Y1 = 40, 553
 TALL = 1.15   # the picture is made at least this much taller than wide, like the other portraits
 
 
-def drop_sky(p):
-    """GrabCut leaves bits of the blue backdrop between hair and shoulder: blue that touches the picture's edge goes"""
+def drop_sky(p, head=0.5):
+    """GrabCut leaves bits of the blue backdrop between hair and shoulder, and in the gaps between curls. Above `head` (a share of the
+    picture's height: the hair and face, never the shirt, whose blue is recoloured to each club's kit) blue that touches the picture's
+    edge goes, and blue left inside the hair becomes dark hair."""
     a = np.array(p).astype(int)
-    blue = (a[..., 2] > a[..., 0] + 50) & (a[..., 2] > a[..., 1] + 20) & (a[..., 3] > 0)
+    H = a.shape[0]
+    top = np.zeros(a.shape[:2], bool)
+    top[:int(H * head)] = True
+    blue = (a[..., 2] > a[..., 0] + 50) & (a[..., 2] > a[..., 1] + 20) & (a[..., 3] > 0) & top
     lab, n = ndi.label(blue)
     edge = set(np.unique(np.concatenate([lab[0], lab[:, 0], lab[:, -1]]))) - {0}
-    gone = np.isin(lab, list(edge))
-    gone = ndi.binary_dilation(gone, iterations=2) & blue
+    gone = ndi.binary_dilation(np.isin(lab, list(edge)), iterations=2) & blue
     a[..., 3][gone] = 0
-    # blue left inside the hair (gaps between curls) would be recoloured with the shirt: it becomes dark hair
-    rest = blue & ~gone & (a[..., 3] > 0)
-    rest = ndi.binary_dilation(rest, iterations=1) & (a[..., 2] > a[..., 0] + 25) & (a[..., 3] > 0)
+    rest = ndi.binary_dilation(blue & ~gone, iterations=1) & (a[..., 2] > a[..., 0] + 25) & (a[..., 3] > 0) & top
     a[..., 0][rest], a[..., 1][rest], a[..., 2][rest] = 38, 26, 22
     out = Image.fromarray(a.astype(np.uint8), 'RGBA')
     return out.crop(out.getbbox())
