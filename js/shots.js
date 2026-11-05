@@ -175,7 +175,7 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
 
 // ---------- Batting 2.0 (Settings > Tools, a test): the swipe itself carries the decisions ----------
 // The length of the swipe is the risk: a short push is safe and weak, a long committed swipe is big and hard to time. Where the finger comes down against the ball's
-// line is the footwork. A run of good shots builds rhythm, and rhythm widens the window and adds power. r = swipe length / the lofting length.
+// line is the footwork. A run of good shots builds confidence, and confidence widens the window and adds power. r = swipe length / the lofting length.
 const bnClamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export function batNewSize(r) {
   const power = r <= 1 ? 0.65 + 0.35 * r : 1 + 0.55 * (r - 1);
@@ -187,7 +187,7 @@ export function batNewZone(off) {
   return { win: bnClamp(1.2 - 0.45 * off, 0.55, 1.1), power: bnClamp(1 - 0.18 * Math.max(0, off - 0.6), 0.65, 1), near: off <= 0.6 ? 'on the line' : off <= 1.2 ? 'close' : 'reaching' };
 }
 export const rhythmStage = v => (v >= 66 ? 2 : v >= 30 ? 1 : 0);
-export const RHYTHM_NAMES = ['SETTLED', 'FLOWING', 'ON FIRE'];
+export const RHYTHM_NAMES = ['SHAKY', 'CONFIDENT', 'UNSTOPPABLE'];
 export const rhythmFx = v => { const s = rhythmStage(v); return { win: 1 + 0.07 * s, power: 1 + 0.07 * s, stage: s }; };
 // a perfect shot builds it a lot, a good one some; a mistimed shot costs, a miss or an edge costs most; a defensive tap leaves it
 export function rhythmNext(v, grade) {

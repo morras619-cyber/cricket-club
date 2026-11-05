@@ -19,13 +19,13 @@ test('the finger on the ball\'s line is worth a full window; reaching costs wind
   assert.ok(reach.win >= 0.55 && reach.power >= 0.65, 'never worse than a floor: a bad read is punished, not made impossible');
 });
 
-test('rhythm builds on good shots and breaks on bad ones', () => {
+test('confidence builds on good shots and breaks on bad ones', () => {
   assert.equal(rhythmStage(0), 0); assert.equal(rhythmStage(30), 1); assert.equal(rhythmStage(66), 2);
   let v = 0;
-  v = rhythmNext(v, 'perfect'); v = rhythmNext(v, 'perfect');         // 64: Flowing
+  v = rhythmNext(v, 'perfect'); v = rhythmNext(v, 'perfect');         // 64: Confident
   assert.equal(rhythmStage(v), 1);
-  v = rhythmNext(v, 'good');                                          // 82: On fire
-  assert.equal(RHYTHM_NAMES[rhythmStage(v)], 'ON FIRE');
+  v = rhythmNext(v, 'good');                                          // 82: Unstoppable
+  assert.equal(RHYTHM_NAMES[rhythmStage(v)], 'UNSTOPPABLE');
   assert.ok(rhythmFx(v).win > rhythmFx(0).win && rhythmFx(v).power > rhythmFx(0).power);
   assert.equal(rhythmNext(v, 'defend'), v);                            // (a defensive tap leaves it)
   assert.ok(rhythmNext(v, 'late') < v);

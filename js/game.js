@@ -979,7 +979,7 @@ export class Game {
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
     else if (aiPower) this.ui.hint('SPECIAL BALL! TAP TO DEFEND');
-    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint(this.settings.batNew && !this.bot ? 'THUMB ON THE DOTTED CIRCLE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND');
+    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint(this.settings.batNew && !this.bot ? 'FINGER DOWN WHERE THE BALL WILL BE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND');
     // before the delivery a tap on the field map enlarges it
     this.onInput = (type, g) => { if (type === 'down' && !this.nets && this.inMap(g)) this.mapBig = !this.mapBig; };
     if (opt.waitPower) await opt.waitPower();
@@ -1046,10 +1046,11 @@ export class Game {
     if (bn) {
       if (this.rhythmInn !== inn) { this.rhythmInn = inn; this.rhythm = 0; }
       const cp = this.cams.bat.project(d.atContact.x, d.atContact.y, d.atContact.z);
-      S.bnZone = cp ? { x: cp.x, y: cp.y, r: Math.max(46, Math.max(16, 0.22 * cp.k) * 2.4) } : null;
+      S.bnZone = cp ? { x: cp.x, y: cp.y, r: Math.max(56, Math.max(16, 0.22 * cp.k) * 3) } : null;   // (not drawn: reading where the ball will be is the skill)
       S.bnLive = null;
       this.batNewHud(true);
     } else this.batNewHud(false);
+    S.bnConf = bn ? rhythmFx(this.rhythm || 0).win : 1;   // (the ring is wider the more confident he is)
     S.delivery = d; S.ballT0 = this.gameTime; S.ring = { meteor: fx.meteor, perfectMs: w.perfect };
     S.readPre = false;
     if (fx.read && S.read === undefined) S.read = d.bounce ? { x: d.bounce.x, z: d.bounce.z, name: LENGTH_LABEL[lengthForBounce(d.bounce.z)] } : { none: true };
@@ -1080,7 +1081,7 @@ export class Game {
         swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, defend: tap, x0: g.x0, y0: g.y0 };
         S.batter.swingT0 = this.realTime;
         if (!tap) this.swingArc(this.myTeam, 'bat');
-        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.ax ?? g.dx, g.ay ?? g.dy, this.loftPx, bn ? null : this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
+        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.ax ?? g.dx, g.ay ?? g.dy, this.loftPx, this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
     if (this.bot) this.botBat(d, S, fx, rng);
@@ -1131,7 +1132,7 @@ export class Game {
       // ball, or swing without picking one, and the real one goes through you
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
-      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, bn ? null : this.shotLoft)) : null;
+      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
       res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * fx.match.power * bnPower * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
       if (aiPower === 'tornado' && myC !== 'brace' && grade === 'miss') res.outcome = 'bowled';
       if (fx.gap && swing && !swing.defend && res.outcome === 'hit') res = this.gapShot(res, grade, aiField, fx.counter === 'brace', rng);
@@ -3193,7 +3194,7 @@ export class Game {
       await this.sleepReal(this.bot ? 100 : 2300);
       for (let k = 0; k < N; k++) {
         const spec = script[(bi * N + k) % script.length];
-        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? (this.settings.batNew && !this.bot ? 'THUMB ON THE DOTTED CIRCLE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND') : undefined, extra: 25 });
+        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? (this.settings.batNew && !this.bot ? 'FINGER DOWN WHERE THE BALL WILL BE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND') : undefined, extra: 25 });
         if (!inn.cur.id) inn.setBatter(cand);   // (bowled in the nets: back to the crease)
         this.hud(inn);
         await this.sleepReal(this.bot ? 60 : 450);
@@ -3795,7 +3796,7 @@ export class Game {
     if (!on) { if (box) box.hidden = true; return; }
     if (!box) {
       box = document.createElement('div'); box.id = 'bnRhythm'; box.className = 'bn-rhythm';
-      box.innerHTML = '<b id="bnName">SETTLED</b><div class="bn-bar"><i></i><i></i><i></i></div>';
+      box.innerHTML = '<small>CONFIDENCE</small><b id="bnName">SHAKY</b><div class="bn-bar"><i></i><i></i><i></i></div>';
       document.getElementById('hud').append(box);
     }
     box.hidden = false; this.batNewPaint();
@@ -3824,7 +3825,7 @@ export class Game {
     const c = movingBall || d.atContact;
     const s = cam.project(c.x, c.y, c.z);
     if (!s) return;
-    const r0 = Math.max(16, 0.22 * s.k) * (S.bnLive ? Math.max(0.7, Math.min(1.3, S.bnLive.win)) : 1);
+    const r0 = Math.max(16, 0.22 * s.k) * (S.bnLive ? Math.max(0.7, Math.min(1.3, S.bnLive.win)) : 1) * (S.bnConf || 1);
     const left = d.tContact - t;
     if (left < -0.3) return;
     const r = r0 * (1 + Math.max(0, left) / 0.45);
@@ -3836,8 +3837,6 @@ export class Game {
     ctx.strokeStyle = S.ring.meteor ? '#ff7a1a' : near ? '#2ecc71' : '#fff4da';
     ctx.lineWidth = near ? 5 : 3;
     ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.stroke();
-    const z = S.bnZone;   // (Batting 2.0: where the finger should come down)
-    if (z) { ctx.setLineDash([9, 7]); ctx.strokeStyle = 'rgba(255, 228, 92, .8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     ctx.restore();
   }
 
