@@ -150,6 +150,7 @@ export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   // ground shadow
   softShadow(ctx, px, py, 0.55 * kPerM, 0.12 * kPerM, 0.28);
   if (opts.glow) { ctx.shadowColor = opts.glow; ctx.shadowBlur = 22; }
+  if (b.people?.left) { ctx.translate(px, 0); ctx.scale(-1, 1); ctx.translate(-px, 0); }   // (a left-hander: the drawing turned round)
   // the previous frame fades out underneath, which reads as motion blur on a fast swing
   if (prev && a < 1) drawOne(ctx, img, prev, px, py, k, (1 - a) * 0.6);
   drawOne(ctx, img, f, px, py, k, 1);

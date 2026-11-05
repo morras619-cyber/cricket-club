@@ -194,3 +194,21 @@ export function rhythmNext(v, grade) {
   const d = { perfect: 32, good: 18, early: -10, late: -10, edge: -50, miss: -50, leave: 0, defend: 0 }[grade] ?? 0;
   return bnClamp(v + d, 0, 100);
 }
+
+// ---------- left-handers: the same game in a mirror ----------
+// A left-hander is worked out exactly as a right-hander is, in a mirror: the ball's line, the shot and the result are flipped on the way in and flipped back on the way out,
+// so the off side is on the left of the screen for him and every rule (the line, the off-side edge, the through-the-gate check) holds as it does for a right-hander.
+export function mirrorDelivery(d) {
+  const m = Object.create(d);
+  m.xt = -d.xt;
+  if (d.atContact) m.atContact = { ...d.atContact, x: -d.atContact.x };
+  if (typeof d.pos === 'function') m.pos = t => { const p = d.pos(t); return p && { ...p, x: -p.x }; };
+  return m;
+}
+export function mirrorResult(res) {
+  if (!res) return res;
+  const out = { ...res };
+  if (typeof out.angle === 'number') out.angle = -out.angle;
+  if (out.offset) out.offset = { ...out.offset, x: -out.offset.x };
+  return out;
+}

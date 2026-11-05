@@ -6,7 +6,7 @@ import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
-import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES } from './shots.js';
+import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
@@ -48,6 +48,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 // the batter seen from behind is drawn this far (m) to the right of where he stands, so his body is half in line with the stumps (drawing only)
 const BAT_BACK_DX = 0.27;
+const batDx = b => (b?.people?.left ? -BAT_BACK_DX : BAT_BACK_DX);   // (a left-hander's drawing sits the other side of his stumps)
+const mirrorField = (list, on) => (on ? list.map(f => ({ ...f, x: -f.x })) : list);   // (his off side is the other side of the field)
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 // the game's pace while you field a catch / a run-out pick-up (the timing bar crosses at this pace; the
 // green stays as many ms of real time whatever it is)
@@ -956,11 +958,14 @@ export class Game {
     S.bowler.look = teamLook(this.oppTeam); S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.bowler.z = 20.6 + runUp(btype).m;   // (he waits where his run-up starts)
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler); // their own skin and hair on the drawn sprites
+    if (opt.assist || opt.hand) S.batter.people.left = false;   // (the tutorial's lessons are for a right-hander)
+    const left = !!S.batter.people.left;   // a left-hander: stands the other side, and every shot is worked out in a mirror (shots.js mirrorDelivery)
+    S.batter.x = left ? 0.5 : -0.5;
     const partner = this.nets ? null : this.nonStrikerOf(inn);   // (the nets: one batter)
     S.nonStriker = partner ? { team: this.myTeam, people: lookOf(partner) } : null;
     if (btype.left) S.bowler.x = -0.6;
     const rng = this.ballRng(ballNo);
-    const aiField = buildField(this.aiFieldPreset(ballNo), ballNo <= 12);
+    const aiField = mirrorField(buildField(this.aiFieldPreset(ballNo), ballNo <= 12), left);
     S.field3d = aiField.filter(f => !f.keeper && f.id !== 'bowler');
     spec = this.mindBowlPower(inn, ballNo, spec, striker, bowler, opt);   // (with a mind it may fire the power of its bowler's type now)
     if (spec.power === 'storm') this.aiStorm = 3;
@@ -1081,7 +1086,7 @@ export class Game {
         swing = { t: tg, dx: g.ax ?? g.dx, dy: g.ay ?? g.dy, defend: tap, x0: g.x0, y0: g.y0 };
         S.batter.swingT0 = this.realTime;
         if (!tap) this.swingArc(this.myTeam, 'bat');
-        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(g.ax ?? g.dx, g.ay ?? g.dy, this.loftPx, this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
+        S.batter.shot = { anim: tap ? 'block' : shotAnim(swipeToShot(left ? -(g.ax ?? g.dx) : (g.ax ?? g.dx), g.ay ?? g.dy, this.loftPx, this.shotLoft)), t0: this.realTime, from: S.batter.shot ? 'leave1' : 'backlift' };
       }
     };
     if (this.bot) this.botBat(d, S, fx, rng);
@@ -1111,7 +1116,7 @@ export class Game {
       bnPower = sz.power * zn.power * rf.power;
       bnInfo = { band: sz.band, near: zn.near, stage: rf.stage };
     }
-    let grade = swing ? gradeTiming(err, wUse, d.xt > 0.08) : 'leave';
+    let grade = swing ? gradeTiming(err, wUse, (left ? -d.xt : d.xt) > 0.08) : 'leave';
     if (swing && !swing.defend) { this.stats.swings++; if (grade === 'perfect' || grade === 'good') this.stats.swingGood++; }   // (what the AI learns your skill from)
     if (swing && fx.focus && grade === 'edge' && fx.counter !== 'brace') grade = 'late'; // focused: no edges
     if (swing && fx.match.edgeP && (grade === 'early' || grade === 'late') && rng.chance(fx.match.edgeP)) grade = 'edge';   // (an aggressive opener early on)
@@ -1132,8 +1137,9 @@ export class Game {
       // ball, or swing without picking one, and the real one goes through you
       res = { outcome: 'bowled', grade: 'miss', mayaFooled: true };
     } else {
-      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;
-      res = resolveContact({ grade, errMs: err ?? 0, shot, d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * fx.match.power * bnPower * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
+      const shot = swing ? (swing.defend ? { kind: 'defend', angle: 0, loft: false } : swipeToShot(left ? -swing.dx : swing.dx, swing.dy, this.loftPx, this.shotLoft)) : null;   // (a left-hander: the shot is worked out in the mirror)
+      res = resolveContact({ grade, errMs: err ?? 0, shot, d: left ? mirrorDelivery(d) : d, fx: { thunder: fx.thunder, mirror: fx.mirror, braced: fx.counter === 'brace', tornado: aiPower === 'tornado' && myC !== 'brace', shatter: aiPower === 'shatter', shatterHalf: myC === 'brace', pitch: this.feel() }, rng, strength: hitStrength(striker.bat) * fx.match.power * bnPower * (fx.showdown ? (this.showdownBrace ? 1.07 : 1.15) : 1) });
+      if (left) res = mirrorResult(res);   // (and back out of it)
       if (aiPower === 'tornado' && myC !== 'brace' && grade === 'miss') res.outcome = 'bowled';
       if (fx.gap && swing && !swing.defend && res.outcome === 'hit') res = this.gapShot(res, grade, aiField, fx.counter === 'brace', rng);
       // his Bouncer Barrage: a hit short of a Perfect (a braced one spares a Good) goes up in the air, a catch chance every time
@@ -1450,7 +1456,7 @@ export class Game {
   }
   // the bat's arc through the swing
   swingArc(team, kind) {
-    const set = this.fxSet(team), b = this.S.batter, p = set && this.cams[kind]?.project(b.x + (kind === 'bat' ? BAT_BACK_DX : 0), 0, b.z);
+    const set = this.fxSet(team), b = this.S.batter, p = set && this.cams[kind]?.project(b.x + (kind === 'bat' ? batDx(b) : 0), 0, b.z);
     if (!p) return;
     const front = kind === 'bowl'; // seen from the bowler's end the swing runs the other way
     this.fx.effect(set, 'arc', p.x + (front ? -0.2 : 0.35) * p.k, p.y - 0.75 * p.k, { w: 1.5 * p.k, dur: 280, grow: 1.05, flip: front, rot: front ? 0.3 : -0.2 });
@@ -1975,9 +1981,9 @@ export class Game {
     this.ui.fieldButton(false);
   }
 
-  currentField(ballNo) {
+  currentField(ballNo, left = false) {
     const pp = ballNo <= 12;
-    return this.bowlChoice.custom ? buildFieldFrom(this.bowlChoice.custom, pp) : buildField(this.bowlChoice.field, pp);
+    return this.bowlChoice.custom ? buildFieldFrom(this.bowlChoice.custom, pp) : mirrorField(buildField(this.bowlChoice.field, pp), left);   // (a preset field is for a right-hander: for a left-hander it is turned round; a field you set yourself is as you set it)
   }
 
   batterHead() {
@@ -1993,7 +1999,7 @@ export class Game {
     const S = this.S, cam = this.cams[this.view];
     if (!S || !cam) return null;
     let p = null;
-    if (role === 'batter') p = cam.project(S.batter.x + (this.view === 'bat' ? BAT_BACK_DX : 0), 1.72, S.batter.z);
+    if (role === 'batter') p = cam.project(S.batter.x + (this.view === 'bat' ? batDx(S.batter) : 0), 1.72, S.batter.z);
     else if (role === 'bowler' && this.view === 'bat') p = cam.project(S.bowler.x, 1.68, S.bowler.z);
     else if (role === 'keeper') p = cam.project(S.keeper.x, 1.3, S.keeper.z);
     return p && p.x > 14 && p.x < this.W - 14 && p.y > 14 && p.y < this.H - 14 ? { x: p.x, y: p.y } : null;
@@ -2029,7 +2035,7 @@ export class Game {
     this.view = 'bowl';
     this.timeScale = 1;
     const rng = this.ballRng(ballNo);
-    S.batter.look = teamLook(this.oppTeam); S.batter.team = this.oppTeam.id; S.batter.emblem = null; S.batter.x = -0.5;
+    S.batter.look = teamLook(this.oppTeam); S.batter.team = this.oppTeam.id; S.batter.emblem = null; S.batter.x = -0.5;   // (a left-hander: set below)
     if (!inn.curBowler) inn.setBowler(this.bowlerOf(inn));
     const bowler = this.bowlerOf(inn), striker = this.batterOf(inn), btype = bowlType(bowler.bowl);
     this.heatShow(inn);
@@ -2037,11 +2043,13 @@ export class Game {
     // right-arm over, a little wide of the stumps so the ball leaves his hand; left-armers from the other side
     S.bowler.runup = btype.runup; S.bowler.z = this.bowlRunZ(S); S.bowler.x = btype.left ? -1.05 : 1.05; S.bowler.left = !!btype.left; S.bowler.spin = !!btype.spin;
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler);
+    const leftBat = !!S.batter.people.left;   // (a left-hander at the other end: he stands the other side, and the AI plays him in the mirror)
+    S.batter.x = leftBat ? 0.5 : -0.5;
     S.keeper.look = teamLook(this.myTeam, 1);
     S.keeper.people = this.keeperPeople();
     const kind = bowler.bowl || 'swing';
     const profile = striker.ai;
-    let field = this.currentField(ballNo);
+    let field = this.currentField(ballNo, leftBat);
     S.field3d = field.filter(f => !f.keeper && f.id !== 'bowler');
     S.weak = this.scouted && !opt.scripted ? profile.weak : null;
     S.glowZone = opt.glow || null;
@@ -2097,7 +2105,7 @@ export class Game {
       G = await this.captureBowlGesture(S, kind, opt.scripted ? null : bowler);
       if (G !== 'field') break;
       await this.editField(ballNo);
-      field = this.currentField(ballNo);
+      field = this.currentField(ballNo, leftBat);
       S.field3d = field.filter(f => !f.keeper && f.id !== 'bowler');
       this.view = 'bowl';
       if (hint) this.ui.hint(hint);
@@ -2242,7 +2250,8 @@ export class Game {
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * (pf.ai / pf.bat) ** 1.5 * aiHome };   // (raised: the pitch has to be felt)
     const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
-    let ai = aiBat(d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    let ai = aiBat(leftBat ? mirrorDelivery(d) : d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    if (leftBat) ai = { ...ai, shot: ai.shot && { ...ai.shot, angle: -(ai.shot.angle ?? 0) }, res: mirrorResult(ai.res) };   // (out of the mirror)
     // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
     if (fxFlags.bouncer && ai.res.outcome === 'hit' && ai.res.grade !== 'defend' && !(ai.grade === 'perfect' || (fxFlags.bouncerBrace && ai.grade === 'good'))) {
       ai.res = { ...ai.res, loft: true, launchDeg: 55 + rng.range(0, 12), v: Math.min(ai.res.v || 20, 20), forced: { chance: true }, label: 'SKIED!' };
@@ -2254,7 +2263,7 @@ export class Game {
 
     await this.until(() => this.gameTime - S.ballT0 >= d.tContact);
     if (ai.res.outcome !== 'leave') { S.batter.swingT0 = this.realTime; if (ai.res.outcome !== 'defend') this.swingArc(this.oppTeam, 'bowl'); }
-    S.batter.shot = { anim: ai.res.outcome === 'leave' ? 'leave' : shotAnim({ kind: 'drive', angle: ai.res.angle ?? 0 }), t0: this.realTime, from: 'ready' };
+    S.batter.shot = { anim: ai.res.outcome === 'leave' ? 'leave' : shotAnim({ kind: 'drive', angle: (leftBat ? -1 : 1) * (ai.res.angle ?? 0) }), t0: this.realTime, from: 'ready' };
     const res = ai.res;
     const contact = d.pos(d.tContact);
     const cs = this.cams.bowl.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 3 };
@@ -3592,13 +3601,13 @@ export class Game {
     if (b.anim === 'celebrate' && !batterBack) push(b.z, () => drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.celebrate(), { back: batterBack, emblem: b.emblem, helmet: true }));
     else push(b.z, () => {
       // seen from behind, the batter is the hand-drawn sprite; from the front (bowling view) the drawn figure
-      const p = batterBack && cam.project(b.x + BAT_BACK_DX, 0, b.z);
+      const p = batterBack && cam.project(b.x + batDx(b), 0, b.z);
       const aura = p && kind === 'bat' && (this.armed.thunder || b.glow === '#5fc8ff') && this.fxSet(this.myTeam);
       if (aura) this.thunderAura(ctx, aura, p, 'back');
       if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) { if (aura) this.thunderAura(ctx, aura, p, 'front'); return; }
       // from the bowling camera, the opposing batter's hand-drawn front view
       const q = !batterBack && cam.project(b.x, 0, b.z);
-      if (q && drawBowlSprite(ctx, q.x, q.y, q.k, batFrame(b, this.realTime).f, this.oppTeam, false, 'batfront', b.people)) return;
+      if (q && drawBowlSprite(ctx, q.x, q.y, q.k, batFrame(b, this.realTime).f, this.oppTeam, !!b.people?.left, 'batfront', b.people)) return;
       drawFigure3D(ctx, cam, b.x, b.z, b.look || AI_LOOK, POSES.bat(angle), { back: batterBack, flip: !batterBack, emblem: b.emblem, batGlow: b.glow, helmet: true });
     });
     // keeper

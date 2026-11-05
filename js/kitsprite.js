@@ -568,14 +568,16 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
   // the painted sheet draws every pose (the old sheet only when ?painted=0); until it is built nothing
   // is drawn from the old art, which was a different height and shade and popped in as a lighter, shorter man
   const pm = KIT_SHEETS['bat-paint'], usePaint = pm && !painted.off;
-  const sheet = playerSheet(usePaint ? 'bat-paint' : 'bat-back', team, look, false);
+  const lefty = !!look.left;   // (a left-hander: the whole sheet mirrored, the print drawn after so it reads right)
+  const sheet = playerSheet(usePaint ? 'bat-paint' : 'bat-back', team, look, lefty);
   if (!sheet) return false;
   const [bh, bw] = buildOf(look), meta = KIT_SHEETS[usePaint ? 'bat-paint' : 'bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
   const one = (name, alpha) => {
     ctx.globalAlpha = alpha;
     // (getting bowled has no painted pose yet: the defensive one stands in)
     const fi = usePaint ? pm.names[pm.names[name] != null ? name : PAINT_STAND_IN[name] ?? 'def1'] : POSE_BAT[name] ?? POSE_BAT[OLD_STAND_IN[name]] ?? 0;
-    const [sx, sy, w, h, ax, ay] = meta.frames[fi];
+    let [sx, sy, w, h, ax, ay] = meta.frames[fi];
+    if (lefty) { sx = sheet.width - sx - w; ax = w - ax; }
     ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   };
   ctx.save();
