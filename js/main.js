@@ -1661,7 +1661,10 @@ function buildBlock(c, id, after) {
   }
   if (lv >= PC.MAX_LEVEL) { out.push(el('p', 'sheetnote', `The best ${BUILD_NAME[id].toLowerCase()} there is.`)); return out; }
   const to = lv + 1, cost = PC.costOf(id, to), why = PC.whyNot(c, id, buildCtx(c));
-  const r = el('div', 'mf-row'); r.append(ico('upgrade'), el('span', '', `Level ${to}${PC.lookOf(to) > PC.lookOf(lv) ? ' (a new look)' : ''} · ${money(cost)} · ${PC.hoursOf(to)} h to build`));
+  // the next level as a panel of its own: the level, what it costs and how long it takes, as chips (not a line of text)
+  const r = el('div', 'lvl-next'), chip = (icon, text, cls = '') => { const c = el('span', `lvl-chip ${cls}`.trim()); c.append(ico(icon), el('b', '', text)); return c; };
+  r.append(el('small', '', 'NEXT LEVEL'), el('b', 'lvl-to', `Level ${to}`), chip('coin', money(cost), c.money < cost ? 'short' : ''), chip('clock', `${PC.hoursOf(to)} h`));
+  if (PC.lookOf(to) > PC.lookOf(lv)) r.append(chip('star', 'New look', 'look'));
   const btn = mfBtn('mf-big', [ico('upgrade', 'big'), el('span', '', `Build level ${to}`)], () => { const res = PC.startBuild(c, id, buildCtx(c)); if (!res.ok) { ui.toast(res.why); return; } sfx.hammer(); saveProfile(profile); after(); });
   btn.disabled = !!why || c.money < cost;
   out.push(r, btn);

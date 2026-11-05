@@ -2113,3 +2113,15 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .auc-stage { background: linear-gradient(180deg, rgba(4, 8, 34, .6), rgba(4, 8, 34, .82)); border-radius: 22px; padding: 8px 8px 8px; }
 .auc-report > div, .auc-facts > div, .auc-rivals { background: rgba(5, 9, 40, .78); }
 @media (max-height: 700px) { .set-grid.tools { gap: 5px; } .set-grid.tools .mf-big { min-height: 34px; font-size: 11px; border-width: 10px; border-image-width: 10px; } }
+/* a building's level screen as tiles and chips, not a list of lines */
+.mf-card.col > .mf-sheet-head { gap: 8px; } .mf-card.col > .mf-sheet-head b { font-size: 21px; } .mf-card.col > .mf-sheet-head .ico { width: 34px; height: 34px; }
+.mf-card.col > .mf-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: rgba(255, 255, 255, .07); border: 1.5px solid rgba(255, 255, 255, .14); font: 800 14px/1.15 var(--body); }
+.mf-card.col > .mf-row > .ico { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background-color: transparent; box-shadow: 0 0 0 2px #070b24; }
+.mf-card.col > .mf-row > span:not(.ico) { min-width: 0; } .mf-card.col > .mf-row .mf-pips { margin-left: auto; }
+.lvl-next { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 9px 10px; border-radius: 16px; background: linear-gradient(180deg, rgba(255, 210, 63, .18), rgba(255, 210, 63, .05)); border: 2px solid rgba(255, 210, 63, .6); }
+.lvl-next > small { flex: 1 1 100%; font: 800 10px/1 var(--body); letter-spacing: 1.2px; color: #ffe45c; }
+.lvl-to { font: 400 26px/1 var(--display); letter-spacing: .5px; margin-right: auto; color: #fff; }
+.lvl-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 6px; border-radius: 99px; background: rgba(5, 9, 40, .75); border: 1.5px solid rgba(255, 255, 255, .25); } .lvl-chip .ico { width: 20px; height: 20px; } .lvl-chip b { font: 800 14px/1 var(--body); }
+.lvl-chip.short { border-color: #ff6b6b; } .lvl-chip.short b { color: #ff9a9a; } .lvl-chip.look { border-color: #ffd23f; } .lvl-chip.look b { color: #ffe45c; }
+.mf-card.col .mf-pips .ico:not(.on) { opacity: .45; filter: grayscale(1) brightness(1.8); } .mf-card.col .mf-pips .ico.on { filter: none; }
+.mf-card.col > .mf-sheet-head b { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
