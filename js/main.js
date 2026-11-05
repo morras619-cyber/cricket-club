@@ -12,7 +12,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, CANDIDATES, HIRE_AT, FLAGS, candidatesOf, candidateById, wageText, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, CANDIDATES, absorbTraining, canGrow, PXP, xpCost, HIRE_AT, FLAGS, candidatesOf, candidateById, wageText, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
 import * as MD from './stamina.js';
@@ -1893,6 +1893,7 @@ function trainTick(c) {
   buildTick(c);
   if (!c.training || clock.state === 'none' || clock.state === 'offline') return null;
   const r = TG.tick(c.training, trainCtx(c));
+  absorbTraining(c);                       // (the coaches' points are the players' XP as they come)
   saveProfile(profile);
   return r;
 }
@@ -1924,7 +1925,7 @@ async function runDrill(c, pid) {
   const r = sum?.trial?.bats?.[pid];
   await syncClock();
   const res = r ? TG.finishDrill(t, pid, r, serverNow(), trainCtx(c)) : null;
-  if (res?.ok) PC.addXp(c, PC.XP.DRILL);
+  if (res?.ok) { PC.addXp(c, PC.XP.DRILL); absorbTraining(c); }
   saveProfile(profile);
   await renderTraining();
   if (res?.ok) { trainSheet = { type: 'drilled', pid, runs: r.runs, pts: res.pts }; paintTraining(c); }
@@ -1965,22 +1966,22 @@ function paintTraining(c) {
         card.addEventListener('click', () => { trainSheet = { type: 'pick', index: i }; sfx.click(); paintTraining(c); });
         grid.append(card); return;
       }
-      const cost = TG.tpCost(info.ovr, info.age), tp = t.tp[pid] || 0, learn = TG.canLearn(info), coach = who.get(pid);
-      const card = playerTile(p, club, { ovr: info.ovr, pot: info.pot, bar: tp / cost * 100, tone: 'green', chips: learn && !coach ? [{ t: 'NEEDS COACH', tone: 'amber' }] : !learn ? [{ t: 'MAXED', tone: 'blue' }] : [{ t: 'TRAINING', tone: 'green' }], onClick: () => { trainSheet = { type: 'slot', index: i }; sfx.click(); paintTraining(c); } });
+      const learn = TG.canLearn(info), coach = who.get(pid);
+      const card = playerTile(p, club, { ovr: info.ovr, sub: learn ? `XP ${Math.round(info.xp)} / ${info.cost}` : (info.age >= TG.TRAIN.PEAK_AGE ? 'Prime years over' : 'At his best'), bar: learn ? info.xp / info.cost * 100 : 100, tone: 'green', chips: !learn ? [{ t: 'MAXED', tone: 'blue' }] : info.capped ? [{ t: 'NEXT SEASON', tone: 'blue' }] : !coach ? [{ t: 'NEEDS COACH', tone: 'amber' }] : [{ t: 'TRAINING', tone: 'green' }], onClick: () => { trainSheet = { type: 'slot', index: i }; sfx.click(); paintTraining(c); } });
       grid.append(card);
     });
     body.append(grid);
-    body.append(hint('clock', `Each point of rating takes about ${durfmt(TG.tpCost(60, 20) / TG.TRAIN.TP_HOUR * 3600000)} of coaching for a young player, more for a better or older one. At most ${L.cap} a season.`));
+    body.append(hint('clock', `Every player has an XP bar: a full bar is one rating point. Coaches, net drills, good innings, wickets and wins all fill it. The better and older he is, the more a point costs. A player gains at most ${PXP.SEASON_CAP} points a season: a full bar waits for the next one.`));
   } else if (trainTab === 'nets') {
-    const list = [...roster].filter(([, p]) => TG.canLearn(p)).sort((a, b) => (b[1].pot - b[1].ovr) - (a[1].pot - a[1].ovr)).slice(0, 8);
+    const list = [...roster].filter(([, p]) => TG.canLearn(p)).sort((a, b) => (b[1].cost - b[1].xp) - (a[1].cost - a[1].xp) || (b[1].pot - b[1].ovr) - (a[1].pot - a[1].ovr)).slice(0, 8);
     if (!list.some(([pid]) => pid === netPick)) netPick = list[0]?.[0] || null;
     const hero = el('div', 'nets-hero'), balls = el('div', 'nets-balls');
     for (let i = 0; i < TG.TRAIN.DRILLS_DAY; i++) balls.append(ico('ball', i < left ? 'on' : ''));
     hero.append(el('b', '', 'Net session'), balls);
-    body.append(hero, hint('ball', `Face ${TG.TRAIN.DRILL_BALLS} balls in the nets yourself: a good drill earns the player up to ${TG.TRAIN.DRILL_MAX} training points.`));
+    body.append(hero, hint('ball', `Face ${TG.TRAIN.DRILL_BALLS} balls in the nets yourself: a good drill earns the player up to ${TG.TRAIN.DRILL_MAX} XP.`));
     if (list.length) {
       const row = el('div', 'ptile-row');
-      for (const [pid, p] of list) row.append(playerTile(c.players[pid], club, { ovr: p.ovr, pot: p.pot, selected: pid === netPick, onClick: () => { netPick = pid; sfx.click(); paintTraining(c); } }));
+      for (const [pid, p] of list) row.append(playerTile(c.players[pid], club, { ovr: p.ovr, sub: `XP ${Math.round(p.xp)} / ${p.cost}`, bar: p.xp / p.cost * 100, tone: 'green', selected: pid === netPick, onClick: () => { netPick = pid; sfx.click(); paintTraining(c); } }));
       body.append(row);
       const who = c.players[netPick], go = el('button', 'cta nets-go'), txt = el('span', 'cta-txt'), orb = el('span', 'cta-orb');
       orb.append(ico('ball')); txt.append(el('b', '', 'Pad up'), el('small', '', `${lastName(who.name)} · ${left} left`));
@@ -2042,13 +2043,13 @@ function paintTraining(c) {
     else if (left < 1) card.append(el('p', 'sheetnote', 'The nets are closed for today. They open again at midnight (UTC).'));
   } else if (trainSheet.type === 'drilled') {
     const d = trainSheet, hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(c.players[d.pid], 96), true), el('b', '', `${d.runs} off ${TG.TRAIN.DRILL_BALLS}`), close);
-    const r = el('div', 'mf-row'); r.append(ico('up'), el('span', '', `+${d.pts} training points for ${lastName(c.players[d.pid].name)}`));
+    const r = el('div', 'mf-row'); r.append(ico('up'), el('span', '', `+${d.pts} XP for ${lastName(c.players[d.pid].name)}`));
     card.append(hd, r);
   } else if (trainSheet.type === 'slot') {
     const pid = t.slots[trainSheet.index], info = roster.get(pid), p = c.players[pid];
     if (!info) { trainSheet = null; sh.hidden = true; return; }
     const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(p, 96), true), el('b', '', info.name), close);
-    const r = el('div', 'mf-row'); r.append(el('span', '', `${info.ovr}`), ico('up'), el('span', '', `potential ${info.pot}`), ico('clock'), el('span', '', `${Math.round(t.tp[pid] || 0)} / ${TG.tpCost(info.ovr, info.age)} points to the next`));
+    const r = el('div', 'mf-row'); r.append(el('span', '', `${info.ovr}`), ico('up'), el('span', '', `potential ${info.pot}`), ico('clock'), el('span', '', `XP ${Math.round(info.xp)} / ${info.cost} to the next point`));
     card.append(hd, r, mfBtn('mf-big red', [ico('cross'), el('span', '', 'Take out of training')], () => done(TG.release(t, trainSheet.index), true)));
   } else if (trainSheet.type === 'hire') {
     const hd = el('div', 'mf-sheet-head'); hd.append(ico('star'), el('b', '', 'Choose a coach'), close);
@@ -3409,7 +3410,7 @@ function careerSquad(c, body) {
     const r = el('div', 'futcell');
     const s = p.stats.season;
     r.append(futCard(p, { size: 112 }),
-      el('div', 'futnote', `${p.contract} season${p.contract === 1 ? '' : 's'} left · this season ${s.runs}r ${s.wkts}w · form ${'▮'.repeat(p.form || 0)}${'▯'.repeat(4 - (p.form || 0))}`));
+      el('div', 'futnote', `${p.contract} season${p.contract === 1 ? '' : 's'} left · this season ${s.runs}r ${s.wkts}w · ${canGrow(p) ? `XP ${Math.round(p.xp || 0)} / ${xpCost(ovr(p), p.age)}` : 'at his best'}`));
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
       confirmTap(rel, 'Tap again to release', () => {

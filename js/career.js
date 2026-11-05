@@ -18,7 +18,7 @@ import { ensureChirp, afterMatchPopularity, seasonPopularity, storyOf, sponsorBo
 import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
 import { memOf } from './chirpfacts.js';
 import { fameAfter, startFame } from './merch.js';
-import { seasonGain } from './training.js';
+import { drainTp } from './training.js';
 import { tierOf, pickTier, POT_RANGE, ACAD } from './academy.js';
 import { freshMedical, medAfterMatch, fitOf } from './stamina.js';
 import { addXp, XP, levelRow, lookOf, buildOf, addDiamonds } from './pacing.js';
@@ -268,6 +268,17 @@ export function migrateCareer(c) {
     if (p.age <= 22) p.pot = Math.max(pot, Math.min(95, main + 8));
     else if (p.age >= 28) p.pot = Math.min(pot, Math.max(main, main + 2));
     c.lookAges[p.id] = a;
+  }
+  // careers from before XP: the form points (4 made a rating point) and the training ground's points become each player's XP, so nobody loses progress
+  if (!c.xpv) {
+    for (const p of Object.values(c.players)) {
+      if (p.retired) continue;
+      const cost = xpCost(ovr(p), p.age);
+      p.xp = Math.min(cost - 1, Math.round(((p.form || 0) / 4) * cost));
+      p.xpSeason = 0; delete p.form;
+    }
+    if (c.training) for (const [pid, tp] of Object.entries(c.training.tp || {})) { const p = c.players[pid]; if (p && canGrow(p)) p.xp = Math.min(xpCost(ovr(p), p.age) - 1, (p.xp || 0) + Math.round(tp)); drainTp(c.training, pid); }
+    c.xpv = 1;
   }
   if (c.club && c.divisions) ensureChirp(c);   // careers from before Chirp get a feed
   if (c.club && !c.rivals && c.divisions) refreshRivals(c);   // careers from before the rivals get them
@@ -761,7 +772,7 @@ function simInnings(c, batId, bowlId, rng, target = null, favour = null) {
 function commitInnings(c, { bat, bowl, L }) {
   for (const [id, s] of bat) recordBat(c, id, s);
   for (const [id, f] of bowl) recordBowl(c, id, f);
-  for (const p of [...L.order, ...L.attack]) if (p) formFrom(c, c.players[p.id], bat.get(p.id), bowl.get(p.id));
+  for (const id of new Set([...L.order, ...L.attack].filter(Boolean).map(p => p.id))) addPlayerXp(c, c.players[id], matchXp(bat.get(id), bowl.get(id)));
 }
 
 // ---------- stats that never go away ----------
@@ -790,16 +801,55 @@ function recordBowl(c, id, f) {
 }
 function pushTop(list, item, cmp) { list.push(item); list.sort(cmp); list.length = Math.min(list.length, 10); }
 
-// ---------- growing ----------
-// Good games build form; every 4 points of form is a rating point, up to his potential,
-// and only until he turns 33.
-function formFrom(c, p, s, f) {
-  if (!p) return;
-  let pts = 0;
-  if (s) pts += s.runs >= 30 ? 2 : s.runs >= 15 ? 1 : 0;
-  if (f && f.balls) pts += (f.wkts >= 2 ? 2 : f.wkts >= 1 ? 1 : 0) + (f.balls >= 6 && f.runs / f.balls < 1 ? 1 : 0);
-  p.form = (p.form || 0) + pts;
-  while (p.form >= 4) { p.form -= 4; grow(c, p, 1); }
+// ---------- growing: every player has XP, and a full bar is one rating point ----------
+// XP comes from training (a coach's hours, the net drills), from his matches (playing, a good innings, wickets, a win, man of the match) and, for the
+// young, from a bonus at the end of each season. The next point costs more the better he is and the older he is. A player gains at most SEASON_CAP points
+// from XP in a season (a full bar waits for the next one), and none past his potential or after 33. His XP is p.xp (towards the next point) and
+// p.xpSeason (the points he has gained this season).
+export const PXP = {
+  BASE: 90, PER: 11, AGE: [1, 1.35, 1.8],              // the next point costs (BASE + PER x (rating - 50)) x the age's factor (23 and under, 24 to 28, older)
+  SEASON_CAP: 3,
+  APPEAR: 8, WIN: 6, MOTM: 30,                          // XP for playing, for a win, and for the man of the match
+  RUNS: [[50, 60], [30, 35], [15, 15]],                 // runs -> XP (the highest row he reaches)
+  WKT: 18, ECON: 10,                                    // a wicket, and bowling an economical spell
+  YOUTH: [[23, 120, 300], [28, 40, 120], [32, 0, 60]],  // the end-of-season bonus: [up to this age, least, most]
+};
+export const xpCost = (ovrNow, age) => Math.round((PXP.BASE + PXP.PER * Math.max(0, ovrNow - 50)) * PXP.AGE[age <= 23 ? 0 : age <= 28 ? 1 : 2]);
+const lastNameOf = p => (p.short || p.name.split(' ').slice(-1)[0]);
+export const canGrow = p => !!p && p.age < PEAK_AGE && ovr(p) < p.pot;
+// give a player XP: returns the rating points it earned. cap: false for the academy, whose prospects grow on their own timetable
+export function addPlayerXp(c, p, n, { cap = true } = {}) {
+  if (!p || !(n > 0) || !canGrow(p)) return 0;
+  p.xp = (p.xp || 0) + n;
+  return settleXp(c, p, cap);
+}
+// turn a full bar into rating points (as many as the season's cap allows); a full bar that is capped waits at full
+export function settleXp(c, p, cap = true) {
+  let gained = 0;
+  while (canGrow(p) && (!cap || (p.xpSeason || 0) < PXP.SEASON_CAP)) {
+    const cost = xpCost(ovr(p), p.age);
+    if ((p.xp || 0) < cost) break;
+    const g = grow(c, p, 1);
+    if (!g) break;
+    p.xp -= cost; p.xpSeason = (p.xpSeason || 0) + 1; gained += g;
+  }
+  if (!canGrow(p)) p.xp = 0;                                                      // (at his potential, or too old: nothing to fill)
+  else p.xp = Math.min(p.xp || 0, xpCost(ovr(p), p.age));                          // (a capped, full bar waits: it does not pile up)
+  return gained;
+}
+// the XP a player earned in a match: s his batting, f his bowling (both optional), won whether his side won
+export function matchXp(s, f, won = false) {
+  let xp = PXP.APPEAR;
+  if (s) xp += (PXP.RUNS.find(([runs]) => s.runs >= runs) || [0, 0])[1];
+  if (f && f.balls) xp += f.wkts * PXP.WKT + (f.balls >= 6 && f.runs / f.balls < 1 ? PXP.ECON : 0);
+  return xp + (won ? PXP.WIN : 0);
+}
+// the training ground's points (its sealed bank, training.js) become the players' XP
+export function absorbTraining(c) {
+  const t = c.training; if (!t) return 0;
+  let got = 0;
+  for (const pid of Object.keys(t.tp || {})) { const n = drainTp(t, pid); if (n > 0) { addPlayerXp(c, c.players[pid], n); got += n; } }
+  return got;
 }
 export function grow(c, p, n) {
   if (p.age >= PEAK_AGE || n <= 0) return 0;
@@ -828,9 +878,19 @@ export function recordPlayerMatch(c, summary) {
     for (const f of inn.bowlingCard()) bowl.set(f.id, { balls: f.balls, runs: f.runs, wkts: f.wkts });
     for (const [id, s] of bat) { recordBat(c, id, s); perf.set(id, { ...perf.get(id), bat: s }); }
     for (const [id, f] of bowl) { recordBowl(c, id, f); perf.set(id, { ...perf.get(id), bowl: f }); }
-    for (const id of new Set([...bat.keys(), ...bowl.keys()])) formFrom(c, c.players[id], bat.get(id), bowl.get(id));
     ids.push(...bat.keys(), ...bowl.keys());
   }
+  // XP: every player who took part earns it once (his batting and bowling together); the winners a little more; and the best of my side in a win is the man of the match
+  const out = summary.result.outcome, mineWon = out === 'win', gainedXp = new Map();
+  let motm = null, motmScore = 0;
+  for (const [id, x] of perf) {
+    const p = c.players[id]; if (!p) continue;
+    const mine = p.team === c.club, won = mine ? mineWon : out === 'loss';
+    if (mine && mineWon) { const sc = (x.bat?.runs || 0) + 25 * (x.bowl?.wkts || 0); if (sc > motmScore && sc >= 20) { motmScore = sc; motm = id; } }
+    gainedXp.set(id, matchXp(x.bat, x.bowl, won));
+  }
+  if (motm) gainedXp.set(motm, gainedXp.get(motm) + PXP.MOTM);
+  for (const [id, n] of gainedXp) addPlayerXp(c, c.players[id], n);
   played(c, ids);
   chemAfterMatch(c, ids);
   gearAfterMatch(c, ids);
@@ -847,7 +907,11 @@ export function recordPlayerMatch(c, summary) {
   for (const p of clubPlayers(c, c.club)) p.fame = fameAfter(fameOf(p), perf.get(p.id), summary.result.outcome === 'win');   // the fans' love, for the jerseys (js/merch.js)
   if (summary.result.outcome === 'win') { const wb = round2(WIN_BONUS * (DIV_MONEY[divisionOf(c, c.club)] ?? 1)); c.money = round2(c.money + wb); book(c, 'in', 'wins', wb); }   // (the lower the division, the smaller the bonus: as with the prizes)
   const ups = clubPlayers(c, c.club).filter(p => ovr(p) > (before.get(p.id) ?? 99)).map(p => `⬆ ${p.name} ${before.get(p.id)} → ${ovr(p)}`);
-  return [...ups, ...c.news.slice(newsAt), ...dealNotes];
+  const xpNotes = [];
+  if (motm) xpNotes.push(`🏅 Man of the match: ${c.players[motm].name} (+${gainedXp.get(motm)} XP)`);
+  const top = [...gainedXp].filter(([id, n]) => c.players[id]?.team === c.club && id !== motm && n >= 30 && canGrow(c.players[id])).sort((x, y) => y[1] - x[1]).slice(0, 3);
+  if (top.length) xpNotes.push(`✨ XP: ${top.map(([id, n]) => `${lastNameOf(c.players[id])} +${n}`).join(' · ')}`);
+  return [...xpNotes, ...ups, ...c.news.slice(newsAt), ...dealNotes];
 }
 // ---------- the club office: the books, the sponsors, the board ----------
 // The books: every $M that comes in or goes out of the club is written down by season (office.led[season] = { in: {...}, out: {...} }).
@@ -1379,7 +1443,7 @@ export function academySeason(c, rng) {
     if (!p) continue;
     const mentor = c.players[a.mentors[id]];
     const mentored = mentor && mentor.team === c.club && !mentor.retired && mentor.age >= ACAD.MENTOR_AGE;
-    grow(c, p, rng.int(ACAD.GROW[0], ACAD.GROW[1]) + (mentored ? ACAD.MENTOR_GROW : 0));
+    addPlayerXp(c, p, (rng.int(ACAD.GROW[0], ACAD.GROW[1]) + (mentored ? ACAD.MENTOR_GROW : 0)) * xpCost(ovr(p), p.age), { cap: false });   // (a prospect's year of growth, as XP: it fills his bar and carries over)
   }
 }
 export const prospectsOf = c => (c.academy?.prospects || []).map(id => c.players[id]).filter(Boolean);
@@ -1429,7 +1493,7 @@ function coachKinds(p) {
   if (p.role === 'bowl' || p.role === 'all') k.push(bowlType(p.bowl).spin ? 'spin' : 'pace');
   return k;
 }
-export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { name: p.name, ovr: ovr(p), age: p.age, pot: p.pot, kinds: coachKinds(p) }]));
+export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { name: p.name, ovr: ovr(p), age: p.age, pot: p.pot, kinds: coachKinds(p), xp: p.xp || 0, cost: xpCost(ovr(p), p.age), capped: (p.xpSeason || 0) >= PXP.SEASON_CAP }]));
 
 // ---------- the merchandise factory's view of the club (js/merch.js) ----------
 export const fameOf = p => p.fame ?? startFame(ovr(p));
@@ -1584,17 +1648,18 @@ export function afterPlayoff(c, summary) {
 export function nextSeason(c) {
   const rng = makeRng(hashStr(`${c.seed}-off-${c.season}`));
   c.news = [...(c.moveNews || [])]; c.moveNews = null;
+  for (const p of Object.values(c.players)) p.xpSeason = 0;                         // (the season turns over first: everything below counts towards the new season's cap, once)
+  absorbTraining(c);                                                                  // (the training ground's points count before the season's XP is settled)
   for (const p of Object.values(c.players)) {
     if (p.retired) continue;
     p.age++;
-    if (p.age < PEAK_AGE) grow(c, p, p.age <= 23 ? rng.int(1, 4) : p.age <= 28 ? rng.int(0, 2) : rng.int(0, 1));
-    else if (p.age >= 34 && !p.heroId) for (const k of primary(p)) p[k] = Math.max(30, p[k] - rng.int(0, 2));
+    delete p.form;
     const mine = p.team === c.club;
-    // the training ground: the points his coach earned him this season become rating (on top of the natural growth, up to his potential)
-    if (mine && c.training) {
-      const n = seasonGain(c.training, p.id, { ovr: ovr(p), age: p.age, pot: p.pot });
-      if (n && grow(c, p, n)) c.news.push(`💪 ${p.name} trained hard: +${n} rating`);
-    }
+    let gained = 0;
+    if (p.age < PEAK_AGE) { const [, lo, hi] = PXP.YOUTH.find(([maxAge]) => p.age <= maxAge) || [0, 0, 0]; gained += addPlayerXp(c, p, rng.int(lo, hi)); }   // (the young grow into the game: a bonus of XP, not a free rating point)
+    else if (p.age >= 34 && !p.heroId) for (const k of primary(p)) p[k] = Math.max(30, p[k] - rng.int(0, 2));
+    gained += settleXp(c, p);                                                          // (a full bar that waited out last season's cap)
+    if (mine && gained) c.news.push(`💪 ${p.name} grew: +${gained} rating`);
     if (!p.heroId && p.age >= 36 && rng.chance(0.35 + (p.age - 36) * 0.3)) {
       if (mine) chirpLeft(c, p, 'retired');
       p.retired = true; p.team = null; p.retiredIn = c.season;
@@ -1602,7 +1667,6 @@ export function nextSeason(c) {
       continue;
     }
     if (p.team && --p.contract <= 0) { if (mine) chirpLeft(c, p, 'contractEnd'); p.team = null; p.contract = 0; }
-    p.form = 0;
   }
   academySeason(c, rng);
   const kids = youthIntake(c, rng, 7);

@@ -102,7 +102,11 @@ function step(t, ctx, who, s) {
   for (const [pid, coach] of who) t.tp[pid] = (t.tp[pid] || 0) + (TRAIN.TP_HOUR * speedOf(coach) / HOUR) * s;
 }
 
+// the points a player has earned are handed over (to his XP, career.js absorbTraining): the bank is emptied for him and the books are sealed again
+export function drainTp(t, pid) { const n = t.tp[pid] || 0; delete t.tp[pid]; seal(t); return n; }
+
 // ---------- the end of a season: points become rating ----------
+// (the career no longer uses this: the points become XP as they come, career.js absorbTraining; it stays for its tests)
 // p: { ovr, age, pot } as he is now; returns the rating points he gains (the caller applies them). The points left over carry on.
 export function seasonGain(t, pid, p) {
   let tp = t.tp[pid] || 0, n = 0;

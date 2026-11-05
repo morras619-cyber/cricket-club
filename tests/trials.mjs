@@ -128,8 +128,8 @@ await page.evaluate(() => document.querySelectorAll('#trainBody .ptile')[1]?.cli
 check(await page.evaluate(() => { const t = document.querySelectorAll('#trainBody .ptile'), b = document.querySelector('#trainBody .nets-go'); return t[1]?.classList.contains('sel') && !!b && !b.disabled && /Pad up/.test(b.textContent); }), 'a tapped player is lifted and the big Pad up button names him');
 await page.evaluate(() => document.querySelector('#trainBody .nets-go').click());
 await page.waitForFunction(() => !document.getElementById('training').hidden, null, { timeout: 90000 }).catch(() => {}); await page.waitForTimeout(1500);
-check(await page.evaluate(() => { const t = window.__sixcharge.profile.career.training; return Object.values(t.tp).some(v => v >= 10) && t.drills.n === 1; }), 'the drill gave the player training points and used one of the three');
-check(await page.evaluate(() => /training points for/.test(document.getElementById('trainSheet').textContent)), 'the result sheet says what the player earned');
+check(await page.evaluate(() => { const c = window.__sixcharge.profile.career, t = c.training; return Object.values(c.players).some(p => (p.xp || 0) >= 10 || (p.xpSeason || 0) > 0) && Object.values(t.tp).every(v => v === 0 || v === undefined) && t.drills.n === 1; }), 'the drill gave the player XP (the training bank is empty: it was handed over) and used one of the three');
+check(await page.evaluate(() => /XP for/.test(document.getElementById('trainSheet').textContent)), 'the result sheet says what XP the player earned');
 await page.evaluate(() => document.querySelector('#trainSheet .mf-x').click()); await page.waitForTimeout(300);
 await page.evaluate(async () => { const T = await import('/js/training.js'); const t = window.__sixcharge.profile.career.training; t.drills = { day: T.drillDay(Date.now()), n: 3 }; t.drills.seal = undefined; });
 check(await page.evaluate(async () => { const T = await import('/js/training.js'); return T.drillsLeft(window.__sixcharge.profile.career.training, Date.now()) === 0; }), 'a count edited by hand closes the nets');
