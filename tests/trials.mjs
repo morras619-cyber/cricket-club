@@ -305,8 +305,8 @@ await page.evaluate(() => document.querySelector('#shopBody .item-tile').click()
 await page.evaluate(() => document.querySelector('#shopSheet .mf-grid .mf-card').click()); await page.waitForTimeout(400);
 check(await page.evaluate(() => !!window.__sixcharge.demo.shop.gear[0].on && document.querySelectorAll('#shopBody .item-tile .mf-frame canvas').length === 1), 'the gear is given to a player, whose portrait shows on it');
 await shopTab('Style');
-check(await page.evaluate(() => document.querySelectorAll('#shopBody .mf-swatch').length === 8) && await shopFits(), 'eight looks: four six lights and four ball trails, fitting the screen');
-await page.evaluate(() => document.querySelector('#shopBody .mf-grid.four .mf-card').click()); await page.waitForTimeout(300);
+check(await page.evaluate(() => document.querySelectorAll('#shopBody .item-grid.four .item-tile').length === 8) && await shopFits(), 'eight looks: four six lights and four ball trails, fitting the screen');
+await page.evaluate(() => document.querySelector('#shopBody .item-grid.four .item-tile').click()); await page.waitForTimeout(300);
 await page.evaluate(() => [...document.querySelectorAll('#shopSheet button')].find(b => /Buy/.test(b.textContent)).click()); await page.waitForTimeout(400);
 check(await page.evaluate(() => { const d = window.__sixcharge.demo; return d.shop.look.lights === 'gold' && d.build.diamonds === 460; }), 'a look is bought with 40 diamonds and switched on');
 await shopTab('Diamonds');

@@ -414,12 +414,10 @@ function paintShop(c) {
   } else if (shopTab === 'style') {
     for (const [kind, title] of [['lights', 'Six lights (at home)'], ['trail', 'Ball trail']]) {
       const hd = el('div', 'mf-sheet-head'); hd.append(el('b', '', title)); body.append(hd);
-      const grid = el('div', 'mf-grid four');
+      const grid = el('div', 'item-grid four');
       for (const [id, L] of Object.entries(SHOP.LOOKS[kind])) {
-        const owned = !!h.owned[kind][id], on = h.look[kind] === id, card = el('button', `mf-card stack${on ? ' pick' : ''}`), sw = el('span', 'mf-swatch'); sw.style.background = L.colour;
-        card.append(sw, el('b', '', L.name.split(' ')[0]), el('small', '', on ? 'On' : owned ? 'Owned' : `${L.cost} 💎`));
-        card.addEventListener('click', () => { if (owned) done(setLook(c, kind, on ? null : id)); else { shopSheet = { type: 'look', kind, id }; sfx.click(); paintShop(c); } });
-        grid.append(card);
+        const owned = !!h.owned[kind][id], on = h.look[kind] === id;
+        grid.append(itemTile(`img/shop/${kind === 'lights' ? 'lights' : 'trail'}-${id}.webp`, L.name.split(' ')[0], on ? 'On' : owned ? 'Owned' : '', on || owned ? '' : `${L.cost} 💎`, { have: on || owned, onClick: () => { if (owned) done(setLook(c, kind, on ? null : id)); else { shopSheet = { type: 'look', kind, id }; sfx.click(); paintShop(c); } } }));
       }
       body.append(grid);
     }
@@ -429,7 +427,7 @@ function paintShop(c) {
     big.className = 'fin-hero'; big.append(el('small', '', 'Your diamonds'), el('b', 'up', String(dm)));
     col.append(big);
     const pg = el('div', 'item-grid');
-    for (const pk of SHOP.PACKS) pg.append(itemTile('diamond', `${pk.diamonds} diamonds`, 'Coming soon', pk.price, { onClick: () => ui.toast('Buying diamonds needs the server, which is not ready yet') }));
+    for (const pk of SHOP.PACKS) pg.append(itemTile(`img/shop/diamonds-${pk.diamonds}.webp`, `${pk.diamonds} diamonds`, 'Coming soon', pk.price, { onClick: () => ui.toast('Buying diamonds needs the server, which is not ready yet') }));
     col.append(pg);
     col.append(info('warn', 'Buying diamonds needs the server, which is not ready yet. For now diamonds come from the Settings test button.'));
     body.append(col);
@@ -1561,10 +1559,13 @@ function paintShell(c, prefix, id, size = 'mid') {
   paintHero(hero, c, id);
 }
 // the building's own picture (the map's, painted in the club's colours) behind the screen's title
+const BANNER = { shop: 'img/banner/shop.webp', apartment: 'img/banner/apartment.webp', office: 'img/banner/office.webp', clubhouse: 'img/banner/clubhouse.webp', medical: 'img/banner/medical.webp', academy: 'img/banner/academy.webp', merch: 'img/banner/merch.webp', training: 'img/banner/training.webp' };   // painted scenes, one per building
 async function paintHero(host, c, id) {
   const club = teamById(c.club), look = PC.lookOf(levelOfBuilding(c, id) || 1), key = `${id}|${club.suit}|${club.trim}|${look}`;
   if (host.dataset.key === key) return;
   host.dataset.key = key; host.querySelector('.bhero-art')?.remove();
+  const banner = BANNER[id];
+  if (banner) { const im = document.createElement('img'); im.className = 'bhero-art bhero-pic'; im.src = banner; im.alt = ''; im.draggable = false; host.prepend(im); return; }
   try {
     const src = await buildingPicture(id, club, look);
     if (host.dataset.key !== key) return;

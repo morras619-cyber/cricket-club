@@ -2049,3 +2049,8 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 /* agent / daily-deals banners: dark glass like the other heroes */
 .mf-body .mf-card.mf-agent { background: linear-gradient(180deg, rgba(20, 34, 92, .92), rgba(8, 14, 48, .94)); border-image: none; border: 2px solid rgba(255, 210, 63, .45); border-radius: 16px; box-shadow: 0 0 0 2px #070b24; color: #fff; }
 .mf-body .mf-card.mf-agent b { color: #fff; } .mf-body .mf-card.mf-agent small { color: rgba(255, 255, 255, .75); }
+/* painted banner scenes behind each building's title */
+.bhero .bhero-pic { position: absolute; left: 0; right: 0; top: 0; bottom: 0; transform: none; width: 100%; max-width: none; height: 100%; object-fit: cover; object-position: 50% 45%; border-radius: 16px; filter: brightness(.92) saturate(1.05); -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); z-index: 0; }
+.bhero[data-compact] .bhero-pic { display: block; opacity: .5; }
+.bhero:has(.bhero-pic)::before { display: none; }
+.item-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; } .item-grid.four .item-tile.art .item-name { font-size: 12px; } .item-grid.four .item-tile.art .item-price { font-size: 11px; padding: 2px 3px; } .item-grid.four .item-tile.art .item-price b { font-size: 11px; }
