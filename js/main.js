@@ -260,8 +260,49 @@ function hubEnter() {
   h.classList.remove('hub-enter'); void h.offsetWidth; h.classList.add('hub-enter');
   clearTimeout(hubEnter.t); hubEnter.t = setTimeout(() => h.classList.remove('hub-enter'), 1600);
 }
+// the hub's second page: my club (swipe left from the hub, or tap the edge); swipe right or tap Play to come back
+function fillHubClub() {
+  const body = $('hubClubBody'), t = myTeam(), c = profile.career, { lv, progress } = level(profile.xp);
+  const stat = (n, k) => { const d = el('div', 'hc-stat'); d.append(el('b', '', String(n)), el('small', '', k)); return d; };
+  const head = el('div', 'hc-head'), crest = el('img', 'hc-crest'); crest.src = logoSrc(t.id); crest.alt = '';
+  const who = el('div', 'hc-who'); who.append(el('b', '', t.name), el('small', '', `${t.style.tag} · ★ ${heroById(t.star).name}`));
+  head.append(crest, who);
+  const lvl = el('div', 'hc-level'), bar = el('div', 'mf-bar green'), fill = el('i'); fill.style.width = `${Math.round(progress * 100)}%`; bar.append(fill);
+  lvl.append(el('b', '', `Level ${lv}`), bar, el('small', '', lv >= 50 ? 'Top level' : `${Math.round(progress * 100)}% to level ${lv + 1}`));
+  const rate = profile.matches ? Math.round(profile.wins / profile.matches * 100) : 0;
+  const stats = el('div', 'hc-stats'); stats.append(stat(profile.matches || 0, 'Matches'), stat(profile.wins || 0, 'Wins'), stat(`${rate}%`, 'Win rate'), stat(profile.best || 0, 'Best score'));
+  const tro = el('div', 'hc-row'); tro.append(ico('trophy'), el('span', '', `${Object.keys(profile.achievements || {}).length} of ${ACHIEVEMENTS.length} trophies and medals`));
+  body.replaceChildren(head, lvl, stats, tro);
+  if (c?.club) {
+    const cc = el('div', 'hc-career'), club = teamById(c.club);
+    cc.append(el('b', '', `${club.name}`), el('small', '', `${divisionName(divisionOf(c, c.club))} · Season ${c.season} · ${money(c.money)} to spend`));
+    const go = el('button', 'mf-big', 'Open the club'); go.addEventListener('click', () => $('btnLeague').click());
+    cc.append(go); body.append(cc);
+  } else {
+    const cc = el('div', 'hc-career'); cc.append(el('b', '', 'Build a club'), el('small', '', 'Create your club, win the auction and build a dynasty.'));
+    const go = el('button', 'mf-big', 'Start your career'); go.addEventListener('click', () => $('btnLeague').click());
+    cc.append(go); body.append(cc);
+  }
+}
+function showHubPage(club) {
+  const h = $('home'); if (club) fillHubClub();
+  h.classList.toggle('on-club', !!club); $('hubClub').setAttribute('aria-hidden', club ? 'false' : 'true');
+}
+{
+  const h = $('home'); let x0 = null, y0 = 0;
+  h.addEventListener('pointerdown', e => { if (e.target.closest('input, select')) return; x0 = e.clientX; y0 = e.clientY; });
+  h.addEventListener('pointerup', e => {
+    if (x0 == null) return; const dx = e.clientX - x0, dy = e.clientY - y0; x0 = null;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+    const club = h.classList.contains('on-club');
+    if (dx < 0 && !club) { sfx.click(); showHubPage(true); } else if (dx > 0 && club) { sfx.click(); showHubPage(false); }
+  });
+  h.addEventListener('pointercancel', () => { x0 = null; });
+  $('hubEdge').addEventListener('click', () => showHubPage(true));
+  $('hubClubBack').addEventListener('click', () => showHubPage(false));
+}
 function renderHub() {
-  ui.show('home'); hubEnter();
+  ui.show('home'); hubEnter(); showHubPage(false);
   $('btnWar').hidden = !FEATURES.war; $('btnPass').hidden = !FEATURES.pass;
   $('btnQuick').hidden = !FEATURES.quick; $('btnCup').hidden = !FEATURES.cup;
   document.querySelector('.hubgrid').classList.toggle('solo', !FEATURES.quick && !FEATURES.cup);   // (the Super League alone: one big tile)
@@ -768,34 +809,8 @@ function saveLineup(order, attack) {
 function teamSheet() {
   const L = currentLineup();
   const wrap = el('div', 'slot teamsheet');
-  const pick = (title, list, cands, size, label, onSet) => {
-    const box = el('div', 'panel paper sheetbox');
-    box.append(el('h3', '', title));
-    for (let i = 0; i < size; i++) {
-      const row = el('label', 'sheetrow');
-      row.append(el('span', 'sheetno', String(i + 1)));
-      const sel = document.createElement('select');
-      sel.setAttribute('aria-label', `${title} ${i + 1}`);
-      for (const p of cands) {
-        const o = document.createElement('option');
-        o.value = p.id; o.textContent = `${p.hero ? '★ ' : ''}${flagName(p)} · ${label(p)}`;
-        sel.append(o);
-      }
-      sel.value = list[i]?.id || '';
-      sel.addEventListener('change', () => {
-        const p = cands.find(c => c.id === sel.value);
-        const j = list.indexOf(p);
-        const next = [...list];
-        if (j >= 0) next[j] = list[i]; // already picked: swap places
-        next[i] = p;
-        onSet(next); sfx.click(); renderSquad();
-      });
-      row.append(sel);
-      box.append(row);
-    }
-    return box;
-  };
-  const roleTxt = p => `${p.label} · bat ${p.bat}`;
+  const pick = (title, list, cands, size, label, onSet) => { const box = el('div', 'panel paper sheetbox'); box.append(slotPicker(title, list, cands, size, label, onSet, renderSquad, teamById(L.id))); return box; };
+  const roleTxt = p => `bat ${p.bat}`;
   // the whole squad, with what each player is known for
   const squadList = el('div', 'panel paper sheetbox');
   squadList.append(el('h3', '', 'The squad'));
@@ -808,7 +823,7 @@ function teamSheet() {
     el('h3', '', `${TEAMS.find(t => t.id === L.id)?.name || 'Your'} team sheet`),
     el('p', 'sheetnote', 'Bat in this order: when a batter is out, the next one walks in. Your three bowlers share the five overs (two each at most), and you pick who bowls each over.'),
     pick('Batting order', L.order, batCandidates(L.pool), ORDER_SIZE, roleTxt, next => saveLineup(next, L.attack)),
-    pick('Bowling attack', L.attack, bowlCandidates(L.pool), ATTACK_SIZE, p => `${bowlType(p.bowl).name}${p.bowlSkill ? ` · ${p.bowlSkill}` : ''}`, next => saveLineup(L.order, next)),
+    pick('Bowling attack', L.attack, bowlCandidates(L.pool), ATTACK_SIZE, p => `${bowlType(p.bowl).short}${p.bowlSkill ? ` ${p.bowlSkill}` : ''}`, next => saveLineup(L.order, next)),
     squadList,
   );
   return wrap;
@@ -3183,8 +3198,8 @@ function careerAuction(c, body) {
     });
     row.append(pass, bidBtn);
     stage.append(row);
-    const skip = el('button', 'chipbtn ghostchip', 'Skip the rest of the auction');
-    skip.addEventListener('click', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
+    const skip = el('button', 'auc-skip', 'Skip the rest of the auction');
+    confirmTap(skip, 'Tap again to pass on every lot left', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });   // (it passes on every player still to come: asked twice)
     stage.append(skip);
     body.append(stage);
   }
@@ -3469,6 +3484,36 @@ function careerPlayoff(c, body) {
   body.append(...leaguePanels(c.league));
 }
 
+// the line-up as tiles: the slots slide along (the first batter, the second, ...); tap one, and the players who can take that place slide
+// along below it: tap one to put him there (if he was already in the line-up the two swap places). Used by the career's team sheet and the quick match's.
+let careerSquadTab = 0;   // (the tab you were on: a swap in the line-up redraws the sheet, and it stays where you were)
+const lineupSlot = {};
+function slotPicker(title, chosen, cands, size, sub, onSet, rerender, club) {
+  const box = el('div', 'slotpick'), at = Math.min(lineupSlot[title] ?? 0, size - 1);
+  box.append(el('b', 'kostage', title));
+  const slots = el('div', 'ptile-row ptile-slide slot-tiles');
+  for (let i = 0; i < size; i++) {
+    const p = chosen[i];
+    if (!p) { const e = el('button', 'mf-card stack empty'); e.append(ico('plus'), el('b', '', `Pick #${i + 1}`)); e.addEventListener('click', () => { lineupSlot[title] = i; sfx.click(); rerender(); }); slots.append(e); continue; }
+    slots.append(playerTile(p, club, { ovr: ovr(p), sub: sub(p), bar: 100, tone: 'green', chips: [{ t: `#${i + 1}` }], selected: i === at, onClick: () => { lineupSlot[title] = i; sfx.click(); rerender(); } }));
+  }
+  const who = chosen[at];
+  box.append(slots, el('p', 'slot-ask', `Who takes place ${at + 1}${who ? ` (now ${lastName(who.name)})` : ''}?`));
+  const row = el('div', 'ptile-row ptile-slide slot-cands');
+  for (const q of cands) {
+    const isNow = who && q.id === who.id;
+    const t = playerTile(q, club, { ovr: ovr(q), sub: sub(q), bar: 100, tone: isNow ? 'green' : '', selected: isNow, onClick: () => {
+      if (isNow) return;
+      const j = chosen.findIndex(x => x?.id === q.id), next = [...chosen];
+      if (j >= 0) next[j] = chosen[at];
+      next[at] = q; onSet(next); sfx.click(); rerender();
+    } });
+    row.append(t);
+  }
+  box.append(row);
+  requestAnimationFrame(() => { slots.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }); row.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }); });
+  return box;
+}
 // your squad: who you've got, how good they could be, and the line-up
 function careerSquad(c, body) {
   const pool = clubPool(c, c.club);
@@ -3497,28 +3542,13 @@ function careerSquad(c, body) {
   requestAnimationFrame(() => row.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
   // line-up for league matches
   const L = resolveLineup(c.club, clubHeroes(pool), c.lineup, {}, pool);
-  const sheet = el('div', 'panel paper sheetbox');
-  sheet.append(el('h3', '', 'Line-up'));
-  const pick = (title, chosen, cands, n, label, save) => {
-    sheet.append(el('b', 'kostage', title));
-    for (let i = 0; i < n; i++) {
-      const row = el('label', 'sheetrow');
-      row.append(el('span', 'sheetno', String(i + 1)));
-      const sel = document.createElement('select');
-      for (const p of cands) { const o = document.createElement('option'); o.value = p.id; o.textContent = `${pname(p)} · ${label(p)}`; sel.append(o); }
-      sel.value = chosen[i]?.id || '';
-      sel.addEventListener('change', () => {
-        const p = cands.find(x => x.id === sel.value), j = chosen.indexOf(p), next = [...chosen];
-        if (j >= 0) next[j] = chosen[i];
-        next[i] = p; save(next); saveProfile(profile); renderCareer();
-      });
-      row.append(sel); sheet.append(row);
-    }
-  };
-  pick('Batting order', L.order, batCandidates(pool), ORDER_SIZE, p => `bat ${p.bat}`, next => { c.lineup = { order: next.map(p => p.id), attack: L.attack.map(p => p.id) }; });
-  pick('Bowling attack', L.attack, bowlCandidates(pool), ATTACK_SIZE, p => `${bowlType(p.bowl).short} ${p.bowlSkill}`, next => { c.lineup = { order: L.order.map(p => p.id), attack: next.map(p => p.id) }; });
-  // nothing scrolls down: the players slide along, the line-up is its own tab
-  pager(body, [['Players', list], ['Line-up', sheet]]);
+  // the line-up is two pages (batting, bowling): each a row of places and a row of players who can take the place chosen
+  const pick = (title, chosen, cands, n, label, save) => { const box = el('div', 'panel paper sheetbox'); box.append(slotPicker(title, chosen, cands, n, label, next => { save(next); saveProfile(profile); }, renderCareer, teamById(c.club))); return box; };
+  const batBox = pick('Batting order', L.order, batCandidates(pool), ORDER_SIZE, p => `bat ${p.bat}`, next => { c.lineup = { order: next.map(p => p.id), attack: L.attack.map(p => p.id) }; });
+  const bowlBox = pick('Bowling attack', L.attack, bowlCandidates(pool), ATTACK_SIZE, p => `${bowlType(p.bowl).short} ${p.bowlSkill}`, next => { c.lineup = { order: L.order.map(p => p.id), attack: next.map(p => p.id) }; });
+  // nothing scrolls down: the players slide along; batting and bowling are tabs of their own
+  pager(body, [['Players', list], ['Batting', batBox], ['Bowling', bowlBox]], careerSquadTab);
+  { const tr = body.querySelector('.pages'); tr?.addEventListener('scroll', () => { careerSquadTab = Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth)); }, { passive: true }); }
 }
 
 // records that never go away
