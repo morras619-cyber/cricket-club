@@ -162,7 +162,7 @@ check(await page.evaluate(() => [...document.querySelectorAll('#mapTabs .map-tab
 await tapAt(0.224, 0.312); await page.waitForTimeout(300);
 check(await page.evaluate(() => document.getElementById('mapName').textContent === 'Club office' && !document.getElementById('mapOpen').hidden), 'the club office opens from the map');
 await page.evaluate(() => document.getElementById('mapOpen').click()); await page.waitForTimeout(700);
-check(await page.evaluate(() => !document.getElementById('office').hidden && document.querySelectorAll('#officeBody .mf-fin').length === 8), 'the real club office shows the books');
+check(await page.evaluate(() => !document.getElementById('office').hidden && document.querySelectorAll('#officeBody .fin-tile').length === 8 && !!document.querySelector('#officeBody .fin-hero b')), 'the real club office shows the books');
 await page.evaluate(() => document.getElementById('officeBack').click()); await page.waitForTimeout(1200);
 await mapTab('Daily'); await page.waitForTimeout(600);
 check(await page.evaluate(() => !document.getElementById('daily').hidden), 'the Daily tab opens the daily challenge');
@@ -241,7 +241,7 @@ await page.evaluate(() => document.getElementById('trainBack').click()); await p
 check(await page.evaluate(() => !document.getElementById('settings').hidden), 'back from the training ground is the settings');
 // the club office: from the settings (a practice club): the books, a sponsor deal, the board, the contracts, with no scrolling
 await page.evaluate(() => document.getElementById('setOffice').click()); await page.waitForTimeout(1200);
-check(await page.evaluate(() => !document.getElementById('office').hidden && document.querySelectorAll('#officeTabs .mf-tab').length === 5 && document.querySelectorAll('#officeBody .mf-fin').length === 8), 'the settings open the club office: five tabs, and the books with eight lines');
+check(await page.evaluate(() => !document.getElementById('office').hidden && document.querySelectorAll('#officeTabs .mf-tab').length === 5 && document.querySelectorAll('#officeBody .fin-tile').length === 8 && !!document.querySelector('#officeBody .fin-hero b')), 'the settings open the club office: five tabs, and the books with eight lines');
 const offTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#officeTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(250); };
 const offFits = async () => page.evaluate(() => { const m = document.querySelector('#office .mf'), b = document.getElementById('officeBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
 check(await offFits(), 'the books fit the screen');

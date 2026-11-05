@@ -2091,6 +2091,7 @@ function paintOffice(c) {
   const inn = totalOf(books.in), out = totalOf(books.out), net = Math.round((inn - out) * 100) / 100;
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   $('officeStats').replaceChildren(stat('up', 'gold', money(inn), 'came in'), stat('cross', 'red', money(out), 'went out'), stat('coin', 'blue', `${net >= 0 ? '+' : '−'}${money(Math.abs(net))}`, 'this season'));
+  $('officeStats').hidden = officeTab === 'money';   // (the money tab's hero says the same, bigger)
   const tb = $('officeTest'); tb.hidden = !officeTest;
   if (officeTest) {
     const chip = (label, fn) => mfBtn('chipbtn', [el('span', '', label)], () => { const n = fn() || []; if (n.length) ui.toast(n[0], 2600); sfx.click(); paintOffice(c); });
@@ -2103,18 +2104,22 @@ function paintOffice(c) {
   const body = $('officeBody');
   body.replaceChildren();
   if (officeTab === 'money') {
-    const rows = el('div', 'mf-col');
+    // a dashboard, not a ledger: the season's profit as the hero, a split bar of what came in against what went out, then a tile for each source of money
+    const hero = el('div', 'fin-hero'), sign = net >= 0 ? '+' : '−', total = Math.max(0.01, inn + out);
+    const split = el('div', 'fin-split'), gi = el('i', 'in'), go = el('i', 'out'); gi.style.width = `${Math.round(inn / total * 100)}%`; go.style.width = `${Math.round(out / total * 100)}%`; split.append(gi, go);
+    hero.append(el('small', '', 'This season'), el('b', net >= 0 ? 'up' : 'down', `${sign}${money(Math.abs(net))}`), split);
+    const legend = el('div', 'fin-legend'); legend.append(el('span', 'in', `▲ ${money(inn)} in`), el('span', 'out', `▼ ${money(out)} out`)); hero.append(legend);
+    const grid = el('div', 'fin-grid');
     const mx = Math.max(0.1, ...Object.values(books.in), ...Object.values(books.out));
-    const row = (dir, cat, label) => {
-      const v = books[dir][cat] || 0, r = el('div', 'mf-fin'), bar = el('div', 'mf-bar'), f = el('i');
-      f.style.width = `${Math.round(v / mx * 100)}%`; bar.append(f);
-      if (dir === 'out') bar.classList.add('red');
-      const t = el('div', 'mf-fin-t'); t.append(el('b', '', label), bar);
-      r.append(ico(FIN_ICON[cat]), t, el('span', `mf-fin-v ${dir}`, `${dir === 'out' && v ? '−' : ''}${v ? money(v) : '–'}`));
-      return r;
+    const tile = (dir, cat, label) => {
+      const v = books[dir][cat] || 0, t = el('div', `fin-tile ${dir}${v ? '' : ' none'}`), orb = el('span', 'fin-orb'), bar = el('span', 'fin-bar'), f = el('i');
+      orb.append(ico(FIN_ICON[cat])); f.style.width = `${v ? Math.max(8, Math.round(v / mx * 100)) : 0}%`; bar.append(f);
+      t.append(orb, el('b', '', v ? `${dir === 'out' ? '−' : ''}${money(v)}` : '–'), el('small', '', label), bar);
+      return t;
     };
-    for (const [k, l] of Object.entries(INCOME)) rows.append(row('in', k, l));
-    for (const [k, l] of Object.entries(OUTGOING)) rows.append(row('out', k, l));
+    for (const [k, l] of Object.entries(INCOME)) grid.append(tile('in', k, l));
+    for (const [k, l] of Object.entries(OUTGOING)) grid.append(tile('out', k, l));
+    const rows = el('div', 'fin-wrap'); rows.append(hero, grid);
     body.append(rows);
     const lastNet = Math.round((totalOf(last.in) - totalOf(last.out)) * 100) / 100;
     const fc = forecast(c);
