@@ -101,6 +101,7 @@ const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance
 const fitWatch = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => fitPage(e.target))) : null;
 function fitPage(pg) {
   if (pg.parentElement && getComputedStyle(pg.parentElement).flexGrow === '0') return;
+  if (pg.querySelector('.auc-stage')) { pg.classList.add('stagepage'); return; }   // (the auction's lot lays itself out to the height: its card and buttons are never shrunk or cut)
   if (pg.querySelector('.chirp, .tcard')) { pg.classList.add('scrolls'); return; }   // (the feed and the net-trial lists are long: they scroll instead of shrinking)
   let box = pg.querySelector(':scope > .fitbox');
   if (!box) {
@@ -140,7 +141,7 @@ function pager(host, pages, start = 0) {
 // the first headed panel (notes, the fixture card) is the first page, called `first`.
 function autoPages(body, first = 'Match') {
   const kids = [...body.children];
-  const NAMES = { 'your results': 'Results', 'across the divisions': 'Divisions', 'travelling scouts': 'Scouts', 'off-season news': 'News' };
+  const NAMES = { 'squad needs': 'Needs', 'coming up': 'Next', 'my squad': 'Mine', 'your results': 'Results', 'across the divisions': 'Divisions', 'travelling scouts': 'Scouts', 'off-season news': 'News' };
   const raw = k => (k.querySelector?.('.lp-head b') || k.querySelector?.('h3'))?.textContent?.replace(/[^\p{L}\p{N}' -]/gu, '').trim();
   const name = k => {
     if (k.classList.contains('stadpanel')) return 'Stadium';
@@ -1057,7 +1058,7 @@ function renderTournament(notes = []) {
     : place === 'champion' ? `${me.name} are CHAMPIONS!` : `Over: ${teamById(t.champion).name} won it.`;
   const body = $('leagueBody');
   body.innerHTML = '';
-  for (const n of notes) body.append(el('div', 'panel paper notecard', n));
+  if (!bidding) for (const n of notes) body.append(el('div', 'panel paper notecard', n));   // (in the auction they were announced already: no card in the way of the bidding)
   if (f) {
     const o = teamById(f.opp);
     body.append(fixtureCard(f, me, o, `${o.name} · ${o.style.tag}: ${o.style.desc} Their star: ${heroById(o.star).name}.`, () => startMatch({ mode: t.kind })));
@@ -3113,36 +3114,29 @@ function careerAuction(c, body) {
     body.append(done);
   } else {
     const p = c.players[lot.pid], A = c.auction, me = teamById(c.club);
-    const stage = el('div', 'lotcard auction');
-    // your franchise: crest, division and rating, squad places, money left
-    const head = el('div', 'auc-club');
-    const crest = el('img', 'auc-crest'); crest.src = logoSrc(c.club); crest.alt = '';
-    const who = el('div', 'auc-who');
-    who.append(el('b', '', me.name), el('small', '', `${divisionName(divisionOf(c, c.club))} · Rating ${clubRating(c, c.club)}`));
-    const squad = el('div', 'auc-squad');
+    const stage = el('div', 'auc-stage');
+    // the strip across the top: your club, its squad places, what is left to spend
+    const head = el('div', 'auc-top'), crest = el('img', 'auc-crest'); crest.src = logoSrc(c.club); crest.alt = '';
+    const who = el('div', 'auc-who'); who.append(el('b', '', me.name), el('small', '', `${divisionName(divisionOf(c, c.club))} · Rating ${clubRating(c, c.club)}`));
     const pips = el('div', 'auc-pips'); pips.setAttribute('aria-label', `${mine.length} of ${MAX_SQUAD} players`);
     for (let i = 0; i < MAX_SQUAD; i++) pips.append(el('i', i < mine.length ? 'on' : ''));
-    squad.append(el('small', '', `SQUAD ${mine.length}/${MAX_SQUAD}`), pips);
-    const budget = el('div', 'auc-budget');
-    budget.append(el('small', '', 'BUDGET LEFT'), el('b', '', money(c.money)));
-    head.append(crest, who, squad, budget);
-    stage.append(head);
-    const shown = Math.min(A.lots.length, 16);
-    stage.append(el('div', 'auc-lot', `LOT ${Math.min(A.idx + 1, shown)} OF ${shown}`));
-    const last = A.results.at(-1);
-    if (last) stage.append(el('div', 'auc-last' + (last.team === c.club ? ' mine' : ''), last.team ? `Last: ${c.players[last.pid].name} → ${last.team === c.club ? 'YOU' : teamById(last.team).name} · ${money(last.price)}` : `Last: ${c.players[last.pid].name} went unsold`));
-    // the player, and what he costs
-    const main = el('div', 'auc-main');
-    const cardBox = el('div', 'auc-card');
-    cardBox.append(futCard(p, { size: Math.max(120, Math.min(210, window.innerWidth * 0.5, window.innerHeight * (window.innerHeight < 700 ? 0.24 : 0.3))) }));
-    const side = el('div', 'auc-side');
-    const price = el('div', 'auc-price');
+    const squad = el('div', 'auc-squad'); squad.append(pips, el('small', '', `${mine.length}/${MAX_SQUAD}`));
+    const budget = el('div', 'auc-budget'); budget.append(el('small', '', 'TO SPEND'), el('b', '', money(c.money)));
+    who.append(squad); head.append(crest, who, budget);
+    // the player on the block (his card grows to the room there is), and what he costs
+    const hero = el('div', 'auc-hero'), cardBox = el('div', 'auc-card'), card = futCard(p, { size: 150 });
+    cardBox.append(card);
+    const side = el('div', 'auc-side'), price = el('div', 'auc-price');
     price.append(el('small', '', lot.leader ? 'CURRENT BID' : 'OPENING PRICE'), el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'No bids yet'));
-    if (lot.leader) price.append(el('em', '', `Opened ${money(openingPrice(p))} · next ${money(nextBid(lot))}`));
-    const facts = el('div', 'auc-facts');
-    for (const [k, v] of [['Age', p.age ?? '—'], ['Batting', p.bat], ['Bowling', p.bowlSkill || '—'], ['Worth', money(value(p))]]) {
-      const row = el('div', ''); row.append(el('span', '', k), el('b', '', String(v))); facts.append(row);
-    }
+    if (lot.leader) price.append(el('em', '', `Next bid ${money(nextBid(lot))}`));
+    price.append(el('p', 'auc-facts', `Age ${p.age ?? '—'} · Worth ${money(value(p))}`));
+    // the lot number, the way out, and the last sale
+    const shown = Math.min(A.lots.length, 16), last = A.results.at(-1);
+    const lotline = el('div', 'auc-lotline'); lotline.append(el('b', '', `LOT ${Math.min(A.idx + 1, shown)}/${shown}`));
+    const skip = el('button', 'auc-skip', 'Skip all ›');
+    confirmTap(skip, 'Tap again to pass on every lot left', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });
+    lotline.append(skip);
+    const lastLine = el('p', 'auc-last' + (last && last.team === c.club ? ' mine' : ''), last ? `Last: ${c.players[last.pid].name.split(' ').pop()} → ${last.team === c.club ? 'YOU' : last.team ? teamById(last.team).name : 'unsold'}${last.team ? ` ${money(last.price)}` : ''}` : 'The first lot is up');
     // the rival clubs: the leader, those who have dropped out (their limits stay hidden until they do), and how many are still in
     const rivals = el('div', 'auc-rivals'), all = rivalsOf(c, lot);
     const crestOf = (r, label) => {
@@ -3152,31 +3146,35 @@ function careerAuction(c, body) {
       rv.append(img, el('span', '', label));
       return rv;
     };
-    const lead = all.find(r => r.state === 'lead'), outs = all.filter(r => r.state === 'out').sort((x, y) => y.at - x.at).slice(0, 4);
+    const lead = all.find(r => r.state === 'lead'), outs = all.filter(r => r.state === 'out').sort((x, y) => y.at - x.at).slice(0, 3);
     if (lead) rivals.append(crestOf(lead, 'LEAD'));
     for (const r of outs) rivals.append(crestOf(r, 'OUT'));
     const stillIn = all.filter(r => r.state === 'in').length;
     rivals.append(el('p', 'rv-count', stillIn ? `${stillIn} club${stillIn > 1 ? 's' : ''} still in` : lead && lead.team === c.club ? 'No club can raise' : 'No one else in'));
-    side.append(price, rivals, facts, el('p', 'auc-note', ageNote(p)));
-    main.append(cardBox, side);
-    stage.append(main);
+    // the decision in four verdicts for the next bid (career.js assessLot)
+    const rep = assessLot(c, lot), report = el('div', 'auc-report');
+    for (const [k, title] of [['fit', 'SQUAD FIT'], ['price', 'PRICE'], ['cash', 'CASH AFTER'], ['risk', 'RISK']]) {
+      const t = el('div', `tone-${rep[k].tone}`); t.title = rep[k].detail;
+      t.append(el('small', '', title), el('b', '', rep[k].label));
+      report.append(t);
+    }
+    side.append(lotline, price, report, rivals, lastLine);
+    hero.append(cardBox, side);
+    // watch the room: the card takes the height there is
+    if (typeof ResizeObserver !== 'undefined') {
+      const fit = () => { const w = hero.clientWidth, h = hero.clientHeight; if (w < 50 || h < 50) return; card.style.setProperty('--w', `${Math.round(Math.max(96, Math.min(w * 0.45, h / 1.72)))}px`); };
+      new ResizeObserver(fit).observe(hero); requestAnimationFrame(fit);
+    }
+    stage.append(head, hero);
     if (p.heroId) {
       const pw = el('div', 'auc-power');
       pw.append(el('b', '', heroById(p.heroId).power.name), el('span', '', heroById(p.heroId).power.desc));
       stage.append(pw);
     }
-    // the decision in four verdicts for the next bid (career.js assessLot)
-    const rep = assessLot(c, lot), report = el('div', 'auc-report');
-    for (const [k, title] of [['fit', 'SQUAD FIT'], ['price', 'PRICE'], ['cash', 'CASH AFTER'], ['risk', 'SQUAD RISK']]) {
-      const t = el('div', `tone-${rep[k].tone}`);
-      t.append(el('small', '', title), el('b', '', rep[k].label), el('span', '', rep[k].detail));
-      report.append(t);
-    }
-    stage.append(report);
-    const row = el('div', 'menu row auc-btns');
-    const pass = el('button', 'bigbtn auc-pass');
+    const row = el('div', 'auc-actions');
+    const pass = el('button', 'mf-big alt auc-pass');
     pass.append(el('b', '', 'Pass'), el('small', '', 'Save your budget'));
-    const bidBtn = el('button', 'bigbtn primary auc-bid');
+    const bidBtn = el('button', 'mf-big auc-bid');
     const stand = repBlock(c, p);
     const why = stand ? 'Will not sign for you yet' : mine.length >= MAX_SQUAD ? 'Squad full' : c.money < nextBid(lot) ? 'Not enough money' : 'Make your move';
     bidBtn.append(el('b', '', `Bid ${money(nextBid(lot))}`), el('small', '', why));
@@ -3198,9 +3196,6 @@ function careerAuction(c, body) {
     });
     row.append(pass, bidBtn);
     stage.append(row);
-    const skip = el('button', 'auc-skip', 'Skip the rest of the auction');
-    confirmTap(skip, 'Tap again to pass on every lot left', () => { while (currentLot(c)) passLot(c); saveProfile(profile); renderCareer(); });   // (it passes on every player still to come: asked twice)
-    stage.append(skip);
     body.append(stage);
   }
   if (lot) {
