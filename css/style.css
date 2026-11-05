@@ -2112,3 +2112,4 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 @media (max-height: 740px) { .auc-card .auc-pic { inset: 0 0 52px 0; } .auc-plate { height: 52px; } .auc-plate b { font-size: 18px; } .auc-plate em { display: none; } .auc-card .pt-ovr b { font-size: 24px; } }
 .auc-stage { background: linear-gradient(180deg, rgba(4, 8, 34, .6), rgba(4, 8, 34, .82)); border-radius: 22px; padding: 8px 8px 8px; }
 .auc-report > div, .auc-facts > div, .auc-rivals { background: rgba(5, 9, 40, .78); }
+@media (max-height: 700px) { .set-grid.tools { gap: 5px; } .set-grid.tools .mf-big { min-height: 34px; font-size: 11px; border-width: 10px; border-image-width: 10px; } }

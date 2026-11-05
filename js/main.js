@@ -413,6 +413,18 @@ $('setXp').addEventListener('click', () => { const c = career(); const up = PC.a
 $('setTrophies').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; renderTrophies(); });
 $('setStats').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; renderStats(); });
 $('setTutorial').addEventListener('click', () => { unlockAudio(); moreFrom = renderSettings; showCover(); });
+// quick practice from the settings: bowl (or bat) in the nets at once, as many balls as you like: Pause then Quit to leave
+async function practice(kind) {
+  unlockAudio(); sfx.click();
+  const mine = roster('thunder').map(enginePlayer), theirs = roster('vipers').map(enginePlayer);
+  const bats = mine.filter(p => (p.bat || 0) >= 70).slice(0, 2);
+  const pick = (...types) => types.map(t => mine.find(p => p.bowl === t)).filter(Boolean);   // (a quick, a swing bowler and a spinner: each type to try)
+  const bowls = pick('express', 'swing', 'legspin');
+  await startMatch({ mode: 'tutorial', drill: { balls: kind === 'bat' ? 24 : 18, bats: kind === 'bat' ? bats : [], bowls: kind === 'bowl' ? bowls : [], practice: kind } });
+  renderSettings();
+}
+$('setPracBowl').addEventListener('click', () => practice('bowl'));
+$('setPracBat').addEventListener('click', () => practice('bat'));
 $('setStory').addEventListener('click', () => { unlockAudio(); careerOpening().then(renderSettings); });   // (the career's opening story again; it plays by itself only the first time)
 $('setStadiumTest').addEventListener('click', () => {   // (testing only: shows your own club's ground at level 1, 2 or 3 in your next match; the saved game is not touched)
   stadiumTest.level = (stadiumTest.level + 1) % 4;
@@ -909,7 +921,11 @@ async function startMatch(opts) {
   const mode = opts.mode;
   const seed = mode === 'challenge' ? opts.challenge.seed : mode === 'daily' ? opts.scenario.seed : randomSeed();
   let team = profile.team || 'thunder', opp = null, sq, lineup = null, levels = {}, pools = null, rival = null, home = null;
-  if (mode === 'tutorial' && opts.trial) {
+  if (mode === 'tutorial' && opts.drill) {
+    // a quick practice from the settings: Thunder's batters or bowlers in the nets against Viper net bowlers and batters, no career needed
+    team = 'thunder'; opp = 'vipers'; home = 'thunder'; levels = {};
+    sq = starSquad('thunder'); rival = starSquad('vipers'); pools = null;
+  } else if (mode === 'tutorial' && opts.trial) {
     // the nets: your own club's colours, the candidates as the pool, another Division 3 club as the net bowlers and batters
     const c = profile.career, T = opts.trial, oppId = c.divisions.d3.find(id => id !== c.club);
     team = c.club; opp = oppId; home = c.club; levels = {};
@@ -963,14 +979,14 @@ async function startMatch(opts) {
   for (const s of ui.screens) $(s).hidden = true;
   if (mode === 'quick') await quickTip();
   game.matchActive = true;
-  crowdMute.on = !!opts.trial;   // (the nets have no crowd)
+  crowdMute.on = !!(opts.trial || opts.drill);   // (the nets have no crowd)
   startAmbience();
   let summary;
   cosmetics.lights = mode === 'career' ? lookColour(profile.career, 'lights') : null; cosmetics.trail = mode === 'career' ? lookColour(profile.career, 'trail') : null;   // (the shop's looks)
   setStartEnergy(mode === 'career' && profile.career.medical ? startEnergies(profile.career) : {});   // (the medical centre: your players start the match on their fitness)
   try {
     summary = await game.runMatch({
-      mode, story: !!opts.story, opening: !!opts.opening, trial: opts.trial ? { balls: opts.trial.balls, bats: opts.trial.bats.map(id => profile.career.players[id]).map(enginePlayer), bowls: opts.trial.bowls.map(id => profile.career.players[id]).map(enginePlayer) } : null, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+      mode, story: !!opts.story, opening: !!opts.opening, trial: opts.drill ? opts.drill : opts.trial ? { balls: opts.trial.balls, bats: opts.trial.bats.map(id => profile.career.players[id]).map(enginePlayer), bowls: opts.trial.bowls.map(id => profile.career.players[id]).map(enginePlayer) } : null, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
       records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill), crowd: mode === 'career' && profile.career?.chirp ? crowdOf(profile.career) : 0,
     });
   } catch (e) {
@@ -984,7 +1000,7 @@ async function startMatch(opts) {
     stopAmbience(); crowdStop(); game.crowdLive = false;
     crowdMute.on = false;
   }
-  if (opts.opening || opts.trial) { game.quit(); return summary; }   // (the story's final: no result screen, the story goes on)
+  if (opts.opening || opts.trial || opts.drill) { game.quit(); return summary; }   // (the story's final: no result screen, the story goes on)
   if (!summary) { if (mode === 'war') warAfterMatch(null); return; } // quit mid-match (a war match is lost)
   if (mode === 'tutorial') { profile.tutorialDone = true; saveProfile(profile); }
   if (mode === 'career' && profile.career?.merch) MF.notePace(profile.career.merch, performance.now() - matchStart);   // (how fast you play: the factory warns when a contract would end first)
