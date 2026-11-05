@@ -53,7 +53,10 @@ export function paceGrade(p) {
 
 // points: [{x, y, t}] in screen px / ms, first = touch down. kind: 'pace' | 'spin'. scale = screenHeight / 844.
 // The bowling camera looks down the pitch from behind the bowler, so screen-left is the off side (+x).
-export function gestureToDelivery(points, kind, scale = 1) {
+// grip: the ball on the right of the screen, { lat, air, cap }: lat -1..1 which way and how much it moves (+ = the finger bulging right: outswing, leg-break),
+// air -1..1 where it moves (down = in the air: swing, flight and loop; up = off the pitch: seam, turn), cap how far this bowler can push it (his rating).
+// With a grip, the movement comes from it and the swipe's curve is ignored: the swipe sets only line, length and pace. Without one the curve decides, as it did.
+export function gestureToDelivery(points, kind, scale = 1, grip = null) {
   if (!points || points.length < 2) return null;
   const a = points[0], z = points[points.length - 1];
   const up = (a.y - z.y) / scale;
@@ -76,8 +79,14 @@ export function gestureToDelivery(points, kind, scale = 1) {
     if (Math.abs(cross) > Math.abs(dev)) dev = cross;
   }
   const curve = dev / len;
-  const mag = Math.max(0, Math.min(1, (Math.abs(curve) - 0.04) / 0.25));
-  const lateWorld = mag > 0.05 ? Math.sign(curve) : 0; // bulge right → ball moves late toward screen-left (off side)
+  let mag = Math.max(0, Math.min(1, (Math.abs(curve) - 0.04) / 0.25));
+  let lateWorld = mag > 0.05 ? Math.sign(curve) : 0; // bulge right → ball moves late toward screen-left (off side)
+  let air = 0;
+  if (grip) {
+    const lat = Math.max(-1, Math.min(1, grip.lat || 0));
+    mag = Math.abs(lat) * Math.max(0, Math.min(1, grip.cap ?? 1)); lateWorld = Math.abs(lat) > 0.08 ? Math.sign(lat) : 0; air = Math.max(-1, Math.min(1, grip.air || 0));
+    if (!lateWorld) mag = 0;
+  }
 
   // speed over the final flick
   const end = z.t;
@@ -100,17 +109,18 @@ export function gestureToDelivery(points, kind, scale = 1) {
     kmh = T.kmh[0] + (T.kmh[1] - T.kmh[0]) * k;
     if (T.spin) {
       const stockDir = Math.sign(T.turn); // + = leg-break direction (turns toward the off side)
-      move = lateWorld * Math.max(m * 1.4, mag > 0.05 ? Math.abs(T.turn) * 0.6 : 0); swing = -lateWorld * m * 0.3; loop = 1.3;
+      move = lateWorld * Math.max(m * 1.4, mag > 0.05 ? Math.abs(T.turn) * 0.6 : 0); swing = -lateWorld * m * 0.3 * (1 - 0.5 * air); loop = 1.3 - 0.5 * air;
+      if (grip) move *= 1 + 0.5 * air;   // (the grip: up is flatter and turns more, down is looped and turns less)
       type = lateWorld === 0 ? T.stock[0] : lateWorld === stockDir ? T.stock[0] : T.variation;
-      if (lateWorld === 0) move = T.turn * 0.35;
+      if (lateWorld === 0) move = T.turn * 0.35 * (grip ? 1 + 0.5 * air : 1);
       if (type === 'Arm ball') { move = 0.02; kmh += 6; loop = 0.9; }
       if (type === 'Googly') loop = 1.5;
     } else {
-      swing = -lateWorld * m * 0.9 * (T.swing / 0.2); move = lateWorld * m * 0.3 * (T.seam / 0.07); loop = 0.4;
+      swing = -lateWorld * m * 0.9 * (T.swing / 0.2) * (1 - 0.5 * air); move = lateWorld * m * 0.3 * (T.seam / 0.07) * (1 + 0.5 * air); loop = 0.4;
       type = lateWorld > 0 ? (T.swing >= T.seam ? 'Outswinger' : 'Leg-cutter') : lateWorld < 0 ? (T.swing >= T.seam ? 'Inswinger' : 'Off-cutter') : T.left ? 'Angled across' : 'Seam up';
     }
     if (slower) { kmh = T.kmh[0] * 0.8; loop = 1.1; type = T.spin ? 'Floater' : T.variation; }
-    return { x, length, bounce, h: heightForBounce(bounce), kmh, swing, move, loop, type, speedP: p, grade, slower, lateWorld, mag, curve, rx: T.left ? -0.3 : 0.3 };
+    return { x, length, bounce, h: heightForBounce(bounce), kmh, swing, move, loop, type, speedP: p, grade, slower, lateWorld, mag, curve, rx: T.left ? -0.3 : 0.3, air, strength: grip ? mag * (1 + 0.5 * Math.abs(air)) : 0, sweet: grip ? gripSweet(length, air, mag, !!T.spin) : false };
   }
   if (kind === 'spin') {
     kmh = 74 + 16 * k;
@@ -123,6 +133,22 @@ export function gestureToDelivery(points, kind, scale = 1) {
   }
   if (slower) { kmh = (kind === 'spin' ? 74 : 126) * 0.8; loop = 1.1; type = kind === 'spin' ? 'Floater' : 'Slower ball'; }
   return { x, length, bounce, h: heightForBounce(bounce), kmh, swing, move, loop, type, speedP: p, grade, slower, lateWorld, mag, curve };
+}
+
+// The right length for the way it moves: swing (low on the ball) wants it full, seam (high) wants a back-of-a-length ball, spin wants it on a good length or fuller.
+export function gripSweet(length, air, mag, spin) {
+  if (mag < 0.3) return false;
+  if (spin) return length === 'good' || length === 'full';
+  if (air <= -0.25) return length === 'full' || length === 'good';
+  if (air >= 0.25) return length === 'good' || length === 'short';
+  return length === 'good';
+}
+// How far this bowler can push the ball on the grip: a better bowler more (0.6 to 1), a swing master more still.
+export function gripCap(skill, ability) { return Math.min(1, 0.6 + 0.4 * Math.max(0, Math.min(1, ((skill || 0) - 45) / 45)) + (ability === 'swingMaster' ? 0.1 : 0)); }
+// Overdoing it: past what he can control the ball goes loose. The chance of that, 0 to 0.5: comfort grows with his rating (0.45 to 0.85 of strength).
+export function overcook(strength, skill) {
+  const comfort = 0.45 + 0.4 * Math.max(0, Math.min(1, ((skill || 0) - 45) / 45));
+  return Math.max(0, Math.min(1, (strength - comfort) / 0.6)) * 0.5;
 }
 
 // What the batter thinks is coming. Batters expect the bowler to repeat himself; some bluff.
@@ -164,6 +190,7 @@ export function deliveryMods(d, history, expect, profile, mood) {
   } else if (prev && prev2 && prev2.length === d.length && prev.length !== d.length) {
     m.sigmaMul *= 0.8; m.tags.push({ id: 'pattern', label: 'PATTERN SPOTTED', charge: 0 });
   }
+  if (d.sweet) { m.sigmaMul *= 1.2; m.tags.push({ id: 'sweet', label: 'RIGHT LENGTH FOR IT!', charge: 3 }); }
   const late = Math.abs(d.after || 0);
   if (late > 0.04) { m.sigmaMul *= 1 + 1.2 * late; m.edgeBoost += 0.35 * late; }
   const md = mood && MOOD[mood.state];
