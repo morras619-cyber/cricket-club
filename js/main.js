@@ -1731,7 +1731,7 @@ function staffRow(kind, people, free, onFree, freeLabel = 'Hire') {
 // ('train', 'med', 'acad'); vals are four { t, title, dim } for its slots; barClass is 'green' for a progress bar
 function fanCard(p, club, { name, fill, barClass = '', vals, variant, onClick, pick = false }) {
   const card = el('button', `mf-card fc fcv-${variant}${pick ? ' pick' : ''}`), art = el('span', 'fc-art');
-  art.append(paintedPortrait(p, p.team ? teamById(p.team) : club) || playerFace(p, 120));
+  art.append(paintedPortrait(p, p.team ? teamById(p.team) : club, { framed: true }) || playerFace(p, 120));
   const bar = el('div', `mf-bar fc-bar ${barClass}`.trim()), f = el('i'); f.style.width = `${Math.max(4, Math.min(100, Math.round(fill)))}%`; bar.append(f);
   const inf = el('div', 'fc-info'); inf.append(el('b', 'fc-name', name), bar);
   vals.forEach((v, i) => { const x = el('span', `fc-v fc-v${i + 1}${v.dim ? ' dim' : ''}`, v.t); x.title = v.title || ''; inf.append(x); });
@@ -1809,7 +1809,7 @@ function paintMerch(c) {
       const p = c.players[pid], stock = m.live[pid] || 0, forever = p.contract >= 50;
       const card = el('button', `mf-card fc${merchSheet?.pid === pid ? ' pick' : ''}`);
       // the card is his painted bust (in his kit) with the numbers beside it; a player without one gets his drawn face
-      const art = el('span', 'fc-art'); art.append(paintedPortrait(p, p.team ? teamById(p.team) : null) || playerFace(p, 120));
+      const art = el('span', 'fc-art'); art.append(paintedPortrait(p, p.team ? teamById(p.team) : null, { framed: true }) || playerFace(p, 120));
       const bar = el('div', 'mf-bar fc-bar'); const fill = el('i'); fill.style.width = `${Math.max(4, info.fame)}%`; bar.append(fill); bar.title = 'Fame';
       // the card's picture has the icons painted in: only the numbers go in its slots
       const val = (n, text, title, dim = false) => { const v = el('span', `fc-v fc-v${n}${dim ? ' dim' : ''}`, text); v.title = title; return v; };
