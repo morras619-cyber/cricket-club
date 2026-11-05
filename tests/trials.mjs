@@ -260,7 +260,7 @@ if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_
 await offTab('Board');
 check(await page.evaluate(() => /TOP \d/.test(document.getElementById('officeBody').textContent) && !!document.querySelector('#officeBody .board-track')) && await offFits(), 'the board has its target for the season, and it fits the screen');
 await offTab('Contracts');
-check(await page.evaluate(() => document.querySelectorAll('#officeBody .mf-card.cc').length >= 4 && document.querySelectorAll('#officeBody .role-badge').length >= 4 && !!document.querySelector('#officeBody .mf-agent')) && await offFits(), 'the contracts tab shows players with a role badge and seasons left, and the agent banner, and fits');
+check(await page.evaluate(() => document.querySelectorAll('#officeBody .ptile').length >= 4 && document.querySelectorAll('#officeBody .ptile .pt-ovr small').length >= 4 && !!document.querySelector('#officeBody .mf-agent')) && await offFits(), 'the contracts tab shows players with a role badge and seasons left, and the agent banner, and fits');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'office-contracts.png') });
 await offTab('Office');
 check(await page.evaluate(() => document.querySelectorAll('#officeBody .cand.free').length === 1 && /Office level 1/.test(document.getElementById('officeBody').textContent) && /Build level 2/.test(document.getElementById('officeBody').textContent)) && await offFits(), 'the Office tab: one place for staff, the level and the Build button, fitting the screen');
@@ -275,13 +275,13 @@ check(await page.evaluate(() => !document.getElementById('settings').hidden), 'b
 await page.evaluate(() => document.getElementById('setClubhouse').click()); await page.waitForTimeout(1500);
 const clubTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#clubhouseTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(300); };
 const clubFits = async () => page.evaluate(() => { const m = document.querySelector('#clubhouse .mf'), b = document.getElementById('clubhouseBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
-check(await page.evaluate(() => !document.getElementById('clubhouse').hidden && document.querySelectorAll('#clubhouseTabs .mf-tab').length === 4 && document.querySelectorAll('#clubhouseBody .mf-card .mf-frame canvas').length >= 2) && await clubFits(), 'the settings open the clubhouse: four tabs, and the chemistry links with framed portraits, fitting the screen');
+check(await page.evaluate(() => !document.getElementById('clubhouse').hidden && document.querySelectorAll('#clubhouseTabs .mf-tab').length === 4 && document.querySelectorAll('#clubhouseBody .link-card .mf-frame').length >= 2) && await clubFits(), 'the settings open the clubhouse: four tabs, and the chemistry links with framed portraits, fitting the screen');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'clubhouse-chemistry.png') });
 await clubTab('Rivals');
-check(await page.evaluate(() => /Thunder Strikers/.test(document.getElementById('clubhouseBody').textContent) && document.querySelectorAll('#clubhouseBody .mf-crest').length === 2) && await clubFits(), 'the rivals tab shows the nemesis and the division rival with their crests, and fits');
+check(await page.evaluate(() => /Thunder Strikers/.test(document.getElementById('clubhouseBody').textContent) && document.querySelectorAll('#clubhouseBody .rival-crest').length === 2) && await clubFits(), 'the rivals tab shows the nemesis and the division rival with their crests, and fits');
 await clubTab('Events');
-check(await page.evaluate(() => [...document.querySelectorAll('#clubhouseBody .chipbtn')].map(b => b.disabled).join() === 'false,false,true') && await clubFits(), 'three events: the parade is locked until a title or a promotion, and it fits');
-await page.evaluate(() => document.querySelector('#clubhouseBody .chipbtn').click()); await page.waitForTimeout(400);
+check(await page.evaluate(() => [...document.querySelectorAll('#clubhouseBody .event-go')].map(b => b.disabled).join() === 'false,false,true') && await clubFits(), 'three events: the parade is locked until a title or a promotion, and it fits');
+await page.evaluate(() => document.querySelector('#clubhouseBody .event-go').click()); await page.waitForTimeout(400);
 check(await page.evaluate(() => window.__sixcharge.demo.clubhouse.events.length === 1 && document.querySelectorAll('#clubhouseBody .mf-bar').length === 1 && /left/.test(document.getElementById('clubhouseBody').textContent)), 'an event is held: it runs on the clock and shows the time left');
 await page.evaluate(() => [...document.querySelectorAll('#clubhouseTest .chipbtn')].find(b => /5 hours/.test(b.textContent)).click()); await page.waitForTimeout(500);
 check(await page.evaluate(() => window.__sixcharge.demo.clubhouse.events.length === 0 && window.__sixcharge.demo.chirp.fans > 900), 'after the hours the supporters came: followers went up');

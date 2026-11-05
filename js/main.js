@@ -2165,15 +2165,10 @@ function paintOffice(c) {
     if (past.length) { const row = el('div', 'board-past'); for (const b of past) { const chip = el('div', `board-chip ${b.met ? 'ok' : 'no'}`); chip.append(ico(b.met ? 'check' : 'cross'), el('b', '', `Season ${b.season}`), el('small', '', `Top ${b.target} · ${ord(b.pos)}${b.met ? ` · +${money(b.reward)}` : ''}`)); row.append(chip); } col.append(row); }
     body.append(col);
   } else if (officeTab === 'contracts') {
-    const list = contractList(c).slice(0, 6), grid = el('div', 'mf-grid cc-grid');
+    const list = contractList(c).slice(0, 6), grid = el('div', 'mf-grid ptile-grid');
     for (const p of list) {
-      const card = el('button', `mf-card cc${p.contract <= 1 ? ' pick' : ''}`), stock = c.merch?.live?.[p.id] || 0, inf = el('div', 'mf-info'), r1 = el('div', 'mf-row'), r2 = el('div', 'mf-row');
-      const badge = el('span', `role-badge role-${p.role in ROLE_NAME ? p.role : 'bat'}`, ROLE_NAME[p.role] || 'Batter');
-      r1.append(ico('clock'), el('span', '', p.contract <= 1 ? '1 season' : `${p.contract} seasons`)); r2.append(ico('jersey'), el('span', '', String(stock)));
-      inf.append(el('b', '', lastName(p.name)), badge, r1, r2);
-      card.append(frameOf(playerFace(p, 64)), inf, el('i', 'btn-go'));
-      card.addEventListener('click', () => { officeSheet = { type: 'extend', pid: p.id }; sfx.click(); paintOffice(c); });
-      grid.append(card);
+      const left = p.contract, last = left <= 1;
+      grid.append(playerTile(p, club, { ovr: ovr(p), sub: last ? 'Last season' : `${left} seasons left`, bar: Math.min(100, left / 3 * 100), tone: last ? 'red' : left === 2 ? 'amber' : 'green', need: last, chips: last ? [{ t: 'RENEW', tone: 'red' }] : [], onClick: () => { officeSheet = { type: 'extend', pid: p.id }; sfx.click(); paintOffice(c); } }));
     }
     body.append(grid);
     const ag = el('div', 'mf-card mf-agent'), agent = o.staff.find(x => x.role === 'agent'), tx = el('div', 'mf-info');
@@ -2276,44 +2271,48 @@ function paintClubhouse(c) {
   body.replaceChildren();
   const info = (icon, text) => { if (text.length > 48) return hint(icon, text); const f = el('div', 'mf-card'); f.append(ico(icon), el('span', 'mf-row', text)); return f; };
   if (clubTab === 'chem') {
-    const bonus = chemBonus(c), col = el('div', 'mf-col');
+    const bonus = chemBonus(c), col = el('div', 'spon-wrap');
     col.append(info('heart', links.length ? `${bonus.size} of your players get extra rating from their links: half a point for a link, a whole point for a strong one, up to ${row.cap}.` : 'No links yet. Players of one nation link at once; others link after 10 matches together.'));
+    const lg = el('div', 'link-grid');
     for (const l of links.slice(0, 4)) {
-      const a = c.players[l.a], b = c.players[l.b], card = el('div', 'mf-card'), inf = el('div', 'mf-info'), bar = el('div', `mf-bar${l.kind === 2 ? ' green' : ''}`), f = el('i');
-      f.style.width = `${Math.min(100, Math.round(l.pts / CLUB.STRONG * 100))}%`; bar.append(f);
-      inf.append(el('b', '', `${lastName(a.name)} & ${lastName(b.name)}`), bar, el('small', '', `${l.kind === 2 ? 'Strong link' : 'Link'} · ${a.nation === b.nation ? 'same nation · ' : ''}${Math.min(l.pts, CLUB.STRONG)}/${CLUB.STRONG}`));
-      card.append(frameOf(playerFace(a, 44)), frameOf(playerFace(b, 44)), inf);
-      col.append(card);
+      const a = c.players[l.a], b = c.players[l.b], strong = l.kind === 2, card = el('div', `link-card${strong ? ' strong' : ''}`), faces = el('div', 'link-faces'), seg = el('span', 'link-seg');
+      faces.append(frameOf(playerFace(a, 52)), el('span', 'link-heart', '♥'), frameOf(playerFace(b, 52)));
+      for (let k = 0; k < 5; k++) seg.append(el('i', k < Math.round(Math.min(l.pts, CLUB.STRONG) / CLUB.STRONG * 5) ? 'on' : ''));
+      card.append(faces, el('b', '', `${lastName(a.name)} & ${lastName(b.name)}`), seg, el('small', '', `${strong ? 'STRONG LINK' : 'LINK'}${a.nation === b.nation ? ' · same nation' : ''}`));
+      lg.append(card);
     }
+    if (links.length) col.append(lg);
     body.append(col);
   } else if (clubTab === 'rivals') {
-    const col = el('div', 'mf-col'), board = rivalBoard(c);
+    const col = el('div', 'spon-wrap'), board = rivalBoard(c);
     for (const r of board) {
-      const card = el('div', 'mf-card col'), hd = el('div', 'mf-sheet-head'), crest = el('img', 'mf-crest'); crest.src = logoSrc(r.id); crest.alt = '';
-      hd.append(crest, el('b', '', teamById(r.id).name), el('span', 'mf-stars', r.kind === 'nemesis' ? 'Nemesis' : 'Rival'));
-      const rec = el('div', 'mf-row'); rec.append(ico(r.w >= r.l ? 'up' : 'warn'), el('span', '', `You ${r.w} – ${r.l} them${r.run ? ` · ${r.run > 0 ? 'won' : 'lost'} ${Math.abs(r.run)} in a row` : ''}`));
-      card.append(hd, rec);
-      if (r.said) card.append(el('p', 'sheetnote', `${r.who}: "${r.said}"`));
+      const card = el('div', `rival-card ${r.kind}`), crest = el('img', 'rival-crest'), mid = el('div', 'rival-mid'); crest.src = logoSrc(r.id); crest.alt = '';
+      const score = el('div', 'rival-score'); score.append(el('b', r.w > r.l ? 'up' : r.w < r.l ? 'down' : '', `${r.w} – ${r.l}`), el('small', '', r.run ? `${r.run > 0 ? 'Won' : 'Lost'} ${Math.abs(r.run)} in a row` : 'Head to head'));
+      mid.append(el('i', 'rival-tag', r.kind === 'nemesis' ? 'NEMESIS' : 'RIVAL'), el('b', '', teamById(r.id).name));
+      if (r.said) mid.append(el('p', '', `“${r.said}”`));
+      card.append(crest, mid, score);
       col.append(card);
     }
     if (!board.length) col.append(info('warn', 'Your rivals appear when you take a club.'));
     col.append(info('clock', 'Matches against real clubs, with revenge matches, come later.'));
     body.append(col);
   } else if (clubTab === 'events') {
-    const col = el('div', 'mf-col'), IC = { fanday: 'users', charity: 'heart', parade: 'trophy' };
+    const col = el('div', 'spon-wrap'), IC = { fanday: 'users', charity: 'heart', parade: 'trophy' };
     for (const [kind, E] of Object.entries(CLUB.EVENTS)) {
-      const card = el('div', 'mf-card'), inf = el('div', 'mf-info'), run = h.events.find(e => e.kind === kind);
-      inf.append(el('b', '', E.name), el('small', '', `${money(eventCost(c, kind))} · ${E.hours} h · about +${Math.round(Math.max(E.min, P.fans * E.fans) * row.boost)} followers`));
+      const card = el('div', 'event-card'), orb = el('span', 'fin-orb'), inf = el('div', 'event-info'), run = h.events.find(e => e.kind === kind), chips = el('div', 'spon-chips');
+      orb.append(ico(IC[kind]));
+      chips.append(el('span', 'spon-chip gold', money(eventCost(c, kind))), el('span', 'spon-chip', `${E.hours} h`), el('span', 'spon-chip', `+${Math.round(Math.max(E.min, P.fans * E.fans) * row.boost)} followers`));
+      inf.append(el('b', '', E.name), chips);
       if (run) {
         const total = E.hours * 3600000, left = Math.max(0, run.end - now), bar = el('div', 'mf-bar green'), f = el('i'); f.style.width = `${Math.max(3, Math.round((1 - left / total) * 100))}%`; bar.append(f);
-        inf.append(bar, el('small', '', left > 0 ? `${durfmt(left)} left` : 'finishing…'));
-        card.append(ico(IC[kind]), inf);
+        inf.append(bar, el('small', 'event-left', left > 0 ? `${durfmt(left)} left` : 'finishing…'));
+        card.append(orb, inf);
       } else {
         const why = whyNoEvent(c, kind, { now, trusted });
-        const go = mfBtn('chipbtn', [el('span', '', 'Hold')], () => done(startEvent(c, kind, { now: serverNow(), trusted: clock.state === 'ok' })));
+        const go = mfBtn('mf-big event-go', [el('span', '', 'Hold it')], () => done(startEvent(c, kind, { now: serverNow(), trusted: clock.state === 'ok' })));
         go.disabled = !!why;
-        if (why) inf.append(el('small', '', why));
-        card.append(ico(IC[kind]), inf, go);
+        if (why) inf.append(el('small', 'event-left', why));
+        card.append(orb, inf, go);
       }
       col.append(card);
     }
