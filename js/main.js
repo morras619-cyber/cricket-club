@@ -7,7 +7,7 @@ import { batSpriteMissing } from './batsprite.js';
 import { squadPool, resolveLineup, batCandidates, bowlCandidates, bowlType, isUnlocked, UNLOCK_COST, ORDER_SIZE, ATTACK_SIZE, roster, fullName, flagName, starSquad, playerSquad, ovr, ratingStars } from './squads.js';
 import { flag, nationName } from './nations.js';
 import { faceEl } from './looks.js';
-import { futCard, portraitFace, paintedPortrait } from './futcard.js';
+import { futCard, portraitFace, paintedPortrait, tierOf } from './futcard.js';
 import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds.js';
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
@@ -1730,6 +1730,19 @@ function fanCard(p, club, { name, fill, barClass = '', vals, variant, onClick, p
   card.append(art, inf); card.addEventListener('click', onClick);
   return card;
 }
+// a player as a tall football-style tile: his picture fills it, his rating is the big badge, the frame's colour is his tier (bronze up to legendary),
+// and one thin bar says how far he has come. opts: { ovr, pot, bar (0..100, default ovr to pot), selected, onClick }
+const ROLE_TAG = { bat: 'BAT', bowl: 'BOWL', all: 'AR', wk: 'WK' };
+function playerTile(p, club, { ovr: o, pot, bar, selected = false, onClick }) {
+  const t = el('button', `ptile tier-${tierOf(o).id}${selected ? ' sel' : ''}`), pic = el('span', 'pt-pic');
+  pic.append(paintedPortrait(p, p.team ? teamById(p.team) : club) || playerFace(p, 120));
+  const badge = el('span', 'pt-ovr'); badge.append(el('b', '', String(o)), el('small', '', ROLE_TAG[p.role] || ''));
+  const plate = el('span', 'pt-plate'), fill = el('i'), meter = el('span', 'pt-bar'); fill.style.width = `${Math.max(6, Math.min(100, Math.round(bar ?? (pot ? o / pot * 100 : 100))))}%`; meter.append(fill);
+  plate.append(el('b', '', lastName(p.name)), pot ? el('small', '', `${o} ▸ ${pot}`) : el('small', '', ''), meter);
+  t.append(pic, badge, el('span', 'pt-flag', flag(p)), plate);
+  t.addEventListener('click', onClick);
+  return t;
+}
 const lastName = n => n.split(' ').slice(-1)[0];
 async function renderMerch(test = false) {
   merchTest = test;
@@ -1872,6 +1885,7 @@ addEventListener('visibilitychange', () => { if (!document.hidden && !$('merch')
 $('setMerch').addEventListener('click', () => { unlockAudio(); sfx.click(); renderMerch(true); });
 
 // ---------- the training ground (js/training.js): coaches train the players in its places, on real time ----------
+let netPick = null;
 let trainTab = 'players', trainSheet = null, trainTimer = 0, trainReport = null, trainTest = false;
 const trainCtx = c => ({ now: serverNow(), trusted: clock.state === 'ok', squad: trainingRoster(c), bank: merchBank(c) });
 function trainTick(c) {
@@ -1959,21 +1973,21 @@ function paintTraining(c) {
     body.append(grid);
     body.append(hint('clock', `Each point of rating takes about ${durfmt(TG.tpCost(60, 20) / TG.TRAIN.TP_HOUR * 3600000)} of coaching for a young player, more for a better or older one. At most ${L.cap} a season.`));
   } else if (trainTab === 'nets') {
-    const pips = el('div', 'mf-pips');
-    for (let i = 0; i < TG.TRAIN.DRILLS_DAY; i++) pips.append(ico('ball', i < left ? 'on' : ''));
-    const hd = el('div', 'mf-card'); hd.append(ico('ball'), el('span', 'mf-row', `Face ${TG.TRAIN.DRILL_BALLS} balls in the nets yourself: a good drill earns the player up to ${TG.TRAIN.DRILL_MAX} training points.`), pips);
-    body.append(hd);
-    const grid = el('div', 'mf-grid');
-    grid.style.cssText = 'grid-auto-rows: auto';
-    const list = [...roster].filter(([, p]) => TG.canLearn(p)).sort((a, b) => (b[1].pot - b[1].ovr) - (a[1].pot - a[1].ovr)).slice(0, 6);
-    for (const [pid, p] of list) {
-      const b = el('button', 'mf-card'), info = el('div', 'mf-info'), r = el('div', 'mf-row'); r.append(el('span', '', `${p.ovr}`), ico('up'), el('span', '', `${p.pot}`));
-      info.append(el('b', '', lastName(p.name)), r);
-      b.append(frameOf(playerFace(c.players[pid], 64)), info);
-      b.addEventListener('click', () => { trainSheet = { type: 'drill', pid }; sfx.click(); paintTraining(c); });
-      grid.append(b);
+    const list = [...roster].filter(([, p]) => TG.canLearn(p)).sort((a, b) => (b[1].pot - b[1].ovr) - (a[1].pot - a[1].ovr)).slice(0, 8);
+    if (!list.some(([pid]) => pid === netPick)) netPick = list[0]?.[0] || null;
+    const hero = el('div', 'nets-hero'), balls = el('div', 'nets-balls');
+    for (let i = 0; i < TG.TRAIN.DRILLS_DAY; i++) balls.append(ico('ball', i < left ? 'on' : ''));
+    hero.append(el('b', '', 'Net session'), balls);
+    body.append(hero, hint('ball', `Face ${TG.TRAIN.DRILL_BALLS} balls in the nets yourself: a good drill earns the player up to ${TG.TRAIN.DRILL_MAX} training points.`));
+    if (list.length) {
+      const row = el('div', 'ptile-row');
+      for (const [pid, p] of list) row.append(playerTile(c.players[pid], club, { ovr: p.ovr, pot: p.pot, selected: pid === netPick, onClick: () => { netPick = pid; sfx.click(); paintTraining(c); } }));
+      body.append(row);
+      const who = c.players[netPick], go = mfBtn('mf-big nets-go', [ico('ball'), el('span', '', `Pad up · ${lastName(who.name)}`)], () => { if (trainTest) return ui.toast('The nets are for your real club, not the practice one'); if (clock.state !== 'ok') return ui.toast('The nets need the server clock: try again when you are online'); if (left < 1) return ui.toast('The nets are closed for today. They open again at midnight (UTC)'); runDrill(c, netPick); });
+      go.disabled = left < 1 && !trainTest;
+      body.append(go);
+      requestAnimationFrame(() => row.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
     }
-    body.append(grid);
     if (!list.length) body.append(el('p', 'sheetnote', 'Nobody in your squad can learn more right now.'));
   } else if (trainTab === 'coaches') {
     const grid = staffRow('training', t.coaches.map(k => ({ s: k, face: staffFace(k, club, 120), job: k.kind, base: TG.TRAIN.WAGE, onOpen: () => { trainSheet = { type: 'coach', id: k.id }; sfx.click(); paintTraining(c); } })), L.coaches - t.coaches.length, () => { trainSheet = { type: 'hire' }; sfx.click(); paintTraining(c); });
