@@ -58,7 +58,7 @@ export function lookOf(p) {
   if (!p) return null;
   // a player with a painted portrait has its skin tone and hair colour on the pitch too
   // (and its haircut, beard and headwear: hair.js)
-  const key = portraitKey(p.name || ''), painted = PORTRAIT_LOOKS[key], cut = PORTRAIT_STYLES[key];
+  const key = p.pic || portraitKey(p.name || ''), painted = PORTRAIT_LOOKS[key], cut = PORTRAIT_STYLES[key];
   const base = baseLook(p);
   // (who and num: the name and number on his shirt)
   return { ...base, ...painted, ...cut, seed: p.id || p.name || '', who: p.name || '', num: p.number || null };

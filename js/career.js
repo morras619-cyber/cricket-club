@@ -4,7 +4,7 @@
 // into (until 33), young players arrive every season, the best become stars with an ability,
 // and every run and wicket goes into records that never reset. Pure data and functions:
 // the state lives in the profile (profile.career).
-import { PORTRAIT_AGE } from './portraits-list.js';
+import { PORTRAIT_AGE, PORTRAIT_KEYS } from './portraits-list.js';
 import { CFG } from './config.js';
 import { makeRng } from './rng.js';
 import { TEAMS, CLUBS, LEAGUE_CLUBS, teamById, divisionName, setMyClub } from './teams.js';
@@ -111,6 +111,38 @@ function addClub(c, t) {
 // a player with a painted portrait is as old as he looks in it
 const portraitKey = name => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 export const lookAge = p => PORTRAIT_AGE[portraitKey(p.name || '')];
+// Players the game makes up (the nets' trialists, academy prospects, free agents) have no painted portrait of their own. Each borrows one, for good (p.pic, a key of
+// portraits-list.js), so every player in a career shows a painted face. It is chosen to suit him (his country, his age) and never repeats a face in his own club;
+// faces already lent are used last. A career saved before this gets its pictures the first time it opens.
+const HAS_PIC = new Set(PORTRAIT_KEYS), picsDone = new WeakMap();
+export function ensurePics(c) {
+  const ps = Object.values(c.players || {});
+  if (picsDone.get(c) === ps.length) return;
+  picsDone.set(c, ps.length);
+  const keyOfP = p => portraitKey((p.heroId && heroById(p.heroId)?.name) || p.name || '');
+  const owner = new Map();
+  for (const q of ps) { const k = keyOfP(q); if (HAS_PIC.has(k)) owner.set(k, q); }
+  const lent = new Map();   // key -> how many have borrowed it
+  for (const q of ps) if (q.pic) lent.set(q.pic, (lent.get(q.pic) || 0) + 1);
+  const myDiv = c.club ? divisionOf(c, c.club) : null;
+  for (const p of ps) {
+    if (p.pic || HAS_PIC.has(keyOfP(p))) continue;
+    const mates = new Set(ps.filter(q => q.team === p.team && p.team != null).map(q => q.pic || keyOfP(q)));
+    let best = null, bestScore = -1e9;
+    for (const [k, o] of owner) {
+      if (o.team === p.team && p.team != null) continue;     // never a face already in his own club
+      if (mates.has(k)) continue;
+      let sc = (lent.get(k) || 0) * -6;                       // lent faces last
+      if (o.nation && o.nation === p.nation) sc += 3;
+      const a = PORTRAIT_AGE[k]; if (a != null && p.age != null) sc -= Math.min(6, Math.abs(a - p.age)) * 0.7;
+      if (o.team && myDiv && c.club && divisionOf(c, o.team) !== myDiv) sc += 2;   // from another division: far from the club he plays for
+      if (o.team === c.club) sc -= 8;                         // not from your own club
+      sc += (hashStr(`${p.id}-${k}`) % 1000) / 1000;         // a stable tie-break
+      if (sc > bestScore) { bestScore = sc; best = k; }
+    }
+    if (best) { p.pic = best; lent.set(best, (lent.get(best) || 0) + 1); }
+  }
+}
 const teamOfStar = id => TEAMS.find(t => t.star === id)?.id || null;
 
 const NICKS = ['Kid', 'Rookie', 'Spark', 'Pocket Rocket', 'Wonderboy', 'Junior', 'Prodigy', 'Rising Sun', 'Little Master', 'Cub', 'Comet', 'Bullet', 'Whiz', 'Ace'];

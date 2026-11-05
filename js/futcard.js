@@ -17,7 +17,7 @@ import { PORTRAIT_FRAMES } from './portrait-looks.js';
 // club's kit (blue to its main colour, yellow to its trim), skin, hair and face untouched.
 const HAS_PORTRAIT = new Set(PORTRAIT_KEYS);
 // (a stand-in club captain, or a hero not in the list, has no name here: so no painted portrait, and the drawn figure is used)
-const keyOf = p => ((p.heroId && heroById(p.heroId)?.name) || p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const keyOf = p => p.pic || ((p.heroId && heroById(p.heroId)?.name) || p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const srcs = new Map(), kits = new Map();
 const FRAME_FACE = 0.62;   // the face's width, as a share of a squad tile's
 // the last batches of portraits are a few pictures (PORTRAIT_FILES); each is cut out of its picture onto a canvas that stands in
