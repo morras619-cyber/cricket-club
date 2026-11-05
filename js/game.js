@@ -2066,7 +2066,7 @@ export class Game {
     if (Math.abs(off) > 0.08) this.fx.word('LATE MOVEMENT!', this.W / 2, this.H * 0.5, { size: 32, color: '#3ec6ff', stroke: INK, rot: 0, dur: 900 });
 
     // read the batter: expectation, weak spot, setups, mood
-    const shape = { length: spec.length, lane: laneFor(d.xt), lateWorld: G.lateWorld, mag: G.mag, slower: G.slower, after: off, sweet: !!G.sweet && rg !== 'loose' };
+    const shape = { length: spec.length, lane: laneFor(d.xt), lateWorld: G.lateWorld, mag: G.mag, air: G.air || 0, slower: G.slower, after: off, sweet: !!G.sweet && rg !== 'loose' };
     const mods = opt.scripted ? null : deliveryMods(shape, this.bowlHistory, exp?.expect, profile, mood);
     shape.combo = mods?.combo || null;
     shape.weak = !!mods?.weak;
@@ -3526,14 +3526,14 @@ export class Game {
   // Drag the ball: left or right is which way it moves (swing, turn or cut) and how much; up is off the pitch (seam, turn), down is in the air (swing, flight).
   // It stays where you leave it from ball to ball. A better bowler can push it further (the dashed ring); past what he controls it may go loose.
   gripGeom() {
-    const m = this.mapRect(), R = 34;
-    return { cx: m.x + m.w / 2, cy: m.y + m.h + 22 + R + 14, R };
+    const m = this.mapRect(), R = 46;
+    return { cx: m.x + m.w / 2, cy: m.y + m.h + 22 + 40 + R, R };   // (the name sits above the ring, where a thumb on the ball doesn't cover it)
   }
   inGrip(g) {
     const S = this.S;
     if (this.view !== 'bowl' || !S?.gripBowler || S.delivery || S.flight) return false;
     const { cx, cy, R } = this.gripGeom();
-    return Math.hypot(g.x - cx, g.y - cy) <= R + 18;
+    return Math.hypot(g.x - cx, g.y - cy) <= R + 20;
   }
   // the grip as the delivery reads it: limited to what this bowler can do
   gripOf(bowler) {
@@ -3546,8 +3546,9 @@ export class Game {
     let lat = (g.x - cx) / R, air = -(g.y - cy) / R;
     const len = Math.hypot(lat, air);
     if (len > cap) { lat *= cap / len; air *= cap / len; }
-    if (Math.abs(lat) < 0.06) lat = 0;   // (a small nudge from the middle is the stock ball)
-    if (Math.abs(air) < 0.08) air = 0;
+    if (Math.abs(lat) < 0.12) lat = 0;   // (near the middle is the stock ball)
+    if (Math.abs(air) < 0.12) air = 0;
+    if (Math.hypot(lat, air) > cap * 0.9) { const k = cap / Math.hypot(lat, air); lat *= k; air *= k; }   // (and near the limit it sits on the limit)
     if (lat !== this.grip.lat || air !== this.grip.air) { this.grip = { lat, air }; buzz(5); }
     this.gripHints = 0;
   }
@@ -3557,26 +3558,29 @@ export class Game {
     const pv = gestureToDelivery([{ x: 0, y: 700, t: 0 }, { x: 0, y: 380, t: 120 }], bowler.bowl || 'swing', 1, g);
     const risk = pv ? overcook(pv.strength, bowler.bowlSkill) : 0;
     const col = risk >= 0.2 ? '#ff6b6b' : risk > 0 ? '#ffcf4a' : '#5dff9b';
+    const px = cx - R - 14, py = cy - R - 52, pw = R * 2 + 28, ph = R * 2 + 62;
     ctx.save();
     ctx.fillStyle = 'rgba(16,22,50,0.9)'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.roundRect(cx - R - 12, cy - R - 14, R * 2 + 24, R * 2 + 46, 12); ctx.fill(); ctx.stroke();
-    // the track, and the limit of this bowler
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 12); ctx.fill(); ctx.stroke();
+    // what it is, above the ring: the delivery's name, the length it likes, and how hard it is to play
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff4da'; ctx.font = '800 12px system-ui, sans-serif'; ctx.fillText((pv?.type || '').toUpperCase(), cx, py + 13);
+    const best = spin ? 'GOOD · FULL' : g.air <= -0.25 ? 'FULL' : g.air >= 0.25 ? 'BACK OF A LENGTH' : 'GOOD LENGTH';
+    ctx.font = '700 9px system-ui, sans-serif'; ctx.fillStyle = pv && pv.mag > 0.3 ? col : 'rgba(255,255,255,0.55)';
+    ctx.fillText(pv && pv.mag > 0.3 ? (risk >= 0.2 ? 'RISKY: MAY GO LOOSE' : `BEST: ${best}`) : 'TAP OR DRAG THE BALL', cx, py + 28);
+    const lvl = pv ? Math.min(4, Math.round(pv.mag * (1 + 0.25 * Math.abs(g.air)) * 4)) : 0;
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = i < lvl ? col : 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.roundRect(cx - 26 + i * 14, py + 37, 12, 5, 2); ctx.fill(); }
+    // the track and the limit of this bowler
     ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,210,63,0.7)'; ctx.beginPath(); ctx.arc(cx, cy, R * cap, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
-    // what the two ends of the up-and-down mean
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '700 8px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(spin ? 'TURN' : 'SEAM', cx, cy - R + 8); ctx.fillText(spin ? 'FLIGHT' : 'AIR', cx, cy + R - 8);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '700 9px system-ui, sans-serif';
+    ctx.fillText(spin ? 'TURN' : 'SEAM', cx, cy - R + 10); ctx.fillText(spin ? 'FLIGHT' : 'AIR', cx, cy + R - 10);
+    ctx.fillText('IN', cx - R + 10, cy); ctx.fillText('OUT', cx + R - 12, cy);
     // the ball is the thumb: its seam turns with the way it is set
     const bx = cx + g.lat * R, by = cy - g.air * R;
     if (g.lat || g.air) { ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke(); }
-    paintBall(ctx, bx, by, 11, Math.atan2(g.lat, g.air || 0.001) + 0.6, { glow: col });
-    // its name, and the length it likes
-    ctx.fillStyle = '#fff4da'; ctx.font = '800 10px system-ui, sans-serif'; ctx.fillText((pv?.type || '').toUpperCase(), cx, cy + R + 14);
-    if (pv && pv.mag > 0.3) {
-      const best = spin ? 'GOOD · FULL' : g.air <= -0.25 ? 'FULL' : g.air >= 0.25 ? 'BACK OF A LENGTH' : 'GOOD LENGTH';
-      ctx.fillStyle = col; ctx.font = '700 8px system-ui, sans-serif'; ctx.fillText(risk >= 0.2 ? 'RISKY' : `BEST: ${best}`, cx, cy + R + 26);
-    }
+    paintBall(ctx, bx, by, 13, Math.atan2(g.lat, g.air || 0.001) + 0.6, { glow: col });
     ctx.restore();
   }
 

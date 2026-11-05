@@ -191,6 +191,13 @@ export function deliveryMods(d, history, expect, profile, mood) {
     m.sigmaMul *= 0.8; m.tags.push({ id: 'pattern', label: 'PATTERN SPOTTED', charge: 0 });
   }
   if (d.sweet) { m.sigmaMul *= 1.2; m.tags.push({ id: 'sweet', label: 'RIGHT LENGTH FOR IT!', charge: 3 }); }
+  // movement itself is hard to play: the more it swings or turns (and the more it does so in the air or off the pitch together), the more he is beaten or edges
+  const mv = (d.mag || 0) * (1 + 0.25 * Math.abs(d.air || 0));
+  if (mv > 0.15) { m.sigmaMul *= 1 + 0.25 * mv; m.edgeBoost += 0.1 * mv; }
+  // ...but he gets used to it: the same way three balls running and he is set for it
+  if (prev && prev2 && d.lateWorld && prev.lateWorld === d.lateWorld && prev2.lateWorld === d.lateWorld && prev.mag > 0.3 && prev2.mag > 0.3 && (d.mag || 0) > 0.3) {
+    m.sigmaMul *= 0.85; m.tags.push({ id: 'settled', label: 'HE\'S SETTLED', charge: 0 });
+  }
   const late = Math.abs(d.after || 0);
   if (late > 0.04) { m.sigmaMul *= 1 + 1.2 * late; m.edgeBoost += 0.35 * late; }
   const md = mood && MOOD[mood.state];

@@ -41,3 +41,13 @@ test('the right length for the movement unsettles the batter', () => {
   const m = deliveryMods({ length: 'full', lane: 'off', lateWorld: 1, mag: 0.7, sweet: true }, [], null, null, null);
   assert.ok(m.sigmaMul > 1.15 && m.tags.some(t => t.id === 'sweet'));
 });
+test('movement itself makes the ball harder to play, and a batter who has seen the same way three times is set for it', () => {
+  const d = (mag, air = 0, lateWorld = 1) => ({ length: 'yorker', lane: 'stumps', lateWorld, mag, air });
+  const still = deliveryMods(d(0), [], null, null, null), mild = deliveryMods(d(0.4), [], null, null, null), big = deliveryMods(d(1, -1), [], null, null, null);
+  assert.equal(still.sigmaMul, 1); assert.ok(mild.sigmaMul > 1 && big.sigmaMul > mild.sigmaMul, 'the more it moves the harder');
+  assert.ok(big.edgeBoost > mild.edgeBoost);
+  const seen = [{ length: 'good', lateWorld: 1, mag: 0.6 }, { length: 'full', lateWorld: 1, mag: 0.6 }];
+  const set = deliveryMods(d(0.6), seen, null, null, null), fresh = deliveryMods(d(0.6), [{ length: 'good', lateWorld: -1, mag: 0.6 }, { length: 'full', lateWorld: 1, mag: 0.6 }], null, null, null);
+  assert.ok(set.tags.some(t => t.id === 'settled') && !fresh.tags.some(t => t.id === 'settled'));
+  assert.ok(set.sigmaMul < fresh.sigmaMul, 'the same ball again is easier');
+});
