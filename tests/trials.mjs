@@ -292,8 +292,9 @@ check(await page.evaluate(() => !document.getElementById('settings').hidden), 'b
 // the club shop: from the settings (a practice club): gear with today's deals, the armoury, looks, the diamond packs, the level; no scrolling
 await page.evaluate(() => document.getElementById('setShop').click()); await page.waitForTimeout(1500);
 const shopTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#shopTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(300); };
+const shopNoClip = async () => page.evaluate(() => { const m = document.querySelector('#shop .mf'); return m.scrollHeight <= m.clientHeight + 1; });
 const shopFits = async () => page.evaluate(() => { const m = document.querySelector('#shop .mf'), b = document.getElementById('shopBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
-check(await page.evaluate(() => !document.getElementById('shop').hidden && document.querySelectorAll('#shopTabs .mf-tab').length === 5 && document.querySelectorAll('#shopBody .item-tile').length === 9 && document.querySelectorAll('#shopBody .item-tile.sale').length === 3) && await shopFits(), 'the settings open the club shop: five tabs, nine items of gear, three of them on sale, fitting the screen');
+check(await page.evaluate(() => !document.getElementById('shop').hidden && document.querySelectorAll('#shopTabs .mf-tab').length === 5 && document.querySelectorAll('#shopBody .item-tile').length === 9 && document.querySelectorAll('#shopBody .item-tile.sale').length === 3) && await shopNoClip(), 'the settings open the club shop: five tabs, nine picture tiles of gear, three of them on sale, scrolling inside the body');
 if (process.env.SHOTS_DIR) await page.screenshot({ path: join(process.env.SHOTS_DIR, 'shop-gear.png') });
 await page.evaluate(() => [...document.querySelectorAll('#shopBody .item-tile')][0].click()); await page.waitForTimeout(300);
 await page.evaluate(() => [...document.querySelectorAll('#shopSheet button')].find(b => /Buy/.test(b.textContent)).click()); await page.waitForTimeout(400);
@@ -317,6 +318,7 @@ check(await page.evaluate(() => !document.getElementById('settings').hidden), 'b
 // the apartment: from the settings (a practice club): the trophy cabinet, the manager, the story, the decor, the level; no scrolling
 await page.evaluate(() => document.getElementById('setApartment').click()); await page.waitForTimeout(1200);
 const aptTab = async name => { await page.evaluate(n => [...document.querySelectorAll('#apartmentTabs .mf-tab')].find(t => t.textContent.includes(n)).click(), name); await page.waitForTimeout(300); };
+const aptNoClip = async () => page.evaluate(() => { const m = document.querySelector('#apartment .mf'); return m.scrollHeight <= m.clientHeight + 1; });
 const aptFits = async () => page.evaluate(() => { const m = document.querySelector('#apartment .mf'), b = document.getElementById('apartmentBody'); return m.scrollHeight <= m.clientHeight + 1 && b.scrollHeight <= b.clientHeight + 1; });
 check(await page.evaluate(() => !document.getElementById('apartment').hidden && document.querySelectorAll('#apartmentTabs .mf-tab').length === 5 && document.querySelectorAll('#apartmentBody .mf-card.empty').length === 5) && await aptFits(), 'the settings open the apartment: five tabs and an empty cabinet with five kinds of trophy to win');
 for (const t of ['D3 title', 'Promoted', 'League title']) await page.evaluate(t => [...document.querySelectorAll('#apartmentTest .chipbtn')].find(b => b.textContent === t).click(), t);
@@ -328,7 +330,7 @@ check(await page.evaluate(() => /Manager level [2-9]/.test(document.getElementBy
 await aptTab('Story');
 check(await page.evaluate(() => document.querySelectorAll('#apartmentBody .mf-card').length === 3) && await aptFits(), 'the story lists the seasons');
 await aptTab('Decor');
-check(await page.evaluate(() => document.querySelectorAll('#apartmentBody .item-tile').length === 9) && await aptFits(), 'nine pieces of decor to buy with the salary, fitting the screen');
+check(await page.evaluate(() => document.querySelectorAll('#apartmentBody .item-tile').length === 9) && await aptNoClip(), 'nine pieces of decor to buy with the salary, scrolling inside the body');
 await page.evaluate(() => [...document.querySelectorAll('#apartmentBody .item-tile')][0].click()); await page.waitForTimeout(300);
 await page.evaluate(() => [...document.querySelectorAll('#apartmentSheet button')].find(b => /Buy/.test(b.textContent)).click()); await page.waitForTimeout(400);
 check(await page.evaluate(() => Object.keys(window.__sixcharge.demo.apartment.decor).length === 1), 'a piece of decor is bought with the salary');

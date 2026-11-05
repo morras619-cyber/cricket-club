@@ -398,7 +398,7 @@ function paintShop(c) {
     const grid = el('div', 'item-grid');
     for (const [id, G] of Object.entries(SHOP.GEAR)) {
       const sale = !!deals && deals.ids.includes(id) && !deals.taken[id];
-      grid.append(itemTile(GEAR_ICON[G.kind], G.name, gearText(G), sale ? money(gearPrice(c, id, true)) : money(G.cost), { sale, old: sale ? money(G.cost) : '', onClick: () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); } }));
+      grid.append(itemTile(`img/shop/${id}.webp`, G.name, gearText(G), sale ? money(gearPrice(c, id, true)) : money(G.cost), { sale, old: sale ? money(G.cost) : '', onClick: () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); } }));
     }
     body.append(grid);
   } else if (shopTab === 'armoury') {
@@ -407,7 +407,7 @@ function paintShop(c) {
       const g = h.gear[i];
       if (!g) { const card = el('div', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Empty')); grid.append(card); continue; }
       const G = SHOP.GEAR[g.item], who = g.on && c.players[g.on];
-      grid.append(itemTile(who ? frameOf(playerFace(who, 44)) : ico(GEAR_ICON[G.kind]), G.name, who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`, '', { bar: g.uses / SHOP.USES * 100, onClick: () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); } }));
+      grid.append(itemTile(`img/shop/${g.item}.webp`, G.name, who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`, '', { bar: g.uses / SHOP.USES * 100, face: who ? frameOf(playerFace(who, 44)) : null, onClick: () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); } }));
     }
     body.append(grid);
     body.append(info('warn', `A player carries one thing. It wears out after ${SHOP.USES} of your matches that he plays in. The armoury holds ${armourySlots(c)}.`));
@@ -1640,9 +1640,10 @@ const ICON_COLOUR = { coin: '#ffd23f', clock: '#ffffff', heart: '#ff4d5e', ball:
 const ico = (name, cls = '') => { const sp = el('span', `ico ${cls}`.trim()); sp.dataset.n = name; if (ICON_COLOUR[name]) sp.style.setProperty('--ic', ICON_COLOUR[name]); sp.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`; return sp; };
 const mfBtn = (cls, content, fn) => { const b = el('button', cls); b.append(...content); if (fn) b.addEventListener('click', fn); return b; };
 // a thing you can buy, win or own, as a tall tile: a big round icon, its name, what it does, and its price (or "yours"). opts: { sale, old, have, bar, onClick }
-function itemTile(icon, name, what, price, { sale = false, old = '', have = false, bar = null, onClick } = {}) {
-  const t = el('button', `item-tile${have ? ' have' : ''}${sale ? ' sale' : ''}`), orb = el('span', 'item-orb');
-  orb.append(typeof icon === 'string' ? ico(icon, have ? 'on' : '') : icon);
+function itemTile(icon, name, what, price, { sale = false, old = '', have = false, bar = null, face = null, onClick } = {}) {
+  const art = typeof icon === 'string' && icon.startsWith('img/'), t = el('button', `item-tile${art ? ' art' : ''}${have ? ' have' : ''}${sale ? ' sale' : ''}`), orb = el('span', 'item-orb');
+  if (art) { const im = el('img'); im.src = icon; im.alt = ''; im.draggable = false; orb.append(im); if (face) orb.append(face); }
+  else orb.append(typeof icon === 'string' ? ico(icon, have ? 'on' : '') : icon);
   const pr = el('span', 'item-price'); if (price) pr.append(old ? el('s', '', old) : '', el('b', '', price));
   t.append(orb, el('b', 'item-name', name), el('small', '', what));
   if (bar != null) { const m = el('span', 'pt-bar item-bar'), f = el('i', 'green'); f.style.width = `${Math.max(6, Math.min(100, Math.round(bar)))}%`; m.append(f); t.append(m); }
@@ -2402,7 +2403,7 @@ function paintApartment(c) {
     const own = Object.keys(a.decor).length, grid = el('div', 'item-grid');
     for (const [id, D] of Object.entries(APT.DECOR)) {
       const have = !!a.decor[id];
-      grid.append(itemTile(DECOR_ICON[id], D.name, `+${D.mp} pts`, have ? 'Yours' : money(D.cost), { have, onClick: () => { if (!have) { aptSheet = { type: 'decor', id }; sfx.click(); paintApartment(c); } } }));
+      grid.append(itemTile(`img/shop/${id}.webp`, D.name, `+${D.mp} pts`, have ? 'Yours' : money(D.cost), { have, onClick: () => { if (!have) { aptSheet = { type: 'decor', id }; sfx.click(); paintApartment(c); } } }));
     }
     body.append(info('heart', `Furnish your place with your salary: ${own} of ${decorSlots(c)} places used.`), grid);
   } else {

@@ -2035,3 +2035,17 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mf[data-tight="3"] .cand-row .mf-card.cand, .mf[data-tight="4"] .cand-row .mf-card.cand { flex: 0 0 78%; } .mf[data-tight="4"] .cand-row .mf-card.cand { flex: 0 0 64%; }
 .mf[data-tight="3"] .mf-body .mf-card.col, .mf[data-tight="4"] .mf-body .mf-card.col { padding: 8px 12px; gap: 5px; } .mf[data-tight="3"] .mf-body .mf-card.col .mf-sheet-head b, .mf[data-tight="4"] .mf-body .mf-card.col .mf-sheet-head b { font-size: 24px; } .mf[data-tight="4"] .mf-body .mf-card.col .mf-row { font-size: 13px; }
 .mf[data-tight="4"] .item-orb { width: 30px; height: 30px; } .mf[data-tight="4"] .item-orb .ico { width: 20px; height: 20px; } .mf[data-tight="4"] .item-tile { padding: 4px 3px 4px; gap: 1px; } .mf[data-tight="4"] .item-price { margin-top: 1px; padding: 2px 8px; min-height: 0; } .mf[data-tight="4"] .item-grid { gap: 5px; padding-bottom: 2px; }
+/* picture-led item tiles: painted art fills the top, a dark caption strip and a gold price below */
+.item-tile.art { padding: 0; gap: 0; overflow: hidden; background: #0c1334; border: 2px solid #070b24; color: #fff; box-shadow: 0 0 0 2px rgba(255, 210, 63, .35), 0 4px 0 2px #070b24; }
+.item-tile.art.sale { box-shadow: 0 0 0 2px #e0382b, 0 4px 0 2px #070b24; } .item-tile.art.have { box-shadow: 0 0 0 2px #2fd35f, 0 4px 0 2px #070b24; }
+.item-tile.art .item-orb { width: 100%; height: auto; aspect-ratio: 1 / 1; border-radius: 0; background: none; box-shadow: none; margin: 0; display: block; position: relative; }
+.item-tile.art .item-orb img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.item-tile.art .item-orb .mf-frame { position: absolute; right: 4px; bottom: 4px; --fs: 34px; border-radius: 50%; box-shadow: 0 0 0 2px #070b24; }
+.item-tile.art .item-name { color: #fff; padding: 5px 4px 0; text-shadow: 0 1px 0 #070b24; } .item-tile.art small { color: rgba(255, 255, 255, .72); padding: 0 4px; }
+.item-tile.art .item-price { margin: 5px 6px 6px; align-self: stretch; justify-content: center; background: linear-gradient(180deg, #ffe062, #f2a91c); box-shadow: 0 2px 0 #070b24; } .item-tile.art .item-price b { color: #2a1700; } .item-tile.art .item-price s { color: rgba(42, 23, 0, .55); }
+.item-tile.art.have .item-price { background: linear-gradient(180deg, #8af0a6, #2fbd5c); } .item-tile.art.have .item-price b { color: #06361a; }
+.item-tile.art .item-bar { margin: 4px 8px 6px; }
+.item-tile.art .item-sale { top: 6px; left: 6px; }
+/* agent / daily-deals banners: dark glass like the other heroes */
+.mf-body .mf-card.mf-agent { background: linear-gradient(180deg, rgba(20, 34, 92, .92), rgba(8, 14, 48, .94)); border-image: none; border: 2px solid rgba(255, 210, 63, .45); border-radius: 16px; box-shadow: 0 0 0 2px #070b24; color: #fff; }
+.mf-body .mf-card.mf-agent b { color: #fff; } .mf-body .mf-card.mf-agent small { color: rgba(255, 255, 255, .75); }
