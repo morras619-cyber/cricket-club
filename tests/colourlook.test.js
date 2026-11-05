@@ -17,7 +17,7 @@ test('every player in a career has skin and hair as colours the cut-in can draw'
     assert.match(col.hair, /^#[0-9a-f]{6}$/i, p.name);
     assert.doesNotThrow(() => { shade(col.skin, 0.15); shade(col.hair, 0.2); }, p.name);
   }
-  assert.ok(generated > 20, 'the career has plenty of generated players, which is what crashed the cut-in');
+  assert.ok(generated > 0, 'the career still has generated players (almost everyone has a painted portrait now), which is what crashed the cut-in');
 });
 
 test('colourLook keeps painted colours and fills what is missing', () => {
