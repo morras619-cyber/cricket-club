@@ -1733,13 +1733,14 @@ function fanCard(p, club, { name, fill, barClass = '', vals, variant, onClick, p
 // a player as a tall football-style tile: his picture fills it, his rating is the big badge, the frame's colour is his tier (bronze up to legendary),
 // and one thin bar says how far he has come. opts: { ovr, pot, bar (0..100, default ovr to pot), selected, onClick }
 const ROLE_TAG = { bat: 'BAT', bowl: 'BOWL', all: 'AR', wk: 'WK' };
-function playerTile(p, club, { ovr: o, pot, bar, selected = false, onClick }) {
-  const t = el('button', `ptile tier-${tierOf(o).id}${selected ? ' sel' : ''}`), pic = el('span', 'pt-pic');
+function playerTile(p, club, { ovr: o, pot, sub, bar, tone = '', chips = [], tier, need = false, selected = false, onClick }) {
+  const t = el('button', `ptile tier-${tier || tierOf(o).id}${selected ? ' sel' : ''}${need ? ' need' : ''}`), pic = el('span', 'pt-pic');
   pic.append(paintedPortrait(p, p.team ? teamById(p.team) : club) || playerFace(p, 120));
   const badge = el('span', 'pt-ovr'); badge.append(el('b', '', String(o)), el('small', '', ROLE_TAG[p.role] || ''));
-  const plate = el('span', 'pt-plate'), fill = el('i'), meter = el('span', 'pt-bar'); fill.style.width = `${Math.max(6, Math.min(100, Math.round(bar ?? (pot ? o / pot * 100 : 100))))}%`; meter.append(fill);
-  plate.append(el('b', '', lastName(p.name)), pot ? el('small', '', `${o} ▸ ${pot}`) : el('small', '', ''), meter);
-  t.append(pic, badge, el('span', 'pt-flag', flag(p)), plate);
+  const plate = el('span', 'pt-plate'), fill = el('i', tone), meter = el('span', 'pt-bar'); fill.style.width = `${Math.max(6, Math.min(100, Math.round(bar ?? (pot ? o / pot * 100 : 100))))}%`; meter.append(fill);
+  plate.append(el('b', '', lastName(p.name)), el('small', '', sub ?? (pot ? `${o} ▸ ${pot}` : '')), meter);
+  const cs = el('span', 'pt-chips'); for (const k of chips) cs.append(el('i', `pt-chip ${k.tone || ''}`, k.t));
+  t.append(pic, badge, el('span', 'pt-flag', flag(p)), cs, plate);
   t.addEventListener('click', onClick);
   return t;
 }
@@ -1956,7 +1957,7 @@ function paintTraining(c) {
   const body = $('trainBody');
   body.replaceChildren();
   if (trainTab === 'players') {
-    const grid = el('div', 'mf-grid fc-grid');
+    const grid = el('div', 'mf-grid ptile-grid');
     t.slots.forEach((pid, i) => {
       const info = pid && roster.get(pid), p = pid && c.players[pid];
       if (!info) {
@@ -1965,9 +1966,7 @@ function paintTraining(c) {
         grid.append(card); return;
       }
       const cost = TG.tpCost(info.ovr, info.age), tp = t.tp[pid] || 0, learn = TG.canLearn(info), coach = who.get(pid);
-      const card = fanCard(p, club, { name: lastName(info.name), variant: 'train', barClass: 'green', fill: tp / cost * 100, onClick: () => { trainSheet = { type: 'slot', index: i }; sfx.click(); paintTraining(c); },
-        vals: [{ t: String(info.ovr), title: 'Rating now' }, { t: String(info.pot), title: 'Potential' }, { t: `${Math.round(tp)}`, title: `Training points: ${Math.round(tp)} of ${cost} for the next rating point` },
-          { t: coach ? '✓' : '!', dim: !coach, title: !learn ? (info.age >= TG.TRAIN.PEAK_AGE ? 'Too old to learn' : 'At his potential') : coach ? 'Training' : `Needs a ${info.kinds.join(' or ')} coach` }] });
+      const card = playerTile(p, club, { ovr: info.ovr, pot: info.pot, bar: tp / cost * 100, tone: 'green', chips: learn && !coach ? [{ t: 'NEEDS COACH', tone: 'amber' }] : !learn ? [{ t: 'MAXED', tone: 'blue' }] : [{ t: 'TRAINING', tone: 'green' }], onClick: () => { trainSheet = { type: 'slot', index: i }; sfx.click(); paintTraining(c); } });
       grid.append(card);
     });
     body.append(grid);
@@ -2473,12 +2472,10 @@ function paintAcademy(c) {
   body.replaceChildren();
   const left = ms => durfmt(Math.max(0, ms));
   if (acadTab === 'prospects') {
-    const grid = el('div', 'mf-grid fc-grid'), list = prospectsOf(c);
+    const grid = el('div', 'mf-grid ptile-grid'), list = prospectsOf(c);
     for (const p of list) {
       const rev = a.revealed[p.id], tier = p.academy?.tier ?? 0, drill = a.drills[p.id], TL = ['C', 'R', 'E', 'S'];
-      const card = fanCard(p, teamById(c.club), { name: lastName(p.name), variant: 'acad', fill: rev ? ovr(p) / Math.max(1, p.pot) * 100 : ovr(p), onClick: () => { acadSheet = { type: 'prospect', id: p.id }; sfx.click(); paintAcademy(c); },
-        vals: [{ t: String(ovr(p)), title: 'Rating now' }, { t: rev ? String(p.pot) : '?', dim: !rev, title: rev ? 'What he can become' : 'A trial drill shows what he can become' }, { t: drill ? left(drill - now) : String(p.age), title: drill ? 'The trial drill is running' : `Age: he can play at ${AC.ACAD.PLAY_AGE}` }, { t: rev ? TL[tier] : '?', dim: !rev, title: rev ? `${AC.TIERS[tier]} prospect` : 'Tier unknown' }] });
-      card.classList.add(`tier-${rev ? TIER_CLS[tier] : 'unknown'}`);
+      const card = playerTile(p, teamById(c.club), { ovr: ovr(p), sub: rev ? `${ovr(p)} ▸ ${p.pot}` : `${ovr(p)} ▸ ?`, bar: rev ? ovr(p) / Math.max(1, p.pot) * 100 : ovr(p), tier: rev ? ['common', 'rare', 'epic', 'legendary'][tier] : 'unknown', chips: drill ? [{ t: left(drill - now), tone: 'blue' }] : [{ t: `AGE ${p.age}`, tone: p.age >= AC.ACAD.PLAY_AGE ? 'green' : '' }], onClick: () => { acadSheet = { type: 'prospect', id: p.id }; sfx.click(); paintAcademy(c); } });
       grid.append(card);
     }
     for (let i = list.length; i < L.slots; i++) {
@@ -2641,11 +2638,10 @@ function paintMedical(c) {
   const hoursToFull = id => { const sp = MD.bedSpeed(m), need = MD.fitCap(m, id) - MD.fitOf(m, id); return sp ? need / (MD.MED.BED * sp) * 3600000 : need / MD.MED.REST * 3600000; };
   const bar = id => { const f = MD.fitOf(m, id), b = el('div', `mf-bar ${fitColour(f)}`), i = el('i'); i.style.width = `${Math.max(3, Math.round(f))}%`; b.append(i); return b; };
   if (medTab === 'squad') {
-    const grid = el('div', 'mf-grid fc-grid'), list = [...squad].sort((a, b) => MD.fitOf(m, a.id) - MD.fitOf(m, b.id)).slice(0, 6);
+    const grid = el('div', 'mf-grid ptile-grid'), list = [...squad].sort((a, b) => MD.fitOf(m, a.id) - MD.fitOf(m, b.id)).slice(0, 6);
     for (const p of list) {
       const f = Math.round(MD.fitOf(m, p.id)), kn = MD.isKnocked(m, p.id), bed = m.beds.includes(p.id);
-      const card = fanCard(p, club, { name: lastName(p.name), variant: 'med', pick: p === list[0] && f < 90, fill: f, barClass: f < 40 ? 'red' : f < 80 ? '' : 'green', onClick: () => { medSheet = { type: 'player', id: p.id }; sfx.click(); paintMedical(c); },
-        vals: [{ t: String(f), title: 'Fitness: how fresh he starts the next match' }, { t: bed ? '✓' : '–', dim: !bed, title: bed ? 'In a bed' : 'Not in a bed' }, { t: kn ? '!' : '–', dim: !kn, title: kn ? 'Has a knock: his fitness stops at 50 until he is treated' : 'No knock' }, { t: String(ovr(p)), title: 'Rating' }] });
+      const card = playerTile(p, club, { ovr: ovr(p), sub: `Fit ${f}`, bar: f, tone: f < 40 ? 'red' : f < 80 ? 'amber' : 'green', need: p === list[0] && f < 90, chips: [...(kn ? [{ t: 'KNOCK', tone: 'red' }] : []), ...(bed ? [{ t: 'IN BED', tone: 'blue' }] : [])], onClick: () => { medSheet = { type: 'player', id: p.id }; sfx.click(); paintMedical(c); } });
       grid.append(card);
     }
     body.append(grid);
