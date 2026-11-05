@@ -3203,6 +3203,20 @@ function careerAuction(c, body) {
     }
     pg.append(tbl, el('p', 'auc-need', now.needed ? `You need ${now.needed} more player${now.needed > 1 ? 's' : ''} to reach ${MIN_SQUAD}. ${now.places} places are free.` : `Squad complete. ${now.places} place${now.places === 1 ? ' is' : 's are'} free.`));
     body.append(pg);
+    // who is coming up next, and your own squad: players that slide along, like the training ground's
+    const next = c.auction.lots.slice(c.auction.idx + 1, c.auction.idx + 9);
+    if (next.length) {
+      const up = el('div', 'panel statcard auc-page'), row = el('div', 'ptile-row ptile-slide auc-slide');
+      up.append(el('h3', 'auc-h', 'Coming up'));
+      for (const pid of next) { const q = c.players[pid]; row.append(playerTile(q, teamById(c.club), { ovr: ovr(q), sub: `${q.age ?? '—'} yrs · ${money(openingPrice(q))}`, bar: ovr(q) / (q.pot || ovr(q)) * 100, onClick: () => { sfx.click(); ui.toast(`${q.name}: ${ageNote(q)}`); } })); }
+      up.append(row, el('p', 'auc-need', 'Swipe along: the next players to come up for auction, and what each opens at.'));
+      body.append(up);
+    }
+    const sq = el('div', 'panel statcard auc-page'), srow = el('div', 'ptile-row ptile-slide auc-slide');
+    sq.append(el('h3', 'auc-h', 'My squad'));
+    for (const q of [...mine].sort((a, b) => ovr(b) - ovr(a))) srow.append(playerTile(q, teamById(c.club), { ovr: ovr(q), sub: q.pot ? `${ovr(q)} ▸ ${q.pot}` : `${q.age ?? '—'} yrs`, onClick: () => { sfx.click(); ui.toast(`${q.name}: ${ageNote(q)}`); } }));
+    sq.append(srow, el('p', 'auc-need', `${mine.length} of ${MAX_SQUAD} places filled · ${money(c.money)} to spend.`));
+    body.append(sq);
   }
   const res = c.auction.results.slice(-8).reverse();
   if (res.length) {
@@ -3461,22 +3475,26 @@ function careerSquad(c, body) {
   const list = el('div', 'panel paper sheetbox');
   list.append(el('h3', '', `${teamById(c.club).name} · ${pool.length}/${MAX_SQUAD}`));
   list.append(el('p', 'sheetnote', `Players improve when they play well, up to their potential, until they turn ${PEAK_AGE}. A regular who reaches ${STAR_OVR} becomes a star with an ability.`));
-  const grid = el('div', 'futgrid');
-  list.append(grid);
-  for (const p of [...pool].sort((a, b) => ovr(b) - ovr(a))) {
-    const r = el('div', 'futcell');
-    const s = p.stats.season;
-    r.append(futCard(p, { size: 112 }),
-      el('div', 'futnote', `${p.contract} season${p.contract === 1 ? '' : 's'} left · this season ${s.runs}r ${s.wkts}w · ${canGrow(p) ? `XP ${Math.round(p.xp || 0)} / ${xpNeed(p)}` : 'at his best'}`));
+  // the players slide along (three show, the next peeks in); the one you tap shows his season and a Release button below
+  const row = el('div', 'ptile-row ptile-slide squad-slide'), detail = el('div', 'squad-detail');
+  const sorted = [...pool].sort((a, b) => ovr(b) - ovr(a));
+  let picked = sorted[0]?.id;
+  const showDetail = () => {
+    const p = pool.find(x => x.id === picked); detail.replaceChildren(); if (!p) return;
+    const s = p.stats.season, xp = canGrow(p);
+    const head = el('div', 'sd-head'); head.append(el('b', '', p.name), el('small', '', `${p.label}${p.age != null ? ` · age ${p.age}` : ''} · ${p.contract} season${p.contract === 1 ? '' : 's'} left`));
+    const meter = el('div', 'mf-bar green'), fill = el('i'); fill.style.width = `${xp ? Math.max(4, Math.min(100, Math.round((p.xp || 0) / xpNeed(p) * 100))) : 100}%`; meter.append(fill);
+    detail.append(head, el('p', 'futnote', `This season ${s.runs} runs · ${s.wkts} wickets · ${xp ? `XP ${Math.round(p.xp || 0)} / ${xpNeed(p)}` : 'at his best'}`), meter);
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
-      confirmTap(rel, 'Tap again to release', () => {
-        releasePlayer(c, p.id); saveProfile(profile); renderCareer();
-      });
-      r.append(rel);
+      confirmTap(rel, 'Tap again to release', () => { releasePlayer(c, p.id); saveProfile(profile); renderCareer(); });
+      detail.append(rel);
     }
-    grid.append(r);
-  }
+  };
+  for (const p of sorted) row.append(playerTile(p, teamById(c.club), { ovr: ovr(p), pot: p.pot, sub: canGrow(p) ? `XP ${Math.round(p.xp || 0)} / ${xpNeed(p)}` : `${p.contract} season${p.contract === 1 ? '' : 's'}`, bar: canGrow(p) ? (p.xp || 0) / xpNeed(p) * 100 : 100, tone: 'green', selected: p.id === picked, onClick: () => { picked = p.id; sfx.click(); for (const t of row.children) t.classList.remove('sel'); row.querySelector(`[data-pid="${p.id}"]`)?.classList.add('sel'); showDetail(); } }));
+  [...row.children].forEach((t, k) => { t.dataset.pid = sorted[k].id; });
+  list.append(row, detail); showDetail();
+  requestAnimationFrame(() => row.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
   // line-up for league matches
   const L = resolveLineup(c.club, clubHeroes(pool), c.lineup, {}, pool);
   const sheet = el('div', 'panel paper sheetbox');
@@ -3499,10 +3517,7 @@ function careerSquad(c, body) {
   };
   pick('Batting order', L.order, batCandidates(pool), ORDER_SIZE, p => `bat ${p.bat}`, next => { c.lineup = { order: next.map(p => p.id), attack: L.attack.map(p => p.id) }; });
   pick('Bowling attack', L.attack, bowlCandidates(pool), ATTACK_SIZE, p => `${bowlType(p.bowl).short} ${p.bowlSkill}`, next => { c.lineup = { order: L.order.map(p => p.id), attack: next.map(p => p.id) }; });
-  // nothing scrolls down: the players swipe in pairs (fours on a tall phone), the line-up is its own tab
-  const per = window.innerHeight >= 800 ? 4 : 2;
-  grid.replaceWith(carousel([...grid.children], per));
-  list.querySelectorAll('.carousel .page').forEach(pg => pg.classList.add('futpage'));
+  // nothing scrolls down: the players slide along, the line-up is its own tab
   pager(body, [['Players', list], ['Line-up', sheet]]);
 }
 

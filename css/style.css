@@ -2087,3 +2087,9 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mf .ptile-row.ptile-slide { padding: 14px 6px 12px; margin: 0 -6px; align-items: flex-start; flex: 0 0 auto; }
 .mf .ptile-row.ptile-slide .mf-card.empty { flex: 0 0 31%; aspect-ratio: 3 / 4.25; min-height: 0; scroll-snap-align: center; }
 .mf .ptile-row.ptile-slide .ptile { flex: 0 0 31%; }
+/* the team sheet and the auction's player rows: the same slide as the nets and the building screens, outside a .mf screen */
+.ptile-row.ptile-slide { flex: 0 0 auto; align-items: flex-start; }
+.ptile-row.ptile-slide .ptile { flex: 0 0 31%; }
+.squad-detail { display: flex; flex-direction: column; gap: 6px; padding: 8px 4px 2px; } .sd-head b { display: block; font: 800 18px/1.1 var(--body); } .sd-head small { opacity: .75; font-weight: 700; }
+.squad-detail .mf-bar { margin: 2px 0; } .squad-detail .chipbtn { align-self: flex-start; }
+.auc-page .auc-h { margin-bottom: 4px; } .auc-page .ptile-row { margin: 0 -8px; padding-left: 8px; padding-right: 8px; } .auc-page .ptile .pt-ovr b { font-size: 24px; }
