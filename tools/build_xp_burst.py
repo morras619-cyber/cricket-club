@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
-SRC, OUT, CSS, SCALE = 'tools/art/xp-burst-source.png', 'tools/art/xp-burst.webp', 'css/style.css', 0.75
+SRC, OUT, CSS, SCALE = 'tools/art/xp-burst-source.png', 'tools/art/xp-burst.webp', 'css/style.css', 1.0
 im = Image.open(SRC).convert('RGBA')
 a = np.asarray(im).astype(np.float32)
 H, W = a.shape[:2]
@@ -31,7 +31,7 @@ for r in range(2):
 res = res.clip(0, 255).astype(np.uint8)
 img = Image.fromarray(res, 'RGBA')
 img = img.resize((round(img.width * SCALE), round(img.height * SCALE)), Image.LANCZOS)
-img.save(OUT, 'WEBP', quality=88, method=6)
+img.save(OUT, 'WEBP', quality=86, method=6)
 print(OUT, img.size)
 import base64, re
 data = base64.b64encode(open(OUT, 'rb').read()).decode()
