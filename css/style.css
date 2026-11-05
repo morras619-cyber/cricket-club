@@ -2098,3 +2098,17 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 @container (max-height: 340px) { .auc-rivals, .auc-last, .auc-price em { display: none; } }
 @container (max-height: 270px) { .auc-price { padding: 5px 4px 6px; } .auc-price b { font-size: clamp(28px, 9vw, 36px); } .auc-report { gap: 4px; } .auc-report > div { flex-direction: row; justify-content: space-between; align-items: center; padding: 3px 7px; } .auc-report small { font-size: 7.5px; } .auc-report b { font-size: 12.5px; white-space: nowrap; } }
 @container (max-height: 200px) { .auc-facts { display: none; } .auc-report > div:nth-child(n+3) { display: none; } }
+.auc-card.tier-bronze { --t1: #e0a06a; --t2: #7a4a22; } .auc-card.tier-common { --t1: #b9c0cc; --t2: #5b6574; } .auc-card.tier-prospect { --t1: #eef3fb; --t2: #8d9bb3; }
+.auc-card.tier-gold { --t1: #ffe066; --t2: #c58a00; } .auc-card.tier-rare { --t1: #6fd0ff; --t2: #1b6cc0; } .auc-card.tier-epic { --t1: #d98bff; --t2: #7a2fc4; } .auc-card.tier-legendary { --t1: #ffd23f; --t2: #ff4d2e; }
+/* no frames on the auction: the lot sits on the arena, the player's portrait fades into his name, the tiles have no borders */
+.auc-stage { background: none; border: 0; box-shadow: none; padding: 4px 2px 6px; text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }
+.auc-card { flex: 0 0 46%; position: relative; display: block; filter: none; align-self: stretch; }
+.auc-card .auc-pic { inset: 0 0 64px 0; border-radius: 18px 18px 0 0; background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--t1) 35%, #2a4fd0) 0%, rgba(14, 28, 100, .55) 55%, rgba(8, 14, 60, 0) 100%); -webkit-mask-image: linear-gradient(#000 82%, transparent); mask-image: linear-gradient(#000 82%, transparent); overflow: visible; }
+.auc-card .pt-pic canvas, .auc-card .pt-pic .face { object-position: 50% 4%; }
+.auc-card .pt-ovr { left: 2px; top: 2px; min-width: 40px; padding: 3px 8px 4px; } .auc-card .pt-ovr b { font-size: 28px; } .auc-card .pt-ovr small { font-size: 10px; }
+.auc-plate { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; text-align: center; } .auc-plate b { font: 400 22px/1 var(--display); letter-spacing: .6px; text-transform: uppercase; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .auc-plate small { font: 800 11.5px/1 var(--body); color: #dfe6ff; } .auc-plate em { font: normal 800 11px/1 var(--body); color: var(--t1); }
+#career .auc-page { background: rgba(5, 9, 34, .66); border: 0; box-shadow: none; border-radius: 20px; }
+.auc-page .ptile { border: 0; border-radius: 16px; background: rgba(10, 18, 70, .5); box-shadow: none; } .auc-page .ptile .pt-plate { border-top: 0; background: linear-gradient(180deg, rgba(5, 9, 40, 0), rgba(5, 9, 40, .92) 45%); } .auc-page .pt-pic { background: radial-gradient(circle at 50% 30%, rgba(59, 99, 216, .75), rgba(20, 34, 110, .35) 75%); } .auc-page .ptile.sel { box-shadow: 0 0 0 2px #ffd23f, 0 0 18px rgba(255, 210, 63, .5); }
+@media (max-height: 740px) { .auc-card .auc-pic { inset: 0 0 52px 0; } .auc-plate { height: 52px; } .auc-plate b { font-size: 18px; } .auc-plate em { display: none; } .auc-card .pt-ovr b { font-size: 24px; } }
+.auc-stage { background: linear-gradient(180deg, rgba(4, 8, 34, .6), rgba(4, 8, 34, .82)); border-radius: 22px; padding: 8px 8px 8px; }
+.auc-report > div, .auc-facts > div, .auc-rivals { background: rgba(5, 9, 40, .78); }

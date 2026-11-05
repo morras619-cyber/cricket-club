@@ -3124,8 +3124,13 @@ function careerAuction(c, body) {
     const budget = el('div', 'auc-budget'); budget.append(el('small', '', 'TO SPEND'), el('b', '', money(c.money)));
     who.append(squad); head.append(crest, who, budget);
     // the player on the block (his card grows to the room there is), and what he costs
-    const hero = el('div', 'auc-hero'), cardBox = el('div', 'auc-card'), card = futCard(p, { size: 150 });
-    cardBox.append(card);
+    // the player on the block: his painted portrait fading into his name, no card frame around it
+    const hero = el('div', 'auc-hero'), cardBox = el('div', `auc-card tier-${tierOf(ovr(p)).id}`), pic = el('div', 'pt-pic auc-pic');
+    pic.append(paintedPortrait(p, p.team ? teamById(p.team) : me, { framed: true }) || (p.heroId ? portrait(heroById(p.heroId), 220, 'celebrate') : playerFace(p, 160)));
+    const badge = el('span', 'pt-ovr'); badge.append(el('b', '', String(ovr(p))), el('small', '', ROLE_TAG[p.role] || ''));
+    const nm = el('div', 'auc-plate'), power = p.heroId ? heroById(p.heroId).power.name : p.ability ? ABILITIES[p.ability].name : (p.trait || p.label);
+    nm.append(el('b', '', p.name), el('small', '', `${flag(p)} ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''}`), el('em', '', power));
+    cardBox.append(pic, badge, nm);
     const side = el('div', 'auc-side'), price = el('div', 'auc-price');
     price.append(el('small', '', lot.leader ? 'CURRENT BID' : 'OPENING PRICE'), el('b', '', money(lot.price)), el('span', '', lot.leader ? `${teamById(lot.leader).name} lead` : 'No bids yet'));
     if (lot.leader) price.append(el('em', '', `Next bid ${money(nextBid(lot))}`));
@@ -3160,11 +3165,6 @@ function careerAuction(c, body) {
     }
     side.append(lotline, price, report, rivals, lastLine);
     hero.append(cardBox, side);
-    // watch the room: the card takes the height there is
-    if (typeof ResizeObserver !== 'undefined') {
-      const fit = () => { const w = hero.clientWidth, h = hero.clientHeight; if (w < 50 || h < 50) return; card.style.setProperty('--w', `${Math.round(Math.max(96, Math.min(w * 0.45, h / 1.72)))}px`); };
-      new ResizeObserver(fit).observe(hero); requestAnimationFrame(fit);
-    }
     stage.append(head, hero);
     if (p.heroId) {
       const pw = el('div', 'auc-power');
