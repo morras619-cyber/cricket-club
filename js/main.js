@@ -361,7 +361,7 @@ $('setUnits').addEventListener('click', () => {
 
 // ---------- the club shop: gear for your players, looks for the ground and the ball, a few deals a day ----------
 let shopTab = 'gear', shopSheet = null, shopTest = false, shopDay = 0;
-const GEAR_ICON = { bat: 'star', grip: 'ball', shoes: 'up' };
+const GEAR_ICON = { bat: 'star', grip: 'ball', shoes: 'up', helmet: 'gear', pads: 'jersey' };   // (the icon stands in until a gear has its painted picture in TILES)
 const gearText = G => [G.bat ? `+${G.bat} batting` : '', G.bowl ? `+${G.bowl} bowling` : ''].filter(Boolean).join(' · ');
 async function renderShop(test = false) {
   shopTest = test;
@@ -399,7 +399,7 @@ function paintShop(c) {
     const grid = el('div', 'item-grid');
     for (const [id, G] of Object.entries(SHOP.GEAR)) {
       const sale = !!deals && deals.ids.includes(id) && !deals.taken[id];
-      grid.append(itemTile(TILES[id], G.name, gearText(G), sale ? money(gearPrice(c, id, true)) : money(G.cost), { sale, old: sale ? money(G.cost) : '', onClick: () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); } }));
+      grid.append(itemTile(TILES[id] || GEAR_ICON[G.kind], G.name, gearText(G), sale ? money(gearPrice(c, id, true)) : money(G.cost), { sale, old: sale ? money(G.cost) : '', onClick: () => { shopSheet = { type: 'buy', id }; sfx.click(); paintShop(c); } }));
     }
     body.append(grid);
   } else if (shopTab === 'armoury') {
@@ -408,7 +408,7 @@ function paintShop(c) {
       const g = h.gear[i];
       if (!g) { const card = el('div', 'mf-card stack empty'); card.append(ico('plus'), el('b', '', 'Empty')); grid.append(card); continue; }
       const G = SHOP.GEAR[g.item], who = g.on && c.players[g.on];
-      grid.append(itemTile(TILES[g.item], G.name, who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`, '', { bar: g.uses / SHOP.USES * 100, face: who ? frameOf(playerFace(who, 44)) : null, onClick: () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); } }));
+      grid.append(itemTile(TILES[g.item] || GEAR_ICON[G.kind], G.name, who ? `${lastName(who.name)} · ${g.uses} left` : `${g.uses} matches left`, '', { bar: g.uses / SHOP.USES * 100, face: who ? frameOf(playerFace(who, 44)) : null, onClick: () => { shopSheet = { type: 'gear', gid: g.id }; sfx.click(); paintShop(c); } }));
     }
     body.append(grid);
     body.append(info('warn', `A player carries one thing. It wears out after ${SHOP.USES} of your matches that he plays in. The armoury holds ${armourySlots(c)}.`));

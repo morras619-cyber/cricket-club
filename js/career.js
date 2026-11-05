@@ -1194,8 +1194,8 @@ export function storyLog(c) {
 }
 
 // ---------- the club shop: gear for your players (club cash), looks for the ground and the ball (diamonds), a few deals each day ----------
-// Gear gives one player a little rating (a bat for the batting, grips for the bowling, shoes for both); it wears out after SHOP.USES of your matches the
-// player took part in. A player carries one thing; the armoury holds so many (the shop's level). Three of the nine are on offer each day (the server's UTC
+// Gear gives one player a little rating (a bat, helmet or pads for the batting, grips for the bowling, shoes for both); it wears out after SHOP.USES of your matches the
+// player took part in. A player carries one thing; the armoury holds so many (the shop's level). Three of the fifteen are on offer each day (the server's UTC
 // day), cheaper the bigger the shop. Looks (the colour of the lights when a six is hit at home, the ball's trail) are bought with diamonds and cost nothing in strength.
 // c.shop = { level, gear: [{ id, item, uses, on }], nextId, owned: { lights: {}, trail: {} }, look: { lights, trail }, deals: { day, ids, taken } }. Money is in $M.
 export const SHOP = {
@@ -1205,6 +1205,9 @@ export const SHOP = {
     blaster: { name: 'Willow Blaster', kind: 'bat', bat: 2, cost: 0.5 }, edge: { name: 'Gold Edge Bat', kind: 'bat', bat: 3, cost: 1.5 }, thunder: { name: 'Thunder Willow', kind: 'bat', bat: 4, cost: 4 },
     grips: { name: 'Seam Grips', kind: 'grip', bowl: 2, cost: 0.5 }, wrap: { name: 'Swing Wrap', kind: 'grip', bowl: 3, cost: 1.5 }, rocket: { name: 'Rocket Bands', kind: 'grip', bowl: 4, cost: 4 },
     sprint: { name: 'Sprint Spikes', kind: 'shoes', bat: 1, bowl: 1, cost: 0.5 }, pro: { name: 'Pro Spikes', kind: 'shoes', bat: 1, bowl: 1, cost: 1.5 }, elite: { name: 'Elite Spikes', kind: 'shoes', bat: 2, bowl: 2, cost: 4 },
+    // helmets and pads are for the batting, and smaller than a bat's gift (a man carries one thing, so they are a cheaper choice, never a stronger one)
+    helm1: { name: 'Club Helmet', kind: 'helmet', bat: 1, cost: 0.4 }, helm2: { name: 'Carbon Helmet', kind: 'helmet', bat: 2, cost: 1.2 }, helm3: { name: 'Titan Helmet', kind: 'helmet', bat: 3, cost: 3 },
+    pads1: { name: 'Club Pads', kind: 'pads', bat: 1, cost: 0.4 }, pads2: { name: 'Cushion Pads', kind: 'pads', bat: 2, cost: 1.2 }, pads3: { name: 'Titan Pads', kind: 'pads', bat: 3, cost: 3 },
   },
   LOOKS: {
     lights: { gold: { name: 'Gold lights', colour: '#ffd23f', cost: 40 }, neon: { name: 'Neon lights', colour: '#ff4ad8', cost: 40 }, sky: { name: 'Sky lights', colour: '#3ec6ff', cost: 40 }, lime: { name: 'Lime lights', colour: '#8cff4a', cost: 40 } },

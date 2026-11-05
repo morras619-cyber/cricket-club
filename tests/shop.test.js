@@ -77,6 +77,17 @@ test('gear wears out after twenty matches the player takes part in, and then it 
   assert.deepEqual(C.shopOf(c).gear.map(g => g.id), [b.id], 'worn out and gone');
   assert.equal(C.gearBonus(c).size, 0);
 });
+test('helmets and pads are batting gear, smaller than a bat\'s, for any player, and wear out like the rest', () => {
+  const c = club(); for (const id of ['helm1', 'helm3', 'pads2']) assert.ok(C.buyGear(c, id, ctx(0, false)).ok);
+  const best = Math.max(...Object.values(SHOP.GEAR).filter(g => g.kind === 'bat').map(g => g.bat));
+  for (const g of Object.values(SHOP.GEAR).filter(g => g.kind === 'helmet' || g.kind === 'pads')) { assert.ok(g.bat > 0 && g.bat < best && !g.bowl); }
+  const [h, , pd] = C.shopOf(c).gear, nb = C.clubPlayers(c, c.club).find(x => !x.bowl);
+  assert.ok(C.equipGear(c, h.id, nb.id).ok, 'a man who does not bowl can wear a helmet');
+  assert.ok(C.equipGear(c, pd.id, nb.id).ok); assert.equal(h.on, null, 'one thing at a time');
+  assert.deepEqual(C.gearBonus(c).get(nb.id), { bat: 2, bowl: 0 });
+  for (let i = 0; i < SHOP.USES; i++) C.gearAfterMatch(c, [nb.id]);
+  assert.equal(C.shopOf(c).gear.some(g => g.id === pd.id), false, 'worn out');
+});
 test('looks cost diamonds, are kept, and can be switched on and off', () => {
   const c = club();
   assert.equal(C.buyLook(c, 'lights', 'gold').ok, false, 'no diamonds');
