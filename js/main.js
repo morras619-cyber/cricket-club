@@ -1,4 +1,4 @@
-import { UI } from './ui.js';
+import { UI, xpPop, warmXpArt } from './ui.js';
 import { TILES, BANNERS } from './shoparts.js';
 import { Game } from './game.js';
 import { HEROES, heroById, heroesFor, BAT_TYPES, POWERS, batTypeOf, bowlPowerOf } from './heroes.js';
@@ -27,7 +27,6 @@ import { preMatch } from './rivals.js';
 import { ensureChirp, faceOfPress, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
 import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
-import { xpPop, warmXpArt } from './xppop.js';
 import { sound, unlockAudio, sfx, buzz, markTap, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute, CHANTS, previewChant } from './audio.js';
 import { FEATURES } from './config.js';
 import { SIDES, WEEKENDS, warClock, weekendSpan, countdown, totals, feed, leader, watchWar, saveMine, myRecord, namesOf, myId, warOnline } from './war.js';
@@ -372,7 +371,7 @@ function showSetPane(id, dir = 0) {
   for (const t of $('setTabs').children) t.classList.toggle('on', t.dataset.pane === id);
   const body = $('setBody'); body.classList.remove('enter'); void body.offsetWidth; body.classList.add('enter'); setTimeout(() => body.classList.remove('enter'), 700);
 }
-// the Effects tab: three players of the practice club to pop the XP burst on (js/xppop.js), to see and tune it without waiting for training
+// the Effects tab: three players of the practice club to pop the XP burst on (xpPop, js/ui.js), to see and tune it without waiting for training
 function buildFxStage() {
   const c = demoCareer(), club = teamById(c.club), stage = $('fxStage');
   warmXpArt();
