@@ -254,8 +254,14 @@ let settingsFrom = null, shopFrom = null, moreFrom = null;
 // ---------- home: the hub ----------
 // There is no hub screen: Play goes into the Super League. (?modes=all brings the old hub back, for the tests.)
 function renderHome() { if (FEATURES.quick) renderHub(); else enterCareer(); }
+// the hub's pieces rise in one after another each time it opens (css .hub-enter; not for people who ask for less motion)
+function hubEnter() {
+  const h = $('home'); if (matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  h.classList.remove('hub-enter'); void h.offsetWidth; h.classList.add('hub-enter');
+  clearTimeout(hubEnter.t); hubEnter.t = setTimeout(() => h.classList.remove('hub-enter'), 1600);
+}
 function renderHub() {
-  ui.show('home');
+  ui.show('home'); hubEnter();
   $('btnWar').hidden = !FEATURES.war; $('btnPass').hidden = !FEATURES.pass;
   $('btnQuick').hidden = !FEATURES.quick; $('btnCup').hidden = !FEATURES.cup;
   document.querySelector('.hubgrid').classList.toggle('solo', !FEATURES.quick && !FEATURES.cup);   // (the Super League alone: one big tile)
