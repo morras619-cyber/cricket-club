@@ -1553,18 +1553,18 @@ function watchTight(mf) {
 }
 for (const mf of document.querySelectorAll('.mf')) watchTight(mf);
 // the top bar and the hero of a building's screen: size is how tall the picture may be (dense tabs ask for a small one)
-function paintShell(c, prefix, id, size = 'mid') {
+function paintShell(c, prefix, id, size = 'mid', art = id) {
   fillTopbar($(`${prefix}Top`), c);
   const hero = $(`${prefix}Hero`); hero.dataset.size = size;
   if (!hero._watch && window.ResizeObserver) { hero._watch = new ResizeObserver(() => { if (hero.getBoundingClientRect().height < 118) hero.dataset.compact = '1'; else delete hero.dataset.compact; }); hero._watch.observe(hero); }   // (a hero squeezed small shows only its sign)
-  paintHero(hero, c, id);
+  paintHero(hero, c, id, art);
 }
 // the building's own picture (the map's, painted in the club's colours) behind the screen's title
-async function paintHero(host, c, id) {
-  const club = teamById(c.club), look = PC.lookOf(levelOfBuilding(c, id) || 1), key = `${id}|${club.suit}|${club.trim}|${look}`;
+async function paintHero(host, c, id, art = id) {
+  const club = teamById(c.club), look = PC.lookOf(levelOfBuilding(c, id) || 1), key = `${id}|${art}|${club.suit}|${club.trim}|${look}`;
   if (host.dataset.key === key) return;
   host.dataset.key = key; host.querySelector('.bhero-art')?.remove();
-  const banner = BANNERS[id];
+  const banner = BANNERS[art];
   if (banner) { const im = document.createElement('img'); im.className = 'bhero-art bhero-pic'; im.src = banner; im.alt = ''; im.draggable = false; host.prepend(im); return; }
   try {
     const src = await buildingPicture(id, club, look);
@@ -2358,7 +2358,7 @@ function paintApartment(c) {
   buildTick(c);
   const a = apartment(c), row = aptRow(c), lvl = mgrLevel(c), trophies = trophiesOf(c);
   const done = (r, close = false) => { if (r && r.ok === false) ui.toast(r.why); else { (close ? sfx.chime : sfx.click).call(sfx); if (close) aptSheet = null; } saveProfile(profile); paintApartment(c); };
-  paintShell(c, 'apartment', 'apartment', aptTab === 'decor' || aptTab === 'cabinet' ? 'small' : 'mid'); $('apartmentLede').textContent = aptTest ? `Practice club (nothing is saved) · salary ${money(salaryCash(c))}` : `${teamById(c.club).name} · salary ${money(salaryCash(c))}`;
+  paintShell(c, 'apartment', 'apartment', aptTab === 'decor' || aptTab === 'cabinet' ? 'small' : 'mid', aptTab === 'cabinet' ? 'cabinet' : 'apartment'); $('apartmentLede').textContent = aptTest ? `Practice club (nothing is saved) · salary ${money(salaryCash(c))}` : `${teamById(c.club).name} · salary ${money(salaryCash(c))}`;
   $('apartmentLvl').replaceChildren(ico('factory'), el('span', '', `LV ${a.level}`));
   const stat = (name, cls, big, small) => { const d = el('div', `mf-chip ${cls}`); const x = el('div'); x.append(el('span', '', big), el('small', '', small)); d.append(ico(name), x); return d; };
   $('apartmentStats').replaceChildren(stat('star', 'gold', `LV ${lvl}`, 'manager'), stat('coin', 'blue', money(salaryCash(c)), 'salary saved'), stat('trophy', 'red', String(trophies.reduce((n, t) => n + t.count, 0)), 'trophies'));
