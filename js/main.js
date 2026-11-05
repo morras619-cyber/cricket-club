@@ -809,7 +809,7 @@ function saveLineup(order, attack) {
 function teamSheet() {
   const L = currentLineup();
   const wrap = el('div', 'slot teamsheet');
-  const pick = (title, list, cands, size, label, onSet) => { const box = el('div', 'panel paper sheetbox'); box.append(slotPicker(title, list, cands, size, label, onSet, renderSquad, teamById(L.id))); return box; };
+  const pick = (title, list, cands, size, label, onSet) => { const box = el('div', 'tilebox'); box.append(slotPicker(title, list, cands, size, label, onSet, renderSquad, teamById(L.id))); return box; };
   const roleTxt = p => `bat ${p.bat}`;
   // the whole squad, with what each player is known for
   const squadList = el('div', 'panel paper sheetbox');
@@ -2055,7 +2055,7 @@ function paintTraining(c) {
       go.addEventListener('click', () => { if (trainTest) return ui.toast('The nets are for your real club, not the practice one'); if (clock.state !== 'ok') return ui.toast('The nets need the server clock: try again when you are online'); if (left < 1) return ui.toast('The nets are closed for today. They open again at midnight (UTC)'); runDrill(c, netPick); });
       go.disabled = left < 1 && !trainTest;
       body.append(go);
-      requestAnimationFrame(() => row.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
+      requestAnimationFrame(() => { const t = row.querySelector('.sel'); if (t) row.scrollLeft = t.offsetLeft - (row.clientWidth - t.offsetWidth) / 2; });
     }
     if (!list.length) body.append(el('p', 'sheetnote', 'Nobody in your squad can learn more right now.'));
   } else if (trainTab === 'coaches') {
@@ -3511,13 +3511,14 @@ function slotPicker(title, chosen, cands, size, sub, onSet, rerender, club) {
     row.append(t);
   }
   box.append(row);
-  requestAnimationFrame(() => { slots.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }); row.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }); });
+  const centre = r => { const t = r.querySelector('.sel'); if (t) r.scrollLeft = t.offsetLeft - (r.clientWidth - t.offsetWidth) / 2; };   // (the row only: scrollIntoView would also scroll the page)
+  requestAnimationFrame(() => { centre(slots); centre(row); });
   return box;
 }
 // your squad: who you've got, how good they could be, and the line-up
 function careerSquad(c, body) {
   const pool = clubPool(c, c.club);
-  const list = el('div', 'panel paper sheetbox');
+  const list = el('div', 'tilebox');
   list.append(el('h3', '', `${teamById(c.club).name} · ${pool.length}/${MAX_SQUAD}`));
   list.append(el('p', 'sheetnote', `Players improve when they play well, up to their potential, until they turn ${PEAK_AGE}. A regular who reaches ${STAR_OVR} becomes a star with an ability.`));
   // the players slide along (three show, the next peeks in); the one you tap shows his season and a Release button below
@@ -3539,11 +3540,11 @@ function careerSquad(c, body) {
   for (const p of sorted) row.append(playerTile(p, teamById(c.club), { ovr: ovr(p), pot: p.pot, sub: canGrow(p) ? `XP ${Math.round(p.xp || 0)} / ${xpNeed(p)}` : `${p.contract} season${p.contract === 1 ? '' : 's'}`, bar: canGrow(p) ? (p.xp || 0) / xpNeed(p) * 100 : 100, tone: 'green', selected: p.id === picked, onClick: () => { picked = p.id; sfx.click(); for (const t of row.children) t.classList.remove('sel'); row.querySelector(`[data-pid="${p.id}"]`)?.classList.add('sel'); showDetail(); } }));
   [...row.children].forEach((t, k) => { t.dataset.pid = sorted[k].id; });
   list.append(row, detail); showDetail();
-  requestAnimationFrame(() => row.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
+  requestAnimationFrame(() => { const t = row.querySelector('.sel'); if (t) row.scrollLeft = t.offsetLeft - (row.clientWidth - t.offsetWidth) / 2; });
   // line-up for league matches
   const L = resolveLineup(c.club, clubHeroes(pool), c.lineup, {}, pool);
   // the line-up is two pages (batting, bowling): each a row of places and a row of players who can take the place chosen
-  const pick = (title, chosen, cands, n, label, save) => { const box = el('div', 'panel paper sheetbox'); box.append(slotPicker(title, chosen, cands, n, label, next => { save(next); saveProfile(profile); }, renderCareer, teamById(c.club))); return box; };
+  const pick = (title, chosen, cands, n, label, save) => { const box = el('div', 'tilebox'); box.append(slotPicker(title, chosen, cands, n, label, next => { save(next); saveProfile(profile); }, renderCareer, teamById(c.club))); return box; };
   const batBox = pick('Batting order', L.order, batCandidates(pool), ORDER_SIZE, p => `bat ${p.bat}`, next => { c.lineup = { order: next.map(p => p.id), attack: L.attack.map(p => p.id) }; });
   const bowlBox = pick('Bowling attack', L.attack, bowlCandidates(pool), ATTACK_SIZE, p => `${bowlType(p.bowl).short} ${p.bowlSkill}`, next => { c.lineup = { order: L.order.map(p => p.id), attack: next.map(p => p.id) }; });
   // nothing scrolls down: the players slide along; batting and bowling are tabs of their own
