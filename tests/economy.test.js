@@ -37,7 +37,7 @@ test('a scouted star will not sign for a division 3 club either', () => {
 
 function ovrOf(n) { return { id: `t${n}`, name: 'T', role: 'bat', bat: n, bowlSkill: 30, age: 25, pot: n }; }
 
-test('the training ground fills a player\'s XP: a trained player ends the season ahead of an untrained twin, but never more than the season\'s cap, and never past his potential', () => {
+test('the training ground fills a player\'s XP: a trained player ends the season ahead of an untrained twin, and never past his potential', () => {
   const T = import('../js/training.js');
   return T.then(TG => {
     const mk = () => { const c = C.newCareer(21); C.chooseClub(c, c.divisions.d3[0]); return c; };
@@ -45,13 +45,16 @@ test('the training ground fills a player\'s XP: a trained player ends the season
     const pa = C.clubPlayers(a, a.club).find(p => p.age <= 21 && p.pot - Math.max(p.bat, p.bowlSkill) >= 8) || C.clubPlayers(a, a.club)[0];
     const pb = b.players[pa.id];
     pa.age = pb.age = 20; pa.pot = pb.pot = 95;
-    a.training = TG.freshTraining(0); a.training.tp[pa.id] = 100000; TG.seal(a.training);
+    a.training = TG.freshTraining(0); a.training.tp[pa.id] = 600; TG.seal(a.training);
     const before = Math.max(pa.bat, pa.bowlSkill);
     C.nextSeason(a); C.nextSeason(b);
     const gain = Math.max(a.players[pa.id].bat, a.players[pa.id].bowlSkill) - Math.max(b.players[pb.id].bat, b.players[pb.id].bowlSkill);
     const total = Math.max(a.players[pa.id].bat, a.players[pa.id].bowlSkill) - before;
     assert.ok(gain >= 1, `trained player is ${gain} ahead of his untrained twin`);
-    assert.ok(total <= C.PXP.SEASON_CAP, `he gained ${total}: the cap is ${C.PXP.SEASON_CAP} a season`);
+    assert.ok(total >= 1 && total <= 8, `he gained ${total} in a season`);
     assert.ok(Math.max(a.players[pa.id].bat, a.players[pa.id].bowlSkill) <= a.players[pa.id].pot);
+    const rich = mk(); const pr = rich.players[pa.id]; pr.age = 20; pr.pot = pr.bat + 3;
+    C.addPlayerXp(rich, pr, 1e6);
+    assert.ok(Math.max(pr.bat, pr.bowlSkill) <= pr.pot, 'a huge pile of XP never takes him past his potential');
   });
 });

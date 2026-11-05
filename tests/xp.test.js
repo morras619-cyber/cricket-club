@@ -22,15 +22,25 @@ test('a full XP bar is one rating point, and the rest carries over', () => {
   assert.ok(p.xp >= 9 && p.xp < C.xpCost(61, 22), `the rest carries over (${p.xp})`);
 });
 
-test('a player gains at most the season\'s cap from XP, and a full bar waits', () => {
+test('a full bar always pays out at once, and each point gained this season makes the next one dearer', () => {
   const c = career(), p = kid();
-  const gained = C.addPlayerXp(c, p, 100000);
-  assert.equal(gained, C.PXP.SEASON_CAP);
-  assert.equal(ovr(p), 60 + C.PXP.SEASON_CAP);
-  assert.equal(p.xp, C.xpCost(ovr(p), p.age), 'the bar waits at full, it does not pile up');
-  assert.equal(C.addPlayerXp(c, p, 500), 0, 'nothing more this season');
-  p.xpSeason = 0;                                              // (a new season)
-  assert.equal(C.settleXp(c, p), 1, 'the waiting bar pays out when the season turns');
+  const c0 = C.xpCost(60, 22, 0), c1 = C.xpCost(60, 22, 1), c2 = C.xpCost(60, 22, 2);
+  assert.ok(c1 > c0 && c2 > c1, 'the surcharge grows with every point gained this season');
+  assert.equal(c1, Math.round(c0 * (1 + C.PXP.SEASON_STEP)));
+  assert.equal(C.addPlayerXp(c, p, c0), 1, 'a full bar is a point, straight away');
+  assert.equal(p.xpSeason, 1);
+  assert.equal(C.xpNeed(p), C.xpCost(ovr(p), 22, 1), 'his next point costs the surcharge now');
+  const q = kid();
+  const gained = C.addPlayerXp(c, q, 100000);
+  assert.ok(gained >= 8, `plenty of XP still pays out, in full (${gained})`);
+  assert.ok(q.xp < C.xpNeed(q), 'the bar is never left full and waiting');
+  q.xpSeason = 0;
+  assert.ok(C.xpNeed(q) < C.xpCost(ovr(q), 22, 3), 'a new season starts the surcharge again');
+});
+
+test('the academy\'s growth is not surcharged', () => {
+  const c = career(), p = kid({ age: 17 }); p.xpSeason = 5;
+  assert.equal(C.addPlayerXp(c, p, C.xpCost(60, 17, 0), { soft: false }), 1);
 });
 
 test('no XP past his potential or after 33', () => {

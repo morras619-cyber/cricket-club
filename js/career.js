@@ -803,38 +803,38 @@ function pushTop(list, item, cmp) { list.push(item); list.sort(cmp); list.length
 
 // ---------- growing: every player has XP, and a full bar is one rating point ----------
 // XP comes from training (a coach's hours, the net drills), from his matches (playing, a good innings, wickets, a win, man of the match) and, for the
-// young, from a bonus at the end of each season. The next point costs more the better he is and the older he is. A player gains at most SEASON_CAP points
-// from XP in a season (a full bar waits for the next one), and none past his potential or after 33. His XP is p.xp (towards the next point) and
-// p.xpSeason (the points he has gained this season).
+// young, from a bonus at the end of each season. The next point costs more the better he is and the older he is, and a little more for each point he has
+// already gained this season (SEASON_STEP): a quick riser slows down, but a bar that is full always pays out at once. None past his potential or after 33.
+// His XP is p.xp (towards the next point) and p.xpSeason (the points he has gained this season).
 export const PXP = {
   BASE: 90, PER: 11, AGE: [1, 1.35, 1.8],              // the next point costs (BASE + PER x (rating - 50)) x the age's factor (23 and under, 24 to 28, older)
-  SEASON_CAP: 3,
+  SEASON_STEP: 0.45,                                    // each point already gained this season makes the next one this much dearer (x1.45, x1.9, x2.35 ...)
   APPEAR: 8, WIN: 6, MOTM: 30,                          // XP for playing, for a win, and for the man of the match
   RUNS: [[50, 60], [30, 35], [15, 15]],                 // runs -> XP (the highest row he reaches)
   WKT: 18, ECON: 10,                                    // a wicket, and bowling an economical spell
   YOUTH: [[23, 120, 300], [28, 40, 120], [32, 0, 60]],  // the end-of-season bonus: [up to this age, least, most]
 };
-export const xpCost = (ovrNow, age) => Math.round((PXP.BASE + PXP.PER * Math.max(0, ovrNow - 50)) * PXP.AGE[age <= 23 ? 0 : age <= 28 ? 1 : 2]);
+export const xpCost = (ovrNow, age, gainedThisSeason = 0) => Math.round((PXP.BASE + PXP.PER * Math.max(0, ovrNow - 50)) * PXP.AGE[age <= 23 ? 0 : age <= 28 ? 1 : 2] * (1 + PXP.SEASON_STEP * gainedThisSeason));
+export const xpNeed = p => xpCost(ovr(p), p.age, p.xpSeason || 0);   // what his next point costs him now
 const lastNameOf = p => (p.short || p.name.split(' ').slice(-1)[0]);
 export const canGrow = p => !!p && p.age < PEAK_AGE && ovr(p) < p.pot;
-// give a player XP: returns the rating points it earned. cap: false for the academy, whose prospects grow on their own timetable
-export function addPlayerXp(c, p, n, { cap = true } = {}) {
+// give a player XP: returns the rating points it earned. soft: false for the academy, whose prospects grow on their own timetable (no season surcharge)
+export function addPlayerXp(c, p, n, { soft = true } = {}) {
   if (!p || !(n > 0) || !canGrow(p)) return 0;
   p.xp = (p.xp || 0) + n;
-  return settleXp(c, p, cap);
+  return settleXp(c, p, soft);
 }
-// turn a full bar into rating points (as many as the season's cap allows); a full bar that is capped waits at full
-export function settleXp(c, p, cap = true) {
+// turn a full bar into rating points, as many as the XP pays for
+export function settleXp(c, p, soft = true) {
   let gained = 0;
-  while (canGrow(p) && (!cap || (p.xpSeason || 0) < PXP.SEASON_CAP)) {
-    const cost = xpCost(ovr(p), p.age);
+  while (canGrow(p)) {
+    const cost = xpCost(ovr(p), p.age, soft ? p.xpSeason || 0 : 0);
     if ((p.xp || 0) < cost) break;
     const g = grow(c, p, 1);
     if (!g) break;
     p.xp -= cost; p.xpSeason = (p.xpSeason || 0) + 1; gained += g;
   }
   if (!canGrow(p)) p.xp = 0;                                                      // (at his potential, or too old: nothing to fill)
-  else p.xp = Math.min(p.xp || 0, xpCost(ovr(p), p.age));                          // (a capped, full bar waits: it does not pile up)
   return gained;
 }
 // the XP a player earned in a match: s his batting, f his bowling (both optional), won whether his side won
@@ -1443,7 +1443,7 @@ export function academySeason(c, rng) {
     if (!p) continue;
     const mentor = c.players[a.mentors[id]];
     const mentored = mentor && mentor.team === c.club && !mentor.retired && mentor.age >= ACAD.MENTOR_AGE;
-    addPlayerXp(c, p, (rng.int(ACAD.GROW[0], ACAD.GROW[1]) + (mentored ? ACAD.MENTOR_GROW : 0)) * xpCost(ovr(p), p.age), { cap: false });   // (a prospect's year of growth, as XP: it fills his bar and carries over)
+    addPlayerXp(c, p, (rng.int(ACAD.GROW[0], ACAD.GROW[1]) + (mentored ? ACAD.MENTOR_GROW : 0)) * xpCost(ovr(p), p.age), { soft: false });   // (a prospect's year of growth, as XP: it fills his bar and carries over)
   }
 }
 export const prospectsOf = c => (c.academy?.prospects || []).map(id => c.players[id]).filter(Boolean);
@@ -1493,7 +1493,7 @@ function coachKinds(p) {
   if (p.role === 'bowl' || p.role === 'all') k.push(bowlType(p.bowl).spin ? 'spin' : 'pace');
   return k;
 }
-export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { name: p.name, ovr: ovr(p), age: p.age, pot: p.pot, kinds: coachKinds(p), xp: p.xp || 0, cost: xpCost(ovr(p), p.age), capped: (p.xpSeason || 0) >= PXP.SEASON_CAP }]));
+export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { name: p.name, ovr: ovr(p), age: p.age, pot: p.pot, kinds: coachKinds(p), xp: p.xp || 0, cost: xpNeed(p) }]));
 
 // ---------- the merchandise factory's view of the club (js/merch.js) ----------
 export const fameOf = p => p.fame ?? startFame(ovr(p));
