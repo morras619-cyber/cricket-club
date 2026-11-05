@@ -78,19 +78,41 @@ def look(path):
     return hexof(sk), hexof(hr)
 
 
+def frame(path):
+    """[x of the face's centre, width of the face], each as a share of the picture's width: the skin of the head's band, ears to
+    ears. The portraits are cut out to their hair, so a close-cropped man fills the picture and a man with big hair does not;
+    the squad tiles use this to draw every face the same size."""
+    a = np.array(Image.open(path).convert('RGBA')).astype(np.float32)
+    H, W = a.shape[:2]
+    op = a[..., 3] > 200
+    h, s, v = hsv(a[..., :3])
+    top = np.nonzero(op.any(1))[0].min()
+    band = np.zeros_like(op)
+    band[top:top + int(H * 0.42)] = True
+    skin = op & band & (h > 5) & (h < 38) & (s > 0.22) & (s < 0.78) & (v > 0.22) & (v < 0.97)
+    xs = np.nonzero(skin)[1]
+    if xs.size < 200:
+        return [0.5, 0.7]
+    lo, hi = np.percentile(xs, 3), np.percentile(xs, 97)
+    return [round(float((lo + hi) / 2 / W), 3), round(float((hi - lo) / W), 3)]
+
+
 def main():
     d = 'img/cards/portraits/'
-    out = {}
+    out, frames = {}, {}
     for f in sorted(os.listdir(d)):
         if not f.endswith('.webp'):
             continue
         k = f[:-5]
         sk, hr = look(d + f)
+        frames[k] = frame(d + f)
         out[k] = {'skin': SKIN_FIX.get(k, sk), 'hair': HAIR_FIX.get(k, hr)}
     with open('js/portrait-looks.js', 'w') as fh:
         fh.write('// Skin tone and hair colour read off each painted portrait, so the player on the pitch\n')
         fh.write('// matches his picture. Made by tools/build_portrait_looks.py.\n')
         fh.write('export const PORTRAIT_LOOKS = ' + json.dumps(out, separators=(',', ':')) + ';\n')
+        fh.write('// where each face is in its picture: [x of its centre, its width], as shares of the picture width (the squad tiles)\n')
+        fh.write('export const PORTRAIT_FRAMES = ' + json.dumps(frames, separators=(',', ':')) + ';\n')
     print(len(out), 'looks')
 
 

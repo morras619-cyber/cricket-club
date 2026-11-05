@@ -10,6 +10,7 @@ import { teamById } from './teams.js';
 import { ABILITIES, potentialStars, money, value } from './career.js';
 import { PORTRAIT_KEYS, PORTRAIT_ATLAS } from './portraits-list.js';
 import { PORTRAIT_FACES } from './portrait-faces.js';
+import { PORTRAIT_FRAMES } from './portrait-looks.js';
 
 // ---------- painted portraits ----------
 // Painted in Thunder's blue and yellow; on a player at another club the shirt is recoloured to that
@@ -18,6 +19,7 @@ const HAS_PORTRAIT = new Set(PORTRAIT_KEYS);
 // (a stand-in club captain, or a hero not in the list, has no name here: so no painted portrait, and the drawn figure is used)
 const keyOf = p => ((p.heroId && heroById(p.heroId)?.name) || p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const srcs = new Map(), kits = new Map();
+const FRAME_FACE = 0.66;   // the face's width, as a share of a squad tile's
 // the last batches of portraits are a few pictures (PORTRAIT_FILES); each is cut out of its picture onto a canvas that stands in
 // for its own image (the same size and 'load' as an image has)
 const PORTRAIT_FILES = ['img/cards/portraits-more.webp', 'img/cards/portraits-more2.webp'];
@@ -66,12 +68,18 @@ function recolour(im, team) {
   return c;
 }
 // the painted portrait for a player (in his club's kit), or null if he hasn't one
-export function paintedPortrait(p, kitTeam = null) {
+export function paintedPortrait(p, kitTeam = null, { framed = false } = {}) {
   const key = keyOf(p);
   if (!HAS_PORTRAIT.has(key)) return null;
   const team = kitTeam || (p.team ? teamById(p.team) : null), ck = `${key}|${team?.id || ''}`;
   const holder = document.createElement('div');
   holder.className = 'fut-pic fut-paint';
+  if (framed && PORTRAIT_FRAMES[key]) {
+    // every face the same size: the picture is scaled so the face is FRAME_FACE of the tile wide, and centred (the pictures are cut out to
+    // their hair, so a close-cropped man would otherwise fill the tile and a man with big hair would not)
+    const [cx, fw] = PORTRAIT_FRAMES[key], u = FRAME_FACE / Math.min(0.82, Math.max(0.55, fw));
+    holder.dataset.framed = '1'; holder.style.setProperty('--u', u.toFixed(3)); holder.style.setProperty('--l', (0.5 - u * cx).toFixed(3));
+  }
   const put = () => { if (!kits.has(ck)) kits.set(ck, recolour(srcs.get(key), team)); const src = kits.get(ck), c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); holder.append(c); };
   const im = portraitSrc(key);
   if (im.complete && im.naturalWidth) put(); else im.addEventListener('load', put, { once: true });

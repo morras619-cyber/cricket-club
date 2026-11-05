@@ -2054,3 +2054,5 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .bhero[data-compact] .bhero-pic { display: block; opacity: .5; }
 .bhero:has(.bhero-pic)::before { display: none; }
 .item-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; } .item-grid.four .item-tile.art .item-name { font-size: 12px; } .item-grid.four .item-tile.art .item-price { font-size: 11px; padding: 2px 3px; } .item-grid.four .item-tile.art .item-price b { font-size: 11px; }
+/* squad tiles: each painted face drawn the same size (futcard.js paintedPortrait framed: --u the picture's width as a share of the tile, --l its left) */
+.pt-pic .fut-paint[data-framed] canvas { inset: auto; left: calc(var(--l) * 100%); top: 2%; width: calc(var(--u) * 100%) !important; height: auto !important; object-fit: fill; }

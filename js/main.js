@@ -1743,7 +1743,7 @@ function fanCard(p, club, { name, fill, barClass = '', vals, variant, onClick, p
 const ROLE_TAG = { bat: 'BAT', bowl: 'BOWL', all: 'AR', wk: 'WK' };
 function playerTile(p, club, { ovr: o, pot, sub, bar, tone = '', chips = [], tier, need = false, selected = false, onClick }) {
   const t = el('button', `ptile tier-${tier || tierOf(o).id}${selected ? ' sel' : ''}${need ? ' need' : ''}`), pic = el('span', 'pt-pic');
-  pic.append(paintedPortrait(p, p.team ? teamById(p.team) : club) || playerFace(p, 120));
+  pic.append(paintedPortrait(p, p.team ? teamById(p.team) : club, { framed: true }) || playerFace(p, 120));
   const badge = el('span', 'pt-ovr'); badge.append(el('b', '', String(o)), el('small', '', ROLE_TAG[p.role] || ''));
   const plate = el('span', 'pt-plate'), fill = el('i', tone), meter = el('span', 'pt-bar'); fill.style.width = `${Math.max(6, Math.min(100, Math.round(bar ?? (pot ? o / pot * 100 : 100))))}%`; meter.append(fill);
   plate.append(el('b', '', lastName(p.name)), el('small', '', sub ?? (pot ? `${o} ▸ ${pot}` : '')), meter);
