@@ -122,12 +122,13 @@ export class Game {
 
   // ---------- plumbing ----------
   // The canvas is drawn at the screen's pixel density, up to 2x. A phone that cannot keep up (frames slower than 22 ms for a couple of seconds of play) steps the
-  // density down (2, 1.5, 1.25, 1): every step is far fewer pixels to paint each frame, so it runs cooler and smoother, a little softer. It never steps back up in the
-  // session (no flicker between the two), and the level is remembered for a day (sixcharge.dpr).
+  // density down (2, 1.5, 1.25, 1): every step is far fewer pixels to paint each frame, so it runs cooler and smoother, a little softer. A phone that cools down gets its
+  // sharp picture back: half a minute of smooth frames steps it up a level (twice at most in a session, so it cannot flicker between the two), and the level is only remembered
+  // for twenty minutes (sixcharge.dpr), so the next game after a break starts sharp.
   dprNow() {
-    if (this.dprCap == null) {   // (remembered for a day: a phone that was only hot for a while gets its sharp picture back)
+    if (this.dprCap == null) {   // (remembered for twenty minutes: a phone that was only hot for a while gets its sharp picture back)
       this.dprCap = 2;
-      try { const [v, t] = (localStorage.getItem('sixcharge.dpr') || '').split('|'); if (+v >= 1 && +v < 2 && Date.now() - +t < 864e5) this.dprCap = +v; } catch { /* from 2 */ }
+      try { const [v, t] = (localStorage.getItem('sixcharge.dpr') || '').split('|'); if (+v >= 1 && +v < 2 && Date.now() - +t < 12e5) this.dprCap = +v; } catch { /* from 2 */ }
     }
     return Math.min(this.dprCap, window.devicePixelRatio || 1);
   }
@@ -143,6 +144,18 @@ export class Game {
   }
   watchSpeed(raw) {   // (raw: the real time since the last frame)
     if (this.view === 'idle' || this.paused || this.warming || document.hidden || raw > 250) { this.slowMs = Math.max(0, (this.slowMs || 0) - 4); return; }
+    // a phone that has cooled: half a minute of smooth frames and the picture steps back up one level (twice at most in a session)
+    if (this.dprCap != null && this.dprCap < 2 && (this.dprUps || 0) < 2 && !this.fixedDpr) {
+      if (raw <= 20) {
+        this.fastMs = (this.fastMs || 0) + raw;
+        if (this.fastMs > 30000) {
+          this.fastMs = 0; this.dprUps = (this.dprUps || 0) + 1;
+          this.dprCap = [1, 1.25, 1.5, 2].find(v => v > this.dprCap + 0.01) ?? 2; this.slowMs = 0;
+          try { if (this.dprCap < 2) localStorage.setItem('sixcharge.dpr', `${this.dprCap}|${Date.now()}`); else localStorage.removeItem('sixcharge.dpr'); } catch { /* ignore */ }
+          this.resize();
+        }
+      } else if (raw > 22) this.fastMs = 0;
+    }
     // (milliseconds over the 22 ms mark add up; fast frames let them drain: sustained slowness, not one hitch, is what steps it down)
     this.slowMs = Math.max(0, (this.slowMs || 0) + (raw > 22 ? raw - 16 : -8));
     if (this.slowMs > 1800 && this.dprNow() > 1 && !this.fixedDpr) {
