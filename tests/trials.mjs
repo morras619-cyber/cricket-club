@@ -1,4 +1,4 @@
-// The net trials, played by the bot in headless Chromium: create a club, face and bowl the six balls of every candidate, pick 4 batters and 5 bowlers,
+// The net trials, played by the bot in headless Chromium: create a club, face and bowl the three balls of every candidate (the last a power ball), pick 4 batters and 5 bowlers,
 // sign them: eleven in the squad, no money, on to the auction. Usage: npm run trials
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -46,7 +46,7 @@ await page.waitForFunction(() => document.querySelectorAll('.tcard').length === 
 check(true, 'twelve candidates were tried and the pick screen is up');
 if (process.env.SHOTS_DIR) { await page.waitForTimeout(500); await page.screenshot({ path: join(process.env.SHOTS_DIR, 'trials-pick.png') }); }
 for (const k of ['bat', 'bowl']) check(await page.evaluate(kind => { const pg = [...document.querySelectorAll('#careerBody .pages > .page')].find(p => p.querySelector(`.tcard[data-k="${kind}"]`)); pg.scrollTop = pg.scrollHeight; const cards = [...pg.querySelectorAll('.tcard')], last = cards.at(-1).getBoundingClientRect(), r = pg.getBoundingClientRect(); const ok = cards.length === 6 && last.bottom <= r.bottom + 1 && last.top >= r.top; pg.scrollTop = 0; return ok; }, k), `the last ${k === 'bat' ? 'batter' : 'bowler'} of the six can be reached on the list (it scrolls when the screen is short)`);
-check(await page.evaluate(() => window.__nbForced === 1 && Object.values(window.__sixcharge.profile.career.trial.results.bowls).length === 6 && Object.values(window.__sixcharge.profile.career.trial.results.bowls).every(r => r.balls === 4)), 'a no-ball bowled in the nets does not count, and every bowler still bowls exactly four balls');
+check(await page.evaluate(() => window.__nbForced === 1 && Object.values(window.__sixcharge.profile.career.trial.results.bowls).length === 6 && Object.values(window.__sixcharge.profile.career.trial.results.bowls).every(r => r.balls === 3)), 'a no-ball bowled in the nets (here on the power ball) does not count, and every bowler still bowls exactly three balls');
 const lines = await page.evaluate(() => [...document.querySelectorAll('.tcard .tr')].map(e => e.textContent));
 check(lines.length === 12 && lines.every(l => /^Nets: /.test(l)), `every candidate has a net result (${lines[0]} | ${lines[6]})`);
 await page.evaluate(() => {
