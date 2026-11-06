@@ -3109,6 +3109,16 @@ export class Game {
     return result;
   }
 
+  // The ball and the fielder as the ball comes to him (fielding events): until the last moments the ball runs along its own path; then he settles over the spot and the ball is
+  // drawn into his hands, so by the time it is his it has slowed into them (it used to fly past him at full speed and then be in his hands in one step)
+  gatherBall(path, t, tEnd, me, P, G = 0.4) {
+    const raw = path.ballAt(t), k = clamp((t - (tEnd - G)) / G, 0, 1);
+    if (k <= 0) return raw;
+    const e = k * k * (3 - 2 * k);
+    me.x = lerp(me.x, P.x, e); me.y = lerp(me.y, P.y, e);
+    return { x: lerp(raw.x, me.x, e), y: lerp(raw.y, me.y, e), h: lerp(raw.h, 0.8, e) };
+  }
+
   async runOutEvent(sim, field) {
     const ro = sim.runOut, path = sim.path;
     const me = this.startEvent(field, ro.fielder.id);
@@ -3124,7 +3134,7 @@ export class Game {
       const t = this.gameTime - t0, dt = this.gameTime - last; last = this.gameTime;
       const speed = F.runSpeed * (this.armed.burst ? 2 : 1);
       if (t > F.react) this.moveFielder(me, P, dt, speed);
-      this.O.ball = path.ballAt(Math.min(t, ro.t));
+      this.O.ball = this.gatherBall(path, Math.min(t, ro.t), ro.t, me, P);   // (the ball runs into his hands, it is not there in one jump)
       this.O.ring = { x: P.x, y: P.y, r: 0.6 + 4 * clamp((ro.t - t) / ro.t, 0, 1), color: Math.abs(ro.t - t) < 0.14 ? '#2ecc71' : '#fff4da' };
       const win = F.collectWindow * (this.armed.burst ? 1.6 : 1);
       this.O.meter = { k: t / ro.t, zone: (win * PICK_SLOW / 1000) / ro.t, green: Math.abs(ro.t - t) * 1000 / PICK_SLOW <= win, label: 'TAP ANYWHERE TO PICK UP' };
