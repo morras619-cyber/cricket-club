@@ -2255,3 +2255,14 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 /* the next match's tabs always fit the width, however many there are (a club with its own stadium and ground has five) */
 #career.hero-mode .pagerhost > .tabs { gap: 4px; }
 #career.hero-mode .pagerhost > .tabs > .tab { flex: 1 1 0; min-width: 0; border-width: 8px; padding: 0 1px; font-size: 14px; letter-spacing: .3px; overflow: hidden; white-space: nowrap; }
+
+/* the Chirp page: the header and the feed are one page (no text between them), and the "i" beside the logo says what Chirp is for */
+.chirpbar { margin-bottom: 0; border-radius: 16px 16px 0 0; box-shadow: none; border-bottom: 2px solid var(--cline); padding-bottom: 8px; }
+.cfeed > .cpost:first-child { border-top-left-radius: 0; border-top-right-radius: 0; border-top: 0; }
+.chirpinfo { flex: none; width: 26px; height: 26px; margin-left: -4px; align-self: flex-start; border-radius: 50%; border: 2px solid #1b9bff; background: #0b1c55; color: #7fe3ff; font: italic 800 15px/1 Georgia, serif; display: grid; place-items: center; cursor: pointer; padding: 0; }
+.chirpinfo:active { background: #1b9bff; color: #fff; }
+.chirptip { position: absolute; left: 6px; right: 6px; top: calc(100% + 6px); z-index: 6; padding: 10px 12px; border-radius: 14px; background: #0a1a52; border: 2px solid #1b9bff; box-shadow: 0 8px 18px rgba(0, 0, 25, .6); font-size: 13px; font-weight: 700; line-height: 1.35; color: var(--ctext); text-align: left; }
+.chirptip[hidden] { display: none; }
+/* the match card's Play button: no pink under it */
+.mhero .playbtn { box-shadow: inset 0 3px 0 rgba(255, 255, 255, .7), inset 0 -4px 0 rgba(255, 120, 0, .45), 0 5px 0 #160d4a; }
+.mhero .playbtn:active { box-shadow: inset 0 3px 0 rgba(255, 255, 255, .7), inset 0 -4px 0 rgba(255, 120, 0, .45), 0 2px 0 #160d4a; }

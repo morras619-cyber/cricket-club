@@ -3502,10 +3502,14 @@ function chirpPanel(c) {
   const f1 = el('span', 'cfol'); f1.append(fol, el('small', '', 'FOLLOWERS'));
   const f2 = el('span', 'cfol'); f2.append(el('b', 'sm', buzzWord(P.buzz)), el('small', '', 'BUZZ'), buzz);
   stats.append(f1, f2);
-  bar.append(logo, stats);
-  box.append(bar);
+  // what Chirp is for: behind an "i" beside the logo (it was a line of text between the header and the feed)
   const perk = sponsorBonus(c), lift = Math.round(crowdOf(c) * CROWD_TIMING * 1000) / 10;
-  box.append(el('p', 'cperk', `${perk > 0 ? `Your fans bring ${money(perk)} extra in sponsorship every season. ` : 'Win matches and your followers grow: big clubs earn more from sponsors. '}${lift >= 0.1 ? `At home, your crowd widens your timing by ${lift}%.` : 'A bigger, hotter crowd will widen your timing at home.'}`));
+  const info = el('button', 'chirpinfo', 'i'), tip = el('div', 'chirptip', `${perk > 0 ? `Your fans bring ${money(perk)} extra in sponsorship every season. ` : 'Win matches and your followers grow: big clubs earn more from sponsors. '}${lift >= 0.1 ? `At home, your crowd widens your timing by ${lift}%.` : 'A bigger, hotter crowd will widen your timing at home.'}`);
+  info.setAttribute('aria-label', 'About Chirp'); tip.hidden = true;
+  info.addEventListener('click', e => { e.stopPropagation(); tip.hidden = !tip.hidden; sfx.click(); });
+  box.addEventListener('click', () => { tip.hidden = true; });
+  bar.append(logo, info, stats, tip);
+  box.append(bar);
   const feed = el('div', 'cfeed');
   const next = nextMatchPost(c); if (next) feed.append(next);
   P.feed.slice(0, 14).forEach((post, k) => feed.append(chirpPost(c, post, k + 1)));
