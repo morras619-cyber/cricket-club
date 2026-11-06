@@ -2,6 +2,7 @@ import { CFG, makeEffectLevel } from './config.js';
 import { INK, FONT_DISPLAY, FONT_BODY, halftonePattern } from './fx.js';
 import { drawFigure, POSES } from './figure.js';
 import { quality } from './quality.js';
+import { groundLight, light } from './light.js';
 import { groundOf } from './grounds.js';
 import { stadiumTest, teamById, logoSrc, myClub, groundCondition, cosmetics } from './teams.js';
 import { paintGround } from './ownground.js';
@@ -1024,9 +1025,22 @@ function line(g, cam, x0, z0, x1, z1, color, w) {
   g.strokeStyle = color; g.lineWidth = w; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
 }
 
-export function drawBackground(ctx, cam) {
+// lit: the match views, whose ground has the pool of warm light on it. The light is laid on the cached background once (a copy of it, so the menus' background is
+// as it was): painted over the picture every frame it was the dearest thing in the view.
+export function drawBackground(ctx, cam, lit = false) {
   if (!cam.bg) cam.bg = renderBackground(cam);
-  ctx.drawImage(cam.bg, 0, 0, cam.W, cam.H);
+  let src = cam.bg;
+  if (lit && light.on && quality.high) {
+    if (cam.bgLitFor !== cam.bg) {
+      const c = document.createElement('canvas'); c.width = cam.bg.width; c.height = cam.bg.height;
+      const g = c.getContext('2d'); g.drawImage(cam.bg, 0, 0);
+      g.scale(c.width / cam.W, c.height / cam.H);
+      groundLight(g, cam.W, cam.H, cam.hy, NIGHT[groundOf(HOME).time] ?? 1);
+      cam.bgLit = c; cam.bgLitFor = cam.bg;
+    }
+    src = cam.bgLit;
+  }
+  ctx.drawImage(src, 0, 0, cam.W, cam.H);
 }
 
 // Stumps at z (0 or 20). broken: { t, dir } when the wicket has been hit.

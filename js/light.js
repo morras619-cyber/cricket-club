@@ -59,3 +59,11 @@ export function finishLight(ctx, W, H, hy, night = 0) {
   }
   ctx.restore();
 }
+
+// The finishing pass as a CSS background for a layer laid over the canvas (index.html #lightFx): the same three things finishLight paints, but the page's compositor lays
+// it over the picture for next to nothing, where painting it on the canvas every frame cost a third of a frame (two full-screen fills). H is the picture's height in px.
+export function lightCss(H, night = 0) {
+  const glow = night > 0.2 && quality.high ? `linear-gradient(rgba(150,190,255,${0.14 * night}), rgba(150,190,255,0)) 0 0 / 100% 30% no-repeat, ` : '';
+  const vignette = `radial-gradient(circle at 50% 55%, rgba(4,6,20,0) ${Math.round(H * 0.28)}px, rgba(4,6,20,${0.4 + 0.14 * night}) ${Math.round(H * 0.78)}px)`;
+  return `${glow}${vignette}, rgba(6,8,24,${DARKEN})`;
+}

@@ -1,5 +1,5 @@
 import { CFG, phaseFor } from './config.js';
-import { finishLight, groundLight, NIGHT } from './light.js';
+import { light, lightCss, NIGHT } from './light.js';
 import { makeRng } from './rng.js';
 import { pitchFeel, pitchLate } from './pitches.js';
 import { Charge } from './charge.js';
@@ -3600,6 +3600,7 @@ export class Game {
     else this.renderIdle();
     ctx.restore();
     this.fx.draw(ctx, W, H);
+    this.lightLayer();
     if (this.disco) { if (this.realTime - this.disco.at > DISCO_MS) this.disco = null; else drawDisco(ctx, W, H, this.realTime - this.disco.at, this.disco.colors, quality.high); }
     if (this.view === 'bowl' && this.thinks) this.drawThinks(ctx, this.thinks);
     else if ((this.view === 'bowl' || this.view === 'bat') && this.tag && this.realTime < this.tag.until) this.drawThinks(ctx, this.tag.text, this.tag.color);
@@ -3608,6 +3609,19 @@ export class Game {
     this.ui.chargeZap(zap, this.realTime);
     this.cutin.draw(ctx, W, H, this.realTime);
     if (this.cutin.busy !== this.cutinShown) { this.cutinShown = this.cutin.busy; document.getElementById('hud').classList.toggle('cutin-on', this.cutinShown); }
+  }
+
+  // the finishing light over the match views (a little darker, the corners falling away, a glow at the top at night) is a CSS layer over the canvas (index.html #lightFx),
+  // set when the view, the size or the ground's time of day changes
+  lightLayer() {
+    const el = this.lightEl || (this.lightEl = document.getElementById('lightFx'));
+    if (!el) return;
+    const on = light.on && (this.view === 'bat' || this.view === 'bowl' || this.view === 'keeper');
+    const key = on ? `${this.H}|${this.ground?.time}` : '';
+    if (key === this.lightKey) return;
+    this.lightKey = key;
+    el.hidden = !on;
+    if (on) el.style.background = lightCss(this.H, NIGHT[this.ground?.time] ?? 1);
   }
 
   renderIdle() {
@@ -3659,8 +3673,7 @@ export class Game {
 
   render3D(kind) {
     const ctx = this.ctx, S = this.S, cam = this.cams[kind];
-    drawBackground(ctx, cam);
-    groundLight(ctx, this.W, this.H, cam.hy, NIGHT[this.ground?.time] ?? 1);   // (the light on the ground, under the figures)
+    drawBackground(ctx, cam, true);   // (the pool of light on the ground is part of the cached picture)
     drawAtmosphere(ctx, cam, this.realTime, Math.max(0, ((this.flareUntil || 0) - this.realTime) / 1600));
     drawBoard(ctx, cam, this.realTime, this.realTime < this.boardUntil ? this.boardMsg : null);
     const items = [];
@@ -3801,7 +3814,6 @@ export class Game {
     items.sort((a, b2) => b2.d - a.d);
     for (const it of items) it.fn();
     if (kind === 'bowl') this.drawBowlOverlay(cam);
-    finishLight(this.ctx, this.W, this.H, cam.hy, NIGHT[this.ground?.time] ?? 1);
 
     // Read the Bowler: where it will land
     if (kind === 'bat' && S.read && !S.read.none && (S.readPre || (S.delivery && this.gameTime - S.ballT0 < (S.delivery.bounceT ?? 0) + 0.05))) this.drawReadMark(cam);

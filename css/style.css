@@ -2266,3 +2266,7 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 /* the match card's Play button: no pink under it */
 .mhero .playbtn { box-shadow: inset 0 3px 0 rgba(255, 255, 255, .7), inset 0 -4px 0 rgba(255, 120, 0, .45), 0 5px 0 #160d4a; }
 .mhero .playbtn:active { box-shadow: inset 0 3px 0 rgba(255, 255, 255, .7), inset 0 -4px 0 rgba(255, 120, 0, .45), 0 2px 0 #160d4a; }
+
+/* the finishing light over the match views: laid over the canvas, under the buttons (see light.js lightCss) */
+#lightFx { position: absolute; inset: 0; pointer-events: none; }
+#lightFx[hidden] { display: none; }
