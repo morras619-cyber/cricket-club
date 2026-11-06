@@ -38,6 +38,8 @@ export function aimVector(path, x0, y0, x, y, tUp, minPx = 28) {
   return { dx: best.dx / best.len * wl, dy: best.dy / best.len * wl };
 }
 
+// how far (radians) from the ball's natural direction a shot can be played: a ball on the left is hit to the left, a straight one anywhere about the straight
+export const HIT_ARC = 0.6, HIT_ARC_SHORT = 0.9;
 const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };
 // how far the ball strays from the swipe's direction (a standard deviation, radians), by the timing grade: a clean contact goes where the finger went
 const SPREAD = { perfect: 0.025, good: 0.07, early: 0.16, late: 0.16 };
@@ -107,12 +109,20 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   let power = POWER[grade];
   // with the line or against it: the shot's direction against the way the ball is going (the powers that force their own result are not judged)
   const judged = !fx.thunder && !fx.mirror && !fx.tornado;
+  // the arc a ball can be hit in: a ball on the left cannot be hit to the right. Swung beyond the arc, the shot is not played where it was aimed: it comes off at the
+  // edge of the arc, with the power taken off it, and most of the time it is beaten or edged (a scoop over the keeper is its own shot, with its own risk)
+  let across = false;
+  if (judged && shot.kind === 'drive' && Math.abs(shot.angle) <= 2.7) {
+    const ideal = idealAngle(d), dev = wrap(shot.angle - ideal), arc = d.length === 'short' || d.length === 'bouncer' ? HIT_ARC_SHORT : HIT_ARC;
+    if (Math.abs(dev) > arc) { shot = { ...shot, angle: ideal + Math.sign(dev) * arc }; across = true; }
+  }
   const lm = judged ? lineMatch(shot.angle, d) : { ideal: shot.angle, diff: 0, q: 1, mis: 0 };
+  if (across) { lm.mis = 1; lm.q = 0; }
   if (judged && shot.loft) { lm.mis = Math.min(1, lm.mis * 1.2); lm.q = 1 - lm.mis; }   // (lofting against the line is worse still)
   if (judged && lm.mis > 0.3) {
     // a good ball played against its line: beaten (and bowled if it was on the stumps) or edged. A well-timed shot is spared more often.
     const k = (lm.mis - 0.3) / 0.7, spare = grade === 'perfect' ? 0.45 : grade === 'good' ? 0.75 : 1;
-    const p = Math.min(0.7, k * 0.5 * ballDifficulty(d) * spare);
+    const p = Math.min(across ? 0.85 : 0.7, k * 0.5 * ballDifficulty(d) * spare + (across ? 0.35 : 0));
     if (rng.chance(p)) {
       if (rng.chance(d.onStumps ? 0.7 : 0.45)) return { outcome: d.onStumps ? 'bowled' : 'beaten', grade, line: lm };
       return { outcome: 'edge', grade: 'edge', line: lm, offset: { x: rng.range(-0.25, 1.5), y: rng.range(0.35, 1.25) } };
@@ -170,7 +180,7 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   if (fx.tornado) {
     v = Math.min(v, 15); loft = false; launchDeg = 0; forced = { cap: 2 };
   }
-  return { outcome: 'hit', grade, angle, loft, launchDeg, v, forced, label, roll: fx.pitch?.roll || 1, line: lm };
+  return { outcome: 'hit', grade, angle, loft, launchDeg, v, forced, label: across && !label ? 'ACROSS THE LINE' : label, roll: fx.pitch?.roll || 1, line: lm, across };
 }
 
 // ---------- Batting 2.0 (Settings > Tools, a test): the swipe itself carries the decisions ----------
@@ -212,3 +222,9 @@ export function mirrorResult(res) {
   if (out.offset) out.offset = { ...out.offset, x: -out.offset.x };
   return out;
 }
+
+// ---------- wides ----------
+// A ball is wide when it passes where the batter cannot reach: off side beyond 0.75 m from the middle of the stumps, leg side beyond 0.5 m (the leg side is called tighter, as in
+// the laws). x is where the ball passes the batter (after its swing and turn), left: he is a left-hander (his off side is the other way).
+export const WIDE = { off: 0.75, leg: -0.5 };
+export function isWide(x, left = false) { const m = left ? -x : x; return m > WIDE.off || m < WIDE.leg; }

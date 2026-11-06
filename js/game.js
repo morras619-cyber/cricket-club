@@ -6,7 +6,7 @@ import { Charge } from './charge.js';
 import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } from './heroes.js';
 import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
-import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult } from './shots.js';
+import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult, isWide } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
@@ -49,6 +49,8 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 // the batter seen from behind is drawn this far (m) to the right of where he stands, so his body is half in line with the stumps (drawing only)
 const BAT_BACK_DX = 0.27;
 const batDx = b => (b?.people?.left ? -BAT_BACK_DX : BAT_BACK_DX);   // (a left-hander's drawing sits the other side of his stumps)
+// a wide bowled again is a fair ball: nearer the stumps, and not allowed to swing or turn back out
+const legalSpec = s => ({ ...s, x: 0.15, lane: 'off', swing: (s.swing || 0) * 0.3, move: (s.move || 0) * 0.3 });
 const mirrorField = (list, on) => (on ? list.map(f => ({ ...f, x: -f.x })) : list);   // (his off side is the other side of the field)
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 // the game's pace while you field a catch / a run-out pick-up (the timing bar crosses at this pace; the
@@ -865,7 +867,7 @@ export class Game {
     this.fillCrease(inn);
     this.hud(inn);
     this.ui.shotButton(true, this.shotLoft, () => { this.shotLoft = !this.shotLoft; sfx.click(); return this.shotLoft; });
-    let redo = null;
+    let redo = null, wideRedo = null;
     while (!inn.done()) {
       const ballNo = inn.balls + 1;
       if (inn.balls % 6 === 0 && this.overStarted !== inn.balls) { this.overStarted = inn.balls; await this.startOver(inn); }
@@ -874,9 +876,13 @@ export class Game {
       const wk = inn.wkts;
       // a no-ball from the AI's bowler (now and then an overstep): +1 run, the ball is played as a free hit,
       // and the replacement ball is a free hit too
-      const spec = redo?.spec || script[ballNo - 1];
+      const spec = redo?.spec || wideRedo?.spec || script[ballNo - 1];
       const nb = redo || spec.power || this.mode === 'tutorial' ? null : makeRng((this.seed * 977 + ballNo * 131 + (this.rebowls || 0) * 7) >>> 0).chance(0.025) ? 'step' : null;
-      await this.batBall(inn, ballNo, spec, { noBall: nb, freeHit: !!nb || !!redo });
+      const c0 = inn.cur.id, r0 = inn.cur.runs;
+      const br = await this.batBall(inn, ballNo, spec, { noBall: nb, freeHit: !!nb || !!redo });
+      if (br?.wide) { wideRedo = { spec: legalSpec(spec) }; this.rebowls = (this.rebowls || 0) + 1; continue; }   // (a wide: bowled again, a fair ball)
+      wideRedo = null;
+      await this.milestoneCheck(inn, c0, r0, true);
       if (nb) { inn.nbPlay = false; this.rebowls = (this.rebowls || 0) + 1; }
       if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
@@ -1045,6 +1051,8 @@ export class Game {
     fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
+    // a wide: it passes where the batter cannot reach (shots.js isWide). Played at and hit, it is a fair ball; left or missed, it is a wide: +1, and bowled again
+    const wide = !opt.noBall && !opt.assist && !opt.hand && !this.nets && this.mode !== 'tutorial' && isWide(d.atContact?.x ?? d.xt, left);
     // Batting 2.0 (a test, in Settings): the swipe carries the decisions; see shots.js batNewSize
     const bn = !!this.settings.batNew && !this.bot && !opt.assist && !opt.hand && !fx.meteor;
     document.getElementById('hud')?.classList.toggle('bn', bn);
@@ -1157,6 +1165,7 @@ export class Game {
       if (bnInfo) this.batNewReport(bnInfo, err, grade, res);
     }
 
+    let wasWide = false;
     const contact = d.pos(d.tContact);
     const cs = this.cams.bat.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 2 };
     if (res.outcome === 'hit' || res.outcome === 'edge') {
@@ -1199,6 +1208,10 @@ export class Game {
         this.charge.wicketLost();
         if (opt.onOut) opt.onOut();
       }
+    } else if (wide && (res.outcome === 'leave' || res.outcome === 'beaten')) {
+      this.bowlCrowd('runs');
+      this.wideCall(inn);
+      wasWide = true;
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs');
       this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
@@ -1225,6 +1238,7 @@ export class Game {
     this.homeClaps(inn, inn.runs - before.runs, inn.wkts > before.wkts, true);
     this.hud(inn);
     if (this.showdown > 0 && (--this.showdown === 0 || inn.wkts > before.wkts)) { this.showdown = 0; this.showdownBrace = false; }   // (a wicket settles it)
+    if (wasWide) { this.hud(inn); await this.sleepReal(this.bot ? 50 : 500); return { wide: true }; }   // (no banter and no breath: it is bowled again)
     if (!opt.assist) await this.battingBanter({ runs: inn.runs - before.runs, wicketFell: inn.wkts > before.wkts, beaten: res.outcome === 'beaten' || (res.outcome === 'edge' && inn.wkts === before.wkts), rng, inn });
     await this.sleepReal(this.bot ? 50 : 650);
   }
@@ -1935,6 +1949,38 @@ export class Game {
     if ((sim.kind === 'six' && !o.caught) || (sim.kind === 'four' && !o.saved)) await this.sleepReal(this.bot ? 0 : 1100);
   }
 
+  // a wide: +1, a call, and the ball does not count
+  wideCall(inn) {
+    inn.wide();
+    this.fx.word('WIDE!', this.W / 2, this.H * 0.4, { size: 56, color: '#3ec6ff', stroke: INK, rot: 0, dur: 1100 });
+    sfx.whoosh();
+    this.hud(inn);
+  }
+
+  // Fifty and a hundred: the batter on strike goes past the mark on this ball. His own celebration (the sheet's celebrate pose, bat raised), a card, the crowd.
+  async milestoneCheck(inn, id, before, mine) {
+    if (!id || inn.cur.id !== id || this.nets || this.mode === 'tutorial') return;
+    const now = inn.cur.runs, n = before < 100 && now >= 100 ? 100 : before < 50 && now >= 50 ? 50 : 0;
+    if (n) await this.milestone(inn, n, mine);
+  }
+  async milestone(inn, n, mine) {
+    const p = this.batterOf(inn), S = this.S, team = mine ? this.myTeam : this.oppTeam, word = n === 100 ? 'CENTURY!' : 'FIFTY!';
+    if (!p || !S) return;
+    this.view = mine ? 'bat' : 'bowl';
+    this.fx.reset();
+    S.batter.anim = 'celebrate'; S.batter.shot = null; S.delivery = null; S.flight = null;
+    this.fx.word(word, this.W / 2, this.H * 0.3, { size: n === 100 ? 92 : 80, color: '#ffd23f', stroke: '#e8343b', dur: 2300 });
+    this.fx.flash('#ffd23f', 0.32); this.fx.shake(8);
+    this.fx.burst(this.W / 2, this.H * 0.55, { color: '#ffd23f', rays: 24, r: 340, dur: 600 });
+    this.fx.sparks(this.W * 0.3, this.H * 0.5, 22); this.fx.sparks(this.W * 0.7, this.H * 0.5, 22);
+    this.fx.ripple(this.W / 2, this.H * 0.5, { r: 150, dur: 900 });
+    sfx.crowd(n === 100 ? 2 : 1.6); sfx.chime(); buzz([60, 40, 100, 40, 160]);
+    if (team.id === this.home) this.sing(0.3, 4, 0.5);
+    this.ui.banner(word, `${p.name} · ${n} off ${inn.cur.balls}`, 2900, cardFor(p, team));
+    await this.sleepReal(this.bot ? 0 : 2900);
+    this.ui.clearBanner();
+  }
+
   // a no-ball that was bowled and played is over: it is not a legal ball, so the next ball is bowled in its place. True if there was one.
   endNoBall(inn) {
     if (!this.nbBall) return false;
@@ -1966,8 +2012,10 @@ export class Game {
         await this.sleepReal(this.bot ? 100 : 2200);
       }
       const wk = inn.wkts;
+      const c0 = inn.cur.id, r0 = inn.cur.runs;
       let r = await this.bowlBall(inn, ballNo);
       if (this.endNoBall(inn)) r = { rebowl: true };   // (a no-ball was bowled and played: it does not count, bowl it again)
+      if (!r?.rebowl) await this.milestoneCheck(inn, c0, r0, false);
       if (inn.wkts > wk && !inn.done()) await this.newBatter(inn);
       this.hud(inn);
       if (!inn.done()) this.prepPlayers(inn); // the pair after any change of strike, before the next ball
@@ -2250,7 +2298,8 @@ export class Game {
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * (pf.ai / pf.bat) ** 1.5 * aiHome };   // (raised: the pitch has to be felt)
     const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
-    let ai = aiBat(leftBat ? mirrorDelivery(d) : d, { hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    const wideB = !opt.scripted && !this.nets && this.mode !== 'tutorial' && !noBall && isWide(d.atContact?.x ?? d.xt, leftBat);   // (a wide: he cannot reach it)
+    let ai = aiBat(leftBat ? mirrorDelivery(d) : d, { wide: wideB,  hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     if (leftBat) ai = { ...ai, shot: ai.shot && { ...ai.shot, angle: -(ai.shot.angle ?? 0) }, res: mirrorResult(ai.res) };   // (out of the mirror)
     // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
     if (fxFlags.bouncer && ai.res.outcome === 'hit' && ai.res.grade !== 'defend' && !(ai.grade === 'perfect' || (fxFlags.bouncerBrace && ai.grade === 'good'))) {
@@ -2310,6 +2359,13 @@ export class Game {
       const trickWord = { googly: 'GOOGLY!', cutter: 'CUTTER!', storm: 'STORM!' }[usedTrick];
       const powerWord = usedPower ? { tornado: 'TORNADO YORKER!', maya: 'MAYA BALL!', shatter: 'SHATTERED!', bouncer: 'BOUNCER!' }[usedPower] : trickWord || (comboTag ? comboTag.label : null);
       wicket(res.mayaFooled ? 'FOOLED BY MAYA!' : 'BOWLED!', usedPower || usedTrick || comboTag ? 'twoWickets' : 'wicket', bowlerHero, { word: powerWord || 'BOWLED!', detail: powerWord ? `${powerWord.replace('!', '').toLowerCase()} wicket` : 'stumps cartwheeling' });
+    } else if (wideB && (res.outcome === 'leave' || res.outcome === 'beaten')) {
+      this.bowlCrowd('dot');
+      this.wideCall(inn);
+      this.nbBall = 'wide';   // (it does not count: bowled again, as after a no-ball but with no free hit)
+      this.hud(inn);
+      await this.sleepReal(this.bot ? 50 : 500);
+      return { rebowl: true };
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs'); // (a miss gets the groan; a ball left alone only lets the build-up fade)
       this.fx.word(res.outcome === 'leave' ? 'LEFT ALONE' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 44, color: '#fff4da', stroke: '#3ec6ff' });

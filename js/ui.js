@@ -94,8 +94,10 @@ export class UI {
     const over = inn.log.slice(start, start + 6);
     const cells = [];
     const nbAt = i => (inn.noBalls || []).filter(b => b === start + i).length; // no-balls before legal ball i
+    const wdAt = i => (inn.wides || []).filter(b => b === start + i).length;   // wides before legal ball i
     for (let i = 0; i < 6; i++) {
       for (let k = nbAt(i); k > 0; k--) cells.push('<b class="nb">NB</b>');
+      for (let k = wdAt(i); k > 0; k--) cells.push('<b class="nb">WD</b>');
       const r = over[i];
       cells.push(r == null ? '<b class="empty"></b>' : `<b class="r${r}">${r}</b>`);
     }

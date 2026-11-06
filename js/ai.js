@@ -144,6 +144,8 @@ export function aiBat(d, ctx, rng) {
   if (ctx.freeHit) sigma *= 0.85; // he picks his spot and commits to it
   if (ctx.hot) sigma *= HOT_BAT.sigma; // the duel is hot: he swings as hard as he can, and misses more
   const intent = aiIntent(ctx);
+  // a wide: out of his reach. He lets it go (now and then he reaches for it anyway)
+  if (ctx.wide && !ctx.freeHit && rng.chance(0.85)) return { errMs: 0, shot: { kind: 'leave' }, grade: 'leave', res: { outcome: 'leave', grade: 'leave' } };
   if (intent === 'attack' && !ctx.freeHit) sigma *= 1.08;   // (going for it: a little more mistimed)
   const mods = ctx.mods || {};
   sigma *= mods.sigmaMul || 1;

@@ -24,6 +24,7 @@ export class Innings {
     this.runs = 0; this.wkts = 0; this.balls = 0;
     this.log = []; // per legal ball: '0' '1' '4' '6' 'W' ...
     this.noBalls = []; // legal balls bowled when each no-ball came (for the over strip)
+    this.wides = [];   // the same for the wides
     // batting stints, one per batter: each dismissal ends one and the next batter comes in.
     // Two are at the crease: cur is on strike, other at the bowler's end. An odd number of runs
     // swaps them, and so does the end of an over.
@@ -86,6 +87,9 @@ export class Innings {
     if (this.curBowler) this.figs[this.curBowler].runs += runs;
     this.tireBall({ extra: true, batter: false });
   }
+
+  // a wide: +1 to the total and the bowler's figures, and the ball does not count (it is bowled again)
+  wide() { this.wides.push(this.balls); this.extra(1); }
 
   // A no-ball that is played (nbPlay): the runs off the bat count (the extra is already in) but it is not a legal ball, and only a run-out ends the batter's innings
   noBallPlay({ runs = 0, wicket = false, runOut = false }) {
