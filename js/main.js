@@ -86,7 +86,7 @@ sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
 game.settings.bowlNew = !!profile.settings.bowlNew;   // (Bowling 2.0, a test: Settings > Tools)
 units.speed = profile.settings.units === 'mph' ? 'mph' : 'kmh';
-window.__sixcharge = { game, ui, profile, moment: m => { queueMoment(m); flushMoments(); } };
+window.__sixcharge = { game, ui, profile, moment: m => { queueMoment(m); flushMoments(); }, renderCareer: (...a) => renderCareer(...a) };   // (renderCareer: for the tests)
 game.onFieldSaved = choice => { profile.field = { preset: choice.field, custom: choice.custom }; saveProfile(profile); };
 
 let challenge = decodeChallenge(location.hash.slice(1));
@@ -150,6 +150,7 @@ function autoPages(body, first = 'Match') {
   const NAMES = { 'squad needs': 'Needs', 'coming up': 'Next', 'my squad': 'Mine', 'your results': 'Results', 'across the divisions': 'Divisions', 'travelling scouts': 'Scouts', 'off-season news': 'News' };
   const raw = k => (k.querySelector?.('.lp-head b') || k.querySelector?.('h3'))?.textContent?.replace(/[^\p{L}\p{N}' -]/gu, '').trim();
   const name = k => {
+    if (k.dataset?.page) return k.dataset.page;   // (a panel that says which page it belongs on)
     if (k.classList.contains('stadpanel')) return 'Stadium';
     const h = raw(k);
     if (!h) return null;
@@ -160,8 +161,8 @@ function autoPages(body, first = 'Match') {
   const pages = [];
   let first_ = [];
   for (const k of kids) {
-    const n = lead(k) ? null : name(k);
-    if (n) pages.push([n, [k]]); else first_.push(k);
+    const n = lead(k) ? null : name(k), same = n && pages.find(p => p[0] === n);
+    if (same) same[1].push(k); else if (n) pages.push([n, [k]]); else first_.push(k);
   }
   if (first_.length) pages.unshift([first, first_]);
   if (!pages.length) return;
@@ -1069,6 +1070,65 @@ function fixtureCard(f, me, o, about, onPlay, derby = null) {
     card.append(q);
   }
   card.append(el('p', 'fixabout', about), go);
+  return card;
+}
+
+
+// The next match as the quick match's picker shows a team: both crests big, a star rating under each, the four ratings side by side, then the ground and the Play button.
+// Everything fits the page (the old card was a scroll). notes: what happened after the last match, in one line you tap through.
+const HERO_RATES = [['bat', 'Batting'], ['bowl', 'Bowling'], ['field', 'Fielding'], ['power', 'Power']];
+let heroStars = null;
+function clubStarsOf(c) {
+  const key = `${c.season}|${Object.keys(c.players).length}|${c.club}`;
+  if (heroStars?.key !== key) heroStars = { key, stars: teamStars(Object.fromEntries(CLUBS.map(t => [t.id, clubPool(c, t.id)])), CLUBS) };
+  return heroStars.stars;
+}
+function matchHero(c, f, me, o, about, onPlay, derby = null, notes = []) {
+  const S = clubStarsOf(c), fill = v => `${(v / 5) * 100}%`;
+  const card = el('div', 'mhero');
+  if (derby) card.classList.add('derby');
+  // what happened last time, one line at a time (tap for the next)
+  if (notes.length) {
+    const rep = el('button', 'mh-report'), txt = el('span', ''), cnt = el('em', '');
+    let i = 0;
+    const show = () => { txt.textContent = notes[i]; cnt.textContent = notes.length > 1 ? `${i + 1}/${notes.length}` : ''; };
+    rep.append(txt, cnt); show();
+    rep.addEventListener('click', () => { i = (i + 1) % notes.length; show(); sfx.click(); });
+    if (notes.length > 1) { const t = setInterval(() => { if (!rep.isConnected) return clearInterval(t); i = (i + 1) % notes.length; show(); }, 4200); }
+    card.append(rep);
+  }
+  const G = groundOf(f.home || me.id);
+  card.append(el('div', 'mh-round', `${f.label} · ${f.home === me.id ? 'HOME' : 'AWAY'}`));
+  const clubs = el('div', 'mh-clubs');
+  const side = (t, mine) => {
+    const b = el('div', `mh-club${mine ? ' mine' : ''}`), logo = document.createElement('img'); logo.src = logoSrc(t.id); logo.alt = t.name;
+    const st = el('i', 'pt-stars'); st.style.setProperty('--fill', fill(S[t.id].overall));
+    const sc = el('span', 'mh-score'); sc.append(el('b', '', S[t.id].overall.toFixed(1)), '/5');
+    b.append(logo, el('strong', '', t.name), st, sc);
+    return b;
+  };
+  const vs = document.createElement('img'); vs.src = 'img/league-vs.webp'; vs.alt = 'v'; vs.className = 'mh-vs';
+  clubs.append(side(me, true), vs, side(o, false));
+  const rates = el('div', 'mh-rates');
+  for (const [k, label] of HERO_RATES) {
+    const a = S[me.id][k], b = S[o.id][k], row = el('div', 'mh-rate');
+    const sa = el('i', 'pt-stars'), sb = el('i', 'pt-stars'); sa.style.setProperty('--fill', fill(a)); sb.style.setProperty('--fill', fill(b));
+    const mid = el('span', 'mh-lab'); mid.append(el('small', '', label));
+    if (a !== b) row.classList.add(a > b ? 'ahead' : 'behind');
+    row.append(sa, mid, sb); rates.append(row);
+  }
+  const venue = el('p', 'mh-venue');
+  venue.append(el('i', '', '🏟'), el('b', '', G.name), '\u00a0· ', el('b', '', `Pitch: ${G.pitch.name}`));
+  pitchLink(venue, G.pitch.id);
+  card.append(clubs, rates, venue);
+  if (derby) card.append(el('p', 'mh-taunt', `${derby.kind === 'nemesis' ? '⚡ YOUR NEMESIS' : '⚔️ DIVISION RIVAL'} · “${derby.text}”`));
+  card.append(el('p', 'mh-about', about));
+  const go = el('button', 'playbtn', `Play ${f.label.startsWith('Matchday') ? 'match' : f.label.toLowerCase()}`);
+  go.addEventListener('click', onPlay);
+  const pace = el('div', 'pace pacehero');
+  card.append(go, pace);
+  fillPace(pace, c);
+  syncClock().then(() => { if (pace.isConnected) fillPace(pace, c); });
   return card;
 }
 
@@ -2876,6 +2936,7 @@ function renderCareer(notes = careerNotes) {
   const bidding = c.phase === 'auction' && careerView !== 'squad' && !!currentLot(c); // the lot on the block: the auction stage's look (css .is-auction)
   $('career').classList.toggle('is-auction', bidding);
   $('career').classList.toggle('in-auction', c.phase === 'auction' && careerView !== 'squad'); // the auction's own backdrop (css), also on its closing card
+  $('career').classList.toggle('hero-mode', (c.phase === 'season' || c.phase === 'playoff') && careerView !== 'squad');   // the next match as one page: the header above it is slimmer (css .hero-mode)
   $('careerTitle').textContent = bidding ? `Season ${c.season} auction` : `Season ${c.season}`;
   const club = c.club ? teamById(c.club) : null;
   $('careerLede').textContent = club && c.phase === 'trials' ? `${club.name} · ${divisionName(divisionOf(c, c.club))} · picking the first squad`
@@ -3310,9 +3371,8 @@ function careerAuction(c, body) {
 function careerSeason(c, body) {
   const f = nextFixture(c.league);
   const me = teamById(c.club);
-  body.append(divisionCard(c));
-  const pace = el('div', 'panel paper statcard pace pacepanel'); fillPace(pace, c); body.append(pace);
-  syncClock().then(() => { if (pace.isConnected) fillPace(pace, c); });
+  const dc = divisionCard(c); dc.dataset.page = 'Table'; body.append(dc);   // (the ladder and what it takes to go up: with the table)
+  const notes = [...body.querySelectorAll(':scope > .notecard')].map(n => { const t = n.textContent; n.remove(); return t; });   // (what happened last time: one line in the match card)
   coachOnce('season', DEV.season).then(async shown => {
     // send a scout abroad; then, once one has found someone, what happens next
     if (!Object.keys(c.scouting || {}).length) shown = (await coachOnce('scoutTip', DEV.scoutTip)) || shown;
@@ -3325,8 +3385,7 @@ function careerSeason(c, body) {
     const o = teamById(f.opp);
     const theirs = clubPlayers(c, o.id), heroes = theirs.filter(p => p.heroId).map(p => heroById(p.heroId).name);
     const best = [...theirs].sort((a, b) => ovr(b) - ovr(a))[0];
-    body.append(fixtureCard(f, me, o, `${o.name} · rating ${clubRating(c, o.id)} · ${o.style.tag}. ${heroes.length ? `Heroes: ${heroes.join(', ')}. ` : ''}Watch out for ${flagName(best)} (${ovr(best)}).`,
-      () => playLeagueMatch(c), preMatch(c, o.id)));
+    body.append(matchHero(c, f, me, o, `${o.style.tag} · Watch out for ${flagName(best)} (${ovr(best)})`, () => playLeagueMatch(c), preMatch(c, o.id), notes));
   }
   body.append(chirpPanel(c));
   if (c.custom) body.append(stadiumPanel(c), groundPanel(c));
@@ -3536,8 +3595,9 @@ function divisionCard(c) {
 function careerPlayoff(c, body) {
   coachOnce(`playoff-${c.season}`, DEV.playoff);
   const me = teamById(c.club), o = teamById(c.playoff.opp);
-  body.append(divisionCard(c));
-  body.append(fixtureCard({ ...c.playoff, label: 'Relegation play-off' }, me, o, `Win and you stay in the Asian Super League. Lose and ${me.name} go down to Division 2.`, () => playLeagueMatch(c)));
+  const dc = divisionCard(c); dc.dataset.page = 'Table'; body.append(dc);
+  const notes = [...body.querySelectorAll(':scope > .notecard')].map(n => { const t = n.textContent; n.remove(); return t; });
+  body.append(matchHero(c, { ...c.playoff, label: 'Relegation play-off' }, me, o, `Win and you stay in the Asian Super League. Lose and you go down to Division 2.`, () => playLeagueMatch(c), null, notes));
   body.append(...leaguePanels(c.league));
 }
 

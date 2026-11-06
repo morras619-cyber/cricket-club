@@ -2196,3 +2196,49 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .bw-bar i { flex: 1; border-radius: 4px; background: rgba(255, 255, 255, .16); position: relative; overflow: hidden; }
 .bw-bar i::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: var(--f, 0%); background: linear-gradient(90deg, #ffb52e, #ffe45c); transition: width .25s; }
 .bw-pressure[data-stage="2"] .bw-bar i::after { background: linear-gradient(90deg, #ff3c2a, #ff9f1c); box-shadow: 0 0 6px rgba(255, 90, 40, .9); }
+
+/* ---------- the career's next match: the quick match picker's look (crests, stars, the four ratings side by side), all on one page ---------- */
+.mhero { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 8px 10px 9px; border-radius: 18px; background: linear-gradient(180deg, #1b2873 0%, #0b1141 100%); border: 2.5px solid #3b4bb0; box-shadow: 0 5px 0 #070b2c, inset 0 0 22px rgba(80, 110, 255, .22); color: #fff; }
+.mhero.derby { border-color: #ff9f1c; box-shadow: 0 5px 0 #070b2c, inset 0 0 22px rgba(255, 159, 28, .2); }
+.mh-report { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 9px; border-radius: 10px; text-align: left; font: 800 12.5px/1.2 var(--ui); color: #ffe27a; background: rgba(255, 210, 63, .1); border: 1.5px solid rgba(255, 210, 63, .4); }
+.mh-report span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mh-report em { flex: none; font-style: normal; font-size: 11px; opacity: .75; }
+.mh-round { text-align: center; font-family: var(--display); font-size: 14px; letter-spacing: 1.6px; color: #b9c2ff; text-transform: uppercase; line-height: 1.1; }
+.mh-clubs { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 4px; }
+.mh-club { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
+.mh-club img { width: min(26vw, 92px); height: auto; filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .55)); }
+.mh-club strong { max-width: 100%; font-family: var(--display); font-weight: 400; font-size: 16px; letter-spacing: .8px; line-height: 1.1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 #060a2a; }
+.mh-club .pt-stars { font-size: 20px; letter-spacing: 2px; }
+.mh-score { font-family: var(--display); font-size: 13px; color: #b9c2ff; line-height: 1; }
+.mh-score b { font-weight: 400; font-size: 24px; color: var(--bolt); -webkit-text-stroke: 1px var(--ink); paint-order: stroke fill; margin-right: 1px; }
+.mh-club.mine strong { color: #ffe27a; }
+.mh-vs { width: 40px; height: auto; margin-bottom: 34px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .5)); }
+.mh-rates { display: grid; gap: 3px; }
+.mh-rate { display: grid; grid-template-columns: 1fr 70px 1fr; align-items: center; padding: 2px 8px; border-radius: 8px; background: #111842; border: 1.5px solid #2c3770; }
+.mh-rate .pt-stars { font-size: 14px; letter-spacing: 1px; justify-self: start; }   /* (sized to its stars: the gold fill is a share of the stars, not of the wide cell) */
+.mh-rate .pt-stars:last-child { justify-self: end; }
+.mh-rate.ahead { border-color: #2f8f5b; } .mh-rate.behind { border-color: #9a3a44; }
+.mh-lab small { display: block; text-align: center; font-family: var(--display); font-size: 12px; letter-spacing: 1px; color: #cfd6ff; text-transform: uppercase; line-height: 1.2; }
+.mh-venue, .mh-taunt, .mh-about { margin: 0; text-align: center; font: 700 12.5px/1.25 var(--ui); color: #b8c6ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mh-venue b { color: #fff; } .mh-venue i { font-style: normal; margin-right: 3px; }
+.mh-venue .pg-i { color: #7fe3ff; }
+.mh-taunt { color: #ffcf6b; }
+.mhero .playbtn { margin-top: 2px; }
+.mhero .pacehero { display: flex; align-items: center; justify-content: center; gap: 4px; color: #b8c6ff; font: 700 12px var(--ui); }
+.mhero .pacehero .pace-txt { color: #b8c6ff; }
+
+/* the next match as one page: Uncle Dev is a round button beside the title, and on a short screen the header gives the match card the room */
+#career.hero-mode .screen-inner { position: relative; }
+#career.hero-mode .pt-coach { position: absolute; right: 14px; top: 60px; margin: 0; z-index: 5; }
+#career.hero-mode .coachbtn { font-size: 0; gap: 0; padding: 0; width: 46px; height: 46px; min-height: 0; justify-content: center; transform: none; margin: 0; border-radius: 50%; }
+#career.hero-mode .coachbtn img { width: 36px; height: 36px; border-radius: 50%; }
+#career.hero-mode #careerRestart { min-height: 0; height: 26px; padding: 0 12px; font-size: 11px; opacity: .85; }
+@media (max-height: 780px) {
+  #career.hero-mode .lede { display: none; }
+  #career.hero-mode .pagerhost > .tabs > .tab { min-height: 42px; font-size: 15px; }
+  #career.hero-mode #careerNav .bigbtn { min-height: 46px; }
+}
+.mh-club img { width: min(22vw, 78px); }
+.mh-vs { width: 34px; margin-bottom: 30px; }
+.mh-rate { padding: 1px 8px; }
+.mhero { gap: 4px; padding: 7px 10px 8px; }

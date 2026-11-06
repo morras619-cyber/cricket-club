@@ -188,10 +188,10 @@ await page.waitForTimeout(700);
 check(await page.evaluate(() => /on the job/.test(document.querySelector('.groundpanel')?.textContent || '')), 'the caretaker is hired and on the job');
 // the match meter: four matches banked at the start; with none left, Play does not start a match and the wait is shown
 await page.waitForTimeout(800);
-check(await page.evaluate(() => /ready/i.test(document.querySelector('.pacepanel')?.textContent || '') && !!window.__sixcharge.profile.career.pace), 'the season page shows the match meter, full at the start');
+check(await page.evaluate(() => /ready/i.test(document.querySelector('.pacehero')?.textContent || '') && !!window.__sixcharge.profile.career.pace), 'the season page shows the match meter, full at the start');
 await page.evaluate(async () => { const P = await import('/js/pacing.js'); const c = window.__sixcharge.profile.career; for (let i = 0; i < P.PACE.BANK; i++) P.spend(c.pace, Date.now()); });
 await page.evaluate(() => document.querySelector('.playbtn').click()); await page.waitForTimeout(1500);
-check(await page.evaluate(() => document.getElementById('hud').hidden && /No match yet/.test(document.querySelector('.pacepanel')?.textContent || '')), 'with no match banked, Play does not start one and the meter shows the wait');
+check(await page.evaluate(() => document.getElementById('hud').hidden && /No match yet/.test(document.querySelector('.pacehero')?.textContent || '')), 'with no match banked, Play does not start one and the meter shows the wait');
 // the testing switch: in the settings it turns the match limit off, and the same Play then starts a match
 await page.evaluate(() => document.getElementById('careerHome').click()); await page.waitForTimeout(900);
 await page.evaluate(() => document.getElementById('mapSettings').click()); await page.waitForTimeout(500);
