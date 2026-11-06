@@ -157,7 +157,9 @@ export class Game {
       } else if (raw > 22) this.fastMs = 0;
     }
     // (milliseconds over the 22 ms mark add up; fast frames let them drain: sustained slowness, not one hitch, is what steps it down)
-    this.slowMs = Math.max(0, (this.slowMs || 0) + (raw > 22 ? raw - 16 : -8));
+    // (down to 1.5x it steps at the first sustained slowness; below that, only when frames are truly slow, under 30 a second: a phone that can do 1.5x is not made soft for a bad few seconds)
+    const limit = this.dprCap != null && this.dprCap <= 1.5 ? 34 : 22;
+    this.slowMs = Math.max(0, (this.slowMs || 0) + (raw > limit ? raw - 16 : -8));
     if (this.slowMs > 1800 && this.dprNow() > 1 && !this.fixedDpr) {
       const steps = [2, 1.5, 1.25, 1], cur = this.dprCap;
       this.dprCap = steps.find(v => v < cur - 0.01) ?? 1;

@@ -1188,46 +1188,62 @@ export class OutfieldView {
     }
     ctx.restore();
   }
-  drawGround(ctx) {
+  // The ground's static layer (the stadium picture, the grass, the wear) never changes while the camera stands still, and it was the dearest thing in this view: a big picture
+  // and sixty clipped grass tiles painted again every frame. It is painted once into a layer and laid back each frame, scaled and moved with the camera, until the camera has
+  // gone far enough for it to be painted again.
+  staticGround(ctx, c, art, top, gr) {
+    const { W, H, k } = this, dpr = ctx.getTransform().a || 1;
+    const key = `${W}|${H}|${dpr}|${HOME}|${wearOf()}|${!!top}|${!!(art.stripImg?.complete)}`;
+    let L = this.layer;
+    const place = L && L.key === key && L.art === art ? { s: k / L.k } : null;
+    if (place) { place.x = c.x - place.s * L.cx; place.y = c.y - place.s * L.cy; }
+    const ok = place && place.s > 0.97 && place.s < 1.03 && place.x <= 1 && place.y <= 1 && place.x + W * place.s >= W - 1 && place.y + H * place.s >= H - 1;
+    if (!ok) {
+      if (!L || L.cv.width !== Math.round(W * dpr) || L.cv.height !== Math.round(H * dpr)) { L = this.layer = { cv: document.createElement('canvas') }; L.cv.width = Math.round(W * dpr); L.cv.height = Math.round(H * dpr); }
+      const g = L.cv.getContext('2d');
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      this.paintGroundStatic(g, c, art, top, gr);
+      Object.assign(L, { key, art, k, cx: c.x, cy: c.y });
+      ctx.drawImage(L.cv, 0, 0, W, H);
+      return;
+    }
+    ctx.drawImage(L.cv, place.x, place.y, W * place.s, H * place.s);
+  }
+  paintGroundStatic(g, c, art, top, gr) {
     const { W, H, k } = this;
-    ctx.fillStyle = '#1b1838'; ctx.fillRect(0, 0, W, H);
-    const c = this.to(0, CY);
-    const art = artFor(), top = art?.meta.top && art.topView;
+    g.fillStyle = '#1b1838'; g.fillRect(0, 0, W, H);
     if (top) {
       // a ground built in Blender: the stadium rendered from this very angle (tools/blender, view
       // 'top': top.px pixels a metre, the pitch centre at top.c), the stands, boards and lights
       // around the grass the game draws below
       const t = art.meta.top, s = k / t.px;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(top, c.x - t.c[0] * s, c.y - t.c[1] * s, t.w * s, t.h * s);
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(top, c.x - t.c[0] * s, c.y - t.c[1] * s, t.w * s, t.h * s);
       if (art.meta.strip && art.stripImg?.complete && k > 5) this.drawStrip(ctx, art.stripImg, art.meta.strip, c, Math.min(1, (k - 5) / 2));
     } else {
       // the stands: a ring of crowd around the rope
       if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(ctx); this.crowdFor = HOME; }
-      ctx.save();
-      ctx.fillStyle = this.crowd;
-      ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 26) * k, (R + 26) * k * 0.78, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#0d0a24'; ctx.lineWidth = 4; ctx.stroke();
-      ctx.restore();
+      g.save();
+      g.fillStyle = this.crowd;
+      g.beginPath(); g.ellipse(c.x, c.y, (R + 26) * k, (R + 26) * k * 0.78, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#0d0a24'; g.lineWidth = 4; g.stroke();
+      g.restore();
     }
-    ctx.save();
-    // (with the rendered stadium the grass stops just past the rope: its boards stand beyond)
-    // (the rendered stadium's own grass ends about 64.3 m out: the rope sits on its edge and the game's grass ends under the rope, so no strip of the picture's grass shows outside it)
-    const ropeR = top ? R + 2.1 : R + 1.5, gr = top ? ropeR : R + 4;
-    ctx.beginPath(); ctx.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2);
-    if (art) {
+    g.save();
+    g.beginPath(); g.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2);
       // the painted grass right up to the stands, its stripes along the pitch as in the match
       // views: whole tiles with drawImage (pattern transforms are unreliable on iPhone Safari)
-      ctx.clip();
+      g.clip();
+      g.imageSmoothingQuality = 'low';   // (the tile is already about the size it is drawn at: the fine filter only costs)
       const tex = mipFor(grassMips(art), k), tw = TILE_M * k, th = TILE_M * k * 0.78;
       const o = this.to(-2.5, 0);
-      for (let x = o.x - Math.ceil(o.x / tw) * tw; x < W; x += tw) for (let y = o.y - Math.ceil(o.y / th) * th; y < H; y += th) ctx.drawImage(tex, x, y, tw + 0.5, th + 0.5);
-      ctx.restore();
+      for (let x = o.x - Math.ceil(o.x / tw) * tw; x < W; x += tw) for (let y = o.y - Math.ceil(o.y / th) * th; y < H; y += th) g.drawImage(tex, x, y, tw + 0.5, th + 0.5);
+      g.restore();
       // (your own ground, if it has been let go: the same dull, patchy grass seen from above)
       const wt = wearOf();
       if (wt > 0.01) {
-        ctx.save();
-        ctx.beginPath(); ctx.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2); ctx.clip();
+        g.save();
+        g.beginPath(); g.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2); g.clip();
         wornDraw(ctx, c.y - gr * k, c.x - gr * k, c.x + gr * k, c.y + gr * k, wt, gg => {
           const r = wornRng(7919);
           for (let i = 0; i < Math.round(150 * wt); i++) {
@@ -1235,8 +1251,18 @@ export class OutfieldView {
             softPatch(gg, p.x, p.y, rx * 1.4, rx * 1.1, r() < 0.7 ? '168,136,84' : '78,64,36', (0.28 + 0.3 * r()) * wt);
           }
         });
-        ctx.restore();
+        g.restore();
       }
+  }
+  drawGround(ctx) {
+    const { W, H, k } = this;
+    const c = this.to(0, CY);
+    const art = artFor(), top = art?.meta.top && art.topView;
+    // (with the rendered stadium the grass stops just past the rope: its boards stand beyond)
+    // (the rendered stadium's own grass ends about 64.3 m out: the rope sits on its edge and the game's grass ends under the rope, so no strip of the picture's grass shows outside it)
+    const ropeR = top ? R + 2.1 : R + 1.5, gr = top ? ropeR : R + 4;
+    if (art) {
+      this.staticGround(ctx, c, art, top, gr);   // (the stadium, the grass and the wear: the static layer)
       // the boundary rope in the home side's colour
       const rw = Math.max(5, 0.5 * k);
       // a four that crosses it sets the rope wobbling: a bulge that rings out and settles
@@ -1260,6 +1286,17 @@ export class OutfieldView {
       }
       ctx.restore();
     } else {
+      ctx.fillStyle = '#1b1838'; ctx.fillRect(0, 0, W, H);
+      // the stands: a ring of crowd around the rope
+      if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(ctx); this.crowdFor = HOME; }
+      ctx.save();
+      ctx.fillStyle = this.crowd;
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, (R + 26) * k, (R + 26) * k * 0.78, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#0d0a24'; ctx.lineWidth = 4; ctx.stroke();
+      ctx.restore();
+    
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2);
       ctx.fillStyle = '#ffd23f'; ctx.fill();
       ctx.beginPath(); ctx.ellipse(c.x, c.y, R * k + 2, R * k * 0.78 + 2, 0, 0, Math.PI * 2);
       ctx.fillStyle = groundOf(HOME).grass[1]; ctx.fill();
