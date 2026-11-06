@@ -91,8 +91,8 @@ export function matchup(batter, bowler, ctx = {}) {
   return out;
 }
 
-// ---------- career difficulty ----------
-// In a career, how good the club across from you is has to be felt, but no club is a pushover and none is out of reach. A club's ratings are pulled in towards the middle
+// ---------- club difficulty (a career, a quick match, the league, the cup) ----------
+// How good the club across from you is has to be felt, but no club is a pushover and none is out of reach. A club's ratings are pulled in towards the middle
 // (and up a little), so a weak side is still a side and a top side is beatable; their bowlers shrink your timing windows and move the ball more the better they are.
 // (Measured on whole simulated innings: with a squad of 70, about 74% against a 58 club, 57% against a 68 and 32% against an 80, most of them within a dozen runs.)
 export const careerBatSkill = s => 68 + ((s ?? 75) - 68) * 0.3 + 3;
