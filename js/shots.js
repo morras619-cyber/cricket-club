@@ -39,7 +39,7 @@ export function aimVector(path, x0, y0, x, y, tUp, minPx = 28) {
 }
 
 // how far (radians) from the ball's natural direction a shot can be played: a ball on the left is hit to the left, a straight one anywhere about the straight
-export const HIT_ARC = 0.6, HIT_ARC_SHORT = 0.9;
+export const HIT_ARC = 0.8, HIT_ARC_SHORT = 1.1;
 // going round the ball's own side (a cut to a ball outside off, a pull or hook to one on the pads) is allowed this far past its natural shot; a cross-bat pull of a short ball outside off carries this much risk
 const ROUND_ARC = 1.7, CROSS_MIS = 0.55;
 const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };
@@ -131,7 +131,7 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   if (judged && lm.mis > 0.3) {
     // a good ball played against its line: beaten (and bowled if it was on the stumps) or edged. A well-timed shot is spared more often.
     const k = (lm.mis - 0.3) / 0.7, spare = grade === 'perfect' ? 0.45 : grade === 'good' ? 0.75 : 1;
-    const p = Math.min(across ? 0.85 : 0.7, k * 0.5 * ballDifficulty(d) * spare + (across ? 0.35 : 0));
+    const p = Math.min(across ? 0.6 : 0.7, k * 0.5 * ballDifficulty(d) * spare + (across ? 0.15 : 0));
     if (rng.chance(p)) {
       if (rng.chance(d.onStumps ? 0.7 : 0.45)) return { outcome: d.onStumps ? 'bowled' : 'beaten', grade, line: lm };
       return { outcome: 'edge', grade: 'edge', line: lm, offset: { x: rng.range(-0.25, 1.5), y: rng.range(0.35, 1.25) } };
