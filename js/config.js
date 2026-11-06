@@ -50,7 +50,7 @@ export const CFG = {
     effect: { batPower: 0.3, batWin: 0.18, batEdge: 0.1, bowlWin: 0.15, bowlPower: 0.08, bowlPace: 0.05 },
   },
 
-  trialBalls: 4,   // the nets: balls each candidate faces or bowls (career.js net trials)
+  trialBalls: 3,   // the nets: balls each candidate faces or bowls (career.js net trials): two as they are, and the last with the player's own power on
 
   ground: { boundaryR: 62, centerY: 10, pitch: 20 },
   running: { first: 2.6, next: 2.4 },

@@ -3269,10 +3269,23 @@ export class Game {
   }
 
   // ---------- Issue #1: the tutorial over ----------
+  // the last ball of a net trial: the player's own power goes on (it costs him nothing in the nets) and its panel shows what it does
+  async trialPower(key) {
+    this.powerLock = false; this.charge.value = 100; this.ui.charge(100);
+    this.activate(key);
+    await this.sleepReal(this.bot ? 0 : 1500);
+  }
+  // ...and afterwards nothing of it is left on for the next player (a power that lasts several balls, a showdown, a counter)
+  trialPowerDone() {
+    this.armed = { mirror: 0, elastic: 0, storm: 0 }; this.showdown = 0; this.aiCounterNow = null;
+    this.charge.value = 40; this.ui.charge(40); this.refreshPowers();
+  }
+
   // the net trials (career.js TRIAL_*): every candidate faces CFG.trialBalls balls (a batter, with a net bowler) or bowls as many (a bowler, at a net batter), played for
   // real as him: his rating and type decide the timing windows and how the ball does. A wicket costs nothing (it is only the nets). Returns what each did.
   async runTrial({ bats = [], bowls = [], balls }) {
     const out = { bats: {}, bowls: {} }, N = balls || CFG.trialBalls;   // (balls: a net drill from the training ground faces more)
+    const powerBall = !balls;   // (the squad trials: the last ball of each is a power ball, the player using his own power; a drill is plain balls)
     const net = this.oppSide.attack[0], netBat = this.oppSide.order[0], netMate = this.oppSide.order[1] || netBat;
     this.fieldState.setting = 'off';   // (the nets: no fielding mini-games)
     this.charge.value = 40; this.ui.charge(40);
@@ -3294,8 +3307,11 @@ export class Game {
       await this.sleepReal(this.bot ? 100 : 2300);
       for (let k = 0; k < N; k++) {
         const spec = script[(bi * N + k) % script.length];
-        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? (!this.bot ? 'FINGER DOWN WHERE THE BALL WILL BE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND') : undefined, extra: 25 });
+        const bp = powerBall && k === N - 1 ? powersOf(cand).bat : null;
+        if (bp) await this.trialPower('bat');
+        await this.batBall(inn, k + 1, spec, { hint: bp ? `POWER BALL · ${bp.name.toUpperCase()}` : k === 0 ? (!this.bot ? 'FINGER DOWN WHERE THE BALL WILL BE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND') : undefined, extra: 25 });
         if (!inn.cur.id) inn.setBatter(cand);   // (bowled in the nets: back to the crease)
+        if (bp) this.trialPowerDone();
         this.hud(inn);
         await this.sleepReal(this.bot ? 60 : 450);
       }
@@ -3317,10 +3333,13 @@ export class Game {
       await this.sleepReal(this.bot ? 100 : 2300);
       while (inn.balls < N) {
         const wk = inn.wkts;
-        let r = await this.bowlBall(inn, inn.balls + 1, { hint: inn.balls === 0 ? 'DRAG THE BALL TO SET HOW IT MOVES · THEN SWIPE FROM YOUR BOWLER UP THE PITCH' : undefined });
+        const wp = powerBall && inn.balls === N - 1 ? powersOf(cand).bowl : null;
+        if (wp && !this.altArmed(wp.kind)) await this.trialPower('bowlpower');   // (and again if a no-ball used it up)
+        let r = await this.bowlBall(inn, inn.balls + 1, { hint: wp ? `POWER BALL · ${wp.name.toUpperCase()} · SWIPE UP THE PITCH` : inn.balls === 0 ? 'DRAG THE BALL TO SET HOW IT MOVES · THEN SWIPE FROM YOUR BOWLER UP THE PITCH' : undefined });
         if (this.endNoBall(inn)) { r = { rebowl: true }; this.rebowls = (this.rebowls || 0) + 1; }   // (a no-ball in the nets does not count either: without this every ball after it was played as a no-ball, and the six never ended)
         if (!inn.cur.id) inn.setBatter(netBat);
         if (inn.wkts > wk) inn.setPartner(netMate);
+        if (wp && inn.balls >= N) this.trialPowerDone();
         this.hud(inn);
         if (r?.rebowl) continue;
         await this.sleepReal(this.bot ? 60 : 350);
