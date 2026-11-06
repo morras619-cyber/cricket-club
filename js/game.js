@@ -528,7 +528,7 @@ export class Game {
     }
     inn.setBowler(p);
     this.lastBowlerId = p.id;
-    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 2300, cardFor(p, inn.side === 'player' ? this.oppTeam : this.myTeam));
+    this.ui.banner(`OVER ${over + 1} · ${p.name.toUpperCase()}`, `${p.hero ? '★ ' : ''}${flag(p)} ${this.typeLine(p)}${p.nick ? ` · '${p.nick}'` : ''}`, 2300, cardFor(p, inn.side === 'player' ? this.oppTeam : this.myTeam, 'bowl'));
     await this.sleepReal(50); // let the banner show first
     this.prepPlayers(inn);
     // play only starts once the card has been read and has gone
@@ -552,7 +552,7 @@ export class Game {
   // a wicket: the next batter walks out
   async newBatter(inn) {
     const p = this.fillCrease(inn)[0] || this.batterOf(inn);
-    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 2300, cardFor(p, inn.side === 'player' ? this.myTeam : this.oppTeam));
+    this.ui.banner('NEW BATTER', `${p.hero ? '★ ' : ''}${flagName(p)} · ${p.trait || p.label}`, 2300, cardFor(p, inn.side === 'player' ? this.myTeam : this.oppTeam, 'bat'));
     this.prepPlayers(inn);
     await this.sleepReal(this.bot ? 60 : 2600);
   }
@@ -830,13 +830,13 @@ export class Game {
     let need;
     if (inn.sixes) {
       const n = inn.target == null ? null : inn.target - inn.sixesHit, s = inn.sixesHit;
-      need = n == null ? `${s} six${s === 1 ? '' : 'es'} · ${inn.ballsLeft} balls left` : inn.side === 'player' ? `Need ${n} six${n === 1 ? '' : 'es'} off ${inn.ballsLeft}` : `They need ${n} six${n === 1 ? '' : 'es'} off ${inn.ballsLeft}`;
+      need = n == null ? `${s} six${s === 1 ? '' : 'es'} · ${inn.ballsLeft} balls left` : inn.side === 'player' ? `Need ${n} six${n === 1 ? '' : 'es'} off ${inn.ballsLeft}` : `Need ${n} six${n === 1 ? '' : 'es'} off ${inn.ballsLeft}`;
     } else if (inn.target != null) {
       const n = inn.target - inn.runs;
       need = inn.side === 'player'
         ? (n > 0 ? `Need ${n} off ${inn.ballsLeft}` : 'Target reached!')
-        : (n > 0 ? `They need ${n} off ${inn.ballsLeft}` : 'They got there');
-    } else need = inn.side === 'player' ? 'Set a target' : 'They\'re setting a target';
+        : (n > 0 ? `Need ${n} off ${inn.ballsLeft}` : 'They got there');
+    } else need = inn.side === 'player' ? 'Set a target' : 'Setting a target';
     const short = h => h.short || h.name.split(' ').slice(-1)[0];
     let heroLine;
     const bat = this.batterOf(inn), bowl = this.bowlerOf(inn);

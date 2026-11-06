@@ -123,6 +123,10 @@ export function ensurePics(c) {
   const owner = new Map();
   for (const q of ps) { const k = keyOfP(q); if (HAS_PIC.has(k)) owner.set(k, q); }
   const lent = new Map();   // key -> how many have borrowed it
+  // what a picture shows: the portraits painted for a bowler hold a ball and those painted for a batter or a keeper a bat, so a made-up player borrows one painted for his kind of player
+  const kindOf = p => p.role === 'bowl' ? 'bowl' : p.role === 'bat' || p.role === 'wk' ? 'bat' : 'all', clash = (a, b) => (a === 'bowl' && b === 'bat') || (a === 'bat' && b === 'bowl');
+  // (a career saved before this: a bowler holding a bat gets another picture)
+  for (const q of ps) { const o = q.pic && owner.get(q.pic); if (o && clash(kindOf(o), kindOf(q))) delete q.pic; }
   for (const q of ps) if (q.pic) lent.set(q.pic, (lent.get(q.pic) || 0) + 1);
   const myDiv = c.club ? divisionOf(c, c.club) : null;
   for (const p of ps) {
@@ -133,6 +137,7 @@ export function ensurePics(c) {
       if (o.team === p.team && p.team != null) continue;     // never a face already in his own club
       if (mates.has(k)) continue;
       let sc = (lent.get(k) || 0) * -6;                       // lent faces last
+      if (clash(kindOf(o), kindOf(p))) sc -= 40; else if (kindOf(o) === kindOf(p)) sc += 6;   // (his own kind of player: a ball for a bowler, a bat for a batter)
       if (o.nation && o.nation === p.nation) sc += 3;
       const a = PORTRAIT_AGE[k]; if (a != null && p.age != null) sc -= Math.min(6, Math.abs(a - p.age)) * 0.7;
       if (o.team && myDiv && c.club && divisionOf(c, o.team) !== myDiv) sc += 2;   // from another division: far from the club he plays for

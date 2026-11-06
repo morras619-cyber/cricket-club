@@ -9,8 +9,10 @@ import { tiredness } from './stamina.js';
 const $ = id => document.getElementById(id);
 
 // Sets text and shrinks the font until it fits its box, so nothing gets cut off.
+let fitGen = 0;   // (bumped when a web font arrives: words fitted in the fallback font are fitted again in the real one)
+if (typeof document !== 'undefined' && document.fonts?.addEventListener) document.fonts.addEventListener('loadingdone', () => { fitGen++; });
 function setFit(el, text) {
-  const cw = el.clientWidth, key = `${text}|${cw}`;
+  const cw = el.clientWidth, key = `${text}|${cw}|${fitGen}`;
   if (el.textContent !== text) el.textContent = text;
   else if (el._fit === key) return;   // (the same words in the same box: already fitted, and nothing to measure again)
   el.style.fontSize = '';
@@ -73,9 +75,10 @@ export class UI {
     const crr = inn.balls ? (inn.runs * 6) / inn.balls : null;
     const left = inn.target != null ? inn.target - inn.runs : null;
     const rrr = left != null && left > 0 && inn.ballsLeft > 0 ? (left * 6) / inn.ballsLeft : null;
+    // (one rate at a time: the one that matters, the required rate in a chase, else the current; the scoreboard is narrow on a phone and the words beside them must fit)
     const parts = [];
-    if (crr != null) parts.push(`CRR <b>${crr.toFixed(2)}</b>`);
     if (rrr != null) parts.push(`RRR <b class="${crr != null && rrr > crr ? 'hot' : ''}">${rrr.toFixed(2)}</b>`);
+    else if (crr != null) parts.push(`CRR <b>${crr.toFixed(2)}</b>`);
     $('hudRates').innerHTML = parts.join(' · ');
     if (stam) {
       for (const [id, e, name] of [['stamBat', stam.bat, 'batter'], ['stamBowl', stam.bowl, 'bowler']]) {

@@ -10,7 +10,8 @@ const ROLE = { bat: 'BAT', bowl: 'BOWL', all: 'ALL-ROUNDER', wk: 'KEEPER' };
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 // p: the player; team: the side he plays for in this match
-export function cardFor(p, team = null) {
+// as: what he is shown doing when he has no painted portrait: 'bowl' (the bowler of the over), 'bat' (a batter walking out); by default his role decides
+export function cardFor(p, team = null, as = null) {
   if (!p) return null;
   const card = mk('div', 'mcard');
   if (team?.suit) card.style.setProperty('--fc', team.suit);
@@ -18,7 +19,8 @@ export function cardFor(p, team = null) {
   if (pic) { pic.className = 'mcard-pic'; card.append(pic); }
   else {
     const hero = p.hero && typeof p.hero === 'object' ? p.hero : null;
-    const f = hero ? portrait(hero, 200, 'celebrate') : faceEl(p, team, 200, 'mcard-face', true);
+    const pose = as === 'bowl' || (!as && p.role === 'bowl') ? 'bowl' : !as && p.role === 'wk' ? 'keeper' : 'celebrate';   // (a bowler does not hold a bat)
+    const f = hero ? portrait(hero, 200, pose) : faceEl(p, team, 200, 'mcard-face', true);
     f.classList.add('mcard-pic', 'mcard-drawn'); f.style.width = f.style.height = '';
     card.append(f);
   }
