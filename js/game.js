@@ -18,7 +18,7 @@ import { dailyOutcome } from './daily.js';
 import { cardFor } from './cards.js';
 import { portraitFace, paintedPortrait } from './futcard.js';
 import { paceTired, tiredness } from './stamina.js';
-import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed } from './ratings.js';
+import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed, careerBatSkill, careerBowlWindow, careerBowlMove } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, runUp, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
 import { playerControls, momentScore } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
@@ -940,7 +940,7 @@ export class Game {
   // good bowler (bowlSkill) squeezes everyone's timing
   windowsFor(fx, extra = 0, tornado = false, skill = 75, bowlSkill = 75) {
     const w = { ...CFG.timing };
-    const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.pitchBat?.() || 1) * (1 + (this.crowdLift || 0));
+    const f = timingFor(skill) * bowlerSqueeze(bowlSkill) * (this.mode === 'career' ? careerBowlWindow(bowlSkill) : 1) * (this.pitchBat?.() || 1) * (1 + (this.crowdLift || 0));
     const braced = fx.counter === 'brace';   // (the bowler answered this power with Brace: half of it)
     for (const k in w) w[k] = w[k] * f + CFG.touchSlackMs + extra + (fx.mirror ? (braced ? 20 : 40) : 0);
     if (fx.focus) { const h = braced ? BRACE.focusWindow : 1; w.perfect += 55 * h; w.good += 45 * h; }
@@ -1050,7 +1050,8 @@ export class Game {
     const bowlRate = (bowler.bowlSkill || 75) + this.adapt.bowl;
     fx.match = matchup(striker, { ...bowler, bowlSkill: bowlRate }, { feel: this.feel(), ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const w = this.windowsFor(fx, opt.extra || 0, aiPower === 'tornado' && myC !== 'brace', skill, bowlRate);
-    const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
+    const careerMv = this.mode === 'career' ? careerBowlMove(bowlRate) : 1;   // (a career: the better their bowler, the more it moves)
+    const d = makeDelivery(this.pitched({ ...spec, swing: (spec.swing || 0) * careerMv, move: (spec.move || 0) * careerMv, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     // a wide: it passes where the batter cannot reach (shots.js isWide). Played at and hit, it is a fair ball; left or missed, it is a wide: +1, and bowled again
     const wide = !opt.noBall && !opt.assist && !opt.hand && !this.nets && this.mode !== 'tutorial' && isWide(d.atContact?.x ?? d.xt, left);
     // Batting 2.0: the swipe carries the decisions (the tutorial's lessons and the bots play the plain way); see shots.js batNewSize
@@ -2311,7 +2312,8 @@ export class Game {
     if (mood.balls > 0 && --mood.balls === 0) mood.state = 'calm';
 
     // the AI batter's ability, and how hard my bowler is to read
-    const aiSkill = this.adapt.bat + striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
+    const aiSkillRaw = this.adapt.bat + striker.bat + (striker.ability === 'eagleEye' ? 12 : 0) + (striker.ability === 'finisher' && ballNo >= 25 ? 20 : 0) - (bowler.ability === 'mystery' ? 12 : 0);
+    const aiSkill = this.mode === 'career' ? careerBatSkill(aiSkillRaw) : aiSkillRaw;   // (a career: no club is a pushover, none out of reach)
     const aiHome = this.home === this.oppTeam.id ? 0.96 : 1; // the home crowd lifts them
     const pf = this.feel();
     const style = { ...this.oppStyle, sigma: (this.oppStyle.sigma || 1) * (pf.ai / pf.bat) ** 1.5 * aiHome };   // (raised: the pitch has to be felt)
