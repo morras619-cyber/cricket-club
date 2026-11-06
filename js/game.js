@@ -9,7 +9,7 @@ import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult, isWide } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
-import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES } from './tactics.js';
+import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES, bowlWhy } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
 import { lookOf, faceCanvas, masksReady, colourLook } from './looks.js';
@@ -2318,7 +2318,8 @@ export class Game {
     const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
     const wideB = !opt.scripted && !this.nets && this.mode !== 'tutorial' && !noBall && isWide(d.atContact?.x ?? d.xt, leftBat);   // (a wide: he cannot reach it)
-    let ai = aiBat(leftBat ? mirrorDelivery(d) : d, { wide: wideB,  hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win * (commit?.sigma || 1) * (bw ? pressureFx(this.pressure || 0).sigma : 1), edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) + (bw ? pressureFx(this.pressure || 0).edge : 0) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    let sameLen = 0; for (let i = this.bowlHistory.length - 1; i >= 0 && this.bowlHistory[i].length === spec.length && sameLen < 6; i--) sameLen++;   // (Bowling 2.0: how many balls running at this length)
+    let ai = aiBat(leftBat ? mirrorDelivery(d) : d, { wide: wideB,  hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, bowlNew: bw, sameLen: sameLen, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win * (commit?.sigma || 1) * (bw ? pressureFx(this.pressure || 0).sigma : 1), edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) + (bw ? pressureFx(this.pressure || 0).edge : 0) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     if (leftBat) ai = { ...ai, shot: ai.shot && { ...ai.shot, angle: -(ai.shot.angle ?? 0) }, res: mirrorResult(ai.res) };   // (out of the mirror)
     // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
     if (fxFlags.bouncer && ai.res.outcome === 'hit' && ai.res.grade !== 'defend' && !(ai.grade === 'perfect' || (fxFlags.bouncerBrace && ai.grade === 'good'))) {
@@ -2433,6 +2434,8 @@ export class Game {
       this.pressure = pressureNext(this.pressure || 0, { runs: noBall ? runs - 1 : runs, wicket: wicketFell, noBall: !!noBall });
       const after2 = pressureStage(this.pressure);
       this.bowlNewPaint();
+      const why = !this.bot && bowlWhy({ length: spec.length, x: d.atContact?.x ?? d.xt, runs, wicket: wicketFell, outcome: res.outcome, grade: ai.grade, label: res.label, defended: ai.shot?.kind === 'defend', same: sameLen });
+      if (why) this.showTag(why, '#fff4da', 2000);
       if (after2 > before2) this.fx.word(`${PRESSURE_NAMES[after2]}!`, this.W / 2, this.H * 0.2, { size: 34, color: after2 === 2 ? '#ff5a3c' : '#ffb52e', stroke: INK, rot: 0, dur: 1100 });
     }
     this.huntOpen = wicketFell;   // (Hat-trick Hunt is on offer for the next ball)

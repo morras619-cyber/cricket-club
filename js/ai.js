@@ -109,7 +109,7 @@ export function aiIntent(ctx) {
 }
 
 // How the AI batter picks a shot direction for a delivery.
-function chooseShot(d, ctx, rng) {
+function chooseShot(d, ctx, rng, Q = null) {
   // he plays the ball by its line (shots.js idealAngle), as well as his skill lets him read it: a good batter goes with the line nearly every time, a weak one
   // is often a long way off it (a slogger swings at everything the same way), and against a ball that is moving a lot even the best are caught out now and then
   const sk = Math.max(0, Math.min(1, ((ctx.skill ?? 75) - 40) / 55)), move = Math.max(0, Math.min(1, (Math.abs(d.swing) || 0) / 0.5 + (Math.abs(d.move) || 0) / 0.3));
@@ -125,6 +125,7 @@ function chooseShot(d, ctx, rng) {
   const intent = aiIntent(ctx);
   if (intent === 'build') loftP *= 0.6; else if (intent === 'attack') loftP = Math.min(0.9, loftP + 0.2); else loftP *= 0.4;   // (building keeps it on the ground; attacking goes over the top)
   if (d.length === 'yorker') loftP *= 0.4;
+  if (Q) loftP = Math.max(0.01, Math.min(0.92, loftP * Q.loft));
   // a free hit: nothing to lose, so he goes over the top for six, mostly straight or over cow corner
   if (ctx.freeHit) return { kind: 'drive', angle: rng.chance(0.6) ? rng.range(-0.25, 0.2) : rng.range(-0.9, -0.5), loft: true, len: 200 };
   return { kind: 'drive', angle, loft: rng.chance(loftP), len: 200 };
@@ -144,6 +145,8 @@ export function aiBat(d, ctx, rng) {
   if (ctx.freeHit) sigma *= 0.85; // he picks his spot and commits to it
   if (ctx.hot) sigma *= HOT_BAT.sigma; // the duel is hot: he swings as hard as he can, and misses more
   const intent = aiIntent(ctx);
+  const Q = ctx.bowlNew ? ballQuality(d, ctx.sameLen || 0) : null;
+  if (Q) sigma *= Q.sigma;
   // a wide: out of his reach. He lets it go (now and then he reaches for it anyway)
   if (ctx.wide && !ctx.freeHit && rng.chance(0.85)) return { errMs: 0, shot: { kind: 'leave' }, grade: 'leave', res: { outcome: 'leave', grade: 'leave' } };
   if (intent === 'attack' && !ctx.freeHit) sigma *= 1.08;   // (going for it: a little more mistimed)
@@ -160,7 +163,7 @@ export function aiBat(d, ctx, rng) {
   if (ctx.repeats >= 3) for (const k in w) w[k] += 20;
   if (ctx.fx?.tornado) w.perfect /= 2;
   const errMs = rng.normal() * sigma + 6 + (mods.bias || 0) + cutterBias;
-  const shot = chooseShot(d, ctx, rng);
+  const shot = chooseShot(d, ctx, rng, Q);
   if (mods.loftAdd && !shot.loft && rng.chance(mods.loftAdd)) shot.loft = true;
   if (f.cutter && !shot.loft && rng.chance(f.cutterBrace ? 0.3 : 0.6)) shot.loft = true;   // (an early swing skies it)
   if (ctx.hot && !ctx.freeHit && !shot.loft && rng.chance(HOT_BAT.loft)) shot.loft = true;
@@ -171,7 +174,9 @@ export function aiBat(d, ctx, rng) {
   }
 
   // defending: he leaves the wide ones and blocks what threatens him (a looser ball he still punishes), with a wider window than a drive has
-  if (intent === 'defend' && !ctx.hot && !ctx.freeHit && !ctx.fx?.maya && ctx.release !== 'loose' && d.length !== 'fulltoss' && !(d.length === 'short' && d.xt > 0.3)) {
+  // Bowling 2.0: a ball that deserves respect is played out now and then, whatever his intent (less when he is going for it)
+  const respect = !!Q && !ctx.freeHit && !ctx.hot && !ctx.fx?.maya && ctx.release !== 'loose' && rng.chance(Q.block * (intent === 'attack' ? 0.5 : 1));
+  if ((intent === 'defend' || respect) && !ctx.hot && !ctx.freeHit && !ctx.fx?.maya && ctx.release !== 'loose' && d.length !== 'fulltoss' && !(d.length === 'short' && d.xt > 0.3)) {
     if (!d.onStumps && Math.abs(d.xt) > 0.4) return { errMs, shot: { kind: 'leave' }, grade: 'leave', res: { outcome: 'leave', grade: 'leave' } };
     const g = gradeTiming(errMs * 0.6, w, false);
     if (g === 'miss') return { errMs, shot: { kind: 'defend' }, grade: 'miss', res: { outcome: d.onStumps ? 'bowled' : 'beaten', grade: 'miss' } };
@@ -184,17 +189,48 @@ export function aiBat(d, ctx, rng) {
   }
   let grade = gradeTiming(errMs, w, d.xt > 0.08);
   if (ctx.steady && grade !== 'perfect') grade = 'good';   // his Steady Hands: a Good timing, however it is bowled
-  if (mods.edgeBoost && ['good', 'early', 'late'].includes(grade) && d.xt > -0.05 && rng.chance(mods.edgeBoost)) grade = 'edge';
-  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, noGate: true, thunder: ctx.power === 'thunder', braced: !!ctx.brace }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) * (ctx.powerMul || 1) });
+  if (((mods.edgeBoost || 0) + (Q ? Q.edge : 0)) && ['good', 'early', 'late'].includes(grade) && d.xt > -0.05 && rng.chance((mods.edgeBoost || 0) + (Q ? Q.edge : 0))) grade = 'edge';
+  const res = resolveContact({ grade, errMs, shot, d, fx: { ...ctx.fx, noGate: true, thunder: ctx.power === 'thunder', braced: !!ctx.brace }, rng, strength: hitStrength(ctx.power ? 75 : (ctx.skill ?? 75)) * (ctx.powerMul || 1) * (Q ? Q.power : 1) });
+  // a lofted shot at a ball that gives him nothing to lift can be mistimed up in the air: a catch chance (a well-timed one is spared more often)
+  if (Q && res.outcome === 'hit' && shot.loft && !res.forced?.six && rng.chance(0.75 * Q.skyP * (grade === 'perfect' ? 0.25 : grade === 'good' ? 0.6 : 1.2))) {
+    res.loft = true; res.launchDeg = 55 + rng.range(0, 13); res.v = Math.min(res.v || 20, 19); res.label = 'SKIED!';   // (a catch for whoever is under it)
+  }
   // through the gate: a mistimed swing at a full, straight ball can miss it and lose the stumps.
   // A weaker batter is beaten more often; a yorker on the stumps is the hardest to keep out.
   if ((grade === 'early' || grade === 'late' || grade === 'edge') && !ctx.freeHit && d.onStumps && ['good', 'full', 'yorker', 'fulltoss'].includes(d.length)) {
-    const p = (d.length === 'yorker' ? 0.4 : d.length === 'fulltoss' ? 0.08 : 0.2) * aiSpread(ctx.skill);
+    const p = (d.length === 'yorker' ? 0.4 : d.length === 'fulltoss' ? 0.08 : 0.2) * aiSpread(ctx.skill) * (Q ? (d.length === 'yorker' ? 0.7 : 0.9) * (1 - 0.17 * Math.max(0, Math.min(ctx.sameLen || 0, 5) - 1)) : 1);   // (Bowling 2.0: less than before, and not at all for a ball he has seen coming)
     if (rng.chance(p)) return { errMs, shot, grade: 'miss', res: { outcome: 'bowled', grade: 'miss' } };
   }
   if (ctx.fx?.tornado && (grade === 'miss' || res.outcome === 'beaten')) res.outcome = 'bowled';
   if (ctx.stance === 'charge' && res.outcome === 'beaten') res.outcome = 'stumping-chance';
   return { errMs, shot, grade, res };
+}
+
+
+// ---------- Bowling 2.0 (Settings > Tools, a test): the ball decides what the batter can do with it ----------
+// Each length has its own character: a yorker cannot be lifted, a half-volley is driven, a good length is respected, a short ball is pulled (and skied), a full toss is hit.
+// The line and the pace change it: a ball on the pads is flicked away, one in the channel outside off is hard to get away, a quick one gives less time (and goes further off the bat).
+// sigma: how much harder (or easier) it is to time. power: how hard it comes off the bat. loft: how likely he is to try to lift it. skyP: the chance a lofted shot is mistimed up in the air.
+// block: the chance he simply plays it out. edge: an extra chance of an edge.
+const LENGTH_Q = {
+  fulltoss: { sigma: 0.85, power: 0.95, loft: 1.2, skyP: 0.03, block: 0, edge: 0 },
+  full: { sigma: 0.92, power: 0.9, loft: 0.9, skyP: 0.12, block: 0.05, edge: 0.005 },
+  good: { sigma: 1.12, power: 0.9, loft: 0.6, skyP: 0.3, block: 0.25, edge: 0.02 },
+  short: { sigma: 1.0, power: 0.85, loft: 0.85, skyP: 0.25, block: 0.1, edge: 0.015 },
+  bouncer: { sigma: 1.2, power: 0.85, loft: 0.55, skyP: 0.35, block: 0.15, edge: 0.03 },
+  yorker: { sigma: 1.18, power: 0.95, loft: 0.2, skyP: 0.4, block: 0.12, edge: 0.015 },
+};
+export function ballQuality(d, same = 0) {
+  const q = { ...(LENGTH_Q[d.length] || LENGTH_Q.good) };
+  const x = d.atContact?.x ?? d.xt ?? 0;
+  if (x < -0.1 && x > -0.5) { q.sigma *= 0.92; q.power *= d.length === 'fulltoss' ? 0.9 : 1.08; q.loft *= d.length === 'fulltoss' ? 0.8 : 1.1; q.block *= 0.4; }          // on the pads: flicked away
+  else if (x >= 0.1 && x < 0.36) { q.sigma *= 1.08; q.edge += 0.01; q.block *= 1.2; }                       // the channel outside off: hard to get away
+  else if (x >= 0.36) { q.power *= 0.9; q.loft *= 0.7; }                                                    // reaching for it
+  if (d.kmh > 100) { const f = Math.max(-0.4, Math.min(1, (d.kmh - 118) / 40)); q.sigma *= 1 + 0.2 * f; q.power *= 1 + 0.1 * f; q.block *= 1 + 0.3 * f; q.edge += 0.03 * Math.max(0, f); }   // a quick one: less time, and it goes further
+  if (d.slower) q.sigma *= 1.15;
+  // the same length again and again: he is set for it (the third ball running, and the fourth more still)
+  if (same >= 2) { const n = Math.min(same, 5) - 1; q.sigma *= 1 - 0.04 * n; q.block *= 1 - 0.1 * n; q.power *= 1 + 0.04 * n; q.loft = Math.max(q.loft * (1 + 0.1 * n), same >= 3 ? 0.3 + 0.12 * n : 0); q.edge *= 0.7; }   // (and he starts to plan for it: a ramp or a scoop over a yorker he has seen coming)
+  return q;
 }
 
 export function aiStance(kind, rng) {

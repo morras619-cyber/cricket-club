@@ -240,3 +240,17 @@ export function pressureNext(v, o = {}) {
   const d = o.noBall ? -10 : o.wicket ? 30 : o.runs <= 0 ? 22 : o.runs === 1 ? 4 : o.runs <= 3 ? -8 : o.runs === 4 ? -28 : -45;
   return bwClamp(v + d, 0, 100);
 }
+
+// Bowling 2.0: a short line after each ball, saying why it went as it did (so the strategy can be learned without a menu)
+const LINE_NAME = { wideoff: 'WIDE OF OFF', off: 'OUTSIDE OFF', stumps: 'ON THE STUMPS', leg: 'ON THE PADS', wideleg: 'WIDE OF LEG' };
+export function bowlWhy({ length, x, runs = 0, wicket = false, outcome, grade, label, defended = false, same = 1 }) {
+  const L = (LENGTH_LABEL[length] || 'Ball').toUpperCase(), lane = laneFor(x ?? 0);
+  const head = `${L} · ${LINE_NAME[lane]}`;
+  let v = null;
+  if (wicket) v = outcome === 'bowled' ? 'BEAT HIM' : outcome === 'edge' ? 'HE EDGED IT' : 'HE TRIED TO LIFT IT';
+  else if (defended || grade === 'defend') v = 'HE RESPECTED IT';
+  else if (label === 'SKIED!') v = 'HE TRIED TO LIFT IT';
+  else if (runs >= 4) v = same >= 3 ? 'HE SAW IT COMING' : length === 'fulltoss' || length === 'full' ? 'A BALL TO HIT' : lane === 'leg' ? 'FLICKED OFF THE PADS' : 'TOO MUCH TO HIT';
+  else if (runs === 0 && ['good', 'yorker', 'bouncer'].includes(length)) v = 'NOTHING TO HIT';
+  return v ? `${head} · ${v}` : null;
+}
