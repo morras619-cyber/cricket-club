@@ -9,7 +9,7 @@ import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult, isWide } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
-import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE } from './tactics.js';
+import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
 import { lookOf, faceCanvas, masksReady, colourLook } from './looks.js';
@@ -110,7 +110,7 @@ export class Game {
     this.onInput = null;
     this.bot = !!window.__SIXCHARGE_BOT;
     this.speed = window.__SIXCHARGE_SPEED || 1;
-    this.settings = { fielding: 'key' };
+    this.settings = { fielding: 'key', bowlNew: false };
     this.armed = {};
     this.charge = new Charge();
     this.showFps = /[?&]fps=1/.test(location.search);
@@ -1056,6 +1056,7 @@ export class Game {
     // Batting 2.0: the swipe carries the decisions (the tutorial's lessons and the bots play the plain way); see shots.js batNewSize
     const bn = !this.bot && !opt.assist && !opt.hand && !fx.meteor;
     document.getElementById('hud')?.classList.toggle('bn', bn);
+    this.bowlNewHud(false);
     if (bn) {
       if (this.rhythmInn !== inn) { this.rhythmInn = inn; this.rhythm = 0; }
       const cp = this.cams.bat.project(d.atContact.x, d.atContact.y, d.atContact.z);
@@ -2100,6 +2101,10 @@ export class Game {
     S.batter.people = lookOf(striker); S.bowler.people = lookOf(bowler);
     const leftBat = !!S.batter.people.left;   // (a left-hander at the other end: he stands the other side, and the AI plays him in the mirror)
     S.batter.x = leftBat ? 0.5 : -0.5;
+    // Bowling 2.0 (a test, in Settings): pace is the risk, and dot balls build pressure on the batter (tactics.js bowlCommit, pressureNext)
+    const bw = !!this.settings.bowlNew && !opt.scripted;
+    if (bw && this.pressureInn !== inn) { this.pressureInn = inn; this.pressure = 0; }
+    this.batNewHud(false); this.bowlNewHud(bw);
     S.keeper.look = teamLook(this.myTeam, 1);
     S.keeper.people = this.keeperPeople();
     const kind = bowler.bowl || 'swing';
@@ -2221,6 +2226,13 @@ export class Game {
     if (pinpoint) { const k = ac === 'brace' ? 1.25 : 1.5; spec.swing *= k; spec.move *= k; } // the Pinpoint Spark: it moves much more too
     // a better bowler moves it more and bowls quicker
     spec.swing *= movementFor(bowler.bowlSkill); spec.move *= movementFor(bowler.bowlSkill); spec.kmh *= paceFor(bowler.bowlSkill);
+    // Bowling 2.0: the faster the flick, the wilder it lands and the more it moves (a Pinpoint ball is exact)
+    const commit = bw ? bowlCommit(G.speedP) : null;
+    if (commit && !pinpoint && !noBall) {
+      spec.x = clamp(spec.x + rng.normal() * commit.spray, -1.0, 1.0);
+      if (spec.bounce != null) { spec.bounce = clamp(spec.bounce + rng.normal() * commit.bounceSpray, 0.7, 11.5); spec.length = lengthForBounce(spec.bounce); spec.h = heightForBounce(spec.bounce); }
+    }
+    if (commit) { spec.swing *= commit.move; spec.move *= commit.move; }
     if (bowler.ability === 'swingMaster') { spec.swing *= 1.3; spec.move *= 1.3; }
     const fxFlags = {};
     const A = this.armed;
@@ -2306,7 +2318,7 @@ export class Game {
     const mu = matchup(striker, bowler, { feel: pf, ballNo, length: spec.length, batEnergy: inn.energyOf(striker.id), bowlEnergy: inn.energyOf(bowler.id) });
     const aiMods = pinpoint ? { ...(mods || {}), sigmaMul: (mods?.sigmaMul || 1) * (ac === 'brace' ? BRACE.pinpointSigma : 1.6) } : mods;
     const wideB = !opt.scripted && !this.nets && this.mode !== 'tutorial' && !noBall && isWide(d.atContact?.x ?? d.xt, leftBat);   // (a wide: he cannot reach it)
-    let ai = aiBat(leftBat ? mirrorDelivery(d) : d, { wide: wideB,  hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win, edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
+    let ai = aiBat(leftBat ? mirrorDelivery(d) : d, { wide: wideB,  hot: this.duelHot(inn), skill: aiSkill, bowlSkill: bowler.bowlSkill || 75, batType: batTypeOf(striker), style, ballNo, need, ballsLeft: inn.ballsLeft, wicketsLeft: inn.sixes ? 3 : inn.maxWkts - inn.wkts, release: rg === 'loose' ? 'loose' : rg, fx: { ...fxFlags, pitch: pf }, stance, power: aiPower === 'thunder' ? 'thunder' : null, brace: myC === 'brace', steady: ac === 'steady', mods: { ...(aiMods || {}), sigmaMul: (aiMods?.sigmaMul || 1) / mu.win * (commit?.sigma || 1) * (bw ? pressureFx(this.pressure || 0).sigma : 1), edgeBoost: Math.max(aiMods?.edgeBoost || 0, mu.edgeP) + (bw ? pressureFx(this.pressure || 0).edge : 0) }, powerMul: mu.power, freeHit: this.freeHit }, rng); // a Pinpoint ball is far harder to time
     if (leftBat) ai = { ...ai, shot: ai.shot && { ...ai.shot, angle: -(ai.shot.angle ?? 0) }, res: mirrorResult(ai.res) };   // (out of the mirror)
     // Bouncer Barrage: any hit short of a Perfect (a braced one spares a Good too) goes up in the air, and there is a catch chance
     if (fxFlags.bouncer && ai.res.outcome === 'hit' && ai.res.grade !== 'defend' && !(ai.grade === 'perfect' || (fxFlags.bouncerBrace && ai.grade === 'good'))) {
@@ -2370,6 +2382,7 @@ export class Game {
       this.bowlCrowd('dot');
       this.wideCall(inn);
       this.nbBall = 'wide';   // (it does not count: bowled again, as after a no-ball but with no free hit)
+      if (bw) { this.pressure = pressureNext(this.pressure || 0, { noBall: true }); this.bowlNewPaint(); }
       this.hud(inn);
       await this.sleepReal(this.bot ? 50 : 500);
       return { rebowl: true };
@@ -2415,6 +2428,13 @@ export class Game {
     this.hud(inn);
 
     const runs = inn.runs - before.runs, wicketFell = inn.wkts > before.wkts;
+    if (bw) {
+      const before2 = pressureStage(this.pressure || 0);
+      this.pressure = pressureNext(this.pressure || 0, { runs: noBall ? runs - 1 : runs, wicket: wicketFell, noBall: !!noBall });
+      const after2 = pressureStage(this.pressure);
+      this.bowlNewPaint();
+      if (after2 > before2) this.fx.word(`${PRESSURE_NAMES[after2]}!`, this.W / 2, this.H * 0.2, { size: 34, color: after2 === 2 ? '#ff5a3c' : '#ffb52e', stroke: INK, rot: 0, dur: 1100 });
+    }
     this.huntOpen = wicketFell;   // (Hat-trick Hunt is on offer for the next ball)
     if (this.aiShowdown > 0 && (--this.aiShowdown === 0 || wicketFell)) this.aiShowdown = 0;
     this.bowlCrowd(wicketFell ? 'wicket' : 'runs'); // (a ball the crowd has not yet heard about)
@@ -3881,6 +3901,26 @@ export class Game {
     const segs = box.querySelectorAll('.bn-bar i');
     const edges = [0, 30, 66, 100];
     segs.forEach((el, i) => { el.style.setProperty('--f', `${Math.round(100 * Math.max(0, Math.min(1, (v - edges[i]) / (edges[i + 1] - edges[i]))))}%`); });
+  }
+  // ---------- Bowling 2.0 ----------
+  // the pressure bar, in the batting mode's place
+  bowlNewHud(on) {
+    let box = document.getElementById('bwPressure');
+    if (!on) { if (box) box.hidden = true; return; }
+    if (!box) {
+      box = document.createElement('div'); box.id = 'bwPressure'; box.className = 'bw-pressure';
+      box.innerHTML = '<small>PRESSURE</small><b id="bwName">CALM</b><div class="bw-bar"><i></i><i></i><i></i></div>';
+      document.getElementById('hud').append(box);
+    }
+    box.hidden = false; this.bowlNewPaint();
+  }
+  bowlNewPaint() {
+    const box = document.getElementById('bwPressure');
+    if (!box) return;
+    const v = this.pressure || 0, st = pressureStage(v);
+    box.dataset.stage = st; document.getElementById('bwName').textContent = PRESSURE_NAMES[st];
+    const edges = [0, 25, 60, 100];
+    box.querySelectorAll('.bw-bar i').forEach((el, i) => { el.style.setProperty('--f', `${Math.round(100 * Math.max(0, Math.min(1, (v - edges[i]) / (edges[i + 1] - edges[i]))))}%`); });
   }
   batNewReport({ band, near, stage }, err, grade, res) {
     const bits = [band === 'push' ? 'PUSH' : band === 'drive' ? 'DRIVE' : 'BIG SWING', near === 'on the line' ? 'ON THE LINE' : near === 'close' ? 'CLOSE TO THE LINE' : 'REACHING'];

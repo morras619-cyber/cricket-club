@@ -2185,3 +2185,14 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .bn-rhythm[data-stage="2"] .bn-bar i::after { background: linear-gradient(0deg, #ff7a1a, #ffd23f); box-shadow: 0 0 8px rgba(255, 140, 20, .9); }
 /* a hint longer than the screen wraps onto a second line instead of being cut off at the edge */
 .hint { white-space: normal; text-wrap: balance; line-height: 1.15; }
+
+/* Bowling 2.0: the pressure strip, under the scoreboard on the left */
+.bw-pressure { position: absolute; left: var(--gut-l, 8px); top: 19.5%; z-index: 30; display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 7px; border-radius: 10px; background: rgba(10, 16, 48, .72); pointer-events: none; white-space: nowrap; }
+.bw-pressure[hidden] { display: none; }
+.bw-pressure small { font: 800 9px/1 var(--ui); font-style: italic; letter-spacing: 1px; color: rgba(255, 255, 255, .75); }
+.bw-pressure b { font: 400 12px/1 var(--display); letter-spacing: .6px; color: #fff; text-shadow: 0 1px 0 #14102a; }
+.bw-pressure[data-stage="1"] b { color: #ffb52e; } .bw-pressure[data-stage="2"] b { color: #ff5a3c; }
+.bw-bar { display: flex; gap: 3px; width: 54px; height: 8px; }
+.bw-bar i { flex: 1; border-radius: 4px; background: rgba(255, 255, 255, .16); position: relative; overflow: hidden; }
+.bw-bar i::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: var(--f, 0%); background: linear-gradient(90deg, #ffb52e, #ffe45c); transition: width .25s; }
+.bw-pressure[data-stage="2"] .bw-bar i::after { background: linear-gradient(90deg, #ff3c2a, #ff9f1c); box-shadow: 0 0 6px rgba(255, 90, 40, .9); }

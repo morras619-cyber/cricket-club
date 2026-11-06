@@ -222,3 +222,21 @@ export function positionName(x, y) {
   if (r < 8) return off ? 'Slip' : 'Leg slip';
   return off ? 'Third man' : 'Fine leg';
 }
+
+// ---------- Bowling 2.0 (Settings > Tools, a test) ----------
+// Pace is the risk: the faster the final flick, the quicker the ball and the harder it is to time, and the less exactly it lands where you drew it. A slow, controlled flick
+// lands on the spot and is easy to play. p = the normalised flick speed (PACE).
+const bwClamp = (v, a, b) => Math.max(a, Math.min(b, v));
+export function bowlCommit(p) {
+  const k = bwClamp(((p ?? PACE.good) - PACE.slower) / (PACE.perfect - PACE.slower), 0, 1.25), r = Math.min(k, 1);
+  return { k, spray: 0.012 + 0.075 * k * k, bounceSpray: 0.08 + 0.45 * k * k, move: 0.92 + 0.2 * r, sigma: 0.93 + 0.2 * r, band: k < 0.35 ? 'CONTROLLED' : k < 0.8 ? 'STEADY' : 'ALL-OUT' };
+}
+// Pressure: dot balls squeeze the batter, a boundary lets him out. At each stage he is a little harder to time and likelier to edge.
+export const PRESSURE_NAMES = ['CALM', 'BUILDING', 'SQUEEZE'];
+export const pressureStage = v => (v >= 60 ? 2 : v >= 25 ? 1 : 0);
+export const pressureFx = v => { const s = pressureStage(v); return { sigma: [1, 1.07, 1.16][s], edge: [0, 0.03, 0.07][s], stage: s }; };
+// o: { runs, wicket, noBall } of the ball just bowled
+export function pressureNext(v, o = {}) {
+  const d = o.noBall ? -10 : o.wicket ? 30 : o.runs <= 0 ? 22 : o.runs === 1 ? 4 : o.runs <= 3 ? -8 : o.runs === 4 ? -28 : -45;
+  return bwClamp(v + d, 0, 100);
+}
