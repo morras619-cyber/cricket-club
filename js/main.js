@@ -131,21 +131,27 @@ function pager(host, pages, start = 0) {
   host.innerHTML = '';
   host.classList.add('pagerhost');
   const tabs = el('div', 'tabs'), track = el('div', 'pages');
-  pages.forEach(([name, nodes], i) => {
-    const b = el('button', 'tab', name);
-    b.addEventListener('click', () => { sfx.click(); track.scrollTo({ left: i * track.clientWidth, behavior: 'smooth' }); });
-    tabs.append(b);
-    const pg = el('div', 'page'); pg.append(...[].concat(nodes)); track.append(pg); watchFit(pg);
+  pages.forEach(([name, nodes, opt], i) => {
+    if (!opt?.hidden) {   // (a page can have no tab of its own: something else takes you there, like the career's Chirp button)
+      const b = el('button', 'tab', name); b.dataset.i = i;
+      b.addEventListener('click', () => { sfx.click(); track.scrollTo({ left: i * track.clientWidth, behavior: 'smooth' }); });
+      tabs.append(b);
+    }
+    const pg = el('div', 'page'); pg.dataset.name = name; pg.append(...[].concat(nodes)); track.append(pg); watchFit(pg);
   });
-  const sync = () => { const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); [...tabs.children].forEach((t, k) => t.classList.toggle('on', k === i)); };
+  const sync = () => {
+    const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    [...tabs.children].forEach(t => t.classList.toggle('on', +t.dataset.i === i));
+    if (host.id === 'careerBody') $('careerChirp')?.classList.toggle('on', track.children[i]?.dataset.name === 'Chirp');
+  };
   track.addEventListener('scroll', sync, { passive: true });
-  tabs.hidden = pages.length < 2;
+  tabs.hidden = tabs.children.length < 2;
   host.append(tabs, track);
   requestAnimationFrame(() => { track.scrollLeft = start * track.clientWidth; sync(); });
 }
 // autoPages: the panels already in `body` become tabs over swipeable pages, named from their headings. Whatever comes before
 // the first headed panel (notes, the fixture card) is the first page, called `first`.
-function autoPages(body, first = 'Match') {
+function autoPages(body, first = 'Match', { hide = [] } = {}) {   // (hide: pages with no tab of their own)
   const kids = [...body.children];
   const NAMES = { 'squad needs': 'Needs', 'coming up': 'Next', 'my squad': 'Mine', 'your results': 'Results', 'across the divisions': 'Divisions', 'travelling scouts': 'Scouts', 'off-season news': 'News' };
   const raw = k => (k.querySelector?.('.lp-head b') || k.querySelector?.('h3'))?.textContent?.replace(/[^\p{L}\p{N}' -]/gu, '').trim();
@@ -166,6 +172,7 @@ function autoPages(body, first = 'Match') {
   }
   if (first_.length) pages.unshift([first, first_]);
   if (!pages.length) return;
+  for (const p of pages) if (hide.includes(p[0])) p[2] = { hidden: true };
   pager(body, pages);   // (one page alone has no tab bar, but still fits the screen)
 }
 // fitBlock: a whole screen block (the team picker) is shrunk to fit its screen, so its buttons are never pushed out of sight
@@ -786,6 +793,13 @@ function pickShow() {
 $('ptPrev').addEventListener('click', () => pickGo(pick.idx - 1));
 $('ptCoach').addEventListener('click', () => coachSay(DEV[pick.coach || 'quickTeam']));
 $('rgCoach').addEventListener('click', () => coachSay(DEV.region));
+// Chirp, from the button beside the title: the page opens, and the same button takes you back
+$('careerChirp').addEventListener('click', () => {
+  const track = document.querySelector('#careerBody .pages'); if (!track) return;
+  const i = [...track.children].findIndex(p => p.dataset.name === 'Chirp'); if (i < 0) return;
+  const here = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+  sfx.click(); track.scrollTo({ left: (here === i ? 0 : i) * track.clientWidth, behavior: 'smooth' });
+});
 $('ptNext').addEventListener('click', () => pickGo(pick.idx + 1));
 $('ptBack').addEventListener('click', () => pick.onBack());
 $('ptMake').addEventListener('click', () => { sfx.click(); pick.make?.(); });
@@ -1109,6 +1123,8 @@ function matchHero(c, f, me, o, about, onPlay, derby = null, notes = []) {
   };
   const vs = document.createElement('img'); vs.src = 'img/league-vs.webp'; vs.alt = 'v'; vs.className = 'mh-vs';
   clubs.append(side(me, true), vs, side(o, false));
+  const refit = () => { const pg = card.closest('.page'); if (pg) fitPage(pg); };   // (the card is fitted to its page again when something in it changes size: a picture arriving, the pace meter filling)
+  for (const im of card.querySelectorAll('img')) if (!im.complete) im.addEventListener('load', refit, { once: true });
   const rates = el('div', 'mh-rates');
   for (const [k, label] of HERO_RATES) {
     const a = S[me.id][k], b = S[o.id][k], row = el('div', 'mh-rate');
@@ -1128,7 +1144,17 @@ function matchHero(c, f, me, o, about, onPlay, derby = null, notes = []) {
   const pace = el('div', 'pace pacehero');
   card.append(go, pace);
   fillPace(pace, c);
-  syncClock().then(() => { if (pace.isConnected) fillPace(pace, c); });
+  syncClock().then(() => { if (pace.isConnected) { fillPace(pace, c); refit(); } });
+  requestAnimationFrame(refit);
+  // for its first few seconds the card is kept inside its page whatever changes under it (a font, a picture, the pace meter, a slow phone): if its bottom is below the page's, it is fitted again
+  let n = 0;
+  const guard = () => {
+    if (!card.isConnected || ++n > 220) return;
+    const pg = card.closest('.page');
+    if (pg && !pg.classList.contains('fitscroll')) { const a = pg.getBoundingClientRect(), r = card.getBoundingClientRect(); if (a.height > 40 && r.bottom > a.bottom + 1) fitPage(pg); }
+    requestAnimationFrame(guard);
+  };
+  requestAnimationFrame(guard);
   return card;
 }
 
@@ -2953,7 +2979,9 @@ function renderCareer(notes = careerNotes) {
     const n = el('div', 'panel paper statcard'); n.append(el('h3', '', 'Off-season news')); for (const x of c.news) n.append(el('div', 'kotie', x)); body.append(n);
   }
   ({ pick: careerPick, trials: careerTrials, scouts: careerScouts, auction: careerAuction, season: careerSeason, playoff: careerPlayoff, done: careerDone })[c.phase](c, body);
-  autoPages(body, 'Now');
+  const heroMode = (c.phase === 'season' || c.phase === 'playoff') && careerView !== 'squad';
+  autoPages(body, 'Now', heroMode ? { hide: ['Chirp'] } : {});   // (the next match as one page: Chirp has a button of its own beside the title)
+  $('careerChirp').hidden = !heroMode || !body.querySelector('.pages > .page[data-name="Chirp"]');
   saveProfile(profile);
 }
 async function enterCareer() {

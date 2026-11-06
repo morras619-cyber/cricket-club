@@ -2242,3 +2242,16 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .mh-vs { width: 34px; margin-bottom: 30px; }
 .mh-rate { padding: 1px 8px; }
 .mhero { gap: 4px; padding: 7px 10px 8px; }
+
+/* the card's pictures keep their room before they arrive (the card is fitted to its page by its height: it must not grow afterwards) */
+.mh-club img { height: min(22vw, 78px); object-fit: contain; }
+.mh-vs { width: 34px; height: 40px; object-fit: contain; }
+/* Chirp: a button of its own on the left, Uncle Dev on the right */
+#career .chirpbtn[hidden] { display: none; }
+#career.hero-mode .chirpbtn { position: absolute; left: 14px; top: 60px; z-index: 5; font-size: 0; gap: 0; padding: 0; width: 46px; height: 46px; min-height: 0; margin: 0; transform: none; border-radius: 14px; justify-content: center; }
+#career.hero-mode .chirpbtn img { width: 36px; height: 36px; border-radius: 9px; }
+#career.hero-mode .chirpbtn.on { filter: brightness(1.25) drop-shadow(0 0 8px rgba(255, 210, 63, .8)); }
+
+/* the next match's tabs always fit the width, however many there are (a club with its own stadium and ground has five) */
+#career.hero-mode .pagerhost > .tabs { gap: 4px; }
+#career.hero-mode .pagerhost > .tabs > .tab { flex: 1 1 0; min-width: 0; border-width: 8px; padding: 0 1px; font-size: 14px; letter-spacing: .3px; overflow: hidden; white-space: nowrap; }
