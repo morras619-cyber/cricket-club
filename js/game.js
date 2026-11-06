@@ -110,7 +110,7 @@ export class Game {
     this.onInput = null;
     this.bot = !!window.__SIXCHARGE_BOT;
     this.speed = window.__SIXCHARGE_SPEED || 1;
-    this.settings = { fielding: 'key', batNew: false };
+    this.settings = { fielding: 'key' };
     this.armed = {};
     this.charge = new Charge();
     this.showFps = /[?&]fps=1/.test(location.search);
@@ -990,7 +990,7 @@ export class Game {
     }
     if (opt.hint !== undefined) this.ui.hint(opt.hint);
     else if (aiPower) this.ui.hint('SPECIAL BALL! TAP TO DEFEND');
-    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint(this.settings.batNew && !this.bot ? 'FINGER DOWN WHERE THE BALL WILL BE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND');
+    else if (ballNo === 1 && this.mode !== 'challenge') this.ui.hint(!this.bot ? 'FINGER DOWN WHERE THE BALL WILL BE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND');
     // before the delivery a tap on the field map enlarges it
     this.onInput = (type, g) => { if (type === 'down' && !this.nets && this.inMap(g)) this.mapBig = !this.mapBig; };
     if (opt.waitPower) await opt.waitPower();
@@ -1053,8 +1053,8 @@ export class Game {
     const d = makeDelivery(this.pitched({ ...spec, rx: spec.rx ?? (btype.left ? -0.3 : 0.3) }, btype));
     // a wide: it passes where the batter cannot reach (shots.js isWide). Played at and hit, it is a fair ball; left or missed, it is a wide: +1, and bowled again
     const wide = !opt.noBall && !opt.assist && !opt.hand && !this.nets && this.mode !== 'tutorial' && isWide(d.atContact?.x ?? d.xt, left);
-    // Batting 2.0 (a test, in Settings): the swipe carries the decisions; see shots.js batNewSize
-    const bn = !!this.settings.batNew && !this.bot && !opt.assist && !opt.hand && !fx.meteor;
+    // Batting 2.0: the swipe carries the decisions (the tutorial's lessons and the bots play the plain way); see shots.js batNewSize
+    const bn = !this.bot && !opt.assist && !opt.hand && !fx.meteor;
     document.getElementById('hud')?.classList.toggle('bn', bn);
     if (bn) {
       if (this.rhythmInn !== inn) { this.rhythmInn = inn; this.rhythm = 0; }
@@ -3266,7 +3266,7 @@ export class Game {
       await this.sleepReal(this.bot ? 100 : 2300);
       for (let k = 0; k < N; k++) {
         const spec = script[(bi * N + k) % script.length];
-        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? (this.settings.batNew && !this.bot ? 'FINGER DOWN WHERE THE BALL WILL BE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND') : undefined, extra: 25 });
+        await this.batBall(inn, k + 1, spec, { hint: k === 0 ? (!this.bot ? 'FINGER DOWN WHERE THE BALL WILL BE · LONGER SWIPE = BIGGER SHOT · LIFT ON THE RING' : 'SWIPE WITH THE BALL\'S LINE · LIFT ON THE RING · TAP TO DEFEND') : undefined, extra: 25 });
         if (!inn.cur.id) inn.setBatter(cand);   // (bowled in the nets: back to the crease)
         this.hud(inn);
         await this.sleepReal(this.bot ? 60 : 450);

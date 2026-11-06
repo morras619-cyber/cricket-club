@@ -84,7 +84,6 @@ loadBowlSprites(profile.team || 'thunder');
 sound.on = profile.settings.sound;
 sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
-game.settings.batNew = !!profile.settings.batNew;   // (Batting 2.0, a test: Settings > Tools)
 units.speed = profile.settings.units === 'mph' ? 'mph' : 'kmh';
 window.__sixcharge = { game, ui, profile, moment: m => { queueMoment(m); flushMoments(); } };
 game.onFieldSaved = choice => { profile.field = { preset: choice.field, custom: choice.custom }; saveProfile(profile); };
@@ -414,7 +413,6 @@ function renderSettings() {
   state('setUnits', units.speed === 'mph' ? 'mph' : 'km/h', true);
   $('setMapLevel').textContent = mapLevelText();
   $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 4 hours)' : 'Match limit: OFF (play freely)';
-  $('setBatNew').textContent = game.settings.batNew ? 'Batting 2.0 test: ON' : 'Batting 2.0 test: off';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });
@@ -446,7 +444,6 @@ async function practice(kind) {
   await startMatch({ mode: 'tutorial', drill: { balls: kind === 'bat' ? 24 : 18, bats: kind === 'bat' ? bats : [], bowls: kind === 'bowl' ? bowls : [], practice: kind } });
   renderSettings();
 }
-$('setBatNew').addEventListener('click', () => { game.settings.batNew = !game.settings.batNew; profile.settings.batNew = game.settings.batNew; saveProfile(profile); sfx.click(); renderSettings(); });
 $('setPracBowl').addEventListener('click', () => practice('bowl'));
 $('setPracBat').addEventListener('click', () => practice('bat'));
 $('setStory').addEventListener('click', () => { unlockAudio(); careerOpening().then(renderSettings); });   // (the career's opening story again; it plays by itself only the first time)

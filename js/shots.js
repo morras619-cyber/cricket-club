@@ -192,7 +192,7 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   return { outcome: 'hit', grade, angle, loft, launchDeg, v, forced, label: across && !label ? 'ACROSS THE LINE' : label, roll: fx.pitch?.roll || 1, line: lm, across };
 }
 
-// ---------- Batting 2.0 (Settings > Tools, a test): the swipe itself carries the decisions ----------
+// ---------- Batting 2.0: the swipe itself carries the decisions ----------
 // The length of the swipe is the risk: a short push is safe and weak, a long committed swipe is big and hard to time. Where the finger comes down against the ball's
 // line is the footwork. A run of good shots builds confidence, and confidence widens the window and adds power. r = swipe length / the lofting length.
 const bnClamp = (v, a, b) => Math.max(a, Math.min(b, v));
