@@ -1968,7 +1968,7 @@ export class Game {
     if (!p || !S) return;
     this.view = mine ? 'bat' : 'bowl';
     this.fx.reset();
-    S.batter.anim = 'celebrate'; S.batter.shot = null; S.delivery = null; S.flight = null;
+    S.batter.anim = 'celebrate'; S.batter.cel0 = this.realTime; S.batter.shot = null; S.delivery = null; S.flight = null;
     this.fx.flash('#ffd23f', 0.32); this.fx.shake(8);
     this.fx.burst(this.W / 2, this.H * 0.55, { color: '#ffd23f', rays: 24, r: 340, dur: 600 });
     this.fx.sparks(this.W * 0.3, this.H * 0.5, 22); this.fx.sparks(this.W * 0.7, this.H * 0.5, 22);

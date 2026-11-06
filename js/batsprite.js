@@ -138,7 +138,9 @@ function drawOne(ctx, img, name, px, py, k, alpha) {
 export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   // a named batter: the kit sheet (his club's colours, his skin, his name and number)
   const fr = batFrame(b, now);
-  if (b.people?.who && drawKitBatter(ctx, px, py, kPerM, fr.f, fr.prev, fr.a ?? 1, teamById(b.team), b.people, opts.glow)) return true;
+  // celebrating (a fifty, a hundred): he hops, the hops dying away over a few seconds
+  const t = b.cel0 != null ? now - b.cel0 : 0, lift = fr.f === 'celebrate' && b.cel0 != null ? Math.abs(Math.sin(t / 170)) * 0.24 * kPerM * Math.max(0.3, 1 - t / 3500) : 0;
+  if (b.people?.who && drawKitBatter(ctx, px, py, kPerM, fr.f, fr.prev, fr.a ?? 1, teamById(b.team), b.people, opts.glow, lift)) return true;
   const sheet = sheetOf(b.team), atlas = atlases.get(sheet);
   if (!atlas || !atlas.ready) return false;
   const img = peopleSheet(atlas.img, `batter-${sheet}`, b.people); // the batter's own skin and hair
@@ -152,8 +154,8 @@ export function drawBatSprite(ctx, px, py, kPerM, b, now, opts = {}) {
   if (opts.glow) { ctx.shadowColor = opts.glow; ctx.shadowBlur = 22; }
   if (b.people?.left) { ctx.translate(px, 0); ctx.scale(-1, 1); ctx.translate(-px, 0); }   // (a left-hander: the drawing turned round)
   // the previous frame fades out underneath, which reads as motion blur on a fast swing
-  if (prev && a < 1) drawOne(ctx, img, prev, px, py, k, (1 - a) * 0.6);
-  drawOne(ctx, img, f, px, py, k, 1);
+  if (prev && a < 1) drawOne(ctx, img, prev, px, py - lift, k, (1 - a) * 0.6);
+  drawOne(ctx, img, f, px, py - lift, k, 1);
   ctx.restore();
   return true;
 }

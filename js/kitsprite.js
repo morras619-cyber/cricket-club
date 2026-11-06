@@ -563,7 +563,7 @@ export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look)
 
 // The batter from behind in his club's kit, feet at (px, py): frame f, with the frame before it
 // faded out underneath (a fast swing reads as motion). False until the sheet is ready.
-export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) {
+export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow, lift = 0) {   // (lift: how high he is off the ground, in pixels: a celebrating batter hops, his shadow stays down)
   if (!team || !look?.who || !KIT_SHEETS['bat-back']) return false;
   // the painted sheet draws every pose (the old sheet only when ?painted=0); until it is built nothing
   // is drawn from the old art, which was a different height and shade and popped in as a lighter, shorter man
@@ -578,7 +578,7 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow) 
     const fi = usePaint ? pm.names[pm.names[name] != null ? name : PAINT_STAND_IN[name] ?? 'def1'] : POSE_BAT[name] ?? POSE_BAT[OLD_STAND_IN[name]] ?? 0;
     let [sx, sy, w, h, ax, ay] = meta.frames[fi];
     if (lefty) { sx = sheet.width - sx - w; ax = w - ax; }
-    ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
+    ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - lift - ay * k, w * kx, h * k);
   };
   ctx.save();
   softShadow(ctx, px, py, 0.55 * kPerM * bw, 0.12 * kPerM, 0.28);
