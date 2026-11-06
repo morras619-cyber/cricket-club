@@ -1957,7 +1957,7 @@ export class Game {
     this.hud(inn);
   }
 
-  // Fifty and a hundred: the batter on strike goes past the mark on this ball. His own celebration (the sheet's celebrate pose, bat raised), a card, the crowd.
+  // Fifty and a hundred: the batter on strike goes past the mark on this ball. His own celebration (the sheet's celebrate pose, bat raised), a banner, the crowd.
   async milestoneCheck(inn, id, before, mine) {
     if (!id || inn.cur.id !== id || this.nets || this.mode === 'tutorial') return;
     const now = inn.cur.runs, n = before < 100 && now >= 100 ? 100 : before < 50 && now >= 50 ? 50 : 0;
@@ -1969,14 +1969,13 @@ export class Game {
     this.view = mine ? 'bat' : 'bowl';
     this.fx.reset();
     S.batter.anim = 'celebrate'; S.batter.shot = null; S.delivery = null; S.flight = null;
-    this.fx.word(word, this.W / 2, this.H * 0.3, { size: n === 100 ? 92 : 80, color: '#ffd23f', stroke: '#e8343b', dur: 2300 });
     this.fx.flash('#ffd23f', 0.32); this.fx.shake(8);
     this.fx.burst(this.W / 2, this.H * 0.55, { color: '#ffd23f', rays: 24, r: 340, dur: 600 });
     this.fx.sparks(this.W * 0.3, this.H * 0.5, 22); this.fx.sparks(this.W * 0.7, this.H * 0.5, 22);
     this.fx.ripple(this.W / 2, this.H * 0.5, { r: 150, dur: 900 });
     sfx.crowd(n === 100 ? 2 : 1.6); sfx.chime(); buzz([60, 40, 100, 40, 160]);
     if (team.id === this.home) this.sing(0.3, 4, 0.5);
-    this.ui.banner(word, `${p.name} · ${n} off ${inn.cur.balls}`, 2900, cardFor(p, team));
+    this.ui.banner(word, `${p.name} · ${n} off ${inn.cur.balls}`, 2900);
     await this.sleepReal(this.bot ? 0 : 2900);
     this.ui.clearBanner();
   }
