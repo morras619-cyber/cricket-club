@@ -294,10 +294,11 @@ export class Game {
     return p ? { team: this.myTeam, people: lookOf(p) } : null;
   }
   freshScene() {
+    const people = this.myBatterLook();   // (a left-hander stands the other side of his stumps, in the banners before the first ball as in the ball)
     return {
       ball: null, trail: [], maya: null, ring: null, delivery: null, ballT0: 0, flight: null, kball: null,
       // between balls (banners, the pitch report) the scene still shows your team's drawn batter
-      batter: { x: -0.5, z: 0.95, angle: -0.4, swingT0: null, shot: null, look: this.myTeam ? teamLook(this.myTeam) : null, team: this.myTeam?.id, emblem: null, glow: null, people: this.myBatterLook() },
+      batter: { x: people?.left ? 0.5 : -0.5, z: 0.95, angle: -0.4, swingT0: null, shot: null, look: this.myTeam ? teamLook(this.myTeam) : null, team: this.myTeam?.id, emblem: null, glow: null, people },
       bowler: { x: 0.6, z: 27.5, pose: POSES.stand(), look: null },
       nonStriker: this.myPartner(),
       keeper: { x: 0, z: -2.4, pose: POSES.keeper(), look: AI_LOOK },
@@ -375,13 +376,13 @@ export class Game {
         inn.balls = CFG.balls - sc.ballsLeft; inn.wkts = sc.wktsDown; inn.runs = sc.runsSoFar;
         this.innings.push(inn);
         this.newCharge(60);
-        await this.introBanner(`DAILY #${sc.no}`, sc.title.toUpperCase());
+        await this.introBanner(`DAILY #${sc.no}`, sc.title.toUpperCase(), inn);
         if (sc.kind === 'chase') await this.battingInnings(inn, script);
         else await this.bowlingInnings(inn);
       } else if (mode === 'challenge') {
         const inn = new Innings('player', opts.challenge.target + 1);
         this.innings.push(inn);
-        await this.introBanner('CHALLENGE!', `Beat ${opts.challenge.name}'s ${opts.challenge.target} off the same 30 balls`);
+        await this.introBanner('CHALLENGE!', `Beat ${opts.challenge.name}'s ${opts.challenge.target} off the same 30 balls`, inn);
         await this.battingInnings(inn, script);
       } else if (opts.order === 'bowl') {
         const first = new Innings('ai');
@@ -392,12 +393,12 @@ export class Game {
         const second = new Innings('player', first.runs + 1);
         this.innings.push(second);
         this.newCharge(carry);
-        await this.introBanner('YOUR CHASE', `${first.runs + 1} to win · ${this.aiPlan[0].name} opens the bowling`);
+        await this.introBanner('YOUR CHASE', `${first.runs + 1} to win · ${this.aiPlan[0].name} opens the bowling`, second);
         await this.battingInnings(second, script);
       } else {
         const first = new Innings('player');
         this.innings.push(first);
-        await this.introBanner('YOU BAT FIRST', `${this.myTeam.name} v ${this.oppTeam.name} · ${this.mySide.order[0].name} opens`);
+        await this.introBanner('YOU BAT FIRST', `${this.myTeam.name} v ${this.oppTeam.name} · ${this.mySide.order[0].name} opens`, first);
         await this.battingInnings(first, script);
         const carry = this.charge.carryOver();
         await this.inningsBreak(first, carry);
@@ -573,9 +574,19 @@ export class Game {
   quit() { handHint(document.getElementById('app')).hide(); this.cancelAll(); this.ui.hud(false); this.clearBowlUI(); this.view = 'idle'; this.paused = false; }
   clearBowlUI() { document.querySelectorAll('.overpick').forEach(e => e.remove()); this.ui.fieldButton(false); this.ui.shotButton(false); this.ui.fieldEditor(false); this.ui.editing(false); this.ui.banter(false); }
 
-  async introBanner(head, sub) {
+  // the scoreboard at the start of an innings, before its first ball: nothing of the last match is left on it
+  blankScore(inn) {
+    const open = inn.side === 'player' ? this.mySide?.order?.[0] : null, n = inn.maxBalls ?? CFG.balls;
+    this.ui.score(inn, {
+      label: inn.side === 'player' ? `YOU BAT${open ? ` · ${open.name.toUpperCase()}` : ''}` : 'YOU BOWL',
+      need: inn.target == null ? (inn.side === 'player' ? 'Set a target' : 'Setting a target') : (inn.side === 'player' ? `Need ${inn.target - inn.runs} off ${inn.ballsLeft}` : `Need ${inn.target - inn.runs} off ${inn.ballsLeft}`),
+      phase: phaseFor(Math.min(n, inn.balls + 1)).name, heroLine: '', logo: this.myTeam ? logoSrc(this.myTeam.id) : null,
+    });
+  }
+  async introBanner(head, sub, inn = null) {
     this.view = 'bat';
     this.S = this.freshScene();
+    if (inn) this.blankScore(inn);
     if (this.myTeam && this.mode !== 'tutorial') this.ui.matchup(this.myTeam.id, this.oppTeam.id);
     this.ui.banner(head, sub, 1800);
     sfx.crowd(0.8);
@@ -717,7 +728,7 @@ export class Game {
   }
   async playTiebreak(inn, script) {
     this.innings.push(inn);
-    if (inn.side === 'player') { await this.introBanner(...inn.intro); await this.battingInnings(inn, script); }
+    if (inn.side === 'player') { await this.introBanner(...inn.intro, inn); await this.battingInnings(inn, script); }
     else await this.bowlingInnings(inn);
   }
 
