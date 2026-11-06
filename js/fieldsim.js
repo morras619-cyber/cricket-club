@@ -127,7 +127,7 @@ export function makePath(res) {
   const forcedSix = res.forced?.six;
   const forcedFour = res.forced?.four;
   const bd = boundaryDist(res.angle);
-  let along, height, T = 0, carry = 0;
+  let along, height, T = 0, carry = 0, speedAt = null;
 
   if (forcedSix || res.loft) {
     const th = (res.launchDeg || 32) * Math.PI / 180;
@@ -141,9 +141,10 @@ export function makePath(res) {
     const vg = forcedFour ? Math.max(res.v, 30) : res.v * 0.95, tau = 2.8 * (res.roll || 1);   // (a fast outfield runs the ball on)
     along = t => vg * tau * (1 - Math.exp(-t / tau));
     height = () => 0;
+    speedAt = t => vg * Math.exp(-t / tau);   // (m/s: a ball rolling out slows to a crawl)
   }
   const ballAt = t => { const s = along(t); return { x: dir.x * s, y: dir.y * s, h: height(t) }; };
-  return { dir, bd, T, carry, along, ballAt, lofted: T > 0 };
+  return { dir, bd, T, carry, along, ballAt, speedAt, lofted: T > 0 };
 }
 
 function runsFor(total) {
@@ -210,6 +211,7 @@ export function simulateHit(res, fielders, rng, opts = {}) {
     if (outside(p)) {
       out.kind = 'four'; out.runs = res.forced?.cap != null ? Math.min(2, res.forced.cap) : 4; out.duration = Math.min(t, 3.2);
       out.ropeT = t; out.ropePoint = p; // when and where it crosses the rope (the replay lets it run there)
+      out.ropeSpeed = path.speedAt ? path.speedAt(t) : 99;   // (how fast it is going when it gets there: a ball crawling over the rope is stopped by anyone chasing it)
       let best = null;
       for (const f of outfield) {
         const m = fielderRunDistance(t - F.react, sp) + F.reach + F.diveReach - dist(f, p);
@@ -278,3 +280,10 @@ export function simulateHit(res, fielders, rng, opts = {}) {
 // Auto-resolve a catch for the AI side, or for a chance outside the player's band.
 export const autoCatch = (chance, rng) => rng.chance(chance.p);
 export const keeperEdgeP = off => Math.max(0.2, Math.min(0.95, 0.95 - 0.32 * Math.abs(off.x - 0.2)));
+
+// The chance a fielder keeps a ball out of the rope (the computer fielding): at most half his reach for a ball hit hard, which he may well not stop, rising to all of it for a ball
+// that has rolled out to a crawl (anyone chasing a ball going at a jog stops it).
+export function saveChance(sim) {
+  const slow = Math.max(0, Math.min(1, (8 - (sim.ropeSpeed ?? 99)) / 6));
+  return Math.min(1, sim.save.p * (0.5 + 0.5 * slow));
+}

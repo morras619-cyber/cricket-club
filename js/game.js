@@ -7,7 +7,7 @@ import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } f
 import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult, isWide } from './shots.js';
-import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS } from './fieldsim.js';
+import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS, saveChance } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES, bowlWhy } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
@@ -1653,7 +1653,7 @@ export class Game {
     // the nets: nobody is out caught there. It scores nothing, and says it could have been
     let netCatch = false;
     if (this.nets && caught) { caught = false; dropped = false; netCatch = true; }
-    if (!caught && sim.save) saved = rng.chance(sim.save.p * 0.5);
+    if (!caught && sim.save) saved = rng.chance(saveChance(sim));
     await this.showAutoPlay(sim, aiField, { side: 'ai', caught, saved, dropped, netCatch });
 
     if (caught) {
@@ -2826,7 +2826,7 @@ export class Game {
       const ch = { kind: 'save', p: sim.save.p };
       let saved;
       if (ctl(ch)) { this.noteEvent(ballNo); saved = await this.saveEvent(sim, field); }
-      else { saved = rng.chance(sim.save.p * 0.5); await this.showAutoPlay(sim, field, { side: 'player', saved }); }
+      else { saved = rng.chance(saveChance(sim)); await this.showAutoPlay(sim, field, { side: 'player', saved }); }
       if (saved) {
         inn.ball({ runs: 2 });
         this.charge.award('boundarySave', 'SAVE');
