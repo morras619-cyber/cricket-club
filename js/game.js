@@ -1957,7 +1957,7 @@ export class Game {
     this.hud(inn);
   }
 
-  // Fifty and a hundred: the batter on strike goes past the mark on this ball. His own celebration (the sheet's celebrate pose, bat raised), a banner, the crowd.
+  // Fifty and a hundred: the batter on strike goes past the mark on this ball. His own celebration (the sheet's celebrate pose, bat raised, hopping), a banner, the crowd. The other side's batter gets the banner only.
   async milestoneCheck(inn, id, before, mine) {
     if (!id || inn.cur.id !== id || this.nets || this.mode === 'tutorial') return;
     const now = inn.cur.runs, n = before < 100 && now >= 100 ? 100 : before < 50 && now >= 50 ? 50 : 0;
@@ -1966,7 +1966,14 @@ export class Game {
   async milestone(inn, n, mine) {
     const p = this.batterOf(inn), S = this.S, team = mine ? this.myTeam : this.oppTeam, word = n === 100 ? 'CENTURY!' : 'FIFTY!';
     if (!p || !S) return;
-    this.view = mine ? 'bat' : 'bowl';
+    // the other side's batter gets only the banner (his celebration would be a drawn figure, not one of your sprites)
+    if (!mine) {
+      this.ui.banner(word, `${p.name} · ${n} off ${inn.cur.balls}`, 2200);
+      await this.sleepReal(this.bot ? 0 : 2200);
+      this.ui.clearBanner();
+      return;
+    }
+    this.view = 'bat';
     this.fx.reset();
     S.batter.anim = 'celebrate'; S.batter.cel0 = this.realTime; S.batter.shot = null; S.delivery = null; S.flight = null;
     this.fx.flash('#ffd23f', 0.32); this.fx.shake(8);
