@@ -198,19 +198,19 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
 const bnClamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export function batNewSize(r) {
   const power = r <= 1 ? 0.65 + 0.35 * r : 1 + 0.55 * (r - 1);
-  const win = r <= 1 ? 1.3 - 0.3 * r : bnClamp(1 - 0.38 * (r - 1), 0.68, 1);
+  const win = r <= 1 ? 1.3 - 0.3 * r : bnClamp(1 - 0.25 * (r - 1), 0.8, 1);
   return { win, power: bnClamp(power, 0.65, 1.45), band: r < 0.55 ? 'push' : r <= 1 ? 'drive' : 'big' };
 }
 // off: how far the finger came down from the ball's line, in zones (1 = the edge of the zone)
 export function batNewZone(off) {
-  return { win: bnClamp(1.2 - 0.45 * off, 0.55, 1.1), power: bnClamp(1 - 0.18 * Math.max(0, off - 0.6), 0.65, 1), near: off <= 0.6 ? 'on the line' : off <= 1.2 ? 'close' : 'reaching' };
+  return { win: bnClamp(1.2 - 0.3 * off, 0.85, 1.1), power: bnClamp(1 - 0.15 * Math.max(0, off - 0.6), 0.7, 1), near: off <= 0.6 ? 'on the line' : off <= 1.2 ? 'close' : 'reaching' };
 }
-export const rhythmStage = v => (v >= 66 ? 2 : v >= 30 ? 1 : 0);
+export const rhythmStage = v => (v >= 60 ? 2 : v >= 25 ? 1 : 0);
 export const RHYTHM_NAMES = ['SHAKY', 'CONFIDENT', 'UNSTOPPABLE'];
 export const rhythmFx = v => { const s = rhythmStage(v); return { win: 1 + 0.07 * s, power: 1 + 0.07 * s, stage: s }; };
 // a perfect shot builds it a lot, a good one some; a mistimed shot costs, a miss or an edge costs most; a defensive tap leaves it
 export function rhythmNext(v, grade) {
-  const d = { perfect: 32, good: 18, early: -10, late: -10, edge: -50, miss: -50, leave: 0, defend: 0 }[grade] ?? 0;
+  const d = { perfect: 40, good: 25, early: -8, late: -8, edge: -40, miss: -40, leave: 0, defend: 0 }[grade] ?? 0;
   return bnClamp(v + d, 0, 100);
 }
 

@@ -1059,7 +1059,7 @@ export class Game {
     if (bn) {
       if (this.rhythmInn !== inn) { this.rhythmInn = inn; this.rhythm = 0; }
       const cp = this.cams.bat.project(d.atContact.x, d.atContact.y, d.atContact.z);
-      S.bnZone = cp ? { x: cp.x, y: cp.y, r: Math.max(56, Math.max(16, 0.22 * cp.k) * 3) } : null;   // (not drawn: reading where the ball will be is the skill)
+      S.bnZone = cp ? { x: cp.x, y: cp.y, r: Math.max(90, Math.max(16, 0.22 * cp.k) * 5) } : null;   // (not drawn: reading where the ball will be is the skill)
       S.bnLive = null;
       this.batNewHud(true);
     } else this.batNewHud(false);
