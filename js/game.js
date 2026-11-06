@@ -1968,7 +1968,7 @@ export class Game {
     if (!p || !S) return;
     // the other side's batter gets only the banner (his celebration would be a drawn figure, not one of your sprites)
     if (!mine) {
-      this.ui.banner(word, `${p.name} · ${n} off ${inn.cur.balls}`, 2200);
+      this.ui.banner(word, `${p.name} · ${n} off ${inn.cur.balls}`, 2200, cardFor(p, team));
       await this.sleepReal(this.bot ? 0 : 2200);
       this.ui.clearBanner();
       return;
@@ -1982,7 +1982,7 @@ export class Game {
     this.fx.ripple(this.W / 2, this.H * 0.5, { r: 150, dur: 900 });
     sfx.crowd(n === 100 ? 2 : 1.6); sfx.chime(); buzz([60, 40, 100, 40, 160]);
     if (team.id === this.home) this.sing(0.3, 4, 0.5);
-    this.ui.banner(word, `${p.name} · ${n} off ${inn.cur.balls}`, 2900);
+    this.ui.banner(word, `${p.name} · ${n} off ${inn.cur.balls}`, 2900, cardFor(p, team));
     await this.sleepReal(this.bot ? 0 : 2900);
     this.ui.clearBanner();
   }
