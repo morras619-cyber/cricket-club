@@ -40,6 +40,8 @@ export function aimVector(path, x0, y0, x, y, tUp, minPx = 28) {
 
 // how far (radians) from the ball's natural direction a shot can be played: a ball on the left is hit to the left, a straight one anywhere about the straight
 export const HIT_ARC = 0.6, HIT_ARC_SHORT = 0.9;
+// going round the ball's own side (a cut to a ball outside off, a pull or hook to one on the pads) is allowed this far past its natural shot; a cross-bat pull of a short ball outside off carries this much risk
+const ROUND_ARC = 1.7, CROSS_MIS = 0.55;
 const POWER = { perfect: 1, good: 0.85, early: 0.5, late: 0.5 };
 // how far the ball strays from the swipe's direction (a standard deviation, radians), by the timing grade: a clean contact goes where the finger went
 const SPREAD = { perfect: 0.025, good: 0.07, early: 0.16, late: 0.16 };
@@ -111,12 +113,19 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   const judged = !fx.thunder && !fx.mirror && !fx.tornado;
   // the arc a ball can be hit in: a ball on the left cannot be hit to the right. Swung beyond the arc, the shot is not played where it was aimed: it comes off at the
   // edge of the arc, with the power taken off it, and most of the time it is beaten or edged (a scoop over the keeper is its own shot, with its own risk)
-  let across = false;
+  let across = false, round = null;
   if (judged && shot.kind === 'drive' && Math.abs(shot.angle) <= 2.7) {
-    const ideal = idealAngle(d), dev = wrap(shot.angle - ideal), arc = d.length === 'short' || d.length === 'bouncer' ? HIT_ARC_SHORT : HIT_ARC;
-    if (Math.abs(dev) > arc) { shot = { ...shot, angle: ideal + Math.sign(dev) * arc }; across = true; }
+    const ideal = idealAngle(d), dev = wrap(shot.angle - ideal), short = d.length === 'short' || d.length === 'bouncer', arc = short ? HIT_ARC_SHORT : HIT_ARC;
+    const side = ideal > 0.15 ? 1 : ideal < -0.15 ? -1 : 0;
+    if (Math.abs(dev) > arc) {
+      if (side && Math.sign(shot.angle) === side && Math.abs(shot.angle) > Math.abs(ideal) && Math.abs(dev) <= ROUND_ARC) round = Math.abs(dev);   // further round the ball's own side: the cut, the pull, the hook, the late cut
+      else if (short && ideal > 0.5 && shot.angle < 0 && shot.angle > -2.5) round = 'cross';                                                         // a short ball outside off, pulled across the line with a cross bat: risky, not barred
+      else { shot = { ...shot, angle: ideal + Math.sign(dev) * arc }; across = true; }
+    }
   }
-  const lm = judged ? lineMatch(shot.angle, d) : { ideal: shot.angle, diff: 0, q: 1, mis: 0 };
+  // how far the shot is from the line, for the risk: going further round a ball's own side counts for half (a cut or a pull is a shot of its own), a cross-bat pull is a set risk
+  const lm = judged ? (typeof round === 'number' ? lineMatch(idealAngle(d) + Math.sign(shot.angle) * round * 0.5, d) : lineMatch(shot.angle, d)) : { ideal: shot.angle, diff: 0, q: 1, mis: 0 };
+  if (round === 'cross') { lm.mis = CROSS_MIS; lm.q = 1 - CROSS_MIS; }
   if (across) { lm.mis = 1; lm.q = 0; }
   if (judged && shot.loft) { lm.mis = Math.min(1, lm.mis * 1.2); lm.q = 1 - lm.mis; }   // (lofting against the line is worse still)
   if (judged && lm.mis > 0.3) {

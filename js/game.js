@@ -1184,7 +1184,7 @@ export class Game {
       S.flight = { p0: contact, t0: this.gameTime, vx: Math.sin(ang) * v * Math.cos(vl), vz: Math.cos(ang) * v * Math.cos(vl), vy: v * Math.sin(vl) };
       await this.sleep(res.outcome === 'edge' ? 350 : 520);
     } else {
-      if (swing) { sfx.thin(); this.timingBar(err, grade); }
+      if (swing) { sfx.thin(); this.timingBar(err, grade, res.line?.mis > 0.3); }
       this.charge.timingStreak(false);
       // let the ball carry on to the stumps or the keeper
       await this.until(() => this.gameTime - S.ballT0 >= (res.outcome === 'bowled' ? d.tStumps : d.tKeeper));
@@ -1513,9 +1513,10 @@ export class Game {
     }
   }
 
-  timingBar(err, grade) {
+  timingBar(err, grade, wrongLine = false) {
     if (err == null) return;
-    const label = grade === 'perfect' ? 'PERFECT' : `${err < 0 ? 'EARLY' : 'LATE'} ${Math.round(Math.abs(err))}ms`;
+    // (a timing word says only how the swing was timed: when the ball was still missed, the line of the shot is why)
+    const label = wrongLine && (grade === 'perfect' || grade === 'good') ? `${grade === 'perfect' ? 'PERFECT' : 'GOOD'} TIMING · WRONG LINE` : grade === 'perfect' ? 'PERFECT' : `${err < 0 ? 'EARLY' : 'LATE'} ${Math.round(Math.abs(err))}ms`;
     this.fx.word(label, this.W / 2, this.H * 0.62, { size: 24, color: '#fff4da', stroke: INK, dur: 1300, rot: 0 });
   }
 

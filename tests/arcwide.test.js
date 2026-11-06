@@ -61,3 +61,28 @@ test('a wide is an extra: a run, the ball does not count, and it shows in the ov
   inn.ball({ runs: 0 }); inn.wide();
   assert.equal(inn.balls, 1); assert.deepEqual(inn.wides, [0, 1]); assert.equal(inn.runs, 2);
 });
+
+const rate = (d, angle, grade = 'perfect', n = 400) => { let hit = 0; for (let s = 1; s <= n; s++) if (play(d, angle, s, grade).outcome === 'hit') hit++; return hit / n; };
+
+test('cuts: a ball outside off can be cut square and late, whatever the length', () => {
+  for (const length of ['good', 'full', 'short']) {
+    const d = ball(0.5, length);
+    for (const a of [1.4, 1.8, 2.1]) assert.ok(rate(d, a) > 0.9, `${length} cut at ${a} rad: ${rate(d, a)}`);
+  }
+});
+
+test('pulls and hooks: a short ball on the pads or on the stumps is pulled all the way round to fine leg', () => {
+  for (const x of [-0.3, 0, 0.1]) for (const a of [-1.2, -1.8, -2.3]) assert.ok(rate(ball(x, 'short'), a) > 0.85, `x ${x} pull at ${a}: ${rate(ball(x, 'short'), a)}`);
+});
+
+test('a short ball outside off may be pulled across the line: a risk, not a bar', () => {
+  const d = ball(0.4, 'short');
+  const p = rate(d, -1.0), q = rate(d, -1.0, 'late');
+  assert.ok(p > 0.85 && q > 0.7 && q < p, `perfect ${p}, late ${q}`);
+});
+
+test('the rule that started it still holds: going the other way round the ball is across the line', () => {
+  assert.ok(rate(ball(-0.3), 1.2) < 0.7, 'a leg-side ball swung to the off side');
+  assert.ok(rate(ball(0.4), -1.2) < 0.7, 'a good ball outside off swung to leg');
+  assert.ok(rate(ball(0.0, 'good'), 1.6) < 0.7, 'a straight good ball cannot be cut square');
+});
