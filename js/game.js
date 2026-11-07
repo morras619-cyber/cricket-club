@@ -1000,7 +1000,7 @@ export class Game {
     if (btype.left) S.bowler.x = -0.6;
     const rng = this.ballRng(ballNo);
     const aiField = mirrorField(buildField(this.aiFieldPreset(ballNo), ballNo <= 12), left);
-    S.field3d = aiField.filter(f => !f.keeper && f.id !== 'bowler');
+    S.field3d = this.nets ? [] : aiField.filter(f => !f.keeper && f.id !== 'bowler');   // (the nets: nobody in the field)
     spec = this.mindBowlPower(inn, ballNo, spec, striker, bowler, opt);   // (with a mind it may fire the power of its bowler's type now)
     if (spec.power === 'storm') this.aiStorm = 3;
     const stormNow = this.aiStorm > 0 && !opt.scripted;   // (Swing Storm: three balls that swing and seam twice as much)
@@ -2139,7 +2139,7 @@ export class Game {
     const kind = bowler.bowl || 'swing';
     const profile = striker.ai;
     let field = this.currentField(ballNo, leftBat);
-    S.field3d = field.filter(f => !f.keeper && f.id !== 'bowler');
+    S.field3d = this.nets ? [] : field.filter(f => !f.keeper && f.id !== 'bowler');   // (the nets: nobody in the field)
     S.weak = this.scouted && !opt.scripted ? profile.weak : null;
     S.glowZone = opt.glow || null;
 
@@ -2194,7 +2194,7 @@ export class Game {
       if (G !== 'field') break;
       await this.editField(ballNo);
       field = this.currentField(ballNo, leftBat);
-      S.field3d = field.filter(f => !f.keeper && f.id !== 'bowler');
+      S.field3d = this.nets ? [] : field.filter(f => !f.keeper && f.id !== 'bowler');
       this.view = 'bowl';
       if (hint) this.ui.hint(hint);
     }
@@ -2491,10 +2491,10 @@ export class Game {
     let pts = null, done = null;
     const gd = pts => gestureToDelivery(pts, kind, scale);
     this.fieldEditRequested = false;
-    this.ui.fieldButton(true, () => { if (!pts) this.fieldEditRequested = true; });
+    this.ui.fieldButton(!this.nets, () => { if (!pts) this.fieldEditRequested = true; });   // (the nets have no field to set)
     this.onInput = (type, g) => {
       if (type === 'down') {
-        if (this.inMap(g)) { this.fieldEditRequested = true; return; }
+        if (!this.nets && this.inMap(g)) { this.fieldEditRequested = true; return; }
         if (g.y < this.H * 0.28 || this.realTime < this.powerFxUntil) return;
         pts = [{ x: g.x, y: g.y, t: g.t }];
         S.runStart = this.realTime;
@@ -3358,7 +3358,7 @@ export class Game {
         const wk = inn.wkts;
         const wp = powerBall && inn.balls === N - 1 ? powersOf(cand).bowl : null;
         if (wp && !this.altArmed(wp.kind)) await this.trialPower('bowlpower');   // (and again if a no-ball used it up)
-        let r = await this.bowlBall(inn, inn.balls + 1, { hint: wp ? `POWER BALL · ${wp.name.toUpperCase()} · SWIPE UP THE PITCH` : inn.balls === 0 ? 'DRAG THE BALL TO SET HOW IT MOVES · THEN SWIPE FROM YOUR BOWLER UP THE PITCH' : undefined });
+        let r = await this.bowlBall(inn, inn.balls + 1, { hint: wp ? `POWER BALL · ${wp.name.toUpperCase()} · SWIPE UP THE PITCH` : inn.balls === 0 ? 'SWIPE FROM YOUR BOWLER UP THE PITCH · CURVE IT TO SWING OR SPIN IT' : undefined });
         if (this.endNoBall(inn)) { r = { rebowl: true }; this.rebowls = (this.rebowls || 0) + 1; }   // (a no-ball in the nets does not count either: without this every ball after it was played as a no-ball, and the six never ended)
         if (!inn.cur.id) inn.setBatter(netBat);
         if (inn.wkts > wk) inn.setPartner(netMate);
