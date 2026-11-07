@@ -1221,10 +1221,10 @@ export class OutfieldView {
       const t = art.meta.top, s = k / t.px;
       g.imageSmoothingQuality = 'high';
       g.drawImage(top, c.x - t.c[0] * s, c.y - t.c[1] * s, t.w * s, t.h * s);
-      if (art.meta.strip && art.stripImg?.complete && k > 5) this.drawStrip(ctx, art.stripImg, art.meta.strip, c, Math.min(1, (k - 5) / 2));
+      if (art.meta.strip && art.stripImg?.complete && k > 5) this.drawStrip(g, art.stripImg, art.meta.strip, c, Math.min(1, (k - 5) / 2));
     } else {
       // the stands: a ring of crowd around the rope
-      if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(ctx); this.crowdFor = HOME; }
+      if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(g); this.crowdFor = HOME; }
       g.save();
       g.fillStyle = this.crowd;
       g.beginPath(); g.ellipse(c.x, c.y, (R + 26) * k, (R + 26) * k * 0.78, 0, 0, Math.PI * 2); g.fill();
@@ -1246,7 +1246,7 @@ export class OutfieldView {
       if (wt > 0.01) {
         g.save();
         g.beginPath(); g.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2); g.clip();
-        wornDraw(ctx, c.y - gr * k, c.x - gr * k, c.x + gr * k, c.y + gr * k, wt, gg => {
+        wornDraw(g, c.y - gr * k, c.x - gr * k, c.x + gr * k, c.y + gr * k, wt, gg => {
           const r = wornRng(7919);
           for (let i = 0; i < Math.round(150 * wt); i++) {
             const a = r() * Math.PI * 2, d = Math.sqrt(r()) * R * 1.05, p = this.to(Math.cos(a) * d, CY + Math.sin(a) * d), rx = (1.5 + 6 * r()) * k;
