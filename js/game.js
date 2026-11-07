@@ -3845,13 +3845,19 @@ export class Game {
   // It stays where you leave it from ball to ball. A better bowler can push it further (the dashed ring); past what he controls it may go loose.
   gripGeom() {
     const m = this.mapRect(), R = 46;
-    return { cx: m.x + m.w / 2, cy: m.y + m.h + 22 + 40 + R, R };   // (the name sits above the ring, where a thumb on the ball doesn't cover it)
+    // (the panel is 2R + 28 wide: kept on the screen, as the map it hangs under sits at the right edge)
+    return { cx: Math.min(m.x + m.w / 2, this.W - 8 - R - 14), cy: m.y + m.h + 22 + 40 + R, R };   // (the name sits above the ring, where a thumb on the ball doesn't cover it)
+  }
+  // the card the ball sits on: all of it is the grip, so a thumb on its name or its corners sets the ball and does not start the run-up
+  gripPanel() {
+    const { cx, cy, R } = this.gripGeom();
+    return { x: cx - R - 14, y: cy - R - 52, w: R * 2 + 28, h: R * 2 + 62 };
   }
   inGrip(g) {
     const S = this.S;
     if (this.view !== 'bowl' || !S?.gripBowler || S.delivery || S.flight) return false;
-    const { cx, cy, R } = this.gripGeom();
-    return Math.hypot(g.x - cx, g.y - cy) <= R + 20;
+    const { cx, cy, R } = this.gripGeom(), p = this.gripPanel();
+    return Math.hypot(g.x - cx, g.y - cy) <= R + 20 || (g.x >= p.x - 6 && g.x <= p.x + p.w + 6 && g.y >= p.y - 6 && g.y <= p.y + p.h + 6);
   }
   // the grip as the delivery reads it: limited to what this bowler can do
   gripOf(bowler) {
@@ -3876,7 +3882,7 @@ export class Game {
     const pv = gestureToDelivery([{ x: 0, y: 700, t: 0 }, { x: 0, y: 380, t: 120 }], bowler.bowl || 'swing', 1, g);
     const risk = pv ? overcook(pv.strength, bowler.bowlSkill) : 0;
     const col = risk >= 0.2 ? '#ff6b6b' : risk > 0 ? '#ffcf4a' : '#5dff9b';
-    const px = cx - R - 14, py = cy - R - 52, pw = R * 2 + 28, ph = R * 2 + 62;
+    const { x: px, y: py, w: pw, h: ph } = this.gripPanel();
     ctx.save();
     ctx.fillStyle = 'rgba(16,22,50,0.9)'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 12); ctx.fill(); ctx.stroke();
@@ -3885,7 +3891,7 @@ export class Game {
     ctx.fillStyle = '#fff4da'; ctx.font = '800 12px system-ui, sans-serif'; ctx.fillText((pv?.type || '').toUpperCase(), cx, py + 13);
     const best = spin ? 'GOOD · FULL' : g.air <= -0.25 ? 'FULL' : g.air >= 0.25 ? 'BACK OF A LENGTH' : 'GOOD LENGTH';
     ctx.font = '700 9px system-ui, sans-serif'; ctx.fillStyle = pv && pv.mag > 0.3 ? col : 'rgba(255,255,255,0.55)';
-    ctx.fillText(pv && pv.mag > 0.3 ? (risk >= 0.2 ? 'RISKY: MAY GO LOOSE' : `BEST: ${best}`) : 'TAP OR DRAG THE BALL', cx, py + 28);
+    ctx.fillText(pv && pv.mag > 0.3 ? (risk >= 0.2 ? 'RISKY: MAY GO LOOSE' : `BEST: ${best}`) : 'TAP OR DRAG THE BALL', cx, py + 28, pw - 8);   // (squeezed to fit the card)
     const lvl = pv ? Math.min(4, Math.round(pv.mag * (1 + 0.25 * Math.abs(g.air)) * 4)) : 0;
     for (let i = 0; i < 4; i++) { ctx.fillStyle = i < lvl ? col : 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.roundRect(cx - 26 + i * 14, py + 37, 12, 5, 2); ctx.fill(); }
     // the track and the limit of this bowler
