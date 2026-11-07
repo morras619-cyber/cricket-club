@@ -26,6 +26,8 @@ export const LENGTHS = [
   { id: 'yorker', name: 'Yorker', bounce: 0.9, h: 0.12 },
   { id: 'fulltoss', name: 'Full toss', bounce: null, h: 0.85 },
 ];
+// how far a ball's late bend runs, as a multiple of its swing
+const SWING_LATE = 1.5;
 export const lengthById = id => LENGTHS.find(l => l.id === id);
 export const laneById = id => LANES.find(l => l.id === id);
 
@@ -42,6 +44,10 @@ export function makeDelivery(opts) {
   const swing = opts.swing || 0;
   const loop = opts.loop ?? 0.5;
   const move = opts.move || 0;
+  // Swing is late: the ball leaves the hand on a line aimed `drift` short of where it is going and bends onto it, most of the bend in the last part of its
+  // flight (u cubed). It was a bulge that peaked halfway down the pitch, so a swinger showed its swing straight out of the hand. Only the look of the
+  // flight: where it pitches and where it arrives are as before.
+  const drift = swing * SWING_LATE;
   const d = { ...opts, lengthName: L.name, v, rx, xt, h };
 
   if (bounce == null) {
@@ -51,7 +57,7 @@ export function makeDelivery(opts) {
       const z = RELEASE_Z - v * t;
       const u = (RELEASE_Z - z) / RELEASE_Z;
       return {
-        x: rx + (xt - rx) * u + swing * 4 * u * (1 - u),
+        x: rx + (xt - drift - rx) * u + drift * u * u * u,
         y: RELEASE_Y + (h - RELEASE_Y) * u + loop * 0.6 * u * (1 - u),
         z,
       };
@@ -68,7 +74,7 @@ export function makeDelivery(opts) {
       if (t <= t1) {
         const u = t / t1;
         return {
-          x: rx + (xb - rx) * u + swing * 4 * u * (1 - u),
+          x: rx + (xb - drift - rx) * u + drift * u * u * u,
           y: Math.max(0, RELEASE_Y * (1 - u) + loop * u * (1 - u)),
           z: RELEASE_Z - (RELEASE_Z - zb) * u,
         };
