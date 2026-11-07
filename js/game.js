@@ -9,7 +9,7 @@ import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult, isWide } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS, saveChance } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
-import { gestureToDelivery, gripCap, overcook, planExpectation, planExpectationBw, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES, bowlWhy } from './tactics.js';
+import { gestureToDelivery, planExpectation, planExpectationBw, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES, bowlWhy } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
 import { lookOf, faceCanvas, masksReady, colourLook } from './looks.js';
@@ -103,7 +103,6 @@ export class Game {
     this.timers = []; this.waiters = [];
     this.gameTime = 0; this.realTime = 0; this.lastNow = performance.now();
     this.powerFxUntil = 0; this.mapBig = false;
-    this.grip = { lat: 0, air: 0 }; this.gripDrag = false; this.gripHints = 5;   // the ball on the right when bowling: which way it moves, and where (in the air or off the pitch)
     this.timeScale = 1; this.hitStopUntil = 0;
     this.view = 'idle'; this.paused = false;
     this.S = this.freshScene(); this.O = null;
@@ -191,9 +190,7 @@ export class Game {
       // (one failing update must not end the loop: the game would stop for good)
       try { this.tick(); this.fx.update(dt); this.of.update(dt); } catch (e) { this.loopError = e; console.error('frame update', e); }
     }
-    this.gripWant = null;
     try { this.render(); } catch (e) { console.error(e); }
-    try { this.gripPadSync(this.gripWant, !!this.gripWant && !this.cutinShown); } catch (e) { console.error(e); }
     if (this.showFps) this.drawFps(raw);
     requestAnimationFrame(t => this.frame(t));
   }
@@ -2185,8 +2182,7 @@ export class Game {
     this.powerLock = false;
     this.refreshPowers();
     if (this.freeHit) this.ui.banner('FREE HIT', 'They can only be run out', 1400);
-    S.gripBowler = opt.scripted ? null : bowler;   // (the tutorial's scripted balls have no grip)
-    const hint = opt.hint || (this.bowlHints-- > 0 ? (this.gripHints > 0 ? 'DRAG THE BALL TO SET HOW IT MOVES · THEN SWIPE UP THE PITCH' : 'SWIPE FROM YOUR BOWLER UP THE PITCH') : null);
+    const hint = opt.hint || (this.bowlHints-- > 0 ? 'SWIPE FROM YOUR BOWLER UP THE PITCH · CURVE IT TO SWING OR SPIN IT' : null);
     if (hint) this.ui.hint(hint);
 
     this.crowdBuild = this.wantBuild(ballNo) && !this.lastOverChorus(inn, ballNo, false);
@@ -2218,11 +2214,6 @@ export class Game {
     if (myC === 'steady' && (rg === 'loose' || rg === 'bad')) rg = 'good';   // Steady Hands: a Good release, however I flick it
     if (bowler.ability === 'deathKing' && ballNo >= 25 && (rg === 'loose' || rg === 'bad')) rg = 'good'; // never sprays it at the death
     if (opt.forceRelease) rg = opt.forceRelease(rg);
-    // too much movement for him to control: the ball goes loose (the bigger the movement against his rating, the likelier)
-    if (G.strength && !opt.scripted && !pinpoint && rg !== 'loose') {
-      const pr = overcook(G.strength, bowler.bowlSkill);
-      if (pr > 0 && this.ballRng(ballNo * 13 + 5).chance(pr)) { rg = 'loose'; G.overdone = true; }
-    }
     // a no-ball: overstepping (a flick that was too fast). The ball is still bowled and played
     let noBall = null;
     if (rg === 'bad') { noBall = 'step'; rg = 'loose'; }
@@ -2234,7 +2225,7 @@ export class Game {
 
     const words = { perfect: '#ffd23f', good: '#fff4da', loose: '#ff8a8a', bad: '#e8343b' };
     // the release, read out in a tag up top so nothing covers the ball
-    const label = noBall === 'step' ? 'OVERSTEPPED!' : rg === 'loose' ? (G.hesitated ? 'HESITATED…' : G.overdone ? 'OVERCOOKED IT!' : 'SPRAYED IT!') : `${G.type.toUpperCase()} · ${speedText(G.kmh * paceFor(bowler.bowlSkill) * (btype.spin ? 1 : this.pitch.kmh))}${rg === 'perfect' ? ' · PERFECT' : ''}`;
+    const label = noBall === 'step' ? 'OVERSTEPPED!' : rg === 'loose' ? (G.hesitated ? 'HESITATED…' : 'SPRAYED IT!') : `${G.type.toUpperCase()} · ${speedText(G.kmh * paceFor(bowler.bowlSkill) * (btype.spin ? 1 : this.pitch.kmh))}${rg === 'perfect' ? ' · PERFECT' : ''}`;
     if (!this.bot) this.showTag(label, words[rg], 1600);
     if (rg === 'perfect') this.charge.award('perfectRelease', 'RELEASE');
     this.charge.timingStreak(rg === 'perfect');
@@ -2323,7 +2314,7 @@ export class Game {
     if (Math.abs(off) > 0.08) this.fx.word('LATE MOVEMENT!', this.W / 2, this.H * 0.5, { size: 32, color: '#3ec6ff', stroke: INK, rot: 0, dur: 900 });
 
     // read the batter: expectation, weak spot, setups, mood
-    const shape = { length: spec.length, lane: laneFor(d.xt), lateWorld: G.lateWorld, mag: G.mag, air: G.air || 0, slower: G.slower, after: off, sweet: !!G.sweet && rg !== 'loose' };
+    const shape = { length: spec.length, lane: laneFor(d.xt), lateWorld: G.lateWorld, mag: G.mag, slower: G.slower, after: off };
     const mods = opt.scripted ? null : deliveryMods(shape, this.bowlHistory, exp?.expect, profile, mood, bw && exp ? exp.conf : null);
     shape.combo = mods?.combo || null;
     shape.weak = !!mods?.weak;
@@ -2498,7 +2489,7 @@ export class Game {
   async captureBowlGesture(S, kind, bowler = null) {
     const scale = this.H / 844;
     let pts = null, done = null;
-    const gd = pts => gestureToDelivery(pts, kind, scale, this.gripOf(bowler));
+    const gd = pts => gestureToDelivery(pts, kind, scale);
     this.fieldEditRequested = false;
     this.ui.fieldButton(true, () => { if (!pts) this.fieldEditRequested = true; });
     this.onInput = (type, g) => {
@@ -2510,10 +2501,6 @@ export class Game {
         this.bowlCrowdStart(this.myTeam); // the crowd builds as the bowler runs in
         this.ui.hint(null);
         this.bowlTrail = pts;
-      } else if (type === 'move' && this.gripDrag) {
-        this.setGrip(g, bowler);
-      } else if (type === 'up' && this.gripDrag) {
-        this.gripDrag = false;
       } else if (type === 'move' && pts) {
         pts.push({ x: g.x, y: g.y, t: g.t });
         const r = this.aimAt(gd(pts), g);
@@ -2551,7 +2538,6 @@ export class Game {
   }
 
   botBowl() {
-    if (Math.random() < 0.6) this.grip = { lat: Math.random() * 2 - 1, air: Math.random() * 2 - 1 };   // (the bot sets the ball too)
     const sc = this.H / 844, y0 = this.H * 0.8;
     const up = 150 + Math.random() * 230, dx = (Math.random() - 0.5) * 220, bend = (Math.random() - 0.5) * 90;
     // it ends its swipe over a line near the stumps (the line is wherever the finger ends)
@@ -3823,7 +3809,6 @@ export class Game {
     // timing ring (batting)
     if (kind === 'bat' && S.ring && S.delivery) this.drawTimingRing(cam, bp);
     if ((kind === 'bat' || kind === 'bowl') && S.field3d && !S.delivery && !S.flight && !this.nets) this.drawFieldMap(S.field3d, kind);   // (the nets: no fielders to map)
-    if (kind === 'bowl' && S.gripBowler && !S.delivery && !S.flight) this.gripWant = S.gripBowler;   // (the ball's card is a DOM element: shown after the frame)
     if (kind === 'keeper' && S.reticle) this.drawReticle(cam);
     if (S.frozen) { ctx.fillStyle = 'rgba(62,198,255,0.15)'; ctx.fillRect(0, 0, this.W, this.H); }
   }
@@ -3839,90 +3824,6 @@ export class Game {
   inMap(g) {
     const r = this.mapRect();
     return (this.view === 'bat' || this.view === 'bowl') && g.x >= r.x - 6 && g.x <= r.x + r.w + 6 && g.y >= r.y - 6 && g.y <= r.y + r.h + 22;
-  }
-
-  // ---------- the ball on the right: set how it moves before you bowl ----------
-  // Drag the ball: left or right is which way it moves (swing, turn or cut) and how much; up is off the pitch (seam, turn), down is in the air (swing, flight).
-  // It stays where you leave it from ball to ball. A better bowler can push it further (the dashed ring); past what he controls it may go loose.
-  gripGeom() {
-    const m = this.mapRect(), R = 46;
-    // (the panel is 2R + 44 wide: kept on the screen, as the map it hangs under sits at the right edge)
-    return { cx: Math.min(m.x + m.w / 2, this.W - 8 - R - 22), cy: m.y + m.h + 22 + 40 + R, R };   // (the name sits above the ring, where a thumb on the ball doesn't cover it)
-  }
-  // the card the ball sits on: all of it is the grip, so a thumb on its name or its corners sets the ball and does not start the run-up
-  gripPanel() {
-    const { cx, cy, R } = this.gripGeom();
-    return { x: cx - R - 22, y: cy - R - 52, w: R * 2 + 44, h: R * 2 + 62 };
-  }
-  // the grip as the delivery reads it: limited to what this bowler can do
-  gripOf(bowler) {
-    if (!bowler) return null;
-    const cap = gripCap(bowler.bowlSkill, bowler.ability), len = Math.hypot(this.grip.lat, this.grip.air) || 0, k = len > cap ? cap / len : 1;
-    return { lat: this.grip.lat * k, air: this.grip.air * k, cap: 1 };
-  }
-  setGrip(g, bowler) {
-    const { cx, cy, R } = this.gripGeom(), cap = bowler ? gripCap(bowler.bowlSkill, bowler.ability) : 1;
-    let lat = (g.x - cx) / R, air = -(g.y - cy) / R;
-    const len = Math.hypot(lat, air);
-    if (len > cap) { lat *= cap / len; air *= cap / len; }
-    if (Math.abs(lat) < 0.12) lat = 0;   // (near the middle is the stock ball)
-    if (Math.abs(air) < 0.12) air = 0;
-    if (Math.hypot(lat, air) > cap * 0.9) { const k = cap / Math.hypot(lat, air); lat *= k; air *= k; }   // (and near the limit it sits on the limit)
-    if (lat !== this.grip.lat || air !== this.grip.air) { this.grip = { lat, air }; buzz(5); }
-    this.gripHints = 0;
-  }
-  // The ball is a card of its own (a DOM element above the picture, so a thumb on any part of it is the grip and never the start of the run-up), styled like the scoreboard.
-  gripPadEl() {
-    if (this.gripPad) return this.gripPad;
-    const el = document.getElementById('gripPad');
-    if (!el) return null;
-    this.gripPad = { el, name: el.querySelector('.gp-name'), hint: el.querySelector('.gp-hint'), bars: [...el.querySelectorAll('.gp-bars i')], cv: el.querySelector('canvas'), key: '' };
-    const on = e => { const S = this.S; if (!S?.gripBowler) return; this.setGrip({ x: e.clientX, y: e.clientY }, S.gripBowler); };
-    el.addEventListener('pointerdown', e => {
-      e.preventDefault(); e.stopPropagation(); unlockAudio();
-      if (!this.S?.gripBowler) return;
-      try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-      this.gripDrag = true; on(e);
-    });
-    el.addEventListener('pointermove', e => { if (this.gripDrag) on(e); });
-    const end = () => { this.gripDrag = false; };
-    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
-    return this.gripPad;
-  }
-  gripPadSync(bowler, want) {
-    const pad = this.gripPadEl();
-    if (!pad) return;
-    if (!want) { if (!pad.el.hidden) pad.el.hidden = true; this.gripDrag = false; return; }
-    const P = this.gripPanel(), { cx, cy, R } = this.gripGeom(), g = this.gripOf(bowler), cap = gripCap(bowler.bowlSkill, bowler.ability), spin = !!bowlType(bowler.bowl).spin;
-    const pv = gestureToDelivery([{ x: 0, y: 700, t: 0 }, { x: 0, y: 380, t: 120 }], bowler.bowl || 'swing', 1, g);
-    const risk = pv ? overcook(pv.strength, bowler.bowlSkill) : 0, col = risk >= 0.2 ? '#ff6b6b' : risk > 0 ? '#ffcf4a' : '#5dff9b';
-    const best = spin ? 'GOOD · FULL' : g.air <= -0.25 ? 'FULL' : g.air >= 0.25 ? 'BACK OF A LENGTH' : 'GOOD LENGTH';
-    const hint = pv && pv.mag > 0.3 ? (risk >= 0.2 ? 'RISKY: MAY GO LOOSE' : `BEST: ${best}`) : 'TAP OR DRAG THE BALL';
-    const lvl = pv ? Math.min(4, Math.round(pv.mag * (1 + 0.25 * Math.abs(g.air)) * 4)) : 0;
-    const dpr = this.dprNow ? Math.min(2, this.dprNow()) : 2, key = [P.x | 0, P.y | 0, g.lat.toFixed(3), g.air.toFixed(3), pv?.type, hint, lvl, col, bowler.id, dpr].join('|');
-    if (pad.key === key && !pad.el.hidden) return;
-    pad.key = key;
-    Object.assign(pad.el.style, { left: `${P.x}px`, top: `${P.y}px`, width: `${P.w}px`, height: `${P.h}px` });
-    pad.el.hidden = false;
-    pad.name.textContent = (pv?.type || '').toUpperCase(); pad.hint.textContent = hint; pad.hint.style.color = pv && pv.mag > 0.3 ? col : '';
-    pad.bars.forEach((b, i) => { b.style.background = i < lvl ? col : ''; });
-    for (const [el, size] of [[pad.name, 18], [pad.hint, 9]]) { el.style.fontSize = ''; let f = size; el.style.fontSize = `${f}px`; while (el.scrollWidth > P.w - 14 && f > 7) el.style.fontSize = `${--f}px`; }   // (a long name or hint is made to fit the card)
-    // the dial: it sits at the bottom of the card, its centre at (cx, cy) on the screen
-    const cv = pad.cv, W = P.w - 6, Hh = 2 * R + 14, ox = P.x + 3, oy = cy - R - 7;   // (the card has a 3px border)
-    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(Hh * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(Hh * dpr); }
-    const ctx = cv.getContext('2d'), mx = cx - ox, my = cy - oy;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, Hh);
-    ctx.fillStyle = 'rgba(6,10,40,0.55)'; ctx.beginPath(); ctx.arc(mx, my, R, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(120,180,255,0.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx, my, R, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,210,63,0.85)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(mx, my, R * cap, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    ctx.strokeStyle = 'rgba(120,180,255,0.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(mx - R, my); ctx.lineTo(mx + R, my); ctx.moveTo(mx, my - R); ctx.lineTo(mx, my + R); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,244,218,0.8)'; ctx.font = '12px "Bangers", Impact, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(spin ? 'TURN' : 'SEAM', mx, my - R + 11); ctx.fillText(spin ? 'FLIGHT' : 'AIR', mx, my + R - 11);
-    ctx.fillText('IN', mx - R + 12, my); ctx.fillText('OUT', mx + R - 14, my);
-    // the ball is the thumb: its seam turns with the way it is set
-    const bx = mx + g.lat * R, by = my - g.air * R;
-    if (g.lat || g.air) { ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(bx, by); ctx.stroke(); }
-    paintBall(ctx, bx, by, 13, Math.atan2(g.lat, g.air || 0.001) + 0.6, { glow: col });
   }
 
   drawFieldMap(fielders, kind) {
