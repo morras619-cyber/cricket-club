@@ -1278,12 +1278,12 @@ export const GROUND_ART = {
     }
    },
    "bowl": {
-    "f": 3570,
-    "w": 1448,
-    "h": 3316,
-    "above": 735.0,
-    "top": "#06032d",
-    "bottom": "#236f24",
+    "f": 2441,
+    "w": 1024,
+    "h": 1536,
+    "above": 526.0,
+    "top": "#1a0f55",
+    "bottom": "#237023",
     "tile": true,
     "board": {
      "r": 40.0,

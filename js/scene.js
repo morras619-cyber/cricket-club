@@ -125,8 +125,8 @@ const SHARED = new Set(['pitch', 'grass', 'stumps', 'stumps-broken']);
 // creases, kept on the pitch: white, with a fine ink edge only where they're big enough to
 // carry one (far away an edge turns a crease into a stack of stripes)
 function drawCreases(g, cam, PX) {
-  // the lines run out to the pitch's sides; return creases meet them. All the ink edges are drawn first and all the
-  // white lines over them, so the lines join cleanly and the edge shows only round the outside of the whole shape
+  // chalk on the pitch, not a sticker on it: no dark outline round the lines (it made them look stuck on), an off-white that lets the pitch's own colour and grain
+  // show a little through, and square ends that reach each other's centre-line so the lines join cleanly at the corners
   const segs = [];
   for (const [z, d] of [[0, 1], [20, -1]]) {
     segs.push([-PX, z + 1.22 * d, PX, z + 1.22 * d]); // popping crease
@@ -134,9 +134,11 @@ function drawCreases(g, cam, PX) {
     for (const x of [-1.32, 1.32]) segs.push([x, z + 1.22 * d, x, z - 1.22 * d]); // return creases
   }
   const ws = segs.map(([x0, z0, x1, z1]) => { const p = cam.project(0, 0, (z0 + z1) / 2); return p ? 0.045 * p.k : 0; });
-  g.lineCap = 'square';   // (square ends reach each other's centre-line: no gaps at the corners)
-  segs.forEach(([x0, z0, x1, z1], i) => { if (ws[i] >= 3) line(g, cam, x0, z0, x1, z1, 'rgba(20,16,24,0.9)', ws[i] + 1.2); });
-  segs.forEach(([x0, z0, x1, z1], i) => { if (ws[i]) line(g, cam, x0, z0, x1, z1, ws[i] >= 3 ? '#fffdf0' : 'rgba(255,253,240,0.7)', Math.max(0.9, ws[i])); });
+  g.lineCap = 'square';
+  g.save();
+  g.globalAlpha = 0.86;
+  segs.forEach(([x0, z0, x1, z1], i) => { if (ws[i]) line(g, cam, x0, z0, x1, z1, ws[i] >= 3 ? '#f7f3df' : 'rgba(247,243,223,0.75)', Math.max(0.9, ws[i])); });
+  g.restore();
 }
 // Grounds with a painted strip of their own, fresh and late (img/ground/<club>/pitch-fresh.webp, pitch-late.webp): the strip
 // fades from one to the other as the match wears (js/pitches.js pitchLate). The others keep the shared strip.
