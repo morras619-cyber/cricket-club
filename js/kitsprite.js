@@ -167,7 +167,11 @@ function shades(t) {
   for (let n = 0; n <= 250; n++) {
     const q = n / 100;
     let o;
-    if (q <= 1) { const sh = q ** 0.9; o = rgb(h, Math.min(1, s * (1 + 0.3 * (1 - sh))), v * sh); }
+    if (q <= 1) {
+      // (a yellow darkened with its hue kept goes olive, an orange goes brown: in the shade they turn warmer, towards orange and red, as cloth does, and stay saturated)
+      const sh = q ** (0.9 - 0.3 * Math.max(0, Math.min(1, (v - 0.7) / 0.3))), dk = 1 - sh, warm = h >= 30 && h <= 75 ? 1 : h >= 8 && h < 30 ? 0.5 : 0;
+      o = rgb((h - warm * 17 * dk + 360) % 360, Math.min(1, s * (1 + (warm ? 0.5 : 0.3) * dk)), v * sh);
+    }
     else { const hi = Math.min(0.7, (q - 1) * 0.8); o = t.map(x => x + (255 - x) * hi); }
     lut.set(o, n * 3);
   }
