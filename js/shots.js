@@ -1,13 +1,18 @@
 // Batting: timing grades, swipe → shot, and contact resolution. Pure functions.
 
-export function gradeTiming(errMs, w, offSideBall = true) {
+// lateMs: how late a swing can still meet the ball. The ball is past the stumps (and the batter) a moment after it reaches his bat, and later than that it is behind him:
+// a swing 160 ms late cannot hit it (lateMs, from the ball's own flight: lateReach). A hair later than that, on the off side, is a thin edge.
+export function gradeTiming(errMs, w, offSideBall = true, lateMs = Infinity) {
   const a = Math.abs(errMs);
+  if (errMs > 0 && a > lateMs) return a <= lateMs + 35 && offSideBall ? 'edge' : 'miss';
   if (a <= w.perfect) return 'perfect';
   if (a <= w.good) return 'good';
   if (a <= w.okay) return errMs < 0 ? 'early' : 'late';
   if (errMs > 0 && a <= w.edge && offSideBall) return 'edge';
   return 'miss';
 }
+// how late (ms) a swing can still reach the ball: it has gone past the stumps, and a little more (the bat's follow-through)
+export const lateReach = d => (d && d.tStumps != null && d.tContact != null ? (d.tStumps - d.tContact) * 1000 + 25 : Infinity);
 
 // Screen swipe (px, y down) → shot. angle: 0 = straight back past the bowler,
 // +π/2 = square on the off side, −π/2 = square on the leg side, ±π = straight behind
