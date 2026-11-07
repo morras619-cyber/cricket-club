@@ -191,7 +191,9 @@ export class Game {
       // (one failing update must not end the loop: the game would stop for good)
       try { this.tick(); this.fx.update(dt); this.of.update(dt); } catch (e) { this.loopError = e; console.error('frame update', e); }
     }
+    this.gripWant = null;
     try { this.render(); } catch (e) { console.error(e); }
+    try { this.gripPadSync(this.gripWant, !!this.gripWant && !this.cutinShown); } catch (e) { console.error(e); }
     if (this.showFps) this.drawFps(raw);
     requestAnimationFrame(t => this.frame(t));
   }
@@ -2501,7 +2503,6 @@ export class Game {
     this.ui.fieldButton(true, () => { if (!pts) this.fieldEditRequested = true; });
     this.onInput = (type, g) => {
       if (type === 'down') {
-        if (!pts && this.inGrip(g)) { this.gripDrag = true; this.setGrip(g, bowler); return; }
         if (this.inMap(g)) { this.fieldEditRequested = true; return; }
         if (g.y < this.H * 0.28 || this.realTime < this.powerFxUntil) return;
         pts = [{ x: g.x, y: g.y, t: g.t }];
@@ -3822,7 +3823,7 @@ export class Game {
     // timing ring (batting)
     if (kind === 'bat' && S.ring && S.delivery) this.drawTimingRing(cam, bp);
     if ((kind === 'bat' || kind === 'bowl') && S.field3d && !S.delivery && !S.flight && !this.nets) this.drawFieldMap(S.field3d, kind);   // (the nets: no fielders to map)
-    if (kind === 'bowl' && S.gripBowler && !S.delivery && !S.flight) this.drawGrip(S.gripBowler);
+    if (kind === 'bowl' && S.gripBowler && !S.delivery && !S.flight) this.gripWant = S.gripBowler;   // (the ball's card is a DOM element: shown after the frame)
     if (kind === 'keeper' && S.reticle) this.drawReticle(cam);
     if (S.frozen) { ctx.fillStyle = 'rgba(62,198,255,0.15)'; ctx.fillRect(0, 0, this.W, this.H); }
   }
@@ -3845,19 +3846,13 @@ export class Game {
   // It stays where you leave it from ball to ball. A better bowler can push it further (the dashed ring); past what he controls it may go loose.
   gripGeom() {
     const m = this.mapRect(), R = 46;
-    // (the panel is 2R + 28 wide: kept on the screen, as the map it hangs under sits at the right edge)
-    return { cx: Math.min(m.x + m.w / 2, this.W - 8 - R - 14), cy: m.y + m.h + 22 + 40 + R, R };   // (the name sits above the ring, where a thumb on the ball doesn't cover it)
+    // (the panel is 2R + 44 wide: kept on the screen, as the map it hangs under sits at the right edge)
+    return { cx: Math.min(m.x + m.w / 2, this.W - 8 - R - 22), cy: m.y + m.h + 22 + 40 + R, R };   // (the name sits above the ring, where a thumb on the ball doesn't cover it)
   }
   // the card the ball sits on: all of it is the grip, so a thumb on its name or its corners sets the ball and does not start the run-up
   gripPanel() {
     const { cx, cy, R } = this.gripGeom();
-    return { x: cx - R - 14, y: cy - R - 52, w: R * 2 + 28, h: R * 2 + 62 };
-  }
-  inGrip(g) {
-    const S = this.S;
-    if (this.view !== 'bowl' || !S?.gripBowler || S.delivery || S.flight) return false;
-    const { cx, cy, R } = this.gripGeom(), p = this.gripPanel();
-    return Math.hypot(g.x - cx, g.y - cy) <= R + 20 || (g.x >= p.x - 6 && g.x <= p.x + p.w + 6 && g.y >= p.y - 6 && g.y <= p.y + p.h + 6);
+    return { x: cx - R - 22, y: cy - R - 52, w: R * 2 + 44, h: R * 2 + 62 };
   }
   // the grip as the delivery reads it: limited to what this bowler can do
   gripOf(bowler) {
@@ -3876,36 +3871,58 @@ export class Game {
     if (lat !== this.grip.lat || air !== this.grip.air) { this.grip = { lat, air }; buzz(5); }
     this.gripHints = 0;
   }
-  drawGrip(bowler) {
-    const ctx = this.ctx, { cx, cy, R } = this.gripGeom(), g = this.gripOf(bowler), cap = gripCap(bowler.bowlSkill, bowler.ability);
-    const spin = !!bowlType(bowler.bowl).spin;
+  // The ball is a card of its own (a DOM element above the picture, so a thumb on any part of it is the grip and never the start of the run-up), styled like the scoreboard.
+  gripPadEl() {
+    if (this.gripPad) return this.gripPad;
+    const el = document.getElementById('gripPad');
+    if (!el) return null;
+    this.gripPad = { el, name: el.querySelector('.gp-name'), hint: el.querySelector('.gp-hint'), bars: [...el.querySelectorAll('.gp-bars i')], cv: el.querySelector('canvas'), key: '' };
+    const on = e => { const S = this.S; if (!S?.gripBowler) return; this.setGrip({ x: e.clientX, y: e.clientY }, S.gripBowler); };
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation(); unlockAudio();
+      if (!this.S?.gripBowler) return;
+      try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      this.gripDrag = true; on(e);
+    });
+    el.addEventListener('pointermove', e => { if (this.gripDrag) on(e); });
+    const end = () => { this.gripDrag = false; };
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    return this.gripPad;
+  }
+  gripPadSync(bowler, want) {
+    const pad = this.gripPadEl();
+    if (!pad) return;
+    if (!want) { if (!pad.el.hidden) pad.el.hidden = true; this.gripDrag = false; return; }
+    const P = this.gripPanel(), { cx, cy, R } = this.gripGeom(), g = this.gripOf(bowler), cap = gripCap(bowler.bowlSkill, bowler.ability), spin = !!bowlType(bowler.bowl).spin;
     const pv = gestureToDelivery([{ x: 0, y: 700, t: 0 }, { x: 0, y: 380, t: 120 }], bowler.bowl || 'swing', 1, g);
-    const risk = pv ? overcook(pv.strength, bowler.bowlSkill) : 0;
-    const col = risk >= 0.2 ? '#ff6b6b' : risk > 0 ? '#ffcf4a' : '#5dff9b';
-    const { x: px, y: py, w: pw, h: ph } = this.gripPanel();
-    ctx.save();
-    ctx.fillStyle = 'rgba(16,22,50,0.9)'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 12); ctx.fill(); ctx.stroke();
-    // what it is, above the ring: the delivery's name, the length it likes, and how hard it is to play
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff4da'; ctx.font = '800 12px system-ui, sans-serif'; ctx.fillText((pv?.type || '').toUpperCase(), cx, py + 13);
+    const risk = pv ? overcook(pv.strength, bowler.bowlSkill) : 0, col = risk >= 0.2 ? '#ff6b6b' : risk > 0 ? '#ffcf4a' : '#5dff9b';
     const best = spin ? 'GOOD · FULL' : g.air <= -0.25 ? 'FULL' : g.air >= 0.25 ? 'BACK OF A LENGTH' : 'GOOD LENGTH';
-    ctx.font = '700 9px system-ui, sans-serif'; ctx.fillStyle = pv && pv.mag > 0.3 ? col : 'rgba(255,255,255,0.55)';
-    ctx.fillText(pv && pv.mag > 0.3 ? (risk >= 0.2 ? 'RISKY: MAY GO LOOSE' : `BEST: ${best}`) : 'TAP OR DRAG THE BALL', cx, py + 28, pw - 8);   // (squeezed to fit the card)
+    const hint = pv && pv.mag > 0.3 ? (risk >= 0.2 ? 'RISKY: MAY GO LOOSE' : `BEST: ${best}`) : 'TAP OR DRAG THE BALL';
     const lvl = pv ? Math.min(4, Math.round(pv.mag * (1 + 0.25 * Math.abs(g.air)) * 4)) : 0;
-    for (let i = 0; i < 4; i++) { ctx.fillStyle = i < lvl ? col : 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.roundRect(cx - 26 + i * 14, py + 37, 12, 5, 2); ctx.fill(); }
-    // the track and the limit of this bowler
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,210,63,0.7)'; ctx.beginPath(); ctx.arc(cx, cy, R * cap, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '700 9px system-ui, sans-serif';
-    ctx.fillText(spin ? 'TURN' : 'SEAM', cx, cy - R + 10); ctx.fillText(spin ? 'FLIGHT' : 'AIR', cx, cy + R - 10);
-    ctx.fillText('IN', cx - R + 10, cy); ctx.fillText('OUT', cx + R - 12, cy);
+    const dpr = this.dprNow ? Math.min(2, this.dprNow()) : 2, key = [P.x | 0, P.y | 0, g.lat.toFixed(3), g.air.toFixed(3), pv?.type, hint, lvl, col, bowler.id, dpr].join('|');
+    if (pad.key === key && !pad.el.hidden) return;
+    pad.key = key;
+    Object.assign(pad.el.style, { left: `${P.x}px`, top: `${P.y}px`, width: `${P.w}px`, height: `${P.h}px` });
+    pad.el.hidden = false;
+    pad.name.textContent = (pv?.type || '').toUpperCase(); pad.hint.textContent = hint; pad.hint.style.color = pv && pv.mag > 0.3 ? col : '';
+    pad.bars.forEach((b, i) => { b.style.background = i < lvl ? col : ''; });
+    for (const [el, size] of [[pad.name, 18], [pad.hint, 9]]) { el.style.fontSize = ''; let f = size; el.style.fontSize = `${f}px`; while (el.scrollWidth > P.w - 14 && f > 7) el.style.fontSize = `${--f}px`; }   // (a long name or hint is made to fit the card)
+    // the dial: it sits at the bottom of the card, its centre at (cx, cy) on the screen
+    const cv = pad.cv, W = P.w - 6, Hh = 2 * R + 14, ox = P.x + 3, oy = cy - R - 7;   // (the card has a 3px border)
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(Hh * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(Hh * dpr); }
+    const ctx = cv.getContext('2d'), mx = cx - ox, my = cy - oy;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, Hh);
+    ctx.fillStyle = 'rgba(6,10,40,0.55)'; ctx.beginPath(); ctx.arc(mx, my, R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,180,255,0.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx, my, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,210,63,0.85)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(mx, my, R * cap, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(120,180,255,0.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(mx - R, my); ctx.lineTo(mx + R, my); ctx.moveTo(mx, my - R); ctx.lineTo(mx, my + R); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,244,218,0.8)'; ctx.font = '12px "Bangers", Impact, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(spin ? 'TURN' : 'SEAM', mx, my - R + 11); ctx.fillText(spin ? 'FLIGHT' : 'AIR', mx, my + R - 11);
+    ctx.fillText('IN', mx - R + 12, my); ctx.fillText('OUT', mx + R - 14, my);
     // the ball is the thumb: its seam turns with the way it is set
-    const bx = cx + g.lat * R, by = cy - g.air * R;
-    if (g.lat || g.air) { ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke(); }
+    const bx = mx + g.lat * R, by = my - g.air * R;
+    if (g.lat || g.air) { ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(bx, by); ctx.stroke(); }
     paintBall(ctx, bx, by, 13, Math.atan2(g.lat, g.air || 0.001) + 0.6, { glow: col });
-    ctx.restore();
   }
 
   drawFieldMap(fielders, kind) {
