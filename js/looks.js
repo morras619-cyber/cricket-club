@@ -5,6 +5,7 @@ import { PORTRAIT_LOOKS } from './portrait-looks.js';
 import { PORTRAIT_STYLES } from './portrait-styles.js';
 import { INK } from './fx.js';
 import { makeRng } from './rng.js';
+import { heroById } from './heroes.js';
 
 export const SKIN = ['#f3cfb0', '#e8b48c', '#c98e63', '#a8714f', '#7f4f33', '#553322'];
 export const HAIR = ['#17110d', '#3b2414', '#6e4524', '#d8b25a', '#a6451c', '#a7a7a7'];
@@ -58,7 +59,8 @@ export function lookOf(p) {
   if (!p) return null;
   // a player with a painted portrait has its skin tone and hair colour on the pitch too
   // (and its haircut, beard and headwear: hair.js)
-  const key = p.pic || portraitKey(p.name || ''), painted = PORTRAIT_LOOKS[key], cut = PORTRAIT_STYLES[key];
+  // (the same picture the card shows: his lent picture, else his hero's, else his own name's: futcard.js keyOf. A hero who plays under another name has the hero's face on his card, so the hero's skin on the pitch)
+  const key = p.pic || portraitKey((p.heroId && heroById(p.heroId)?.name) || p.name || ''), painted = PORTRAIT_LOOKS[key], cut = PORTRAIT_STYLES[key];
   const base = baseLook(p);
   // (who and num: the name and number on his shirt)
   return { ...base, ...painted, ...cut, seed: p.id || p.name || '', who: p.name || '', num: p.number || null, left: isLeft(p) };

@@ -110,7 +110,7 @@ function addClub(c, t) {
 }
 // a player with a painted portrait is as old as he looks in it
 const portraitKey = name => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-export const lookAge = p => PORTRAIT_AGE[portraitKey(p.name || '')];
+export const lookAge = p => PORTRAIT_AGE[p.pic || portraitKey((p.heroId && heroById(p.heroId)?.name) || p.name || '')];
 // Players the game makes up (the nets' trialists, academy prospects, free agents) have no painted portrait of their own. Each borrows one, for good (p.pic, a key of
 // portraits-list.js), so every player in a career shows a painted face. It is chosen to suit him (his country, his age) and never repeats a face in his own club;
 // faces already lent are used last. A career saved before this gets its pictures the first time it opens.

@@ -32,7 +32,13 @@ HAIR_FIX = {
 
 
 # skin misread (a lit face on a dark painting): the tone to use instead
-SKIN_FIX = {'andre-belgrave': '#7a4a2e', 'captain-comet': '#c27a52', 'cyclone-zaheer': '#cd8458',
+# the black players: the painted faces are lit warm, so the face reads lighter than the man is, and they came out a light brown (or white) on the pitch. Each is set by eye
+BLACK_FIX = {k: '#6b412a' for k in [
+    'dwayne-hollis', 'jermaine-alleyne', 'jermaine-belgrave', 'jermaine-granger', 'jermaine-thorpe', 'marlon-greaves', 'marlon-thorpe', 'mpho-ndlovu', 'mpho-nkosi',
+    'mpho-steyn-louw', 'romario-clarke', 'ruan-mokoena', 'shamar-greaves', 'shane-granger', 'shane-phillip', 'sipho-nkosi', 'tendai-moyo', 'tevin-baptiste', 'tevin-clarke',
+    'tevin-hollis', 'thabo-botha', 'thabo-mthembu', 'andre-granger']}
+BROWN_FIX = {k: '#8a5a3a' for k in ['akeem-bascombe', 'kyle-jacobs', 'qais-safi', 'nuwan-jayasena']}
+SKIN_FIX = {**BLACK_FIX, **BROWN_FIX, 'callum-fraser': '#f0ac82', 'thunder-raja': '#c98e63', 'andre-belgrave': '#7a4a2e', 'captain-comet': '#c27a52', 'cyclone-zaheer': '#cd8458',
             'iron-wall-ian': '#f0ac82', 'rubber-rocket-rory': '#f0ac82'}   # (the two Westerners: the peach of their painted faces, a fair tone between the game's two lightest)
 
 
@@ -45,6 +51,50 @@ def hsv(rgb):
     hr = m & (mx == r); hg = m & (mx == g) & ~hr; hb = m & ~hr & ~hg
     h[hr] = ((g - b)[hr] / d[hr]) % 6; h[hg] = (b - r)[hg] / d[hg] + 2; h[hb] = (r - g)[hb] / d[hb] + 4
     return (h * 60) % 360, np.where(mx > 0, d / np.maximum(mx, 1e-6), 0), mx
+
+
+SKIN_PALETTE = ['#f3cfb0', '#e8b48c', '#c98e63', '#a8714f', '#7f4f33', '#553322']   # (js/looks.js SKIN, light to dark)
+# the painted face is lit warm and its highlights run orange, so its colours are not a skin tone to paint a figure with. What it does say is how light or dark the person is:
+# the middle of the cheeks and forehead (not the hair's edge, the beard or a highlight), as a lightness, read onto the game's own skin palette
+TONE_FROM = [90, 105, 120, 140, 160, 180]      # the face's lightness in the painting ...
+TONE_TO = [58, 80, 105, 140, 172, 205]         # ... and the lightness of the skin to paint the figure with
+
+
+def palette_at(lum):
+    cols = [np.array([int(c[i:i + 2], 16) for i in (1, 3, 5)], float) for c in SKIN_PALETTE]
+    ls = [float(c @ np.array([0.3, 0.59, 0.11])) for c in cols]     # (214 .. 55)
+    if lum >= ls[0]:
+        return cols[0]
+    if lum <= ls[-1]:
+        return cols[-1]
+    for i in range(len(cols) - 1):
+        if ls[i] >= lum >= ls[i + 1]:
+            t = (ls[i] - lum) / (ls[i] - ls[i + 1])
+            return cols[i] * (1 - t) + cols[i + 1] * t
+
+
+def face_tone(path, fr):
+    a = np.array(Image.open(path).convert('RGBA')).astype(np.float32)
+    H, W = a.shape[:2]
+    op = a[..., 3] > 200
+    top = np.nonzero(op.any(1))[0].min()
+    cx, fw = fr
+    x0, x1 = max(0, int((cx - fw * 0.18) * W)), int((cx + fw * 0.18) * W)
+    y0, y1 = top + int(H * 0.10), top + int(H * 0.26)
+    box = a[y0:y1, x0:x1]
+    h, s, v = hsv(box[..., :3])
+    m = (box[..., 3] > 200) & (h > 8) & (h < 34) & (s > 0.3) & (s < 0.78) & (v > 0.45)
+    if m.sum() < 30:
+        return None
+    return float(np.median(box[..., :3][m] @ np.array([0.3, 0.59, 0.11])))
+
+
+def natural_skin(path, fr, fallback):
+    lp = face_tone(path, fr)
+    if lp is None:
+        return fallback
+    ls = float(np.interp(lp, TONE_FROM, TONE_TO))
+    return hexof(palette_at(ls))
 
 
 def hexof(c):
@@ -106,6 +156,7 @@ def main():
         k = f[:-5]
         sk, hr = look(d + f)
         frames[k] = frame(d + f)
+        sk = natural_skin(d + f, frames[k], sk)
         out[k] = {'skin': SKIN_FIX.get(k, sk), 'hair': HAIR_FIX.get(k, hr)}
     with open('js/portrait-looks.js', 'w') as fh:
         fh.write('// Skin tone and hair colour read off each painted portrait, so the player on the pitch\n')
