@@ -26,8 +26,6 @@ export const LENGTHS = [
   { id: 'yorker', name: 'Yorker', bounce: 0.9, h: 0.12 },
   { id: 'fulltoss', name: 'Full toss', bounce: null, h: 0.85 },
 ];
-// how far a ball's late bend runs, as a multiple of its swing
-const SWING_LATE = 1.5;
 export const lengthById = id => LENGTHS.find(l => l.id === id);
 export const laneById = id => LANES.find(l => l.id === id);
 
@@ -44,10 +42,14 @@ export function makeDelivery(opts) {
   const swing = opts.swing || 0;
   const loop = opts.loop ?? 0.5;
   const move = opts.move || 0;
-  // Swing is late: the ball leaves the hand on a line aimed `drift` short of where it is going and bends onto it, most of the bend in the last part of its
-  // flight (u cubed). It was a bulge that peaked halfway down the pitch, so a swinger showed its swing straight out of the hand. Only the look of the
-  // flight: where it pitches and where it arrives are as before.
-  const drift = swing * SWING_LATE;
+  // Swing is a bulge over the flight, the way the finger bulged: opts.profile (gestureToDelivery's swingProfile: 11 values, each tenth of the way down the pitch, 1 at the
+  // furthest) when the swipe set it, else an even bulge that peaks halfway (the AI's balls). Only the look of the flight: where it pitches and arrives is as before.
+  const prof = Array.isArray(opts.profile) && opts.profile.length > 1 ? opts.profile : null;
+  const shape = u => {
+    if (!prof) return 4 * u * (1 - u);
+    const f = Math.max(0, Math.min(1, u)) * (prof.length - 1), i = Math.min(prof.length - 2, Math.floor(f));
+    return prof[i] + (prof[i + 1] - prof[i]) * (f - i);
+  };
   const d = { ...opts, lengthName: L.name, v, rx, xt, h };
 
   if (bounce == null) {
@@ -57,7 +59,7 @@ export function makeDelivery(opts) {
       const z = RELEASE_Z - v * t;
       const u = (RELEASE_Z - z) / RELEASE_Z;
       return {
-        x: rx + (xt - drift - rx) * u + drift * u * u * u,
+        x: rx + (xt - rx) * u + swing * shape(u),
         y: RELEASE_Y + (h - RELEASE_Y) * u + loop * 0.6 * u * (1 - u),
         z,
       };
@@ -74,7 +76,7 @@ export function makeDelivery(opts) {
       if (t <= t1) {
         const u = t / t1;
         return {
-          x: rx + (xb - drift - rx) * u + drift * u * u * u,
+          x: rx + (xb - rx) * u + swing * shape(u),
           y: Math.max(0, RELEASE_Y * (1 - u) + loop * u * (1 - u)),
           z: RELEASE_Z - (RELEASE_Z - zb) * u,
         };

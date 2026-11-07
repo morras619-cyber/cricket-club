@@ -2239,7 +2239,7 @@ export class Game {
     }
 
     // the delivery the swipe describes
-    const spec = { x: G.x, length: G.length, bounce: G.bounce, h: G.h, kmh: G.kmh, swing: G.swing, move: G.move, loop: G.loop, rx: btype.left ? -0.3 : 0.3, flight: btype.spin ? SPIN_FLIGHT : 1 };
+    const spec = { x: G.x, length: G.length, bounce: G.bounce, h: G.h, kmh: G.kmh, swing: G.swing, profile: G.swingProfile, move: G.move, loop: G.loop, rx: btype.left ? -0.3 : 0.3, flight: btype.spin ? SPIN_FLIGHT : 1 };
     // where you draw is where it lands: no random scatter, only a little spray on a flick that was too fast
     if (rg === 'loose') {
       spec.x = clamp(spec.x + rng.range(-0.06, 0.06), -1.0, 1.0);

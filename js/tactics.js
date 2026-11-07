@@ -76,6 +76,21 @@ export function gestureToDelivery(points, kind, scale = 1) {
     if (Math.abs(cross) > Math.abs(dev)) dev = cross;
   }
   const curve = dev / len;
+  // the shape of the curve over the swipe, so the ball swings when and how the finger did: how far the finger was off the straight line at each tenth of the way
+  // up the pitch, as a share of its furthest (1 = the furthest, the way it bulged; below 0 = it crossed to the other side)
+  let swingProfile = null;
+  if (Math.abs(dev) > 1) {
+    const prog = points.map(q => ({ t: ((q.x - a.x) * cx + (q.y - a.y) * cy) / (len * len), d: (cx * (q.y - a.y) - cy * (q.x - a.x)) / len * Math.sign(dev) / Math.abs(dev) }));
+    swingProfile = [];
+    for (let k = 0; k <= 10; k++) {
+      const u = k / 10; let v = 0;
+      for (let j = 1; j < prog.length; j++) {
+        const p0 = prog[j - 1], p1 = prog[j];
+        if ((p0.t <= u && p1.t >= u) || (p0.t >= u && p1.t <= u)) { v = p1.t === p0.t ? p1.d : p0.d + (p1.d - p0.d) * (u - p0.t) / (p1.t - p0.t); break; }
+      }
+      swingProfile.push(k === 0 || k === 10 ? 0 : Math.max(-1, Math.min(1, v)));
+    }
+  }
   let mag = Math.max(0, Math.min(1, (Math.abs(curve) - 0.04) / 0.25));
   let lateWorld = mag > 0.05 ? Math.sign(curve) : 0; // bulge right → ball moves late toward screen-left (off side)
 
@@ -110,7 +125,7 @@ export function gestureToDelivery(points, kind, scale = 1) {
       type = lateWorld > 0 ? (T.swing >= T.seam ? 'Outswinger' : 'Leg-cutter') : lateWorld < 0 ? (T.swing >= T.seam ? 'Inswinger' : 'Off-cutter') : T.left ? 'Angled across' : 'Seam up';
     }
     if (slower) { kmh = T.kmh[0] * 0.8; loop = 1.1; type = T.spin ? 'Floater' : T.variation; }
-    return { x, length, bounce, h: heightForBounce(bounce), kmh, swing, move, loop, type, speedP: p, grade, slower, lateWorld, mag, curve, rx: T.left ? -0.3 : 0.3 };
+    return { x, length, bounce, h: heightForBounce(bounce), kmh, swing, move, loop, type, speedP: p, grade, slower, lateWorld, mag, curve, swingProfile, rx: T.left ? -0.3 : 0.3 };
   }
   if (kind === 'spin') {
     kmh = 74 + 16 * k;
@@ -122,7 +137,7 @@ export function gestureToDelivery(points, kind, scale = 1) {
     type = lateWorld > 0 ? 'Outswinger' : lateWorld < 0 ? 'Inswinger' : 'Seam up';
   }
   if (slower) { kmh = (kind === 'spin' ? 74 : 126) * 0.8; loop = 1.1; type = kind === 'spin' ? 'Floater' : 'Slower ball'; }
-  return { x, length, bounce, h: heightForBounce(bounce), kmh, swing, move, loop, type, speedP: p, grade, slower, lateWorld, mag, curve };
+  return { x, length, bounce, h: heightForBounce(bounce), kmh, swing, move, loop, type, speedP: p, grade, slower, lateWorld, mag, curve, swingProfile };
 }
 
 // What the batter thinks is coming. Batters expect the bowler to repeat himself; some bluff.
