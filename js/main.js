@@ -84,7 +84,7 @@ loadBowlSprites(profile.team || 'thunder');
 sound.on = profile.settings.sound;
 sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
-game.settings.bowlNew = !!profile.settings.bowlNew;   // (Bowling 2.0, a test: Settings > Tools)
+game.settings.bowlNew = profile.settings.bowlNew !== false;   // (Bowling 2.0: on unless switched off in Settings > Tools)
 units.speed = profile.settings.units === 'mph' ? 'mph' : 'kmh';
 window.__sixcharge = { game, ui, profile, moment: m => { queueMoment(m); flushMoments(); }, renderCareer: (...a) => renderCareer(...a) };   // (renderCareer: for the tests)
 game.onFieldSaved = choice => { profile.field = { preset: choice.field, custom: choice.custom }; saveProfile(profile); };
@@ -422,7 +422,7 @@ function renderSettings() {
   state('setUnits', units.speed === 'mph' ? 'mph' : 'km/h', true);
   $('setMapLevel').textContent = mapLevelText();
   $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 4 hours)' : 'Match limit: OFF (play freely)';
-  $('setBowlNew').textContent = game.settings.bowlNew ? 'Bowling 2.0 test: ON' : 'Bowling 2.0 test: off';
+  $('setBowlNew').textContent = game.settings.bowlNew ? 'Bowling 2.0: ON' : 'Bowling 2.0: off';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
 }
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });
