@@ -110,7 +110,7 @@ export class Game {
     this.onInput = null;
     this.bot = !!window.__SIXCHARGE_BOT;
     this.speed = window.__SIXCHARGE_SPEED || 1;
-    this.settings = { fielding: 'key', bowlNew: true };
+    this.settings = { fielding: 'key', bowlNew: false };
     this.armed = {};
     this.charge = new Charge();
     this.showFps = /[?&]fps=1/.test(location.search);
