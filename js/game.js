@@ -9,7 +9,7 @@ import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult, isWide } from './shots.js';
 import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS, saveChance } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
-import { gestureToDelivery, gripCap, overcook, planExpectation, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES, bowlWhy } from './tactics.js';
+import { gestureToDelivery, gripCap, overcook, planExpectation, planExpectationBw, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES, bowlWhy } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
 import { Innings, matchResult } from './match.js';
 import { lookOf, faceCanvas, masksReady, colourLook } from './looks.js';
@@ -2174,10 +2174,10 @@ export class Game {
 
     // what the batter is thinking
     const mood = this.batterMood;
-    const exp = opt.scripted ? null : planExpectation(this.bowlHistory, profile, rng);
+    const exp = opt.scripted ? null : bw ? planExpectationBw(this.bowlHistory) : planExpectation(this.bowlHistory, profile, rng);   // (Bowling 2.0: what he expects is what you have shown him, told straight)
     if (exp && !this.bot) {
       const moodTxt = mood.state === 'rattled' ? ' (rattled)' : mood.state === 'fired' ? ' (fired up)' : '';
-      this.thinks = `HE EXPECTS: ${LENGTH_LABEL[exp.shown].toUpperCase()}${moodTxt.toUpperCase()}`;
+      this.thinks = `HE EXPECTS: ${LENGTH_LABEL[exp.shown].toUpperCase()}${exp.conf >= 0.75 ? ' · SURE' : ''}${moodTxt.toUpperCase()}`;
     }
 
     this.powerLock = false;
@@ -2322,7 +2322,7 @@ export class Game {
 
     // read the batter: expectation, weak spot, setups, mood
     const shape = { length: spec.length, lane: laneFor(d.xt), lateWorld: G.lateWorld, mag: G.mag, air: G.air || 0, slower: G.slower, after: off, sweet: !!G.sweet && rg !== 'loose' };
-    const mods = opt.scripted ? null : deliveryMods(shape, this.bowlHistory, exp?.expect, profile, mood);
+    const mods = opt.scripted ? null : deliveryMods(shape, this.bowlHistory, exp?.expect, profile, mood, bw && exp ? exp.conf : null);
     shape.combo = mods?.combo || null;
     shape.weak = !!mods?.weak;
     this.bowlHistory.push(shape);

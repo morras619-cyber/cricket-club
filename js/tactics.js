@@ -163,16 +163,35 @@ export function planExpectation(history, profile, rng) {
   return { expect, shown, honest };
 }
 
+// Bowling 2.0: what he expects is what you have shown him, and it is always told straight: the length you have bowled most of late (the last ball counts most).
+// conf: how sure he is, 0.35 to 1 (a bowler who mixes it up gives him nothing to be sure of). No history: a good length.
+export function planExpectationBw(history) {
+  const w = [0.4, 0.3, 0.2, 0.1], score = {};
+  const recent = history.slice(-4).reverse();
+  recent.forEach((h, i) => { score[h.length] = (score[h.length] || 0) + w[i]; });
+  const total = recent.reduce((t, _, i) => t + w[i], 0);
+  let expect = 'good', best = 0;
+  for (const l of Object.keys(score)) if (score[l] > best + 1e-9) { best = score[l]; expect = l; }
+  const conf = recent.length ? Math.max(0.35, Math.min(1, best / total)) : 0.35;
+  return { expect, shown: expect, honest: true, conf };
+}
+
 const MOOD = { rattled: { sigma: 1.3, edge: 0.1, loft: 0 }, fired: { sigma: 0.85, edge: 0, loft: 0.2 } };
 
 // d: { length, lane, lateWorld, mag, slower, after }. history: previous deliveries (oldest first).
-export function deliveryMods(d, history, expect, profile, mood) {
+export function deliveryMods(d, history, expect, profile, mood, conf = null) {
   const m = { sigmaMul: 1, loftAdd: 0, bias: 0, edgeBoost: 0, tags: [], combo: null };
   const prev = history[history.length - 1], prev2 = history[history.length - 2];
   // a combo works once; the batter is wise to it for the next 3 balls
   const fresh = id => !history.slice(-3).some(h => h.combo === id);
 
-  if (expect) {
+  if (expect && conf != null) {
+    // Bowling 2.0: he is set for what he expects. Right: he is ready for it, and punishes it. Wrong by a step: nothing. Wrong by two or more: he has already committed
+    // to the wrong ball: mistimed, and early, so it is caught or edged. The surer he was (conf), the harder he is caught out.
+    const gap = Math.abs(LENGTH_ORDER.indexOf(expect) - LENGTH_ORDER.indexOf(d.length)), sure = 0.35 + 0.65 * conf;
+    if (gap === 0) { m.sigmaMul *= 1 - 0.3 * sure; m.loftAdd += 0.15 * sure; m.tags.push({ id: 'read', label: 'HE READ IT!', charge: 0 }); }
+    else if (gap >= 2) { m.sigmaMul *= 1 + (gap >= 3 ? 0.9 : 0.6) * sure; m.edgeBoost += 0.12 * sure; m.bias -= 45 * sure; m.tags.push({ id: 'surprise', label: 'SURPRISE!', charge: 4 }); }
+  } else if (expect) {
     const gap = Math.abs(LENGTH_ORDER.indexOf(expect) - LENGTH_ORDER.indexOf(d.length));
     if (gap === 0) { m.sigmaMul *= 0.75; m.tags.push({ id: 'read', label: 'HE READ IT!', charge: 0 }); }
     else if (gap >= 2) { m.sigmaMul *= 1.3; m.tags.push({ id: 'surprise', label: 'SURPRISE!', charge: 4 }); }
