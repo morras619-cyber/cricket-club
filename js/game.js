@@ -1065,8 +1065,6 @@ export class Game {
     fx.showdown = this.showdown > 0;
     if (ac && (fx.focus || fx.thunder || fx.meteor || fx.mirror || fx.gap)) fx.counter = ac;
     if (ac === 'brace' && fx.showdown) this.showdownBrace = true;
-    if (fx.meteor) S.batter.glow = '#ff7a1a';
-    if (fx.mirror) this.fx.flash('#7a3fe0', 0.25);
     this.timeScale = (opt.slow ?? 1) * (fx.focus ? (fx.counter === 'brace' ? BRACE.focusSlow : 0.6) : 1);
     if (fx.focus) this.fx.speed = fx.counter === 'brace' ? BRACE.focusSlow : 0.6;
 
@@ -1517,13 +1515,9 @@ export class Game {
   hitBlast(at, power, grade) {
     const big = Math.min(this.W * 0.95, 420);
     const set = this.fxSet(this.myTeam);
-    if (set && power === 'thunder') { this.electricHit(set, at, 1.3); this.fx.shake(16); return; }   // (no bolt out of the sky: the power's hit is the burst and the shake)
-    if (set && !power && grade === 'perfect') return; // contactFeedback draws the electric hit
-    if (power) {
-      const hue = { thunder: 0, meteor: -38, mirror: 230 }[power] || 0;
-      this.fx.blast(at.x, at.y, { size: big, hue, dur: 460 });
-      this.fx.shake(16);
-    } else if (grade === 'perfect') this.fx.blast(at.x, at.y, { size: big * 0.55, dur: 360 });
+    if (power) { this.fx.shake(16); return; }   // (a power shot has no coloured burst, glow or flash of its own: the shake, the sound and the words)
+    if (set && grade === 'perfect') return; // contactFeedback draws the electric hit
+    if (grade === 'perfect') this.fx.blast(at.x, at.y, { size: big * 0.55, dur: 360 });
   }
 
   contactFeedback(grade, at, err) {
@@ -1668,7 +1662,7 @@ export class Game {
     if (res.meteorRuns) {
       const runs = res.meteorRuns;
       this.fx.word('BOOOOM!', this.W / 2, this.H * 0.3, { size: 84, color: '#ff7a1a', stroke: INK, dur: 1600 });
-      this.fx.flash('#ff7a1a', 0.7); this.fx.shake(16); sfx.boom(); sfx.crowd(1.2); buzz([80, 40, 120]);
+      this.fx.shake(16); sfx.boom(); sfx.crowd(1.2); buzz([80, 40, 120]);
       await this.showAutoPlay(simulateHit({ ...res }, aiField, rng), aiField, { side: 'ai' });
       inn.ball({ runs });
       this.charge.award('six', `${runs} RUNS`);
@@ -2376,13 +2370,9 @@ export class Game {
     if (res.outcome === 'hit' || res.outcome === 'edge') {
       const aiSet = this.fxSet(this.oppTeam);
       if (ai.grade === 'perfect') { sfx.bat('perfect'); if (aiSet) this.electricHit(aiSet, cs, 0.6); else this.fx.burst(cs.x, cs.y, { r: 140 }); } else sfx.bat('good');
-      if (aiSet && res.outcome === 'hit' && aiPower === 'thunder') { this.fx.shake(10); }
+      if (res.outcome === 'hit' && aiPower) this.fx.shake(10);   // (his power shot: the shake only, no coloured burst)
       // far end of the pitch: a smaller burst, still big enough to read
-      else if (res.outcome === 'hit' && (aiPower === 'thunder' || aiPower === 'mirror' || (ai.grade === 'perfect' && !aiSet))) {
-        const hue = { thunder: 0, mirror: 230 }[aiPower] || 0;
-        this.fx.blast(cs.x, cs.y, { size: aiPower ? 240 : 140, hue, dur: aiPower ? 460 : 360 });
-        if (aiPower) this.fx.shake(10);
-      }
+      else if (res.outcome === 'hit' && ai.grade === 'perfect' && !aiSet) this.fx.blast(cs.x, cs.y, { size: 140, dur: 360 });
       S.delivery = null; S.ball = { ...contact };
       const v = res.v || 25, ang = res.outcome === 'edge' ? Math.PI - 0.3 : res.angle, vl = (res.launchDeg || 4) * Math.PI / 180;
       S.flight = { p0: contact, t0: this.gameTime, vx: Math.sin(ang) * v * Math.cos(vl), vz: Math.cos(ang) * v * Math.cos(vl), vy: v * Math.sin(vl) };
