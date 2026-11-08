@@ -612,8 +612,10 @@ export class Game {
     const g = (this.prepCanvas || (this.prepCanvas = Object.assign(document.createElement('canvas'), { width: 4, height: 4 }))).getContext('2d');
     const jobs = [];
     const job = (label, fn) => jobs.push({ label, fn });
-    job('Stadium', () => until(groundReady, 15000));
+    job('Stadium', async () => { await until(groundReady, 15000); this.of?.prewarm?.(); });   // (and the top-down view's ground, baked once)
     job('Faces', () => masksReady(6000));
+    // the top-down view's sprite sheets, repainted in each team's kit the first time they are drawn (a stall of a second or more on a mid-range phone, at the first hit)
+    job('Outfield', () => until(() => ['top', 'front'].every(v => [this.myTeam, this.oppTeam].every(t => drawTopSprite(g, 2, 2, 1, 'ready', t, v, false, null))), 6000));
     job('Kits', async () => {
       loadKitSprites(this.myTeam.id, this.oppTeam.id); loadHair();
       await masksReady(1500);

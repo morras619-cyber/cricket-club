@@ -1194,6 +1194,7 @@ export class OutfieldView {
   // and sixty clipped grass tiles painted again every frame. It is painted once into a layer and laid back each frame, scaled and moved with the camera, until the camera has
   // gone far enough for it to be painted again.
   staticGround(ctx, c, art, top, gr) {
+    if (top) return this.worldGround(ctx, c, art, top, gr);
     const { W, H, k } = this, dpr = ctx.getTransform().a || 1;
     const key = `${W}|${H}|${dpr}|${HOME}|${wearOf()}|${!!top}|${!!(art.stripImg?.complete)}`;
     let L = this.layer;
@@ -1211,7 +1212,44 @@ export class OutfieldView {
     }
     ctx.drawImage(L.cv, place.x, place.y, W * place.s, H * place.s);
   }
-  paintGroundStatic(g, c, art, top, gr) {
+  // A ground built in Blender is baked once, whole: the stadium picture, the grass and the wear, painted at the picture's own scale onto one canvas centred on the pitch, and
+  // then drawn each frame scaled and moved to wherever the camera is (one picture, cheap to draw). The camera eases in and out and follows the ball, so a layer painted for
+  // one view was painted again nearly every frame it moved: a 250 ms stall on a mid-range phone. The bake is made while the match loads (prewarm) and again only if the
+  // ground changes (it is worn, or another ground).
+  worldKey(art) { return `${HOME}|${wearOf()}|${art.meta.top.w}`; }
+  bakeWorld(art, top) {
+    const t = art.meta.top, key = this.worldKey(art);
+    if (this.world && this.world.key === key && this.world.art === art) return this.world;
+    const BW = Math.ceil(2 * Math.max(t.c[0], t.w - t.c[0])), BH = Math.ceil(2 * Math.max(t.c[1], t.h - t.c[1]));
+    const W = this.world?.cv ? this.world.cv : document.createElement('canvas');
+    W.width = BW; W.height = BH;
+    const g = W.getContext('2d');
+    const save = { W: this.W, H: this.H, k: this.k, cx: this.cx, cy: this.cy };
+    try {
+      Object.assign(this, { W: BW, H: BH, k: t.px, cx: 0, cy: CY });
+      g.clearRect(0, 0, BW, BH);
+      this.paintGroundStatic(g, this.to(0, CY), art, top, R + 2.1, true);
+    } finally { Object.assign(this, save); }
+    return (this.world = { key, art, cv: W, BW, BH, K0: t.px });
+  }
+  worldGround(ctx, c, art, top) {
+    const w = this.bakeWorld(art, top), { W, H, k } = this, s = k / w.K0;
+    ctx.fillStyle = '#1b1838'; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingQuality = 'medium';
+    ctx.drawImage(w.cv, c.x - s * w.BW / 2, c.y - s * w.BH / 2, w.BW * s, w.BH * s);
+    if (art.meta.strip && art.stripImg?.complete && k > 5) {   // (the close-up stands: live, they fade in with the zoom, and stay outside the grass as they were when the grass was painted over them)
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.ellipse(c.x, c.y, (R + 2.1) * k, (R + 2.1) * k * 0.78, 0, 0, Math.PI * 2); ctx.clip('evenodd');
+      this.drawStrip(ctx, art.stripImg, art.meta.strip, c, Math.min(1, (k - 5) / 2));
+      ctx.restore();
+    }
+  }
+  // paint the ground's bake now (while the match loads), so the first sight of the top-down view does not stall
+  prewarm() {
+    const art = artFor(), top = art?.meta?.top && art.topView;
+    if (art && top && top.complete && top.naturalWidth) this.bakeWorld(art, top);
+  }
+  paintGroundStatic(g, c, art, top, gr, noStrip = false) {
     const { W, H, k } = this;
     g.fillStyle = '#1b1838'; g.fillRect(0, 0, W, H);
     if (top) {
@@ -1221,7 +1259,7 @@ export class OutfieldView {
       const t = art.meta.top, s = k / t.px;
       g.imageSmoothingQuality = 'high';
       g.drawImage(top, c.x - t.c[0] * s, c.y - t.c[1] * s, t.w * s, t.h * s);
-      if (art.meta.strip && art.stripImg?.complete && k > 5) this.drawStrip(g, art.stripImg, art.meta.strip, c, Math.min(1, (k - 5) / 2));
+      if (!noStrip && art.meta.strip && art.stripImg?.complete && k > 5) this.drawStrip(g, art.stripImg, art.meta.strip, c, Math.min(1, (k - 5) / 2));
     } else {
       // the stands: a ring of crowd around the rope
       if (!this.crowd || this.crowdFor !== HOME) { this.crowd = crowdPattern(g); this.crowdFor = HOME; }
