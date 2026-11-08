@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 const copyAssets = () => ({
   name: 'copy-game-assets',
   closeBundle() {
-    for (const d of ['img', 'snd']) if (existsSync(d)) cpSync(d, resolve('dist', d), { recursive: true });
+    for (const d of ['img', 'snd', 'fonts']) if (existsSync(d)) cpSync(d, resolve('dist', d), { recursive: true });
     // The service worker and the web manifest must sit at the root, under their own names (the manifest's icon paths and "./" scope are relative to it).
     cpSync('sw.js', resolve('dist/sw.js')); cpSync('manifest.webmanifest', resolve('dist/manifest.webmanifest'));
     const page = resolve('dist/index.html'), html = readFileSync(page, 'utf8');
@@ -43,9 +43,19 @@ const unpackImages = () => ({
   },
 });
 
+// The web version takes its type from Google Fonts; the build ships the same faces (fonts/, latin and latin-ext) so the app needs no network for its text.
+const localFonts = () => ({
+  name: 'local-fonts',
+  transformIndexHtml(html) {
+    const out = html.replace(/<link[^>]*fonts\.(googleapis|gstatic)\.com[^>]*>\s*/g, '');
+    if (out === html) throw new Error('build: the Google Fonts links were not found in index.html');
+    return out.replace('</head>', '<link rel="stylesheet" href="fonts/fonts.css">\n</head>');
+  },
+});
+
 export default defineConfig({
   base: './',
   publicDir: false,
-  plugins: [unpackImages(), copyAssets()],
+  plugins: [localFonts(), unpackImages(), copyAssets()],
   build: { target: 'es2020', outDir: 'dist', emptyOutDir: true, assetsInlineLimit: 0, chunkSizeWarningLimit: 2000, sourcemap: false },
 });
