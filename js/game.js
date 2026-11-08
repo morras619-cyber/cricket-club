@@ -20,7 +20,7 @@ import { portraitFace, paintedPortrait } from './futcard.js';
 import { paceTired, tiredness } from './stamina.js';
 import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed, careerBatSkill, careerBowlWindow, careerBowlMove } from './ratings.js';
 import { resolveLineup, overPlan, bowlType, runUp, canBowl, MAX_OVERS, starSquad, flagName, roster, ovr } from './squads.js';
-import { playerControls, momentScore } from './rules.js';
+import { playerControls, momentScore, tipFeed } from './rules.js';
 import { FX, INK, FONT_BODY, drawEffect, preloadEffects } from './fx.js';
 import { speedText, speedRange } from './config.js';
 import { paintBall, Cam3D, OutfieldView, drawBackground, drawBoard, drawAtmosphere, setGround, setPitchLate, drawStumps, drawBall3D, drawFigure3D, POSES, groundReady } from './scene.js';
@@ -63,6 +63,7 @@ const BOWLER_WARM = ['start', 'run1', 'run2', 'run3', 'gather', 'coil', 'frontar
 const BOWL_RUNUP_M = 8.6, SPIN_BOWL_RUN_MS = 900, BOWL_RUN_MS = 930;
 // and its ball through the air, quicker than its km/h alone would make it (the speed shown stays)
 const SPIN_FLIGHT = 1.3;
+const nextTip = tipFeed();   // (shared by every loading screen of the session)
 const SHOT_WORDS = ['THWACK!', 'DHOOM!', 'KRAK!', 'BLAM!', 'SMASH!'];
 
 // The opposing side's heroes: their own team's star, in his slot.
@@ -661,6 +662,13 @@ export class Game {
       for (const id of [this.myTeam.id, this.oppTeam.id]) { const im = new Image(); im.src = logoSrc(id); try { await im.decode(); } catch { /* shown when it comes */ } }
     });
     el.hidden = false; this.warming = true;
+    // a tip on the loading screen, a new one every few seconds (shuffled: not the same ones, in the same order, every time)
+    const tipBox = document.getElementById('mlTip'), tipText = tipBox?.querySelector('span');
+    let tipTimer = 0;
+    if (tipText) {
+      tipText.textContent = nextTip(); tipBox.style.opacity = 1;
+      tipTimer = setInterval(() => { tipBox.style.opacity = 0; setTimeout(() => { tipText.textContent = nextTip(); tipBox.style.opacity = 1; }, 260); }, 4200);
+    }
     try {
       const n = jobs.length;
       for (let i = 0; i < n; i++) {
@@ -673,7 +681,7 @@ export class Game {
       }
       if (fill) fill.style.width = '100%';
       await breathe();
-    } finally { el.hidden = true; this.warming = false; this.slowMs = 0; this.warmMs = Math.round(performance.now() - t0); }
+    } finally { clearInterval(tipTimer); el.hidden = true; this.warming = false; this.slowMs = 0; this.warmMs = Math.round(performance.now() - t0); }
   }
 
   // Repaint the players about to be seen (batter on strike, his partner, the bowler) off screen,
