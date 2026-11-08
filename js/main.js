@@ -13,7 +13,7 @@ import { groundOf, pitchOf, homeFromSeed, GROUNDS, PITCH_TYPES } from './grounds
 import { GUIDE, GUIDE_ORDER, meters } from './pitchguide.js';
 import { newLeague, newCup, nextFixture, advance, playerResult, table, finish, unbeaten, ordinal, LEAGUE_PRIZE, CUP_PRIZE } from './tournament.js';
 import { newCareer, chooseClub, currentLot, nextBid, bid, pass as passLot, finishAuction, nextSeason, afterLeagueMatch, clubPlayers, clubPool, clubHeroes, clubRating,
-  value, potentialStars, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, ensurePics, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, CANDIDATES, absorbTraining, canGrow, xpNeed, HIRE_AT, FLAGS, candidatesOf, candidateById, wageText, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
+  value, potentialStars, trialFit, ageNote, money, assessLot, squadNeeds, openingPrice, rivalsOf, leaders, playerName, ABILITIES, MAX_SQUAD, MIN_SQUAD, PEAK_AGE, STAR_OVR, isUnlocked as careerUnlocked, divisionOf, divisionName, afterPlayoff, migrateCareer, ensurePics, SCOUT_FEE, CARE, groundCond, hasCaretaker, hireCaretaker, dismissCaretaker, SCOUT_REGIONS, scoutOut, sendScout, scoutFinds, signFind, finishScouts, createClub, signTrialists, TRIAL_PICKS, enginePlayer, STADIUMS, stadiumLevel, stadiumLvl, ticketOf, setStadiumLevel, stadiumBlocked, OFFICE, OFFICERS, officeTick, hireOfficer, fireOfficer, trainOfficer, officerTrainCost, extendContract, extendFee, extensionsLeft, forecast, CANDIDATES, absorbTraining, canGrow, xpNeed, HIRE_AT, FLAGS, candidatesOf, candidateById, wageText, officeRow, APT, apartment, aptRow, decorSlots, trophiesOf, trophyBuffs, mgrPoints, mgrLevel, mgrShare, managerPay, repBonus, repCap, salaryCash, buyDecor, storyLog, SHOP, shopOf, shopRow, armourySlots, dealsToday, gearPrice, buyGear, equipGear, unequipGear, discardGear, matchPool, buyLook, setLook, lookColour, CLUB, clubhouse, clubhouseRow, chemLinks, chemBonus, chemPool, rivalBoard, eventCost, whyNoEvent, startEvent, settleEvents, eventSlots, paradeDue, chemAfterMatch, officeSlots, officePlaces, officerMax, officerWage, officeWagePerDay, accountantBonus, releasePlayer, startSeason, merchRoster, merchDemand, matchesLeft, fameOf, repBlock, trainingRoster, fitnessOf, startEnergies, office, seasonBooks, totalOf, INCOME, OUTGOING, SPONSORS, DEAL, dealWorth, signSponsor, objectiveOf, contractList, book, officeMatch, settleObjective, makeProspect, prospectsOf, veteransOf, academyPrice, promoteProspect, sellProspect, academySeason } from './career.js';
 import { dailyScenario, updateStreak } from './daily.js';
 import { setStartEnergy } from './match.js';
 import * as MD from './stamina.js';
@@ -3333,6 +3333,11 @@ function careerTrials(c, body) {
       btn.firstChild.textContent = on ? 'Picked ✓' : bat ? 'Pick this batter' : 'Pick this bowler';
       btn.lastChild.textContent = on ? 'Tap to put him back' : 'He joins your eleven';
     }
+    for (const sl of slides.children) {   // (why he would or would not work for the squad as it stands now: his role, the engine's numbers, the nets, how far he can go)
+      const f = trialFit(c, sl.dataset.id, sl.dataset.k, [...trialSel.bats, ...trialSel.bowls]), box = sl.querySelector('.trs-why'), head = el('div', `trs-verdict ${f.tone}`);
+      head.append(el('b', '', f.verdict), el('small', '', 'for your squad'));
+      box.replaceChildren(head, ...f.rows.slice(0, 6).map(r => { const row = el('p', `trs-row ${r.tone}`); row.append(el('i', '', r.tone === 'pro' ? '✓' : r.tone === 'con' ? '✕' : '•'), el('span', '', r.text)); return row; }));
+    }
     [...rail.children].forEach((d, i) => d.classList.toggle('picked', (slides.children[i].dataset.k === 'bat' ? trialSel.bats : trialSel.bowls).has(slides.children[i].dataset.id)));
   };
   const slide = (id, kind, i, of, best) => {
@@ -3362,8 +3367,7 @@ function careerTrials(c, body) {
         price.append(strip);
       }
     } else price.append(el('small', '', 'IN THE NETS'), el('span', '', 'Not tried'));
-    const rate = el('div', 'trs-rate'); rate.append(el('small', '', bat ? 'BATTING' : 'BOWLING'), el('b', '', String(bat ? p.bat : p.bowlSkill)));
-    side.append(price, rate);
+    side.append(price);
     hero.append(cardBox, side);
     const pick = el('button', 'mf-big trs-pick'); pick.append(el('b', ''), el('small', ''));
     pick.addEventListener('click', () => {
@@ -3373,7 +3377,7 @@ function careerTrials(c, body) {
       sfx.click(); refresh();
       if (added && sl.nextElementSibling) setTimeout(() => slides.scrollTo({ top: sl.offsetTop + sl.offsetHeight, behavior: 'smooth' }), 260);   // (on to the next one)
     });
-    sl.append(kick, hero, pick);
+    sl.append(kick, hero, el('div', 'trs-why'), pick);
     return sl;
   };
   for (const [kind, ids] of [['bat', T.bats], ['bowl', T.bowls]]) {

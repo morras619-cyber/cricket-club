@@ -19,6 +19,10 @@ import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
 import { memOf } from './chirpfacts.js';
 import { fameAfter, startFame } from './merch.js';
 import { drainTp } from './training.js';
+import { matchup } from './ratings.js';
+import { batTypeOf } from './heroes.js';
+import { PITCH_TYPES } from './grounds.js';
+import { pitchFeel } from './pitches.js';
 import { tierOf, pickTier, POT_RANGE, ACAD } from './academy.js';
 import { freshMedical, medAfterMatch, fitOf } from './stamina.js';
 import { addXp, XP, levelRow, lookOf, buildOf, addDiamonds } from './pacing.js';
@@ -472,6 +476,87 @@ function makeTrialists(c) {
   const kab = newPlayer({ ...KABIR, ai: { ...WEAK[0], honesty: 0.7, fire: 0.3, rattle: 0.4 } }, { age: 24, pot: 82, team: c.club, contract: 99, founder: true, app: { skin: 2, hair: 1, style: 'curly', beard: 'none', cut: 'curly' } });
   c.players[kab.id] = kab;
   c.trial = T;
+}
+// ---------- the pick: why a net candidate would or would not work for this squad ----------
+// Everything it says is worked out from the game's own numbers: the type matchups (ratings.js matchup, probed at the phases of an innings, against swing bowling and the short ball),
+// the club's own pitch (pitchFeel), the squad as it stands (the founder, the keeper and the picks so far), the rating order of the six, the nets, age and potential.
+// -> { verdict, tone ('good' | 'ok' | 'bad'), rows: [{ tone: 'pro' | 'con' | 'info', text }] }
+const pct = x => `${x >= 0 ? '+' : '−'}${Math.round(Math.abs(x) * 100)}%`;
+const ordinal = n => `${n}${['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : Math.min(n % 10, 4) % 4]}`;
+const an = w => (/^[aeiou]/i.test(w) ? 'an ' : 'a ') + w;
+const TYPE_NAME = { opener: 'opener', power: 'power batter', anchor: 'anchor', finisher: 'finisher', touch: 'touch batter', tactical: 'tactical batter', keeper: 'keeper-batter' };
+export function trialFit(c, id, kind, picked = []) {
+  const T = c.trial, P = x => c.players[x], p = P(id), bat = kind === 'bat', rows = [];
+  const res = T.results?.[bat ? 'bats' : 'bowls']?.[id], group = (bat ? T.bats : T.bowls).map(P);
+  const others = picked.filter(x => x !== id && (bat ? T.bats : T.bowls).includes(x)).map(P);
+  let score = 0;
+  const add = (tone, text, pts = 0) => { rows.push({ tone, text }); score += pts; };
+  const name = q => q.name.split(' ').slice(-1)[0];
+  // 1. what he is, and whether the squad needs it
+  if (bat) {
+    const type = batTypeOf(p) || 'tactical', mine = [P('kabir-anand'), P(T.keeper), ...others].filter(Boolean).map(q => ({ q, t: batTypeOf(q) }));
+    const nb = { bowl: null, bowlSkill: 60 }, at = (ballNo, length = 'good', b = nb) => matchup(p, b, { ballNo, length });
+    const mid = at(15), early = at(5), late = at(28), swing = at(15, 'good', { bowl: 'swing', bowlSkill: 60 }), short = at(15, 'short');
+    const good = [], bad = [];
+    const note = (label, d) => { if (Math.abs(d) >= 0.02) (d > 0 ? good : bad).push(`${label} ${pct(d)}`); };
+    note('timing', mid.win - 1); note('power', mid.power - 1);
+    for (const [label, m] of [['first 8 balls', early], ['last 6 balls', late]]) {
+      const dw = m.win / mid.win - 1, dp = m.power / mid.power - 1;
+      if (Math.abs(dw) >= 0.03 || Math.abs(dp) >= 0.03) (dw + dp > 0 ? good : bad).push(`${label}: ${[Math.abs(dw) >= 0.03 && `timing ${pct(dw)}`, Math.abs(dp) >= 0.03 && `power ${pct(dp)}`].filter(Boolean).join(', ')}`);
+      if (m.edgeP - mid.edgeP >= 0.02) bad.push(`${label}: edge chance +${Math.round((m.edgeP - mid.edgeP) * 100)} points`);
+    }
+    if (swing.win / mid.win - 1 <= -0.02) bad.push(`vs swing and left-arm pace: timing ${pct(swing.win / mid.win - 1)}`);
+    if (short.win / mid.win - 1 <= -0.02) bad.push(`vs short balls: timing ${pct(short.win / mid.win - 1)}`);
+    const same = mine.filter(m => m.t === type);
+    if (type === 'keeper') add('info', 'A keeper-batter: your keeper already keeps wicket', 0);
+    else if (!same.length) add('pro', `Adds ${an(TYPE_NAME[type])}: nobody in your side has that role yet`, 2);
+    else add('con', `Same role as ${same.map(m => name(m.q)).join(' and ')}: another ${TYPE_NAME[type]} adds little`, -1);
+    if (good.length) add('pro', `Strong: ${good.slice(0, 3).join(' · ')}`, 1);
+    if (bad.length) add('con', `Weak: ${bad.slice(0, 3).join(' · ')}`, bad.length > 2 ? -1 : 0);
+    // 2. where he would stand in your batting
+    const order = [...mine.map(m => m.q), p].sort((a, b) => b.bat - a.bat), place = order.indexOf(p) + 1, rank = group.slice().sort((a, b) => b.bat - a.bat).indexOf(p) + 1;
+    add(rank <= 2 ? 'pro' : rank >= 5 ? 'con' : 'info', `Bat ${p.bat}: ${ordinal(rank)} of the six batters${rank > 1 ? ` (best is ${name(group.slice().sort((a, b) => b.bat - a.bat)[0])}, ${Math.max(...group.map(q => q.bat))})` : ''}; ranks ${ordinal(place)} of ${order.length} batters in your squad so far`, rank <= 2 ? 2 : rank >= 5 ? -1 : 1);
+  } else {
+    const T0 = BOWL_TYPES[p.bowl] || {}, sp = x => !!BOWL_TYPES[x.bowl]?.spin;
+    const same = others.filter(q => q.bowl === p.bowl), spinners = others.filter(sp).length, pace = others.length - spinners;
+    if (same.length) add('con', `Same type as ${same.map(name).join(' and ')} (${T0.name}): the attack repeats itself`, -1);
+    else if (sp(p) && !spinners) add('pro', `Adds spin: ${pace ? `your ${pace} pace pick${pace > 1 ? 's have' : ' has'} no spinner to bowl with` : 'nobody in your attack spins it yet'}`, 2);
+    else if (!sp(p) && pace >= 3) add('con', `A ${ordinal(pace + 1)} pace bowler: your attack is already pace-heavy`, -1);
+    else add('pro', `Adds ${T0.name.toLowerCase()}: ${others.length ? `your attack so far is ${pace} pace, ${spinners} spin` : 'the first bowler in your attack'}`, 1);
+    // the pitch he would bowl on at home, and what his type does to the batter
+    const pt = PITCH_TYPES[c.custom?.pitch] || null, feel = pt ? pitchFeel(pt, { wear: 0.5 }) : null;
+    if (feel) {
+      const nb = { bat: 60, role: 'bat' }, win = (b, f, ballNo = 15) => matchup(nb, b, { feel: f, ballNo, length: 'good' }).win;
+      const none = { bowl: null, bowlSkill: p.bowlSkill }, onP = win(p, feel) / win(none, feel) - 1, flat = win(p, pitchFeel({})) / win(none, pitchFeel({})) - 1;
+      const text = Math.abs(onP) < 0.005 ? `Your ${pt.name.toLowerCase()} pitch neither helps nor hurts him` : `On your ${pt.name.toLowerCase()} pitch (mid-match) the batter's timing window is ${pct(onP)} against him${Math.abs(flat - onP) >= 0.01 ? ` (${pct(flat)} on a flat one)` : ''}`;
+      add(onP <= -0.02 ? 'pro' : onP >= 0.02 ? 'con' : 'info', text, onP <= -0.04 ? 2 : onP <= -0.02 ? 1 : onP >= 0.02 ? -1 : 0);
+    }
+    const late = matchup({ bat: 60, role: 'bat' }, p, { ballNo: 28 }).win / matchup({ bat: 60, role: 'bat' }, p, { ballNo: 5 }).win - 1;
+    if (late >= 0.03) add('con', `Tires at the death: the batter's timing is ${pct(late)} in the last 6 balls`, -1);
+    const mul = CFG.stamina.bowlMul[p.bowl] ?? 1;
+    if (mul !== 1) add(mul <= 0.7 ? 'pro' : mul >= 1.2 ? 'con' : 'info', `Stamina: drains ${mul >= 1 ? `${Math.round((mul - 1) * 100)}% faster` : `${Math.round((1 - mul) * 100)}% slower`} than a swing bowler${mul >= 1.2 ? ': best in short spells' : mul <= 0.7 ? ': stays fresh for both overs' : ''}`, mul <= 0.7 ? 1 : mul >= 1.2 ? -1 : 0);
+    const rank = group.slice().sort((a, b) => b.bowlSkill - a.bowlSkill).indexOf(p) + 1, best = group.slice().sort((a, b) => b.bowlSkill - a.bowlSkill)[0];
+    add(rank <= 2 ? 'pro' : rank >= 5 ? 'con' : 'info', `Bowl ${p.bowlSkill}: ${ordinal(rank)} of the six bowlers${rank > 1 ? ` (best is ${name(best)}, ${best.bowlSkill})` : ''}; ${T0.kmh ? `${T0.kmh[0]}-${T0.kmh[1]} km/h` : ''}`.replace(/; $/, ''), rank <= 2 ? 2 : rank >= 5 ? -1 : 1);
+  }
+  // 3. the nets
+  if (res) {
+    const last = res.seq?.[res.seq.length - 1];
+    if (bat) {
+      const sr = res.balls ? Math.round(res.runs / res.balls * 100) : 0;
+      const power = last === undefined ? '' : last === 'W' ? '; out on his power ball' : `; ${last} off his power ball`;
+      add(res.outs ? 'con' : res.runs >= 8 ? 'pro' : 'info', `Nets: ${res.runs} off ${res.balls} (strike rate ${sr}), ${res.outs ? `out ${res.outs}×` : 'not out'}${power}`, res.outs ? (res.runs < 4 ? -2 : -1) : res.runs >= 8 ? 1 : 0);
+    } else {
+      const eco = res.balls ? res.runs / res.balls * 6 : 0, power = last === undefined ? '' : last === 'W' ? '; wicket with his power ball' : `; ${last} off his power ball`;
+      add(res.outs || eco <= 8 ? 'pro' : eco >= 14 ? 'con' : 'info', `Nets: ${res.outs} for ${res.runs} in ${res.balls} balls (economy ${eco.toFixed(1)}), ${res.dots} dot${res.dots === 1 ? '' : 's'}${power}`, res.outs ? 1 : eco >= 14 ? -1 : eco <= 8 ? 1 : 0);
+    }
+  }
+  // 4. how far he can go
+  if (p.pot != null) {
+    const room = p.pot - ovr(p);
+    add(room >= 12 && p.age <= 22 ? 'pro' : room <= 3 && p.age >= 24 ? 'con' : 'info', `${p.age} years old, ${ovr(p)} now, up to ${p.pot}${room >= 1 ? ` (+${room})` : ''}`, room >= 12 && p.age <= 22 ? 1 : room <= 3 && p.age >= 24 ? -1 : 0);
+  }
+  const verdict = score >= 5 ? 'STRONG FIT' : score >= 3 ? 'GOOD FIT' : score >= 1 ? 'BACK-UP OPTION' : 'POOR FIT';
+  return { verdict, tone: score >= 3 ? 'good' : score >= 1 ? 'ok' : 'bad', score, rows };
 }
 // the picks: 4 batters and 5 bowlers from the trialists. They join; the others stay on the market (the auction sells them). The club has no money for its first auction.
 export function signTrialists(c, batIds, bowlIds) {
