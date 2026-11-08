@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Sixcharge: Superhero Cricket \u2014 mobile web vertical slice",
+  "description": "Sixcharge: Superhero Cricket — mobile web vertical slice",
   "scripts": {
     "start": "npx --yes http-server -c-1 -p 8080 .",
     "test": "node --test tests/*.test.js",
     "smoke": "node tests/smoke.mjs",
     "opening": "node tests/opening.mjs",
     "trials": "node tests/trials.mjs",
-    "android": "node tests/android.mjs"
+    "android": "node tests/android.mjs",
+    "build": "vite build",
+    "preview": "vite preview --port 8081"
+  },
+  "devDependencies": {
+    "vite": "^8.3.6"
   }
 }

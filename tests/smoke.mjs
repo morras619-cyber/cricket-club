@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { ({ chromium } = require(join(process.execPath, '../../lib/node_modules/playwright'))); }
 
-const root = resolve(new URL('..', import.meta.url).pathname);
+const root = resolve(process.env.SERVE_DIR || new URL('..', import.meta.url).pathname);   // (SERVE_DIR=dist tests the production build)
 const shots = process.env.SHOTS_DIR || join(root, 'smoke-shots');
 mkdirSync(shots, { recursive: true });
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp' };
