@@ -231,20 +231,6 @@ const smoothed = new Map();
 const smoothTones = (view, tn, m, W, H) => { if (!smoothed.has(view)) smoothed.set(view, smoothTone(tn, m, W, H, KIT_SHEETS[view].frames)); return smoothed.get(view); };
 const helmets = new Map();   // (the top of each frame of a batter sheet: his helmet is one colour, not the yoke's second one)
 const helmetOf = (view, W, H) => { if (!helmets.has(view)) { const hm = new Uint8Array(W * H); for (const [fx, fy, fw, fh] of KIT_SHEETS[view].frames) for (let y = fy; y < fy + Math.round(fh * 0.15); y++) hm.fill(1, y * W + fx, y * W + fx + fw); helmets.set(view, hm); } return helmets.get(view); };
-// where each frame's helmet is, for the shop's helmets: the first rows of the frame that have kit in them (a raised bat or glove above his head is not kit), and about an eighth of the frame's height below
-const helmetRows = new Map();
-function helmetAdaptive(view, m, W, H) {
-  if (!helmetRows.has(view)) {
-    const hm = new Uint8Array(W * H);
-    for (const [fx, fy, fw, fh] of KIT_SHEETS[view].frames) {
-      let y0 = fy;
-      for (; y0 < fy + fh; y0++) { let n = 0; for (let x = fx; x < fx + fw; x++) { const j = (y0 * W + x) * 4; if (m[j + 2] >= 128 && m[j] <= 127) n++; } if (n >= 34) break; }
-      for (let y = y0; y < Math.min(fy + fh, y0 + Math.round(fh * 0.115)); y++) hm.fill(1, y * W + fx, y * W + fx + fw);
-    }
-    helmetRows.set(view, hm);
-  }
-  return helmetRows.get(view);
-}
 const smoothedW = new Map();
 const weightsOf = (view, tn, m, W, H) => { if (!smoothedW.has(view)) smoothedW.set(view, smoothWeights(tn, m, W, H)); return smoothedW.get(view); };
 const smoothedSkin = new Map();
@@ -371,28 +357,6 @@ function printLine(g, text, cap, cy, fill, edge) {
 }
 
 const playerCache = new Map();
-
-// ---------- the shop's helmets, drawn on the batter who wears one ----------
-// Club Helmet is the plain shell in the club's colour (as every batter wears). Carbon Helmet: a dark carbon-fibre shell with a fine weave and a trace of the club colour.
-// Titan Helmet: polished titanium with a warm gold cast and a strong sheen. The helmet's own light and shade are kept (its brightness against the club colour's).
-const HELMET_STYLES = {
-  helm2: { stops: [[0.2, [10, 12, 16]], [1, [42, 47, 58]], [1.6, [92, 100, 114]], [2.3, [168, 178, 194]]], weave: 0.12, mix: 0.12, gold: 0 },
-  helm3: { stops: [[0.2, [58, 63, 72]], [1, [172, 180, 192]], [1.6, [238, 242, 248]], [2.3, [255, 255, 255]]], weave: 0, mix: 0.04, gold: 0.16 },
-};
-function helmetStyle(tier, p, i, x, y, suit, ref) {
-  const st = HELMET_STYLES[tier];
-  if (!st) return;
-  const t = Math.max(0.2, Math.min(2.3, lum(p[i], p[i + 1], p[i + 2]) / ref)), S = st.stops;
-  let k = 1; while (k < S.length - 1 && t > S[k][0]) k++;
-  const [t0, c0] = S[k - 1], [t1, c1] = S[k], f = Math.max(0, Math.min(1, (t - t0) / (t1 - t0)));
-  const weave = st.weave && t < 1.7 ? (((x >> 1) + (y >> 1)) & 1 ? 1 + st.weave : 1 - st.weave) : 1;
-  for (let c = 0; c < 3; c++) {
-    let v = (c0[c] + (c1[c] - c0[c]) * f) * weave;
-    v = v * (1 - st.mix) + suit[c] * st.mix * (t / 1.2);
-    if (st.gold) v = v * (1 - st.gold * (1 - Math.abs(t - 1) / 1.3)) + [217, 180, 74][c] * st.gold * (1 - Math.abs(t - 1) / 1.3);
-    p[i + c] = Math.max(0, Math.min(255, v));
-  }
-}
 function playerSheet(view, team, look, mirror) {
   const meta = KIT_SHEETS[view], data = viewData(view);
   if (!data || !fontReady) return null;
@@ -404,8 +368,7 @@ function playerSheet(view, team, look, mirror) {
   const wp = wear && meta.hair?.[wear] ? hairData(view, wear) : null;
   if (hp === undefined || bp === undefined || wp === undefined) return null;
   const name = shirtName(look.who), num = shirtNumber(look);
-  const tier = view === 'bat-back' || view === 'bat-paint' ? look.helmet : null;
-  const key = [view, team.id, team.suit, team.trim, crestKey(team.id), sk, hr, style, beard, wear, name, num, mirror, tier].join('|');
+  const key = [view, team.id, team.suit, team.trim, crestKey(team.id), sk, hr, style, beard, wear, name, num, mirror].join('|');
   if (playerCache.has(key)) { const c = playerCache.get(key); playerCache.delete(key); playerCache.set(key, c); return c; }
   if (facing && !crestCanvas(team.id)) return null;
   const kit = teamSheet(view, team);
@@ -420,11 +383,9 @@ function playerSheet(view, team, look, mirror) {
   let img = g.getImageData(0, 0, W, H), p = img.data;
   const m = data.mask, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255;
   const sl = view === 'bat-back' ? skinTones(view, p, m, W, H) : null;   // (the batter's skin without the painted mottling)
-  const hmask = tier && HELMET_STYLES[tier] ? helmetAdaptive(view, m, W, H) : null, suitRgb = hexRgb(team.suit), href = lum(...suitRgb) || 1;
   // hair and beard in his hair colour (shading kept); the cap as drawn
   const layers = [[hp, style], [bp, beard], [wp, null]].filter(([d]) => d).map(([d, s2]) => [d, s2 ? meta.hair[s2] * 255 : 0]);
   for (let i = 0; i < p.length; i += 4) {
-    if (hmask && hmask[i >> 2] && p[i + 3] && m[i] <= 127 && m[i + 2] >= 128) helmetStyle(tier, p, i, (i >> 2) % W, Math.floor((i >> 2) / W), suitRgb, href);   // (his helmet)
     if (m[i] > 127 && p[i + 3]) {
       let r = (sl ? sl[i >> 2] : lum(p[i], p[i + 1], p[i + 2])) / sref;
       if (sl) r = Math.max(0.1, 1 + (r - 1) * 1.45);   // (his arm: more of the muscle's light and shade, now that the mottling is gone)
@@ -512,8 +473,7 @@ function fielderFrame(team, look, idx, mirror = false) {
   if (!meta || !data || !fontReady) return null;
   const sk = skinHex(look), name = shirtName(look.who), num = shirtNumber(look);
   mirror = mirror && KIT_SHEETS.field.place[idx][2] > 0;
-  const tier = idx >= 30 && idx <= 41 ? look.helmet : null;   // (the non-striker and the batter walking: a batter's helmet; the fielders wear caps)
-  const key = [team.id, team.suit, team.trim, crestKey(team.id), sk, name, num, idx, mirror ? 'm' : '', tier].join('|');
+  const key = [team.id, team.suit, team.trim, crestKey(team.id), sk, name, num, idx, mirror ? 'm' : ''].join('|');
   if (fieldCache.has(key)) return fieldCache.get(key);
   const kit = teamSheet('field', team);
   if (!kit) return null;
@@ -523,10 +483,9 @@ function fielderFrame(team, look, idx, mirror = false) {
   const g = c.getContext('2d', { willReadFrequently: true });
   g.drawImage(kit, sx, sy, w, h, 0, 0, w, h);
   let img = g.getImageData(0, 0, w, h), p = img.data;
-  const m = data.mask, st = hexRgb(sk), sref = meta.skin * 255, suitRgb = hexRgb(team.suit), href = lum(...suitRgb) || 1, hy = Math.round(h * 0.17);
+  const m = data.mask, st = hexRgb(sk), sref = meta.skin * 255;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = (y * w + x) * 4, mi = ((sy + y) * W + sx + x) * 4;
-    if (tier && y < hy && p[i + 3] && m[mi] <= 127 && m[mi + 2] >= 128) helmetStyle(tier, p, i, x, y, suitRgb, href);
     if (m[mi] > 127 && p[i + 3]) {
       const r = lum(p[i], p[i + 1], p[i + 2]) / sref;
       for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);

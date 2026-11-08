@@ -1303,21 +1303,21 @@ export function gearAfterMatch(c, ids) {
   for (const g of c.shop.gear) if (g.on && took.has(g.on) && c.players[g.on]?.team === c.club) g.uses--;
   c.shop.gear = c.shop.gear.filter(g => g.uses > 0);
 }
-// the rating points each of your players gets from what he carries: { bat, bowl }, and the helmet he wears, if any
+// the rating points each of your players gets from what he carries: { bat, bowl }
 export function gearBonus(c) {
   const out = new Map();
   for (const g of c.shop?.gear || []) {
     const p = g.on && c.players[g.on], G = SHOP.GEAR[g.item];
     if (!p || p.team !== c.club || g.uses <= 0) continue;
     const b = out.get(g.on) || { bat: 0, bowl: 0 };
-    b.bat += G.bat || 0; b.bowl += G.bowl || 0; if (G.kind === 'helmet') b.helmet = g.item; out.set(g.on, b);
+    b.bat += G.bat || 0; b.bowl += G.bowl || 0; out.set(g.on, b);
   }
   return out;
 }
 // the match's copies of your players, with chemistry and gear
 export function matchPool(c, pool) {
   const gear = gearBonus(c);
-  return chemPool(c, pool).map(p => { const b = gear.get(p.id); return b ? { ...p, bat: Math.min(99, p.bat + b.bat), bowlSkill: p.bowl ? Math.min(99, p.bowlSkill + b.bowl) : p.bowlSkill, ...(b.helmet ? { helmet: b.helmet } : {}) } : p; });   // (helmet: which one he wears, drawn on him: kitsprite.js)
+  return chemPool(c, pool).map(p => { const b = gear.get(p.id); return b ? { ...p, bat: Math.min(99, p.bat + b.bat), bowlSkill: p.bowl ? Math.min(99, p.bowlSkill + b.bowl) : p.bowlSkill } : p; });
 }
 // looks, in diamonds
 export function buyLook(c, kind, id) {

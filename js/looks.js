@@ -63,7 +63,7 @@ export function lookOf(p) {
   const key = p.pic || portraitKey((p.heroId && heroById(p.heroId)?.name) || p.name || ''), painted = PORTRAIT_LOOKS[key], cut = PORTRAIT_STYLES[key];
   const base = baseLook(p);
   // (who and num: the name and number on his shirt)
-  return { ...base, ...painted, ...cut, seed: p.id || p.name || '', who: p.name || '', num: p.number || null, left: isLeft(p), helmet: p.helmet || null };
+  return { ...base, ...painted, ...cut, seed: p.id || p.name || '', who: p.name || '', num: p.number || null, left: isLeft(p) };
 }
 // batting left-handed: a player says so (hand: 'L' or 'R'), else about one in four, decided by his id so he is the same man every time
 export const isLeft = p => (p.hand ? p.hand === 'L' : hashStr(p.id || p.name || '') % 100 < 24);
