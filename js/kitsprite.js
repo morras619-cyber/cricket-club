@@ -393,13 +393,14 @@ function playerFrame(view, team, look, mirror, idx) {
   let img = g.getImageData(0, 0, fw, fh), p = img.data;
   const m = data.mask, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255;
   const sl = view === 'bat-back' ? skinToneOf(view, kit, m, W, H) : null;   // (the batter's skin without the painted mottling)
+  const hk = sl ? Math.min(1, Math.max(0.3, lum(st[0], st[1], st[2]) / 150)) : 1;   // (the lit parts of a dark arm lighten less than a light one's: else a dark-skinned batter's arm came out a shade or two lighter than his picture)
   const layers = [[hp, style], [bp, beard], [wp, null]].filter(([d]) => d).map(([d, s2]) => [d, s2 ? meta.hair[s2] * 255 : 0]);
   for (let ly = 0; ly < fh; ly++) for (let lx = 0; lx < fw; lx++) {
     const i = (ly * fw + lx) * 4, si = (fy + ly) * W + fx + lx, mi = si * 4;
     if (m[mi] > 127 && p[i + 3]) {
       let r = (sl ? sl[si] : lum(p[i], p[i + 1], p[i + 2])) / sref;
       if (sl) r = Math.max(0.1, 1 + (r - 1) * 1.45);   // (his arm: more of the muscle's light and shade, now that the mottling is gone)
-      for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
+      for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1) * hk;
     }
     if (layers.length) for (const [d, href] of layers) {
       const a = d[mi + 3] / 255;

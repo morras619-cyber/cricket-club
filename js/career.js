@@ -12,7 +12,8 @@ import { HEROES, heroById } from './heroes.js';
 import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating, WEAK, BOWL_TYPES } from './squads.js';
 import { newLeague, simLeague, advance, playerResult, table, finish, nextFixture } from './tournament.js';
 import { NATIONS, pickNation } from './nations.js';
-import { randomLook } from './looks.js';
+import { randomLook, SKIN } from './looks.js';
+import { PORTRAIT_LOOKS } from './portrait-looks.js';
 import { ensureRivals, nemesisOf, say, afterMatch, messageNote, rivalKind, meetings, speakerOf } from './rivals.js';
 import { ensureChirp, afterMatchPopularity, seasonPopularity, storyOf, sponsorBonus, compact, postMilestone } from './chirp.js';
 import { chirpAfterMatch, chirpStory, chirpMilestone } from './chirpposts.js';
@@ -119,6 +120,8 @@ export const lookAge = p => PORTRAIT_AGE[p.pic || portraitKey((p.heroId && heroB
 // portraits-list.js), so every player in a career shows a painted face. It is chosen to suit him (his country, his age) and never repeats a face in his own club;
 // faces already lent are used last. A career saved before this gets its pictures the first time it opens.
 const HAS_PIC = new Set(PORTRAIT_KEYS), picsDone = new WeakMap();
+// the palette step (0 lightest) a skin colour is nearest to
+const skinStep = hex => { const n = parseInt(hex.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255]; let best = 0, d0 = 1e9; SKIN.forEach((h, i) => { const m = parseInt(h.slice(1), 16), d = (c[0] - ((m >> 16) & 255)) ** 2 + (c[1] - ((m >> 8) & 255)) ** 2 + (c[2] - (m & 255)) ** 2; if (d < d0) { d0 = d; best = i; } }); return best; };
 export function ensurePics(c) {
   const ps = Object.values(c.players || {});
   if (picsDone.get(c) === ps.length) return;
@@ -131,6 +134,11 @@ export function ensurePics(c) {
   const kindOf = p => p.role === 'bowl' ? 'bowl' : p.role === 'bat' || p.role === 'wk' ? 'bat' : 'all', clash = (a, b) => (a === 'bowl' && b === 'bat') || (a === 'bat' && b === 'bowl');
   // (a career saved before this: a bowler holding a bat gets another picture)
   for (const q of ps) { const o = q.pic && owner.get(q.pic); if (o && clash(kindOf(o), kindOf(q))) delete q.pic; }
+  // (a career saved before faces were matched to skin tone: a borrowed face two steps or more from the player's own tone is taken back, once, and he is given another)
+  if (!c.picsMatched) {
+    for (const q of ps) if (q.pic && owner.get(q.pic) !== q && q.app && typeof q.app.skin === 'number' && PORTRAIT_LOOKS[q.pic] && Math.abs(skinStep(PORTRAIT_LOOKS[q.pic].skin) - q.app.skin) >= 2) delete q.pic;
+    c.picsMatched = 1;
+  }
   for (const q of ps) if (q.pic) lent.set(q.pic, (lent.get(q.pic) || 0) + 1);
   const myDiv = c.club ? divisionOf(c, c.club) : null;
   for (const p of ps) {
@@ -144,6 +152,7 @@ export function ensurePics(c) {
       if (clash(kindOf(o), kindOf(p))) sc -= 40; else if (kindOf(o) === kindOf(p)) sc += 6;   // (his own kind of player: a ball for a bowler, a bat for a batter)
       if (o.nation && o.nation === p.nation) sc += 3;
       const a = PORTRAIT_AGE[k]; if (a != null && p.age != null) sc -= Math.min(6, Math.abs(a - p.age)) * 0.7;
+      if (p.app && typeof p.app.skin === 'number' && PORTRAIT_LOOKS[k]) sc -= 4 * Math.abs(skinStep(PORTRAIT_LOOKS[k].skin) - p.app.skin);   // (a face whose skin tone is near the one his nation and name give him: no pale face on a man who is made dark)
       if (o.team && myDiv && c.club && divisionOf(c, o.team) !== myDiv) sc += 2;   // from another division: far from the club he plays for
       if (o.team === c.club) sc -= 8;                         // not from your own club
       sc += (hashStr(`${p.id}-${k}`) % 1000) / 1000;         // a stable tie-break

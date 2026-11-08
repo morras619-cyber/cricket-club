@@ -3065,6 +3065,7 @@ function renderCareer(notes = careerNotes) {
   const bidding = c.phase === 'auction' && careerView !== 'squad' && !!currentLot(c); // the lot on the block: the auction stage's look (css .is-auction)
   const picking = c.phase === 'trials' && !!c.trial?.results && careerView !== 'squad';   // (and the squad pick, a slide to each candidate, has the same slim screen)
   $('career').classList.toggle('is-auction', bidding || picking);
+  $('career').classList.toggle('is-picking', picking);   // (no title over the pick: the bar says what it is, and the slide gets the room)
   $('career').classList.toggle('in-auction', c.phase === 'auction' && careerView !== 'squad'); // the auction's own backdrop (css), also on its closing card
   $('career').classList.toggle('hero-mode', (c.phase === 'season' || c.phase === 'playoff') && careerView !== 'squad');   // the next match as one page: the header above it is slimmer (css .hero-mode)
   $('careerTitle').textContent = bidding ? `Season ${c.season} auction` : `Season ${c.season}`;
@@ -3322,6 +3323,17 @@ function careerTrials(c, body) {
   const slides = el('div', 'trs-slides'), rail = el('div', 'trs-rail');
   const dotCls = v => (v === 'W' ? 'w' : v >= 6 ? 's6' : v === 4 ? 's4' : v === 0 ? 'z' : 'r');
   const score = (r, bat) => (bat ? r.runs - 6 * r.outs : r.outs * 8 - r.runs + 0.5 * r.dots);
+  // the picture and the nets panel keep their room: the "why" rows give way from the bottom up until the picture has 190 px and the Pick button is whole (always the first row, the role)
+  const fitSlides = () => requestAnimationFrame(() => {
+    for (const sl of slides.children) {
+      const hero = sl.querySelector('.auc-hero'), rows = [...sl.querySelectorAll('.trs-row')];
+      if (!hero || !hero.isConnected) continue;
+      rows.forEach(r => { r.style.display = ''; }); hero.style.minHeight = '';
+      const over = () => sl.scrollHeight > sl.clientHeight + 1;
+      for (let i = rows.length - 1; i >= 1 && (hero.clientHeight < 190 || over()); i--) rows[i].style.display = 'none';
+      if (over()) hero.style.minHeight = '0';   // (a very short screen: the picture shrinks before the Pick button is cut off)
+    }
+  });
   const refresh = () => {
     const nb = trialSel.bats.size, nw = trialSel.bowls.size, ok = nb === TRIAL_PICKS.bat && nw === TRIAL_PICKS.bowl;
     chipBat.textContent = `Batters ${nb}/${TRIAL_PICKS.bat}`; chipBat.classList.toggle('full', nb === TRIAL_PICKS.bat);
@@ -3338,6 +3350,7 @@ function careerTrials(c, body) {
       head.append(el('b', '', f.verdict), el('small', '', 'for your squad'));
       box.replaceChildren(head, ...f.rows.slice(0, 6).map(r => { const row = el('p', `trs-row ${r.tone}`); row.append(el('i', '', r.tone === 'pro' ? '✓' : r.tone === 'con' ? '✕' : '•'), el('span', '', r.text)); return row; }));
     }
+    fitSlides();
     [...rail.children].forEach((d, i) => d.classList.toggle('picked', (slides.children[i].dataset.k === 'bat' ? trialSel.bats : trialSel.bowls).has(slides.children[i].dataset.id)));
   };
   const slide = (id, kind, i, of, best) => {
@@ -3363,7 +3376,6 @@ function careerTrials(c, body) {
       if (r.seq) {   // (ball by ball; the last ball of each trial is the power ball)
         const strip = el('div', 'trc-seq');
         r.seq.forEach((v, k) => strip.append(el('i', `trc-ball ${dotCls(v)}${k === r.seq.length - 1 ? ' pw' : ''}`, String(v))));
-        strip.append(el('small', '', 'ball by ball · last = power ball'));
         price.append(strip);
       }
     } else price.append(el('small', '', 'IN THE NETS'), el('span', '', 'Not tried'));
@@ -3389,7 +3401,7 @@ function careerTrials(c, body) {
   const railSync = () => { const k = Math.round(slides.scrollTop / Math.max(1, slides.clientHeight)); [...rail.children].forEach((d, i) => d.classList.toggle('here', i === k)); };
   slides.addEventListener('scroll', railSync, { passive: true });
   const wrap = el('div', 'trs-wrap'); wrap.append(slides, rail);
-  stage.append(bar, wrap, el('p', 'trs-hint', 'Swipe up for the next one'));
+  stage.append(bar, wrap, el('p', 'trs-hint', 'Swipe up for the next one · the ringed ball is the power ball'));
   body.append(stage);
   sign.addEventListener('click', () => {
     if (!signTrialists(c, [...trialSel.bats], [...trialSel.bowls])) return;
@@ -3399,6 +3411,7 @@ function careerTrials(c, body) {
     coachOnce('trialsDone', DEV.trialsDone);
   });
   refresh(); requestAnimationFrame(railSync);
+  addEventListener('resize', fitSlides);
   coachOnce('trialsPick', DEV.trialsPick);
 }
 
