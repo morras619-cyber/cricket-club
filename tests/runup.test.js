@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BOWL_TYPES, runUp, PACE_STEPS } from '../js/squads.js';
 
-test('a fast bowler starts a long way back; a spinner takes a short run', () => {
-  const fast = ['express', 'swing', 'leftpace', 'seam'].map(id => runUp(BOWL_TYPES[id]));
-  const spin = ['offspin', 'legspin'].map(id => runUp(BOWL_TYPES[id]));
-  assert.ok(Math.min(...fast.map(r => r.m)) > 2 * Math.max(...spin.map(r => r.m)));
-  assert.ok(runUp(BOWL_TYPES.express).m > runUp(BOWL_TYPES.seam).m);
-  assert.ok(runUp(BOWL_TYPES.express).m <= 19 && runUp(BOWL_TYPES.offspin).m >= 2);
+test('only the quick bowlers start a long way back: the run follows the pace, and a medium-paced seamer takes a short one', () => {
+  const m = id => runUp(BOWL_TYPES[id]).m, top = id => BOWL_TYPES[id].kmh[1];
+  const byPace = ['seam', 'swing', 'leftpace', 'express'];
+  for (let i = 1; i < byPace.length; i++) {
+    assert.ok(top(byPace[i]) > top(byPace[i - 1]) && m(byPace[i]) > m(byPace[i - 1]), `${byPace[i]} bowls faster and runs further than ${byPace[i - 1]}`);
+  }
+  assert.ok(m('seam') <= 9, 'a medium-paced bowler does not run from far');
+  assert.ok(m('express') >= 16 && m('express') <= 19);
+  assert.ok(m('express') >= 2 * m('seam'));
+  assert.ok(m('offspin') >= 2);
 });
 
 test('a spinner runs more slowly than a quick, even though his run is shorter', () => {

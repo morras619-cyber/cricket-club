@@ -1518,7 +1518,7 @@ export class Game {
   hitBlast(at, power, grade) {
     const big = Math.min(this.W * 0.95, 420);
     const set = this.fxSet(this.myTeam);
-    if (set && power === 'thunder') { this.skyStrike(set, at.x, at.y, { w: 230 }); this.electricHit(set, at, 1.3); this.fx.shake(16); return; }
+    if (set && power === 'thunder') { this.electricHit(set, at, 1.3); this.fx.shake(16); return; }   // (no bolt out of the sky: the power's hit is the burst and the shake)
     if (set && !power && grade === 'perfect') return; // contactFeedback draws the electric hit
     if (power) {
       const hue = { thunder: 0, meteor: -38, mirror: 230 }[power] || 0;
@@ -2377,7 +2377,7 @@ export class Game {
     if (res.outcome === 'hit' || res.outcome === 'edge') {
       const aiSet = this.fxSet(this.oppTeam);
       if (ai.grade === 'perfect') { sfx.bat('perfect'); if (aiSet) this.electricHit(aiSet, cs, 0.6); else this.fx.burst(cs.x, cs.y, { r: 140 }); } else sfx.bat('good');
-      if (aiSet && res.outcome === 'hit' && aiPower === 'thunder') { this.skyStrike(aiSet, cs.x, cs.y, { w: 120 }); this.fx.shake(10); }
+      if (aiSet && res.outcome === 'hit' && aiPower === 'thunder') { this.fx.shake(10); }
       // far end of the pitch: a smaller burst, still big enough to read
       else if (res.outcome === 'hit' && (aiPower === 'thunder' || aiPower === 'mirror' || (ai.grade === 'perfect' && !aiSet))) {
         const hue = { thunder: 0, mirror: 230 }[aiPower] || 0;
@@ -3652,22 +3652,6 @@ export class Game {
     return null;
   }
 
-  // Thunderclap Six armed: a crackling ring round the batter's feet (its back half behind him)
-  // and sparks running up round him
-  thunderAura(ctx, set, p, part) {
-    const t = this.realTime, w = 1.7 * p.k, flick = 0.7 + 0.3 * Math.sin(t * 0.05) * Math.random();
-    const flip = Math.floor(t / 90) % 2 === 0;
-    ctx.save();
-    ctx.beginPath();
-    if (part === 'back') ctx.rect(0, 0, this.W, p.y - 2); else ctx.rect(0, p.y - 2, this.W, this.H);
-    ctx.clip();
-    drawEffect(ctx, set, 'ring4', p.x, p.y, { w, h: w * 0.42, alpha: 0.95 * flick, flip });
-    ctx.restore();
-    if (part === 'front') {
-      drawEffect(ctx, set, Math.floor(t / 70) % 2 ? 'ring1' : 'ring2', p.x, p.y - 0.95 * p.k, { w: 1.3 * p.k, h: 2.1 * p.k, alpha: 0.45 * flick, flip: !flip });
-    }
-  }
-
   render3D(kind) {
     const ctx = this.ctx, S = this.S, cam = this.cams[kind];
     drawBackground(ctx, cam, true);   // (the pool of light on the ground is part of the cached picture)
@@ -3756,9 +3740,7 @@ export class Game {
     else push(b.z, () => {
       // seen from behind, the batter is the hand-drawn sprite; from the front (bowling view) the drawn figure
       const p = batterBack && cam.project(b.x + batDx(b), 0, b.z);
-      const aura = p && kind === 'bat' && (this.armed.thunder || b.glow === '#5fc8ff') && this.fxSet(this.myTeam);
-      if (aura) this.thunderAura(ctx, aura, p, 'back');
-      if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) { if (aura) this.thunderAura(ctx, aura, p, 'front'); return; }
+      if (p && drawBatSprite(ctx, p.x, p.y, p.k, { ...b, look: b.look || AI_LOOK }, this.realTime, { glow: b.glow })) return;
       // from the bowling camera, the opposing batter's hand-drawn front view
       const q = !batterBack && cam.project(b.x, 0, b.z);
       if (q && drawBowlSprite(ctx, q.x, q.y, q.k, batFrame(b, this.realTime).f, this.oppTeam, !!b.people?.left, 'batfront', b.people)) return;

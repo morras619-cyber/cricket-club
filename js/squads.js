@@ -7,15 +7,16 @@ import { flag, NATIONS } from './nations.js';
 
 // ---------- bowler types ----------
 // kmh: stock speed range. swing/seam: how much the ball moves in the air / off the pitch (m).
-// turn: spin off the pitch for a right-hander (+ = leg to off). runup: share of a full run-up.
+// turn: spin off the pitch for a right-hander (+ = leg to off). runup: share of a full run-up, set by how fast he bowls: only the quick bowlers start far back (express 1,
+// left-arm pace 0.8, swing 0.6, the medium-paced seamers 0.45, spinners 0.35).
 export const BOWL_TYPES = {
   express: { id: 'express', name: 'Express pace', short: 'Express', spin: false, kmh: [145, 156], swing: 0.1, seam: 0.07, runup: 1,
     stock: ['Seam up', 'Outswinger'], variation: 'Slower bouncer' },
-  swing: { id: 'swing', name: 'Swing bowler', short: 'Swing', spin: false, kmh: [128, 139], swing: 0.38, seam: 0.05, runup: 0.9,
+  swing: { id: 'swing', name: 'Swing bowler', short: 'Swing', spin: false, kmh: [128, 139], swing: 0.38, seam: 0.05, runup: 0.6,
     stock: ['Outswinger', 'Inswinger'], variation: 'Slower ball' },
-  seam: { id: 'seam', name: 'Seam & cutters', short: 'Seam', spin: false, kmh: [117, 128], swing: 0.07, seam: 0.16, runup: 0.75,
+  seam: { id: 'seam', name: 'Seam & cutters', short: 'Seam', spin: false, kmh: [117, 128], swing: 0.07, seam: 0.16, runup: 0.45,
     stock: ['Leg-cutter', 'Off-cutter'], variation: 'Knuckle ball' },
-  leftpace: { id: 'leftpace', name: 'Left-arm pace', short: 'Left-arm', spin: false, left: true, kmh: [132, 143], swing: 0.26, seam: 0.06, runup: 0.9,
+  leftpace: { id: 'leftpace', name: 'Left-arm pace', short: 'Left-arm', spin: false, left: true, kmh: [132, 143], swing: 0.26, seam: 0.06, runup: 0.8,
     stock: ['Angled across', 'Inswinger'], variation: 'Slower ball' },
   offspin: { id: 'offspin', name: 'Off-spin', short: 'Off-spin', spin: true, kmh: [80, 90], turn: -0.27, runup: 0.35,
     stock: ['Off-break'], variation: 'Arm ball' },
@@ -30,7 +31,10 @@ export const bowlType = id => BOWL_TYPES[id] || BOWL_TYPES.swing;
 // starts a long way back and runs in at a steady pace; a spinner takes a short run, more slowly. `runup` (above) is the share of the longest run.
 // PACE_RUNUP and SPIN_RUNUP: how many times as long the run takes as the basic 0.85 s. PACE_STEPS: the running frames in a pace bowler's run.
 export const RUNUP_M = 18, PACE_RUNUP = 2.4, SPIN_RUNUP = 1.9, PACE_STEPS = 18;
-export const runUp = type => ({ m: RUNUP_M * type.runup, ms: 850 * (0.55 + 0.45 * type.runup) * (type.spin ? SPIN_RUNUP : PACE_RUNUP) });
+// A pace bowler runs in faster the longer his run: 6 m/s for a short jog up to the express bowler's 8.8 m/s (so a short run is a short time, not a slow crawl).
+// A spinner keeps his own easy pace.
+const PACE_MPS = runup => 6 + (RUNUP_M / (850 * PACE_RUNUP / 1000) - 6) * runup;
+export const runUp = type => ({ m: RUNUP_M * type.runup, ms: type.spin ? 850 * (0.55 + 0.45 * type.runup) * SPIN_RUNUP : (RUNUP_M * type.runup / PACE_MPS(type.runup)) * 1000 });
 
 // Physics for a named delivery of a bowler type. k (0..1) picks a speed within the range.
 export function deliveryParams(typeId, name, k = 0.6, rng = null) {
