@@ -685,7 +685,10 @@ export class Game {
       const striker = this.batterOf(inn), partner = this.nonStrikerOf(inn), bowler = this.bowlerOf(inn);
       const spin = bowler && bowlType(bowler.bowl).spin;
       if (batting) {
-        if (striker) drawBatSprite(g, 2, 2, 1, { team: batTeam.id, people: lookOf(striker), angle: 0 }, this.realTime);
+        if (striker) {
+          drawBatSprite(g, 2, 2, 1, { team: batTeam.id, people: lookOf(striker), angle: 0 }, this.realTime);
+          for (const f of ['backlift', 'drive1', 'def1', 'leave1']) drawBatSprite(g, 2, 2, 1, { team: batTeam.id, people: lookOf(striker), angle: 0, forceFrame: f }, this.realTime);   // (his first poses, painted now, in the pause before the ball, a few milliseconds each)
+        }
         if (partner) drawBowlSprite(g, 2, 2, 1, 'ns1', batTeam, false, 'nonstriker', lookOf(partner));
         if (bowler) drawBowlSprite(g, 2, 2, 1, 'start', bowlTeam, false, spin ? 'spin-front' : 'front', lookOf(bowler));
       } else {

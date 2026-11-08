@@ -356,10 +356,20 @@ function printLine(g, text, cap, cy, fill, edge) {
   g.restore();
 }
 
-const playerCache = new Map();
-function playerSheet(view, team, look, mirror) {
+// ---------- a player's frames, made one at a time ----------
+// A player is painted for his club, skin, hair, number and name a frame at a time, the first time that pose is drawn (a few milliseconds), not the whole sheet of his poses at
+// once (a hundred milliseconds, ten times that on a mid-range phone, and a stall each time a new batter or bowler came on). The sheet kept 4 players at 25 MB each; this keeps
+// the frames that have been used, within a budget.
+const frameCache = new Map();
+let framePx = 0;
+const FRAME_PX_BUDGET = 16e6;   // (about 64 MB of finished frames)
+const skinToneOf = (view, kit, m, W, H) => {
+  if (!smoothedSkin.has(view)) smoothedSkin.set(view, smoothSkin(kit.getContext('2d').getImageData(0, 0, kit.width, kit.height).data, m, W, H));   // (once for each sheet, whichever club: skin is not kit)
+  return smoothedSkin.get(view);
+};
+function playerFrame(view, team, look, mirror, idx) {
   const meta = KIT_SHEETS[view], data = viewData(view);
-  if (!data || !fontReady) return null;
+  if (!data || !fontReady || !meta.frames[idx]) return null;
   const sk = skinHex(look), hr = hairHex(look), style = hairStyleOf(look);
   const facing = view.endsWith('front');
   const beard = facing ? beardOf(look) : null, wear = wearOf(look);
@@ -368,62 +378,62 @@ function playerSheet(view, team, look, mirror) {
   const wp = wear && meta.hair?.[wear] ? hairData(view, wear) : null;
   if (hp === undefined || bp === undefined || wp === undefined) return null;
   const name = shirtName(look.who), num = shirtNumber(look);
-  const key = [view, team.id, team.suit, team.trim, crestKey(team.id), sk, hr, style, beard, wear, name, num, mirror].join('|');
-  if (playerCache.has(key)) { const c = playerCache.get(key); playerCache.delete(key); playerCache.set(key, c); return c; }
+  const key = [view, team.id, team.suit, team.trim, crestKey(team.id), sk, hr, style, beard, wear, name, num, mirror, idx].join('|');
+  if (frameCache.has(key)) { const c = frameCache.get(key); frameCache.delete(key); frameCache.set(key, c); return c; }
   if (facing && !crestCanvas(team.id)) return null;
   const kit = teamSheet(view, team);
   if (!kit) return null;
-  const W = kit.width, H = kit.height;
-  const c = document.createElement('canvas');
-  c.width = W; c.height = H;
-  const g = c.getContext('2d', { willReadFrequently: true });
+  const W = kit.width, H = kit.height, [fx, fy, fw, fh] = meta.frames[idx];
+  let c = document.createElement('canvas');
+  c.width = fw; c.height = fh;
+  let g = c.getContext('2d', { willReadFrequently: true });
   if (!g) return null;
-  g.drawImage(kit, 0, 0);
+  g.drawImage(kit, fx, fy, fw, fh, 0, 0, fw, fh);
   // skin, then his hair (none if he's bald)
-  let img = g.getImageData(0, 0, W, H), p = img.data;
+  let img = g.getImageData(0, 0, fw, fh), p = img.data;
   const m = data.mask, st = hexRgb(sk), ht = hexRgb(hr), sref = meta.skin * 255;
-  const sl = view === 'bat-back' ? skinTones(view, p, m, W, H) : null;   // (the batter's skin without the painted mottling)
-  // hair and beard in his hair colour (shading kept); the cap as drawn
+  const sl = view === 'bat-back' ? skinToneOf(view, kit, m, W, H) : null;   // (the batter's skin without the painted mottling)
   const layers = [[hp, style], [bp, beard], [wp, null]].filter(([d]) => d).map(([d, s2]) => [d, s2 ? meta.hair[s2] * 255 : 0]);
-  for (let i = 0; i < p.length; i += 4) {
-    if (m[i] > 127 && p[i + 3]) {
-      let r = (sl ? sl[i >> 2] : lum(p[i], p[i + 1], p[i + 2])) / sref;
+  for (let ly = 0; ly < fh; ly++) for (let lx = 0; lx < fw; lx++) {
+    const i = (ly * fw + lx) * 4, si = (fy + ly) * W + fx + lx, mi = si * 4;
+    if (m[mi] > 127 && p[i + 3]) {
+      let r = (sl ? sl[si] : lum(p[i], p[i + 1], p[i + 2])) / sref;
       if (sl) r = Math.max(0.1, 1 + (r - 1) * 1.45);   // (his arm: more of the muscle's light and shade, now that the mottling is gone)
       for (let k = 0; k < 3; k++) p[i + k] = r <= 1 ? st[k] * r : st[k] + (255 - st[k]) * Math.min(0.85, (r - 1) * 1.1);
     }
     if (layers.length) for (const [d, href] of layers) {
-      const a = d[i + 3] / 255;
+      const a = d[mi + 3] / 255;
       if (a <= 0.01) continue;
       if (href) {
-        const q = lum(d[i], d[i + 1], d[i + 2]) / href;
+        const q = lum(d[mi], d[mi + 1], d[mi + 2]) / href;
         for (let k = 0; k < 3; k++) p[i + k] = (q <= 1 ? ht[k] * q : ht[k] + (255 - ht[k]) * Math.min(0.8, (q - 1) * 0.6)) * a + p[i + k] * (1 - a);
-      } else for (let k = 0; k < 3; k++) p[i + k] = d[i + k] * a + p[i + k] * (1 - a);
-      p[i + 3] = Math.max(p[i + 3], d[i + 3]);
+      } else for (let k = 0; k < 3; k++) p[i + k] = d[mi + k] * a + p[i + k] * (1 - a);
+      p[i + 3] = Math.max(p[i + 3], d[mi + 3]);
     }
   }
   g.putImageData(img, 0, 0);
-  // a left-armer: the whole sheet mirrored (the crest and print are drawn after, so they read right)
+  // a left-armer: the frame mirrored (the crest and print are drawn after, so they read right)
   if (mirror) {
     const flipped = document.createElement('canvas');
-    flipped.width = W; flipped.height = H;
-    const fg = flipped.getContext('2d');
-    fg.translate(W, 0); fg.scale(-1, 1); fg.drawImage(c, 0, 0);
-    g.clearRect(0, 0, W, H);
-    g.drawImage(flipped, 0, 0);
-    flipped.width = 0; flipped.height = 0;
+    flipped.width = fw; flipped.height = fh;
+    const fg = flipped.getContext('2d', { willReadFrequently: true });
+    fg.translate(fw, 0); fg.scale(-1, 1); fg.drawImage(c, 0, 0);
+    c.width = 0; c.height = 0;
+    c = flipped; g = fg;
   }
-  // the crest (front) or the name and number (back), on a layer of their own
+  // the crest (front) or the name and number (back), on a layer of their own: the places that fall on this frame
   const layer = document.createElement('canvas');
-  layer.width = W; layer.height = H;
+  layer.width = fw; layer.height = fh;
   const lg = layer.getContext('2d', { willReadFrequently: true });
-  const mx = (x) => (mirror ? W - x : x), ma = (a) => (mirror ? -a : a);
+  const mx = x => (mirror ? fw - (x - fx) : x - fx), my = y => y - fy, ma = a => (mirror ? -a : a), near = (x, y) => x > fx - 260 && x < fx + fw + 260 && y > fy - 260 && y < fy + fh + 260;
   if (facing) {
     const cr = crestCanvas(team.id);
     for (const [x, y, size, sx, sy, ang] of meta.place) {
-      const s = size / Math.max(cr.width, cr.height);
+      if (!near(x, y)) continue;
+      const sc = size / Math.max(cr.width, cr.height);
       lg.save();
-      lg.translate(mx(x), y); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(sx, sy);
-      lg.drawImage(cr, -cr.width * s / 2, -cr.height * s / 2, cr.width * s, cr.height * s);
+      lg.translate(mx(x), my(y)); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(sx, sy);
+      lg.drawImage(cr, -cr.width * sc / 2, -cr.height * sc / 2, cr.width * sc, cr.height * sc);
       lg.restore();
     }
   } else {
@@ -434,23 +444,24 @@ function playerSheet(view, team, look, mirror) {
     const edge = close ? `rgb(${hexRgb(team.suit).map(x => Math.round(x * 0.35)).join(',')})` : null;
     const hb = BLOCK.name + BLOCK.gap + BLOCK.num;
     for (const [x, y, w, sx, sy, ang, ndx, ndy, udx, udy] of meta.place) {
+      if (!near(x, y)) continue;
       for (const [text, cap, cy, dx, dy] of [[name, BLOCK.name, -hb / 2 + BLOCK.name / 2, ndx, ndy], [String(num), BLOCK.num, hb / 2 - BLOCK.num / 2, udx, udy]]) {
         lg.save();
-        lg.translate(mx(x + dx), y + dy); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(w / BLOCK.w * sx, w / BLOCK.w * sy);
+        lg.translate(mx(x + dx), my(y + dy)); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(w / BLOCK.w * sx, w / BLOCK.w * sy);
         printLine(lg, text, cap, cy, fill, edge);
         lg.restore();
       }
     }
   }
   // onto the shirt only (an arm in front hides it), shaded with the cloth's folds
-  const lp = lg.getImageData(0, 0, W, H).data;
-  img = g.getImageData(0, 0, W, H); p = img.data;
+  const lp = lg.getImageData(0, 0, fw, fh).data;
+  img = g.getImageData(0, 0, fw, fh); p = img.data;
   const ref = (meta.tones ? lum(...premiumOf(team)[0]) : lum(...ramp(team.suit)[1])) || 1, [lo, hi] = facing ? [0.6, 1.12] : [0.55, 1.15];
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4;
+  for (let ly = 0; ly < fh; ly++) {
+    for (let lx = 0; lx < fw; lx++) {
+      const i = (ly * fw + lx) * 4;
       if (!lp[i + 3]) continue;
-      const mi = (y * W + (mirror ? W - 1 - x : x)) * 4;
+      const mi = ((fy + ly) * W + (mirror ? fx + fw - 1 - lx : fx + lx)) * 4;
       if (m[mi + 1] < 128) continue;
       // (long hair hanging over the back hides the print)
       const a = lp[i + 3] / 255 * (hp ? 1 - hp[mi + 3] / 255 : 1), f = Math.max(lo, Math.min(hi, lum(p[i], p[i + 1], p[i + 2]) / ref));
@@ -459,8 +470,8 @@ function playerSheet(view, team, look, mirror) {
   }
   g.putImageData(img, 0, 0);
   layer.width = 0; layer.height = 0;
-  playerCache.set(key, c);
-  while (playerCache.size > 4) { const [k, old] = playerCache.entries().next().value; playerCache.delete(k); old.width = 0; old.height = 0; }
+  frameCache.set(key, c); framePx += fw * fh;
+  while (framePx > FRAME_PX_BUDGET && frameCache.size > 1) { const [k0, old] = frameCache.entries().next().value; frameCache.delete(k0); framePx -= old.width * old.height; old.width = 0; old.height = 0; }
   return c;
 }
 
@@ -493,7 +504,7 @@ function fielderFrame(team, look, idx, mirror = false) {
   }
   const [px, py, pw, psx, psy, ang] = meta.place[idx];
   if (pw > 0) {
-    // the name and number, as on the bowler's back (see playerSheet)
+    // the name and number, as on the bowler's back (see playerFrame)
     const layer = document.createElement('canvas');
     layer.width = w; layer.height = h;
     const lg = layer.getContext('2d', { willReadFrequently: true });
@@ -550,17 +561,17 @@ export function drawKitFielder(ctx, px, py, kPerM, frame, team, look, flip = fal
 // The bowler in the plain kit, feet at (px, py). False if it isn't ready (the old sprite is drawn).
 export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look) {
   if (!team || !look?.who) return false;
-  const sheet = playerSheet(view, team, look, !!flip);
-  if (!sheet) return false;
   const meta = KIT_SHEETS[view];
   const pose = (view === 'spin-back' ? POSE_SPIN_BACK[frame] : view === 'spin-front' ? POSE_SPIN[frame] : view === 'front' && POSE_FRONT[frame] !== undefined ? POSE_FRONT[frame] : POSE[frame]) ?? 0;
-  let [sx, sy, w, h, ax, ay] = meta.frames[pose];
-  if (flip) { sx = sheet.width - sx - w; ax = w - ax; }
+  const fr = playerFrame(view, team, look, !!flip, pose);
+  if (!fr) return false;
+  let [, , w, h, ax, ay] = meta.frames[pose];
+  if (flip) ax = w - ax;
   // his own build: taller or shorter, broader or slighter, about his feet
   const [bh, bw] = buildOf(look), k = kPerM * REF_HEIGHT_M / meta.refPx * bh, kx = k * bw;
   ctx.save();
   softShadow(ctx, px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0.26);
-  ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
+  ctx.drawImage(fr, 0, 0, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   ctx.restore();
   return true;
 }
@@ -573,22 +584,24 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow, 
   // is drawn from the old art, which was a different height and shade and popped in as a lighter, shorter man
   const pm = KIT_SHEETS['bat-paint'], usePaint = pm && !painted.off;
   const lefty = !!look.left;   // (a left-hander: the whole sheet mirrored, the print drawn after so it reads right)
-  const sheet = playerSheet(usePaint ? 'bat-paint' : 'bat-back', team, look, lefty);
-  if (!sheet) return false;
-  const [bh, bw] = buildOf(look), meta = KIT_SHEETS[usePaint ? 'bat-paint' : 'bat-back'], k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
-  const one = (name, alpha) => {
+  const view = usePaint ? 'bat-paint' : 'bat-back', meta = KIT_SHEETS[view];
+  // (getting bowled has no painted pose yet: the defensive one stands in)
+  const indexOf = name => (usePaint ? pm.names[pm.names[name] != null ? name : PAINT_STAND_IN[name] ?? 'def1'] : POSE_BAT[name] ?? POSE_BAT[OLD_STAND_IN[name]] ?? 0);
+  const cur = playerFrame(view, team, look, lefty, indexOf(f));
+  if (!cur) return false;
+  const [bh, bw] = buildOf(look), k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
+  const one = (name, alpha, fr) => {
     ctx.globalAlpha = alpha;
-    // (getting bowled has no painted pose yet: the defensive one stands in)
-    const fi = usePaint ? pm.names[pm.names[name] != null ? name : PAINT_STAND_IN[name] ?? 'def1'] : POSE_BAT[name] ?? POSE_BAT[OLD_STAND_IN[name]] ?? 0;
-    let [sx, sy, w, h, ax, ay] = meta.frames[fi];
-    if (lefty) { sx = sheet.width - sx - w; ax = w - ax; }
-    ctx.drawImage(sheet, sx, sy, w, h, px - ax * kx, py - lift - ay * k, w * kx, h * k);
+    const fi = indexOf(name);
+    let [, , w, h, ax, ay] = meta.frames[fi];
+    if (lefty) ax = w - ax;
+    ctx.drawImage(fr, 0, 0, w, h, px - ax * kx, py - lift - ay * k, w * kx, h * k);
   };
   ctx.save();
   softShadow(ctx, px, py, 0.55 * kPerM * bw, 0.12 * kPerM, 0.28);
   if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 22; }
-  if (prev && a < 1) one(prev, (1 - a) * 0.6);
-  one(f, 1);
+  if (prev && a < 1) { const pf = playerFrame(view, team, look, lefty, indexOf(prev)); if (pf) one(prev, (1 - a) * 0.6, pf); }
+  one(f, 1, cur);
   ctx.restore();
   return true;
 }
