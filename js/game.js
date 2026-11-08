@@ -59,6 +59,7 @@ const CATCH_SLOW = 1.1, PICK_SLOW = 1.1;
 // run-ups: a fast bowler starts a long way back and comes in quickly; a spinner takes a short, slower, easy run. A type's own length is
 // the longest run-up times its `runup` (squads.js: express 1 down to a spinner's 0.35); runUp (squads.js) is the batting view (the bowler at the far end),
 // BOWL_RUNUP_M the bowling view (my bowler, drawn from behind). The batting view's numbers are squads.js runUp.
+const BOWLER_WARM = ['start', 'run1', 'run2', 'run3', 'gather', 'coil', 'frontarm', 'release', 'follow1', 'follow2', 'follow3', 'finish'];   // (a bowler's poses, in the order he uses them)
 const BOWL_RUNUP_M = 8.6, SPIN_BOWL_RUN_MS = 900, BOWL_RUN_MS = 930;
 // and its ball through the air, quicker than its km/h alone would make it (the speed shown stays)
 const SPIN_FLIGHT = 1.3;
@@ -614,6 +615,8 @@ export class Game {
     const job = (label, fn) => jobs.push({ label, fn });
     job('Stadium', async () => { await until(groundReady, 15000); this.of?.prewarm?.(); });   // (and the top-down view's ground, baked once)
     job('Faces', () => masksReady(6000));
+    // each camera's background (the picture of the ground in that camera's perspective, with the light on it) is painted the first time the camera is used: a stall of 100 ms or more
+    job('Views', async () => { await until(groundReady, 15000); for (const c of Object.values(this.cams)) { try { drawBackground(g, c, true); } catch { /* the view paints it itself later */ } await breathe(); } });
     // the top-down view's sprite sheets, repainted in each team's kit the first time they are drawn (a stall of a second or more on a mid-range phone, at the first hit)
     job('Outfield', () => until(() => ['top', 'front'].every(v => [this.myTeam, this.oppTeam].every(t => drawTopSprite(g, 2, 2, 1, 'ready', t, v, false, null))), 6000));
     job('Kits', async () => {
@@ -690,10 +693,10 @@ export class Game {
           for (const f of ['backlift', 'drive1', 'def1', 'leave1']) drawBatSprite(g, 2, 2, 1, { team: batTeam.id, people: lookOf(striker), angle: 0, forceFrame: f }, this.realTime);   // (his first poses, painted now, in the pause before the ball, a few milliseconds each)
         }
         if (partner) drawBowlSprite(g, 2, 2, 1, 'ns1', batTeam, false, 'nonstriker', lookOf(partner));
-        if (bowler) drawBowlSprite(g, 2, 2, 1, 'start', bowlTeam, false, spin ? 'spin-front' : 'front', lookOf(bowler));
+        if (bowler) for (const f of BOWLER_WARM) drawBowlSprite(g, 2, 2, 1, f, bowlTeam, false, spin ? 'spin-front' : 'front', lookOf(bowler));   // (his run-up, painted now: a pose is a few milliseconds, painted as he runs it is a dropped frame)
       } else {
         if (striker) drawBowlSprite(g, 2, 2, 1, 'ready', batTeam, false, 'batfront', lookOf(striker));
-        if (bowler) drawBowlSprite(g, 2, 2, 1, 'start', bowlTeam, false, spin ? 'spin-back' : 'back', lookOf(bowler));
+        if (bowler) for (const f of BOWLER_WARM) drawBowlSprite(g, 2, 2, 1, f, bowlTeam, false, spin ? 'spin-back' : 'back', lookOf(bowler));
       }
     } catch { /* only a warm-up */ }
   }
