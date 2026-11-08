@@ -45,6 +45,8 @@ import { stadiumThumb } from './ownground.js';
 import { TossAnim, loadToss } from './toss.js';
 import { loadKitSprites, drawKitFielder } from './kitsprite.js';
 import { runCalibration, CAL } from './calibrate.js';
+import { saveState, exportSave, parseSaveCode, restoreSave } from './profile.js';
+import { installErrorLog, errorReport, errorCount } from './errorlog.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -374,7 +376,10 @@ function renderHub() {
 // ---------- settings ----------
 // the settings' three pages (painted tabs, and a swipe sideways turns the page, like the training ground's)
 let setPane = 'game';
-const SET_PANES = [['game', 'gear', 'Game'], ['more', 'star', 'More'], ['tools', 'pencil', 'Tools'], ['fx', 'up', 'Effects']];
+// Developer tools (free diamonds and XP, the test stadium, the Bowling 2.0 switch, the effects panel) are not in the game players get: ?dev=1 in the address (or sixcharge.dev = 1 in storage) brings them back.
+const DEV_TOOLS = (() => { try { return /[?&]dev=1/.test(location.search) || localStorage.getItem('sixcharge.dev') === '1'; } catch { return false; } })();
+const DEV_BUTTONS = ['setBowlNew', 'setDiamonds', 'setXp', 'setMapLevel', 'setStadiumTest'];
+const SET_PANES = [['game', 'gear', 'Game'], ['more', 'star', 'More'], ['tools', 'pencil', 'Tools'], ['fx', 'up', 'Effects']].filter(p => DEV_TOOLS || p[0] !== 'fx');
 function showSetPane(id, dir = 0) {
   setPane = id;
   if (id === 'fx') buildFxStage();
@@ -415,6 +420,7 @@ function makeSetTabs() {
 }
 function renderSettings() {
   ui.show('settings');
+  for (const id of DEV_BUTTONS) $(id).hidden = !DEV_TOOLS;
   makeSetTabs(); showSetPane(setPane);
   $('playerName').value = profile.name;
   const state = (id, text, on) => { const b = $(id); b.querySelector('span').textContent = text; b.classList.toggle('off', !on); };
@@ -460,6 +466,34 @@ $('calSave').addEventListener('click', () => {
 $('calRetry').addEventListener('click', () => { sfx.click(); renderCalibrate(); });
 $('calReset').addEventListener('click', () => { profile.settings.inputOffsetMs = 0; game.settings.inputOffsetMs = 0; saveProfile(profile); sfx.click(); renderCalibrate(); });
 $('calBack').addEventListener('click', () => { calStop(); sfx.click(); renderSettings(); });
+// ---------- backup: the save as a code to copy, and a code to restore from; a save that could not be written is said aloud ----------
+saveState.listeners.push(st => { if (!st.ok) ui.banner('COULD NOT SAVE', 'Storage is full or blocked: Settings, More, Backup keeps your progress', 5000); });
+let bkArm = 0;
+const bkSay = (html, bad) => { const m = $('bkMsg'); m.hidden = !html; m.innerHTML = html || ''; m.style.color = bad ? '#ff9a9a' : ''; };
+function renderBackup() {
+  ui.show('backup'); bkArm = 0; $('bkCode').value = ''; $('bkRestore').textContent = 'Restore from this code';
+  $('bkStatus').textContent = saveState.ok ? `Saved on this phone${saveState.bytes ? ` (${Math.max(1, Math.round(saveState.bytes / 1024))} KB)` : ''}. A backup code lets you move your progress to another phone, or keep it safe.` : 'The last save did NOT work (storage is full or blocked). Make a backup code now.';
+  bkSay('');
+}
+$('setBackup').addEventListener('click', () => { sfx.click(); renderBackup(); });
+$('bkCopy').addEventListener('click', async () => {
+  sfx.click(); const code = exportSave(profile), box = $('bkCode'); box.value = code;
+  try { await navigator.clipboard.writeText(code); bkSay('<b>Copied</b>Paste it somewhere safe (a note or a message to yourself).'); }
+  catch { box.focus(); box.select(); bkSay('<b>Select and copy the code</b>Your phone would not copy it for you.'); }
+});
+$('bkRestore').addEventListener('click', () => {
+  sfx.click(); const r = parseSaveCode($('bkCode').value);
+  if (!r.ok) { bkArm = 0; $('bkRestore').textContent = 'Restore from this code'; bkSay(`<b>Cannot restore</b>${r.why}`, true); return; }
+  if (!bkArm || Date.now() - bkArm > 8000) { bkArm = Date.now(); $('bkRestore').textContent = 'Tap again: replace this phone\'s save'; bkSay(`<b>${r.profile.name || 'Player'}, level ${level(r.profile.xp).lv}</b>This replaces what is on this phone now (kept as a backup copy). Tap again to go ahead.`); return; }
+  if (restoreSave(r.profile)) location.reload(); else bkSay('<b>Could not restore</b>This phone has no room to save it.', true);
+});
+installErrorLog(() => ({ view: game.view || '', mode: game.mode || '' }));
+$('bkReport').addEventListener('click', async () => {
+  sfx.click(); const text = errorReport({ schema: profile.v, saveOk: saveState.ok, saveKB: Math.round((saveState.bytes || 0) / 1024) }), box = $('bkCode'); box.value = text;
+  try { await navigator.clipboard.writeText(text); bkSay(`<b>Copied</b>${errorCount() ? `${errorCount()} problem${errorCount() > 1 ? 's' : ''} noted.` : 'No problems noted.'} Send it to us.`); }
+  catch { box.focus(); box.select(); bkSay('<b>Select and copy the report</b>Your phone would not copy it for you.'); }
+});
+$('bkBack').addEventListener('click', () => { sfx.click(); renderSettings(); });
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });
 $('settingsBack').addEventListener('click', () => { const f = settingsFrom; settingsFrom = null; (f || renderHome)(); });
 $('setClubMap').addEventListener('click', () => { unlockAudio(); sfx.click(); renderClubMap(true); });

@@ -2279,3 +2279,6 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .cal-count { text-align: center; font: 400 22px/1 var(--display); letter-spacing: 1px; color: var(--bolt); min-height: 24px; }
 .cal-result { padding: 10px 14px; text-align: center; font: 700 15px/1.35 var(--body); }
 .cal-result b { font: 400 26px/1.1 var(--display); letter-spacing: 1px; display: block; color: var(--bolt); }
+
+/* Backup: the save as a code to copy, and the code to restore from */
+.bk-code { width: 100%; box-sizing: border-box; margin: 8px 0; padding: 10px; border-radius: 12px; border: 2.5px solid var(--ink); background: rgba(16, 22, 50, .75); color: var(--paper); font: 600 12px/1.35 ui-monospace, Menlo, monospace; resize: none; word-break: break-all; }

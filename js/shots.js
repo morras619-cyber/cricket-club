@@ -11,6 +11,16 @@ export function gradeTiming(errMs, w, offSideBall = true, lateMs = Infinity) {
   if (errMs > 0 && a <= w.edge && offSideBall) return 'edge';
   return 'miss';
 }
+// Whether the bat can physically reach the ball at the moment of a swing (t, seconds on the delivery's clock): the ball's position then against where it meets the bat (depth,
+// sideways and height together), within a bat's reach. The timing grades are wider than this on purpose (an early or late swing is a weak shot, not a miss); lateReach below is
+// the hard edge for a swing that is too late. Anything not a number cannot hit.
+export const BAT_REACH = 0.85;
+export function isBallReachableAtSwing(d, t, reach = BAT_REACH) {
+  if (typeof d?.pos !== 'function' || !d.atContact || !Number.isFinite(t)) return false;
+  const p = d.pos(t), c = d.atContact;
+  if (![p?.x, p?.y, p?.z, c.x, c.y, c.z].every(Number.isFinite)) return false;
+  return Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z) <= reach;
+}
 // how late (ms) a swing can still reach the ball: it has gone past the stumps, and a little more (the bat's follow-through)
 export const lateReach = d => (d && d.tStumps != null && d.tContact != null ? (d.tStumps - d.tContact) * 1000 + 25 : Infinity);
 

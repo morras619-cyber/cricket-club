@@ -168,6 +168,19 @@ vs a random team</small></button>
     </div>
   </section>
 
+  <section id="backup" class="screen" hidden>
+    <div class="screen-inner">
+      <h2 class="title">Backup</h2>
+      <p class="cal-say" id="bkStatus"></p>
+      <textarea class="bk-code" id="bkCode" rows="6" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Your backup code appears here. To restore, paste a code here."></textarea>
+      <div class="panel cal-result" id="bkMsg" hidden></div>
+      <button class="bigbtn" id="bkCopy">Make a backup code</button>
+      <button class="bigbtn ghost" id="bkRestore">Restore from this code</button>
+      <button class="bigbtn ghost" id="bkReport">Copy a problem report</button>
+      <button class="bigbtn ghost" id="bkBack">Back</button>
+    </div>
+  </section>
+
   <section id="settings" class="screen" hidden>
     <div class="mf set-mf">
       <header class="mf-head set-head"><b>Settings</b></header>
@@ -189,6 +202,7 @@ vs a random team</small></button>
           <button class="mf-big" id="setTutorial">Tutorial</button>
           <button class="mf-big" id="setPitches">Pitch guide</button>
           <button class="mf-big" id="setStory">Watch the story</button>
+          <button class="mf-big" id="setBackup">Backup &amp; restore</button>
           <button class="mf-big" id="setTokens">Match limit</button>
         </div>
         <div class="set-pane fxpane" data-pane="fx" hidden>

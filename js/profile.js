@@ -16,16 +16,77 @@ const fresh = () => ({
   settings: { sound: true, haptics: true, fielding: 'key', units: 'kmh', inputOffsetMs: 0 },   // (inputOffsetMs: this phone's touch delay, measured by the touch timing screen: js/calibrate.js)
 });
 
+// ---------- saving: a versioned save, a rolling backup copy, a failed write that is noticed, and a code to carry a save to another phone ----------
+// The save is one key in the browser's storage. SCHEMA counts the shape of the save (MIGRATIONS[n] takes a save from n - 1 to n), so a later change to the shape can bring
+// an old save along instead of breaking it. Before a save overwrites the last one that was good, the last one is kept as a backup (at most one a minute).
+export const SCHEMA = 2;
+const MIGRATIONS = { 2: p => p };   // (1 had no version number and no settings.inputOffsetMs: nothing to change but the number)
+const BAK = KEY + '.bak', MAGIC = 'SIXCHARGE1:';
+export const saveState = { ok: true, error: '', bytes: 0, backup: false, fails: 0, listeners: [] };
+let lastBak = 0;
+const note = () => { for (const f of saveState.listeners) { try { f(saveState); } catch { /* a listener's own trouble is not the save's */ } } };
+
+export function migrate(p) {
+  let v = Number.isInteger(p?.v) ? p.v : 1;
+  while (v < SCHEMA) { v++; if (MIGRATIONS[v]) p = MIGRATIONS[v](p) || p; }
+  p.v = SCHEMA;
+  return p;
+}
+// what a good save looks like, enough that a code pasted in or a copy read back is not rubbish
+export const looksLikeSave = p => !!p && typeof p === 'object' && !Array.isArray(p) && typeof p.xp === 'number' && typeof p.coins === 'number' && typeof p.settings === 'object' && p.settings !== null;
+const mergeSave = raw => { const f = fresh(); return migrate({ ...f, ...raw, settings: { ...f.settings, ...(raw.settings || {}) } }); };
+
 export function loadProfile() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...fresh(), ...JSON.parse(raw) };
+    if (raw) {
+      try { const p = JSON.parse(raw); if (looksLikeSave(p)) return mergeSave(p); } catch { /* damaged: the backup below */ }
+      const bak = localStorage.getItem(BAK);
+      if (bak) { const p = JSON.parse(bak); if (looksLikeSave(p)) { saveState.backup = true; return mergeSave(p); } }
+    }
   } catch { /* storage unavailable: play without saving */ }
-  return fresh();
+  return migrate(fresh());
 }
 
 export function saveProfile(p) {
-  try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ }
+  try {
+    p.v = SCHEMA;
+    const json = JSON.stringify(p);
+    const prev = localStorage.getItem(KEY);
+    if (prev && prev !== json && Date.now() - lastBak > 60000) { try { localStorage.setItem(BAK, prev); lastBak = Date.now(); } catch { /* no room for a backup: the save itself matters more */ } }
+    localStorage.setItem(KEY, json);
+    const was = saveState.ok;
+    saveState.ok = true; saveState.error = ''; saveState.bytes = json.length;
+    if (!was) note();
+  } catch (e) {
+    saveState.ok = false; saveState.error = e?.name || 'error'; saveState.fails++;
+    note();
+  }
+}
+
+// the save as a code to copy (and the other way): MAGIC then the save, as text a phone can carry (base64 of its UTF-8)
+const b64 = {
+  enc: str => btoa(unescape(encodeURIComponent(str))),
+  dec: str => decodeURIComponent(escape(atob(str))),
+};
+export function exportSave(p) { return MAGIC + b64.enc(JSON.stringify({ ...p, v: SCHEMA })); }
+export function parseSaveCode(text) {
+  try {
+    const t = String(text || '').trim();
+    if (!t.startsWith(MAGIC)) return { ok: false, why: 'That is not a Sixcharge backup code.' };
+    const p = JSON.parse(b64.dec(t.slice(MAGIC.length).replace(/\s+/g, '')));
+    if (!looksLikeSave(p)) return { ok: false, why: 'The code is damaged.' };
+    return { ok: true, profile: mergeSave(p) };
+  } catch { return { ok: false, why: 'The code is damaged or incomplete.' }; }
+}
+// replace the save on this device with a restored one (the one it replaces becomes the backup)
+export function restoreSave(profile) {
+  try {
+    const cur = localStorage.getItem(KEY);
+    if (cur) localStorage.setItem(BAK, cur);
+    localStorage.setItem(KEY, JSON.stringify(profile));
+    return true;
+  } catch { return false; }
 }
 
 export function level(xp) {

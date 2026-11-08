@@ -47,6 +47,7 @@ for (const key of pick) {
   await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await page.addInitScript(() => {
     window.__SIXCHARGE_BOT = true; window.__SIXCHARGE_SPEED = 1;
+    { let seed = 20260101; Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296; }   // (the same match every run, so that two runs can be compared)
     window.__frames = []; window.__long = [];
     let last = 0; const tick = t => { if (last && !document.hidden) window.__frames.push(t - last); last = t; requestAnimationFrame(tick); }; requestAnimationFrame(tick);
     try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__long.push(e.duration); }).observe({ entryTypes: ['longtask'] }); } catch {}
