@@ -120,3 +120,20 @@ test('net drills: a save from before the drills still works', () => {
   assert.ok(T.finishDrill(t, 'a', { balls: TRAIN.DRILL_BALLS, runs: 10, outs: 0 }, 0, mkCtx(0)).ok);
   assert.ok(T.sealed(t));
 });
+
+test('net drills: a coach who teaches him can run the drill instead (a few points, one of the day\'s drills); with no such coach it is refused', () => {
+  const t = T.freshTraining(0), ctx = mkCtx(0, { squad: squadOf({ a: { kinds: ['bat'] } }) });
+  assert.equal(T.coachFor(t, ctx.squad.get('a')), null);
+  assert.equal(T.skipDrill(t, 'a', 0, ctx).ok, false, 'no coach: refused');
+  assert.equal(t.tp.a, undefined, 'and nothing was given');
+  assert.ok(T.hire(t, 'bat').ok);
+  const coach = T.coachFor(t, ctx.squad.get('a'));
+  assert.ok(coach && coach.kind === 'bat');
+  const r = T.skipDrill(t, 'a', 0, ctx);
+  assert.ok(r.ok && r.pts === T.skipPoints(coach) && t.tp.a === r.pts);
+  assert.ok(r.pts > TRAIN.DRILL_MIN - 1 && r.pts < TRAIN.DRILL_MAX, 'a few points: below the best a played drill can earn');
+  assert.equal(T.drillsLeft(t, 0), TRAIN.DRILLS_DAY - 1, 'it used one of the day\'s drills');
+  for (let i = 1; i < TRAIN.DRILLS_DAY; i++) assert.ok(T.skipDrill(t, 'a', 0, ctx).ok);
+  assert.equal(T.skipDrill(t, 'a', 0, ctx).ok, false, 'the nets close for the day');
+  assert.ok(T.sealed(t), 'the books still add up');
+});

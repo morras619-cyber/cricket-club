@@ -129,6 +129,7 @@ export function drillsLeft(t, now) {
   return d.day === drillDay(now) ? Math.max(0, TRAIN.DRILLS_DAY - d.n) : TRAIN.DRILLS_DAY;
 }
 export const drillPoints = r => Math.max(TRAIN.DRILL_MIN, Math.min(TRAIN.DRILL_MAX, Math.round(15 + 3 * r.runs - 5 * r.outs)));
+const countDrill = (t, now) => { const day = drillDay(now), used = t.drills && t.drills.day === day ? t.drills.n : 0; t.drills = { day, n: used + 1 }; t.drills.seal = dmark(t.drills); };
 // a played drill: r is what the player did ({ balls, runs, outs }); returns the points given
 export function finishDrill(t, pid, r, now, ctx) {
   const p = ctx.squad.get(pid);
@@ -136,11 +137,26 @@ export function finishDrill(t, pid, r, now, ctx) {
   if (!p || !canLearn(p)) return no('He cannot learn more right now');
   if (!r || r.balls < TRAIN.DRILL_BALLS) return no('The drill was not finished');
   if (drillsLeft(t, now) < 1) return no('The nets are closed for today');
-  const day = drillDay(now), used = t.drills && t.drills.day === day ? t.drills.n : 0;
-  t.drills = { day, n: used + 1 }; t.drills.seal = dmark(t.drills);
+  countDrill(t, now);
   const pts = drillPoints(r);
   t.tp[pid] = (t.tp[pid] || 0) + pts;
   seal(t); return { ok: true, pts };
+}
+// Skipping the drill: a coach who teaches the player's kind runs it instead of you. It is worth a few points, never a played drill's best (a better coach gets a little more),
+// and it uses one of the day's drills like a played one does.
+export const coachFor = (t, p) => (p ? t.coaches.filter(c => p.kinds.includes(c.kind)).sort((a, b) => b.lvl - a.lvl)[0] || null : null);
+export const skipPoints = coach => Math.round(TRAIN.DRILL_MIN + 4 * speedOf(coach));
+export function skipDrill(t, pid, now, ctx) {
+  const p = ctx.squad.get(pid);
+  if (!sealed(t)) return no('The books do not add up');
+  if (!p || !canLearn(p)) return no('He cannot learn more right now');
+  const coach = coachFor(t, p);
+  if (!coach) return no('Hire a coach who teaches him to skip the drill');
+  if (drillsLeft(t, now) < 1) return no('The nets are closed for today');
+  countDrill(t, now);
+  const pts = skipPoints(coach);
+  t.tp[pid] = (t.tp[pid] || 0) + pts;
+  seal(t); return { ok: true, pts, coach: coach.name };
 }
 
 // ---------- what you do ----------

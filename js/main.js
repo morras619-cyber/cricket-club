@@ -2286,6 +2286,21 @@ function paintTraining(c) {
       go.addEventListener('click', () => { if (trainTest) return ui.toast('The nets are for your real club, not the practice one'); if (clock.state !== 'ok') return ui.toast('The nets need the server clock: try again when you are online'); if (left < 1) return ui.toast('The nets are closed for today. They open again at midnight (UTC)'); runDrill(c, netPick); });
       go.disabled = left < 1 && !trainTest;
       body.append(go);
+      // (a coach who teaches him can run the drill instead: a few points, and it uses one of the day's drills)
+      const coach = TG.coachFor(t, roster.get(netPick)), skip = el('button', 'mf-big alt nets-skip');
+      skip.append(el('b', '', 'Skip the drill'), el('small', '', coach ? `${coach.name} runs it · +${TG.skipPoints(coach)} XP` : `Hire a coach who teaches him to skip it`));
+      skip.disabled = !coach || (left < 1 && !trainTest);
+      skip.addEventListener('click', async () => {
+        if (trainTest) return ui.toast('The nets are for your real club, not the practice one');
+        if (clock.state !== 'ok') return ui.toast('The nets need the server clock: try again when you are online');
+        if (trainTick(c) === null) return;
+        const res = TG.skipDrill(t, netPick, serverNow(), trainCtx(c));
+        if (!res.ok) return ui.toast(res.why);
+        absorbTraining(c); saveProfile(profile); sfx.chime();
+        ui.toast(`${res.coach} ran the drill: +${res.pts} XP for ${lastName(c.players[netPick].name)}`);
+        await renderTraining();
+      });
+      body.append(skip);
       requestAnimationFrame(() => { const t = row.querySelector('.sel'); if (t) row.scrollLeft = t.offsetLeft - (row.clientWidth - t.offsetWidth) / 2; });
     }
     if (!list.length) body.append(el('p', 'sheetnote', 'Nobody in your squad can learn more right now.'));
