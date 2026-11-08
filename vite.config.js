@@ -4,6 +4,7 @@
 import { defineConfig } from 'vite';
 import { cpSync, existsSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 
 const copyAssets = () => ({
   name: 'copy-game-assets',
@@ -19,9 +20,32 @@ const copyAssets = () => ({
   },
 });
 
+// The source keeps its small painted images as base64 text inside js/packed.js, js/shoparts.js and css/style.css (that is how the web version stays under its file
+// limit). In the build they become real image files: the text is not downloaded and parsed at start-up, and each picture is decoded only when it is used.
+const unpackImages = () => ({
+  name: 'unpack-embedded-images',
+  generateBundle(_, bundle) {
+    const made = new Map();
+    const file = (type, b64) => {
+      const hash = createHash('sha1').update(b64).digest('hex').slice(0, 10), name = `assets/emb-${hash}.${type === 'jpeg' ? 'jpg' : type}`;
+      if (!made.has(name)) { made.set(name, 1); this.emitFile({ type: 'asset', fileName: name, source: Buffer.from(b64, 'base64') }); }
+      return name.slice('assets/'.length);   // (the chunk and the stylesheet both sit in assets/)
+    };
+    let n = 0;
+    for (const f of Object.values(bundle)) {
+      if (f.type === 'chunk') {
+        f.code = f.code.replace(/(["'`])data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/=]+)\1/g, (_, q, t, b64) => { n++; return `new URL(${JSON.stringify(file(t, b64))},import.meta.url).href`; });
+      } else if (f.fileName.endsWith('.css')) {
+        f.source = String(f.source).replace(/url\((["']?)data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/=]+)\1\)/g, (_, q, t, b64) => { n++; return `url(${file(t, b64)})`; });
+      }
+    }
+    this.info?.(`unpacked ${n} embedded images into ${made.size} files`);
+  },
+});
+
 export default defineConfig({
   base: './',
   publicDir: false,
-  plugins: [copyAssets()],
+  plugins: [unpackImages(), copyAssets()],
   build: { target: 'es2020', outDir: 'dist', emptyOutDir: true, assetsInlineLimit: 0, chunkSizeWarningLimit: 2000, sourcemap: false },
 });
