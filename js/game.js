@@ -7,7 +7,7 @@ import { SPARKS, HUNT, SHORT, POWERS, powersOf, heroById, AI_LOOK, batTypeOf } f
 import { teamById, rivalTeam, teamLook, logoSrc, myClub, cosmetics } from './teams.js';
 import { makeDelivery, lengthById } from './physics.js';
 import { gradeTiming, lateReach, swipeToShot, resolveContact, aimVector, batNewSize, batNewZone, rhythmFx, rhythmNext, rhythmStage, RHYTHM_NAMES, mirrorDelivery, mirrorResult, isWide } from './shots.js';
-import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, ENDS, saveChance } from './fieldsim.js';
+import { simulateHit, gapAngle, buildField, buildFieldFrom, presetPositions, outsideRing, ringRadius, runsAfterCollect, runOutMargins, keeperEdgeP, edgeCatch, ENDS, saveChance } from './fieldsim.js';
 import { aiBowlingScript, aiBat, aiStance, applyPower } from './ai.js';
 import { gestureToDelivery, planExpectation, planExpectationBw, deliveryMods, laneFor, lengthForBounce, heightForBounce, positionName, LENGTH_LABEL, BOUNCE_RANGES, LANE_RANGES, PACE, bowlCommit, pressureNext, pressureFx, pressureStage, PRESSURE_NAMES, bowlWhy } from './tactics.js';
 import { line, sledgeOutcome } from './banter.js';
@@ -1253,14 +1253,15 @@ export class Game {
       inn.ball({ runs: 0, missed: res.outcome === 'beaten' });
       if (res.outcome === 'beaten') this.charge.missed(); else this.charge.dot();   // (a swing and a miss costs charge; a leave, like a block, keeps it level)
     } else if (res.outcome === 'edge') {
-      const caught = !fx.lucky && rng.chance(keeperEdgeP(res.offset));   // (Lucky Break: it drops)
+      const ec = edgeCatch(res.offset, aiField);   // (the keeper, or a slip if it flew too wide for him; with neither it runs away)
+      const caught = !fx.lucky && rng.chance(ec.p);   // (Lucky Break: it drops)
       if (caught) {
-        sfx.glove(); this.wicketFx('CAUGHT BEHIND!', cs);
+        sfx.glove(); this.wicketFx(ec.by === 'slip' ? 'CAUGHT AT SLIP!' : 'CAUGHT BEHIND!', cs);
         S.bowler.spr = { anim: 'celebrate', t0: this.realTime };
         inn.ball({ wicket: true }); this.charge.wicketLost();
       } else {
         const four = res.offset.x > 1.0 && rng.chance(0.5);
-        this.fx.word(four ? 'EDGED FOR FOUR!' : 'LUCKY EDGE!', this.W / 2, this.H * 0.4, { size: 40 });
+        this.fx.word(four ? 'EDGED FOR FOUR!' : ec.by ? 'LUCKY EDGE!' : 'WIDE OF THE KEEPER!', this.W / 2, this.H * 0.4, { size: 40 });
         inn.ball({ runs: four ? 4 : rng.chance(0.4) ? 1 : 0 });
         this.charge.award('edgeSurvived', 'LUCKY');
       }
@@ -2427,20 +2428,22 @@ export class Game {
         wicket('STUMPED!', 'keeper', this.heroFor('field'), { fielding: true, word: 'STUMPED!', detail: 'lightning-fast stumping' });
       } else { inn.ball({ runs: 0 }); this.charge.dot(); }
     } else if (res.outcome === 'edge') {
-      const chance = { kind: 'edge', p: keeperEdgeP(res.offset) };
+      const ec = edgeCatch(res.offset, field);   // (the keeper takes what is within his reach; wider than that it needs a slip, and with none it runs away)
+      const chance = { kind: 'edge', p: ec.p };
       let r;
-      if (playerControls(chance, this.fieldState, ballNo)) {
+      if (ec.by === 'keeper' && playerControls(chance, this.fieldState, ballNo)) {
         this.noteEvent(ballNo);
         r = await this.keeperEvent('edge', d, res.offset, { shatter: fxFlags.shatter });
-      } else r = rng.chance(chance.p) ? 'caught' : 'dropped';
+      } else r = rng.chance(ec.p) ? 'caught' : 'dropped';
       this.view = 'bowl';
       if (r === 'caught') {
-        this.charge.award('keeperDismissal', 'KEEPER');
-        wicket('CAUGHT BEHIND!', 'keeper', this.heroFor('field'), { fielding: true, word: 'SNAFFLED!', detail: 'edge taken behind the stumps' });
+        this.charge.award('keeperDismissal', ec.by === 'slip' ? 'SLIP CATCH' : 'KEEPER');
+        wicket(ec.by === 'slip' ? 'CAUGHT AT SLIP!' : 'CAUGHT BEHIND!', ec.by === 'slip' ? 'catch' : 'keeper', this.heroFor('field'), { fielding: true, word: 'SNAFFLED!', detail: ec.by === 'slip' ? 'edge carried to slip' : 'edge taken behind the stumps' });
       } else {
         const four = res.offset.x > 1.0 && rng.chance(0.5);
         inn.ball({ runs: four ? 4 : rng.chance(0.4) ? 1 : 0 });
         if (four) this.fx.word('EDGED FOR FOUR', this.W / 2, this.H * 0.4, { size: 40 });
+        else if (!ec.by) this.fx.word('WIDE OF THE KEEPER!', this.W / 2, this.H * 0.4, { size: 40 });
       }
     } else {
       this.hitGrade = ai.grade;
@@ -3310,7 +3313,7 @@ export class Game {
     this.fieldState.setting = 'off';   // (the nets: no fielding mini-games)
     this.charge.value = 40; this.ui.charge(40);
     const tally = (inn, from) => {
-      const d = inn.detail.slice(from), s = { balls: d.length, runs: 0, outs: 0, fours: 0, sixes: 0, dots: 0 };
+      const d = inn.detail.slice(from), s = { balls: d.length, runs: 0, outs: 0, fours: 0, sixes: 0, dots: 0, seq: d.map(x => (x.k ? 'W' : x.r)) };   // (seq: each ball, for the squad pick screen)
       for (const x of d) { s.runs += x.r; if (x.k) s.outs++; if (x.r === 4) s.fours++; if (x.r === 6) s.sixes++; if (x.r === 0 && !x.k) s.dots++; }
       return s;
     };

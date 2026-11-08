@@ -281,6 +281,17 @@ export function simulateHit(res, fielders, rng, opts = {}) {
 export const autoCatch = (chance, rng) => rng.chance(chance.p);
 export const keeperEdgeP = off => Math.max(0.2, Math.min(0.95, 0.95 - 0.32 * Math.abs(off.x - 0.2)));
 
+// Who can take an edge. The keeper reaches a ball that goes within KEEPER_EDGE_REACH of his gloves (a dive included); an edge that flies wider than that is out of his reach,
+// and is only a catch if there is a slip or a gully (a fielder behind the wicket) for it to carry to. With no one there it runs away: a single, or a four.
+export const KEEPER_EDGE_REACH = 0.95;
+export const hasSlip = field => (field || []).some(f => !f.keeper && f.id !== 'bowler' && f.y < 1.5 && f.y > -14 && Math.abs(f.x) > 0.8 && Math.abs(f.x) < 14);
+// { by: 'keeper' | 'slip' | null, p: the chance it is caught }
+export function edgeCatch(offset, field) {
+  if (Math.abs(offset.x - 0.3) <= KEEPER_EDGE_REACH) return { by: 'keeper', p: keeperEdgeP(offset) };
+  if (hasSlip(field)) return { by: 'slip', p: 0.55 };
+  return { by: null, p: 0 };
+}
+
 // The chance a fielder keeps a ball out of the rope (the computer fielding): at most half his reach for a ball hit hard, which he may well not stop, rising to all of it for a ball
 // that has rolled out to a crawl (anyone chasing a ball going at a jog stops it).
 export function saveChance(sim) {

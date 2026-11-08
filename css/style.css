@@ -1385,6 +1385,24 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 .tcard .tt { font-weight: 800; font-size: 13px; opacity: .8; }
 .tcard .tr { font-weight: 800; font-size: 13px; color: #1f45a8; }
 .tcard.on { background: #ffd23f; border-color: #1f45a8; box-shadow: 0 0 0 3px #1f45a8, 0 3px 0 rgba(0, 0, 0, .3); }
+/* the nets pick: a card for every candidate (his picture and what he did in the nets) in a pane that slides up and down, batters and bowlers on their own tabs */
+.pages > .page:has(.trc) { scroll-snap-type: y proximity; } .trc { scroll-snap-align: start; scroll-margin-top: 44px; }
+.trc-count { margin: -4px 0 0; font: 800 12.5px/1 var(--body); color: #1f45a8; } .trc-count.full { color: #1c8a3d; }
+.trc { position: relative; flex: none; display: flex; gap: 10px; width: 100%; text-align: left; padding: 8px; margin-top: 8px; border-radius: 16px; border: 3px solid var(--ink); background: linear-gradient(160deg, #1b2c78, #0b1346); color: #fff; font: inherit; box-shadow: 0 3px 0 rgba(0, 0, 0, .3); }
+.trc.on { border-color: #ffd23f; box-shadow: 0 0 0 2px #ffd23f, 0 0 16px rgba(255, 210, 63, .45); }
+.trc-art { --t1: #ffe066; --t2: #c58a00; position: relative; flex: none; width: 92px; height: 120px; border-radius: 12px; overflow: hidden; }
+.trc-art .trc-pic { inset: 0; }
+.trc-tick { position: absolute; right: 4px; bottom: 4px; display: none; width: 26px; height: 26px; border-radius: 50%; background: #ffd23f; color: #14102a; font: 900 16px/26px var(--body); text-align: center; box-shadow: 0 2px 0 rgba(0, 0, 0, .4); } .trc.on .trc-tick { display: block; }
+.trc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.trc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; } .trc-top b { font: 400 19px/1 var(--display); letter-spacing: .5px; }
+.trc-best { padding: 3px 7px 2px; border-radius: 99px; background: #ffd23f; color: #14102a; font: 900 9.5px/1.1 var(--body); font-style: normal; letter-spacing: .4px; }
+.trc-sub { font: 800 12px/1.25 var(--body); color: #c9d4ff; }
+.trc-main { font: 800 12px/1.1 var(--body); color: #dfe6ff; } .trc-main b { font: 400 28px/1 var(--display); color: #ffd23f; margin-right: 6px; } .trc-main small { font: 800 11.5px/1 var(--body); }
+.trc-chips { display: flex; flex-wrap: wrap; gap: 4px; } .trc-chip { padding: 4px 7px 3px; border-radius: 99px; background: rgba(255, 255, 255, .12); font: 800 11px/1 var(--body); font-style: normal; color: #e6ecff; }
+.trc-chip.good { background: rgba(93, 255, 155, .2); color: #5dff9b; } .trc-chip.bad { background: rgba(255, 90, 90, .22); color: #ff9a9a; }
+.trc-seq { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; } .trc-seq small { font: 800 10px/1.1 var(--body); color: #9fb0ee; margin-left: 2px; }
+.trc-ball { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #2b3a78; color: #fff; font: 900 12px/1 var(--body); font-style: normal; }
+.trc-ball.w { background: #e8343b; } .trc-ball.s4 { background: #2f6fe4; } .trc-ball.s6 { background: #ffb81e; color: #14102a; } .trc-ball.z { background: #3a4468; color: #9aa6d0; } .trc-ball.pw { box-shadow: 0 0 0 2px #ffd23f; }
 .tnote { margin: 0 0 10px; font-weight: 800; font-size: 14px; line-height: 1.3; color: var(--ink); }
 
 /* ---------- the club builder: the fan chant and the pitch ---------- */

@@ -42,17 +42,15 @@ check(await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('six
 // (the third ball bowled in the nets is an overstep, a no-ball: it must not count, and the next balls must count as usual)
 await page.evaluate(() => { const g = window.__sixcharge.game, cap = g.captureBowlGesture.bind(g); let n = 0; window.__nbForced = 0; g.captureBowlGesture = async (...a) => { const G = await cap(...a); if (++n === 3) { G.grade = 'bad'; G.hesitated = false; window.__nbForced++; } return G; }; });
 await page.evaluate(() => [...document.querySelectorAll('#careerBody button')].find(b => /Go to the nets/.test(b.textContent)).click());
-await page.waitForFunction(() => document.querySelectorAll('.tcard').length === 12, null, { timeout: 240000 });
+await page.waitForFunction(() => document.querySelectorAll('.trc').length === 12, null, { timeout: 240000 });
 check(true, 'twelve candidates were tried and the pick screen is up');
 if (process.env.SHOTS_DIR) { await page.waitForTimeout(500); await page.screenshot({ path: join(process.env.SHOTS_DIR, 'trials-pick.png') }); }
-for (const k of ['bat', 'bowl']) check(await page.evaluate(kind => { const pg = [...document.querySelectorAll('#careerBody .pages > .page')].find(p => p.querySelector(`.tcard[data-k="${kind}"]`)); pg.scrollTop = pg.scrollHeight; const cards = [...pg.querySelectorAll('.tcard')], last = cards.at(-1).getBoundingClientRect(), r = pg.getBoundingClientRect(); const ok = cards.length === 6 && last.bottom <= r.bottom + 1 && last.top >= r.top; pg.scrollTop = 0; return ok; }, k), `the last ${k === 'bat' ? 'batter' : 'bowler'} of the six can be reached on the list (it scrolls when the screen is short)`);
+for (const k of ['bat', 'bowl']) check(await page.evaluate(kind => { const pg = [...document.querySelectorAll('#careerBody .pages > .page')].find(p => p.querySelector(`.trc[data-k="${kind}"]`)); pg.scrollTop = pg.scrollHeight; const cards = [...pg.querySelectorAll('.trc')], last = cards.at(-1).getBoundingClientRect(), r = pg.getBoundingClientRect(); const ok = cards.length === 6 && last.bottom <= r.bottom + 1 && last.top >= r.top; pg.scrollTop = 0; return ok; }, k), `the last ${k === 'bat' ? 'batter' : 'bowler'} of the six can be reached by sliding the list (it slides when the screen is short)`);
 check(await page.evaluate(() => window.__nbForced === 1 && Object.values(window.__sixcharge.profile.career.trial.results.bowls).length === 6 && Object.values(window.__sixcharge.profile.career.trial.results.bowls).every(r => r.balls === 3)), 'a no-ball bowled in the nets (here on the power ball) does not count, and every bowler still bowls exactly three balls');
-const lines = await page.evaluate(() => [...document.querySelectorAll('.tcard .tr')].map(e => e.textContent));
-check(lines.length === 12 && lines.every(l => /^Nets: /.test(l)), `every candidate has a net result (${lines[0]} | ${lines[6]})`);
-await page.evaluate(() => {
-  const by = k => [...document.querySelectorAll(`.tcard[data-k="${k}"]`)];
-  by('bat').slice(0, 4).forEach(b => b.click()); by('bowl').slice(0, 5).forEach(b => b.click());
-});
+const lines = await page.evaluate(() => [...document.querySelectorAll('.trc')].map(e => `${e.querySelector('.trc-main')?.textContent} | ${e.querySelectorAll('.trc-ball').length} balls | ${!!e.querySelector('.pt-pic canvas, .pt-pic .face, .pt-pic img')}`));
+check(lines.length === 12 && lines.every(l => !/Not tried/.test(l) && /\| 3 balls \| true$/.test(l)), `every candidate has his picture, a net result and his three balls (${lines[0]} | ${lines[6]})`);
+check(await page.evaluate(() => document.querySelectorAll('.trc-best').length === 2), 'the best batter and the best bowler of the nets are marked');
+await page.evaluate(() => { const by = k => [...document.querySelectorAll(`.trc[data-k="${k}"]`)]; by('bat').slice(0, 4).forEach(b => b.click()); by('bowl').slice(0, 5).forEach(b => b.click()); });
 check(/Sign the squad/.test(await page.textContent('#careerBody')), '4 batters and 5 bowlers picked');
 if (process.env.SHOTS_DIR) { await page.screenshot({ path: join(process.env.SHOTS_DIR, 'trials-picked.png') }); await page.evaluate(() => [...document.querySelectorAll('.tab')].find(t => /Batters/.test(t.textContent)).click()); await page.waitForTimeout(700); await page.screenshot({ path: join(process.env.SHOTS_DIR, 'trials-bats.png') }); await page.evaluate(() => [...document.querySelectorAll('.tab')].find(t => /Bowlers/.test(t.textContent)).click()); await page.waitForTimeout(700); await page.screenshot({ path: join(process.env.SHOTS_DIR, 'trials-bowls.png') }); }
 await page.evaluate(() => [...document.querySelectorAll('#careerBody button')].find(b => /Sign the squad/.test(b.textContent)).click());

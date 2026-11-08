@@ -31,6 +31,8 @@ const APPEAR = {
   'royals-0': '0 4 swept 1', 'royals-1': '2 0 short 3', 'royals-2': '2 0 spiky 0', 'royals-3': '3 0 curly 1', 'royals-4': '2 0 short 2',
   'royals-5': '0 3 short 0', 'royals-6': '4 0 short 1', 'royals-7': '5 0 dreads 3', 'royals-8': '1 0 swept 1', 'royals-9': '2 5 short 3',
 };
+// The main character, Kabir Anand: dark brown curly hair, brown skin, clean-shaven (as in his story pictures). Set here so he is the same man in every save, the tutorial and the career.
+APPEAR['kabir-anand'] = '2 1 curly 0';
 export const hasOwnLook = id => !!APPEAR[id];
 const parse = s => { const [k, h, style, b] = s.split(' '); return { skin: +k, hair: +h, style, beard: BEARDS[+b] }; };
 

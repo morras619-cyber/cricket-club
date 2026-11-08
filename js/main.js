@@ -2201,6 +2201,22 @@ async function runDrill(c, pid) {
   if (res?.ok) { trainSheet = { type: 'drilled', pid, runs: r.runs, pts: res.pts }; paintTraining(c); }
   else if (res) ui.toast(res.why);
 }
+// The painted portrait is as wide as its box allows and about twice as tall as wide, with the face in its top half; in a short box (a squeezed lot) the bottom of the box cuts
+// through the face. When the box is too short to show the chin, the picture shrinks until it fits (never below 55%).
+function fitAuctionPortrait(pic) {
+  const holder = pic.querySelector('.fut-paint[data-framed]');
+  if (!holder) return;
+  const fit = () => {
+    const cv = holder.querySelector('canvas');
+    if (!cv || !pic.isConnected || !cv.offsetHeight) return;
+    const visible = pic.clientHeight * 0.82, need = cv.offsetHeight * 0.5 + cv.offsetTop;   // (the mask fades the last 18% of the box; the chin is about half way down the picture)
+    if (visible >= need * 0.95) return;
+    const k = Math.max(0.55, visible / need), u = parseFloat(holder.style.getPropertyValue('--u')), l = parseFloat(holder.style.getPropertyValue('--l'));
+    holder.style.setProperty('--u', (u * k).toFixed(3)); holder.style.setProperty('--l', (l + (u - u * k) / 2).toFixed(3));
+  };
+  requestAnimationFrame(fit);
+  new MutationObserver(() => requestAnimationFrame(fit)).observe(holder, { childList: true });   // (the canvas is made when the picture has loaded)
+}
 const KIND_ICON = { bat: 'star', pace: 'ball', spin: 'gear' };
 function paintTraining(c) {
   const t = c.training, club = teamById(c.club), roster = trainingRoster(c), L = PC.levelRow(TG.TRAIN.LEVELS, t.level);
@@ -3288,23 +3304,53 @@ function careerTrials(c, body) {
     const nb = trialSel.bats.size, nw = trialSel.bowls.size, ok = nb === TRIAL_PICKS.bat && nw === TRIAL_PICKS.bowl;
     sign.textContent = ok ? 'Sign the squad' : `Batters ${nb}/${TRIAL_PICKS.bat} · Bowlers ${nw}/${TRIAL_PICKS.bowl}`;
     sign.disabled = !ok;
-    for (const b of body.querySelectorAll('.tcard')) b.classList.toggle('on', (b.dataset.k === 'bat' ? trialSel.bats : trialSel.bowls).has(b.dataset.id));
+    for (const b of body.querySelectorAll('.trc')) b.classList.toggle('on', (b.dataset.k === 'bat' ? trialSel.bats : trialSel.bowls).has(b.dataset.id));
+    for (const b of body.querySelectorAll('.trc-count')) { const bat = b.dataset.k === 'bat', n = bat ? nb : nw, max = bat ? TRIAL_PICKS.bat : TRIAL_PICKS.bowl; b.textContent = n === max ? `${n} of ${max} picked` : `Pick ${max}: ${n} so far`; b.classList.toggle('full', n === max); }
+  };
+  // each candidate is a card with his picture and what he did in the nets; the cards slide up and down in a pane, the batters and the bowlers on their own tabs
+  const club = teamById(c.club);
+  const dotCls = v => (v === 'W' ? 'w' : v >= 6 ? 's6' : v === 4 ? 's4' : v === 0 ? 'z' : 'r');
+  const score = (r, bat) => (bat ? r.runs - 6 * r.outs : r.outs * 8 - r.runs + 0.5 * r.dots);
+  const card = (id, kind, best) => {
+    const p = c.players[id], bat = kind === 'bat', r = T.results[bat ? 'bats' : 'bowls'][id];
+    const el1 = el('button', 'trc'); el1.dataset.id = id; el1.dataset.k = kind;
+    const art = el('span', 'trc-art'), pic = el('span', 'pt-pic trc-pic');
+    pic.append(paintedPortrait(p, club, { framed: true }) || playerFace(p, 120));
+    const badge = el('span', 'pt-ovr'); badge.append(el('b', '', String(ovr(p))), el('small', '', ROLE_TAG[p.role] || ''));
+    art.append(pic, badge, el('span', 'trc-tick', '✓'));
+    const info = el('span', 'trc-info'), top = el('span', 'trc-top');
+    top.append(el('b', '', p.name), best ? el('i', 'trc-best', 'BEST IN THE NETS') : '');
+    const kindLine = bat ? p.label : bowlType(p.bowl).name;
+    info.append(top, el('span', 'trc-sub', `${flag(p)} ${kindLine} · ${p.age} · ${bat ? `Bat ${p.bat}` : `Bowl ${p.bowlSkill}`} · ${'★'.repeat(potentialStars(p))}${'☆'.repeat(5 - potentialStars(p))}`));
+    if (r) {
+      const main = el('span', 'trc-main');
+      if (bat) main.append(el('b', '', `${r.runs}`), el('small', '', `off ${r.balls} · strike rate ${r.balls ? Math.round(r.runs / r.balls * 100) : 0}`));
+      else main.append(el('b', '', `${r.outs} for ${r.runs}`), el('small', '', `${r.balls} balls · economy ${r.balls ? (r.runs / r.balls * 6).toFixed(1) : '0.0'}`));
+      const chips = el('span', 'trc-chips');
+      const chip = (n, w, tone = '') => n || tone ? chips.append(el('i', `trc-chip ${tone}`, `${n} ${w}`)) : 0;
+      if (bat) { chip(r.fours, r.fours === 1 ? 'four' : 'fours', r.fours ? 'good' : ''); chip(r.sixes, r.sixes === 1 ? 'six' : 'sixes', r.sixes ? 'good' : ''); chips.append(el('i', `trc-chip ${r.outs ? 'bad' : 'good'}`, r.outs ? `out ${r.outs}×` : 'not out')); }
+      else { chip(r.dots, r.dots === 1 ? 'dot' : 'dots', r.dots ? 'good' : ''); chip(r.fours + r.sixes, 'hit for boundaries', r.fours + r.sixes ? 'bad' : ''); }
+      info.append(main, chips);
+      if (r.seq) {   // (ball by ball; the last ball of each trial is the power ball)
+        const strip = el('span', 'trc-seq');
+        r.seq.forEach((v, i) => { const d = el('i', `trc-ball ${dotCls(v)}${i === r.seq.length - 1 ? ' pw' : ''}`, String(v)); strip.append(d); });
+        strip.append(el('small', '', 'ball by ball · last = power ball'));
+        info.append(strip);
+      }
+    } else info.append(el('span', 'trc-main', 'Not tried'));
+    el1.append(art, info);
+    el1.addEventListener('click', () => {
+      const set = bat ? trialSel.bats : trialSel.bowls, max = bat ? TRIAL_PICKS.bat : TRIAL_PICKS.bowl;
+      if (set.has(id)) set.delete(id); else if (set.size < max) set.add(id); else ui.toast(`You can only sign ${max} ${bat ? 'batters' : 'bowlers'}: put one back first`);
+      sfx.click(); refresh();
+    });
+    return el1;
   };
   const section = (title, ids, kind, max) => {
-    const box = el('div', 'panel paper statcard'); box.append(el('h3', '', title));
-    for (const id of ids) {
-      const p = c.players[id], r = T.results[kind === 'bat' ? 'bats' : 'bowls'][id];
-      const card = el('button', 'tcard'); card.dataset.id = id; card.dataset.k = kind;
-      const bt = kind === 'bat' ? p.label : bowlType(p.bowl).name;
-      const rate = kind === 'bat' ? `Bat ${p.bat}` : `Bowl ${p.bowlSkill}`;
-      card.append(el('b', '', p.name), el('span', 'tt', `${bt} · ${p.age} · ${rate} · ${'★'.repeat(potentialStars(p))}${'☆'.repeat(5 - potentialStars(p))}`), el('span', 'tr', r ? `Nets: ${statLine(r, kind === 'bat')}` : 'Not tried'));
-      card.addEventListener('click', () => {
-        const set = kind === 'bat' ? trialSel.bats : trialSel.bowls;
-        if (set.has(id)) set.delete(id); else if (set.size < max) set.add(id); else ui.toast(`You can only sign ${max} ${kind === 'bat' ? 'batters' : 'bowlers'}: put one back first`);
-        sfx.click(); refresh();
-      });
-      box.append(card);
-    }
+    const bat = kind === 'bat', res = T.results[bat ? 'bats' : 'bowls'], box = el('div', 'panel paper statcard');
+    const top = ids.reduce((m, id) => (res[id] && (!m || score(res[id], bat) > score(res[m], bat)) ? id : m), null);
+    const count = el('p', 'trc-count'); count.dataset.k = kind;
+    box.append(el('h3', '', title), count, ...ids.map(id => card(id, kind, id === top)));
     return box;
   };
   body.append(section('Batters', T.bats, 'bat', TRIAL_PICKS.bat), section('Bowlers', T.bowls, 'bowl', TRIAL_PICKS.bowl));
@@ -3350,6 +3396,7 @@ function careerAuction(c, body) {
     // the player on the block: his painted portrait fading into his name, no card frame around it
     const hero = el('div', 'auc-hero'), cardBox = el('div', `auc-card tier-${tierOf(ovr(p)).id}`), pic = el('div', 'pt-pic auc-pic');
     pic.append(paintedPortrait(p, p.team ? teamById(p.team) : me, { framed: true }) || (p.heroId ? portrait(heroById(p.heroId), 220, 'celebrate') : playerFace(p, 160)));
+    fitAuctionPortrait(pic);
     const badge = el('span', 'pt-ovr'); badge.append(el('b', '', String(ovr(p))), el('small', '', ROLE_TAG[p.role] || ''));
     const nm = el('div', 'auc-plate'), power = p.heroId ? heroById(p.heroId).power.name : p.ability ? ABILITIES[p.ability].name : (p.trait || p.label);
     nm.append(el('b', '', p.name), el('small', '', `${flag(p)} ${p.label}${p.bowl ? ` · ${bowlType(p.bowl).short}` : ''}`), el('em', '', power));
@@ -3393,6 +3440,8 @@ function careerAuction(c, body) {
       const pw = el('div', 'auc-power');
       pw.append(el('b', '', heroById(p.heroId).power.name), el('span', '', heroById(p.heroId).power.desc));
       stage.append(pw);
+      // (the power's line only if the portrait keeps room: squeezed, the picture is cut off at the nose, so the line gives way)
+      requestAnimationFrame(() => { if (hero.isConnected && hero.clientHeight - (cardBox.querySelector('.auc-plate')?.offsetHeight || 64) < 150) pw.style.display = 'none'; });
     }
     const row = el('div', 'auc-actions');
     const pass = el('button', 'mf-big alt auc-pass');
