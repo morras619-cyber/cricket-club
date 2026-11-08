@@ -13,7 +13,7 @@ const fresh = () => ({
   daily: { day: 0, last: '' },
   pass: { season: 1, xp: 0, claimed: 0 }, // the season pass: tiers reached by playing, rewards claimed
   skill: { est: 50, n: 0 }, // how well you play, as the AI has learned it (js/adapt.js)
-  settings: { sound: true, haptics: true, fielding: 'key', units: 'kmh', inputOffsetMs: 0 },   // (inputOffsetMs: this phone's touch delay, measured by the touch timing screen: js/calibrate.js)
+  settings: { sound: true, haptics: true, fielding: 'key', units: 'kmh', inputOffsetMs: 0 },   // (inputOffsetMs: this phone's touch delay, measured by the touch timing screen: js/profile.js)
 });
 
 // ---------- saving: a versioned save, a rolling backup copy, a failed write that is noticed, and a code to carry a save to another phone ----------
@@ -260,3 +260,102 @@ export const fmt = {
   stint: st => `${st.runs}${st.out ? '' : '*'} (${st.balls})`,
   figures: f => `${f.wkts}/${f.runs} (${Math.floor(f.balls / 6)}.${f.balls % 6} ov)`,
 };
+
+// ===== touch timing (the touch timing screen) =====
+// Touch calibration. Every phone has its own delay between a finger touching the screen and the game seeing it, and between the game drawing something and the screen showing it
+// (a budget Android phone can add 40 to 100 ms). The batting windows are tight, so the game measures it: a ring closes on a ball on a steady beat, the player taps as it
+// closes (the same thing as meeting the ball), and the median distance between the taps and the beats is that phone's offset. The batting timing then takes it off.
+// Pure maths here (calibrationOffset); the screen and the loop are runCalibration.
+export const CAL = { warm: 4, beats: 12, gapMs: 720, windowMs: 340, minMs: -120, maxMs: 250, minTaps: 8, steadyMs: 60 };
+
+const medianOf = a => { const s = [...a].sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+
+// taps, beats: times in ms on one clock. Each beat takes the first tap within windowMs of it; the offset is the median of tap - beat (positive: the taps land late),
+// its spread the robust standard deviation of those. ok: enough taps and steady enough to trust.
+export function calibrationOffset(taps, beats, windowMs = CAL.windowMs) {
+  const diffs = [];
+  const used = new Set();
+  for (const b of beats) {
+    let best = null;
+    taps.forEach((t, i) => { if (!used.has(i) && Math.abs(t - b) <= windowMs && (best === null || Math.abs(t - b) < Math.abs(taps[best] - b))) best = i; });
+    if (best !== null) { used.add(best); diffs.push(taps[best] - b); }
+  }
+  const m = medianOf(diffs), mad = medianOf(diffs.map(d => Math.abs(d - m))), spread = 1.4826 * mad;
+  const offset = Math.round(Math.max(CAL.minMs, Math.min(CAL.maxMs, m)));
+  return { offset, spread: Math.round(spread), n: diffs.length, ok: diffs.length >= CAL.minTaps && spread <= CAL.steadyMs, raw: Math.round(m) };
+}
+
+// Runs the screen: el = { stage, ring, ball, count, say } (elements); done(result) at the end. Returns { stop }.
+export function runCalibration(el, done) {
+  const total = CAL.warm + CAL.beats, start = performance.now() + 1100, beats = Array.from({ length: total }, (_, i) => start + i * CAL.gapMs), taps = [];
+  let raf = 0, stopped = false, finished = false;
+  const onTap = e => { e.preventDefault(); if (!finished) taps.push(e.timeStamp); };
+  el.stage.addEventListener('pointerdown', onTap);
+  el.say.textContent = 'Tap the ball just as the ring closes on it';
+  const frame = () => {
+    if (stopped) return;
+    const now = performance.now();
+    const k = (now - start) / CAL.gapMs, i = Math.floor(k);       // i: the beat that has just gone, k - i how far to the next
+    if (i >= total) {
+      if (!finished && now > beats[total - 1] + 600) {
+        finished = true;
+        const res = calibrationOffset(taps.filter(t => t >= beats[CAL.warm] - CAL.windowMs), beats.slice(CAL.warm));
+        el.stage.removeEventListener('pointerdown', onTap);
+        el.ring.style.opacity = '0';
+        done(res);
+        return;
+      }
+    } else if (now >= start - CAL.gapMs) {
+      const f = k < 0 ? 1 + k : k - i;               // 0 just after a beat, nearing 1 at the next one
+      el.ring.style.opacity = i < total - 1 || k < 0 ? '1' : '0';
+      el.ring.style.transform = `scale(${(2.6 - 1.6 * f).toFixed(3)})`;
+      el.ball.style.transform = f < 0.12 ? 'scale(1.12)' : 'scale(1)';
+      el.count.textContent = i >= CAL.warm ? `${Math.min(CAL.beats, i - CAL.warm + 1)} / ${CAL.beats}` : 'warm up';
+    }
+    raf = requestAnimationFrame(frame);
+  };
+  raf = requestAnimationFrame(frame);
+  return { beats, stop() { stopped = true; cancelAnimationFrame(raf); el.stage.removeEventListener('pointerdown', onTap); } };
+}
+
+// ===== error log =====
+// A record of what went wrong on this phone. Errors the game catches itself (a frame that failed to draw, a sheet that did not load) and errors nobody caught are kept in a
+// short list in storage (the last 20, the same one only counted again), so that a player can send a problem report that says what happened, and so that a bug the game swallows
+// is no longer invisible. Nothing leaves the phone by itself: a report is text the player copies (and, once the game has a server, window.__SIXCHARGE_REPORT_URL sends it).
+const ERR_KEY = 'sixcharge.errors', ERR_MAX = 20, ERR_VERSION = '0.1.0';
+let errList = [], errInstalled = false;
+const loadErrors = () => { try { const j = JSON.parse(localStorage.getItem(ERR_KEY) || '[]'); if (Array.isArray(j)) errList = j.slice(-ERR_MAX); } catch { errList = []; } };
+const saveErrors = () => { try { localStorage.setItem(ERR_KEY, JSON.stringify(errList)); } catch { /* the log is not worth a quota error */ } };
+
+export function record(kind, err, extra = {}) {
+  const msg = String(err?.message || err || 'unknown').slice(0, 300), stack = String(err?.stack || '').split('\n').slice(0, 4).join(' | ').slice(0, 400);
+  const sig = `${kind}|${msg}|${stack.slice(0, 80)}`, hit = errList.find(e => e.sig === sig);
+  if (hit) { hit.n++; hit.last = Date.now(); }
+  else errList.push({ sig, kind, msg, stack, n: 1, first: Date.now(), last: Date.now(), ...extra });
+  if (errList.length > ERR_MAX) errList.splice(0, errList.length - ERR_MAX);
+  saveErrors();
+}
+export const errorList = () => errList.slice();
+export const errorCount = () => errList.reduce((a, e) => a + e.n, 0);
+export function clearErrors() { errList = []; saveErrors(); }
+
+export function installErrorLog(context = () => ({})) {
+  if (errInstalled || typeof window === 'undefined') return;
+  errInstalled = true; loadErrors();
+  window.addEventListener('error', e => record('error', e.error || e.message, { at: `${(e.filename || '').replace(/^.*\//, '')}:${e.lineno || 0}`, ...context() }));
+  window.addEventListener('unhandledrejection', e => record('promise', e.reason, context()));
+  const orig = console.error;
+  console.error = (...a) => { try { record('caught', a.find(x => x instanceof Error) || a.map(x => (typeof x === 'string' ? x : x?.message || '')).join(' '), context()); } catch { /* never let the log break logging */ } orig.apply(console, a); };
+}
+
+// the report a player can send: the phone, the game, and what went wrong
+export function errorReport(extra = {}) {
+  const nav = typeof navigator !== 'undefined' ? navigator : {}, win = typeof window !== 'undefined' ? window : {};
+  const head = { game: 'Sixcharge', version: ERR_VERSION, time: new Date().toISOString(), ua: nav.userAgent, screen: win.innerWidth ? `${win.innerWidth}x${win.innerHeight}@${win.devicePixelRatio || 1}` : '', ...extra };
+  return JSON.stringify({ ...head, errors: errList.map(({ sig, ...e }) => e) }, null, 1);
+}
+export async function sendReport(text) {
+  const url = typeof window !== 'undefined' && window.__SIXCHARGE_REPORT_URL;
+  if (!url) return false;
+  try { return !!navigator.sendBeacon?.(url, text) || (await fetch(url, { method: 'POST', body: text, keepalive: true })).ok; } catch { return false; }
+}

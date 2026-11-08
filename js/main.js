@@ -44,9 +44,9 @@ import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
 import { TossAnim, loadToss } from './toss.js';
 import { loadKitSprites, drawKitFielder } from './kitsprite.js';
-import { runCalibration, CAL } from './calibrate.js';
+import { runCalibration, CAL } from './profile.js';
 import { saveState, exportSave, parseSaveCode, restoreSave } from './profile.js';
-import { installErrorLog, errorReport, errorCount } from './errorlog.js';
+import { installErrorLog, errorReport, errorCount } from './profile.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -434,7 +434,7 @@ function renderSettings() {
   $('setBowlNew').textContent = game.settings.bowlNew ? 'Bowling 2.0 test: ON' : 'Bowling 2.0 test: off';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
 }
-// ---------- touch timing: this phone's delay, measured (js/calibrate.js) and taken off the batting timing ----------
+// ---------- touch timing: this phone's delay, measured (js/profile.js) and taken off the batting timing ----------
 let calRun = null, calResult = null;
 const calStop = () => { calRun?.stop(); calRun = null; };
 function renderCalibrate() {

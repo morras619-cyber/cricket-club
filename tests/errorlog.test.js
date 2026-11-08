@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) };
-const { record, errorList, errorCount, errorReport, clearErrors } = await import('../js/errorlog.js');
+const { record, errorList, errorCount, errorReport, clearErrors } = await import('../js/profile.js');
 
 test('the same error is counted, not listed again; the list keeps the last 20; the report says what happened', () => {
   clearErrors();

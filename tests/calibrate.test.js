@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calibrationOffset, CAL } from '../js/calibrate.js';
+import { calibrationOffset, CAL } from '../js/profile.js';
 
 const beats = Array.from({ length: 12 }, (_, i) => 1000 + i * 720);
 const jitter = [0, 9, -7, 12, -11, 5, -3, 8, -9, 4, 10, -6];
