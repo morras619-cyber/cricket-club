@@ -1526,7 +1526,7 @@ export class Game {
       this.hitStop(80); this.fx.flash(set ? '#cfeeff' : '#fff', 0.55);
       if (set) this.electricHit(set, at); else this.fx.burst(at.x, at.y, { color: '#ffd23f' });
       this.fx.word('PERFECT', this.W / 2, this.H * 0.3, { size: 24, color: '#ffd23f', stroke: INK, rot: 0, dur: 900 });
-      this.fx.word(SHOT_WORDS[Math.floor(Math.random() * SHOT_WORDS.length)], at.x, at.y - 30, { size: 64, color: '#fff4da', stroke: '#e8343b' });
+      this.fx.word(SHOT_WORDS[Math.floor(Math.random() * SHOT_WORDS.length)], this.W / 2, this.H * 0.37, { size: 52, color: '#fff4da', stroke: '#e8343b', dur: 750 });   // (up by the stands, clear of the batter, below the scoreboard and the pips)
       this.fx.shake(10); sfx.bat('perfect'); buzz(45);
     } else if (grade === 'defend') {
       this.fx.word('DEFENDED', this.W / 2, this.H * 0.3, { size: 42, color: '#fff4da', stroke: INK, rot: 0 });

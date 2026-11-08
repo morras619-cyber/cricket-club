@@ -8,9 +8,10 @@ export const CFG = {
   timing: { perfect: 40, good: 80, okay: 150, edge: 220, defend: 230 },
   touchSlackMs: 20,
 
-  // Simulated ball speed = real speed × paceScale, so a 140 km/h ball takes ~1 s to arrive.
-  paceScale: 0.5,
-  paceSpread: 1.35,
+  // Simulated ball speed = real speed × paceScale, so a 140 km/h ball takes ~0.75 s to arrive (an express 150 about 0.66 s, a medium 120 about 0.9 s, a spinner 1.2 s).
+  // paceSpread above 1 stretches the gaps between the types, so the fastest bowler is clearly the fastest.
+  paceScale: 0.58,
+  paceSpread: 1.5,
 
   bowling: { perfect: 35, good: 75, loose: 125, runupMs: 1100 },
 
