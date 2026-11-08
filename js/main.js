@@ -488,6 +488,8 @@ $('bkRestore').addEventListener('click', () => {
   if (restoreSave(r.profile)) location.reload(); else bkSay('<b>Could not restore</b>This phone has no room to save it.', true);
 });
 installErrorLog(() => ({ view: game.view || '', mode: game.mode || '' }));
+// the service worker (sw.js): kept loads and offline play. Not under the test bot, and a failure to register is only a slower game.
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.__SIXCHARGE_BOT) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 $('bkReport').addEventListener('click', async () => {
   sfx.click(); const text = errorReport({ schema: profile.v, saveOk: saveState.ok, saveKB: Math.round((saveState.bytes || 0) / 1024) }), box = $('bkCode'); box.value = text;
   try { await navigator.clipboard.writeText(text); bkSay(`<b>Copied</b>${errorCount() ? `${errorCount()} problem${errorCount() > 1 ? 's' : ''} noted.` : 'No problems noted.'} Send it to us.`); }
