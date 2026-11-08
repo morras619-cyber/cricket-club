@@ -1065,7 +1065,6 @@ export class Game {
     fx.showdown = this.showdown > 0;
     if (ac && (fx.focus || fx.thunder || fx.meteor || fx.mirror || fx.gap)) fx.counter = ac;
     if (ac === 'brace' && fx.showdown) this.showdownBrace = true;
-    if (fx.thunder) S.batter.glow = '#5fc8ff';
     if (fx.meteor) S.batter.glow = '#ff7a1a';
     if (fx.mirror) this.fx.flash('#7a3fe0', 0.25);
     this.timeScale = (opt.slow ?? 1) * (fx.focus ? (fx.counter === 'brace' ? BRACE.focusSlow : 0.6) : 1);
