@@ -359,3 +359,49 @@ export async function sendReport(text) {
   if (!url) return false;
   try { return !!navigator.sendBeacon?.(url, text) || (await fetch(url, { method: 'POST', body: text, keepalive: true })).ok; } catch { return false; }
 }
+
+// A second copy of the saves in the phone's own storage, for the Android app. The game keeps its saves in the web view's localStorage, which Android can clear on its own
+// (low storage, a web view update); the app's native preferences (Capacitor's Preferences plugin) are not cleared that way and are part of the phone's backup.
+// On the web (and in tests) there is no Capacitor and none of this does anything. Everything the game keeps under "sixcharge." is covered.
+// nativeReady: settles once anything missing from localStorage has been put back from the native copy; main.js waits for it before it reads the profile.
+const NATIVE_PREFIX = 'sixcharge.', NATIVE_WAIT_MS = 400;
+const nativeCap = globalThis.Capacitor;
+const nativePrefs = nativeCap?.isNativePlatform?.() ? nativeCap.registerPlugin?.('Preferences') : null;
+const nativeMine = k => typeof k === 'string' && k.startsWith(NATIVE_PREFIX);
+
+const nativePending = new Set();
+let nativeTimer = 0;
+async function nativeFlush() {
+  nativeTimer = 0;
+  const keys = [...nativePending]; nativePending.clear();
+  for (const key of keys) {
+    try {
+      const value = localStorage.getItem(key);
+      if (value === null) await nativePrefs.remove({ key }); else await nativePrefs.set({ key, value });
+    } catch { /* the web view's copy is still there */ }
+  }
+}
+const nativeQueue = key => { if (!nativeMine(key)) return; nativePending.add(key); if (!nativeTimer) nativeTimer = setTimeout(nativeFlush, NATIVE_WAIT_MS); };
+
+async function nativeHydrate() {
+  const { keys } = await nativePrefs.keys();
+  for (const key of keys.filter(nativeMine)) {
+    if (localStorage.getItem(key) !== null) continue;
+    const { value } = await nativePrefs.get({ key });
+    if (value !== null && value !== undefined) localStorage.setItem(key, value);   // (the web view lost it: the native copy comes back)
+  }
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (nativeMine(k) && !keys.includes(k)) nativePending.add(k); }   // (what the web view has and the native copy has not)
+  if (nativePending.size) nativeFlush();
+}
+
+function nativeMirror() {
+  const set = Storage.prototype.setItem, remove = Storage.prototype.removeItem, clear = Storage.prototype.clear;
+  Storage.prototype.setItem = function (k, v) { set.call(this, k, v); if (this === localStorage) nativeQueue(String(k)); };
+  Storage.prototype.removeItem = function (k) { remove.call(this, k); if (this === localStorage) nativeQueue(String(k)); };
+  Storage.prototype.clear = function () { const keys = this === localStorage ? Object.keys(localStorage) : []; clear.call(this); keys.forEach(nativeQueue); };
+  const now = () => { if (nativeTimer) { clearTimeout(nativeTimer); nativeFlush(); } };
+  addEventListener('pagehide', now);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') now(); });
+}
+
+export const nativeReady = nativePrefs ? nativeHydrate().catch(() => {}).then(nativeMirror) : Promise.resolve();

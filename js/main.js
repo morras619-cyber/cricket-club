@@ -46,7 +46,7 @@ import { TossAnim, loadToss } from './toss.js';
 import { loadKitSprites, drawKitFielder } from './kitsprite.js';
 import { runCalibration, CAL } from './profile.js';
 import { saveState, exportSave, parseSaveCode, restoreSave } from './profile.js';
-import { installErrorLog, errorReport, errorCount } from './profile.js';
+import { installErrorLog, errorReport, errorCount, nativeReady } from './profile.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -54,6 +54,7 @@ try { if (window.self !== window.top) document.documentElement.classList.add('em
 const $ = id => document.getElementById(id);
 const ui = new UI();
 const game = new Game(ui);
+await nativeReady;   // (in the Android app: anything the web view lost is put back from the phone's own copy first)
 const profile = loadProfile();
 // Uncle Dev remembers what he has told you (never during the automated test runs)
 // the coin toss art loads in the background, ready for the first match

@@ -57,5 +57,5 @@ export default defineConfig({
   base: './',
   publicDir: false,
   plugins: [localFonts(), unpackImages(), copyAssets()],
-  build: { target: 'es2020', outDir: 'dist', emptyOutDir: true, assetsInlineLimit: 0, chunkSizeWarningLimit: 2000, sourcemap: false },
+  build: { target: 'es2022', outDir: 'dist', emptyOutDir: true, assetsInlineLimit: 0, chunkSizeWarningLimit: 2000, sourcemap: false },
 });
