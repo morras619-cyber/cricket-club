@@ -35,6 +35,7 @@ for (const key of pick) {
   const D = DEVICES[key];
   const ctx = await browser.newContext({ viewport: D.viewport, deviceScaleFactor: D.dpr, isMobile: true, hasTouch: true, userAgent: UA });
   const page = await ctx.newPage();
+  page.setDefaultNavigationTimeout(240000); page.setDefaultTimeout(240000);   // (a budget phone on a slow connection takes a while: the wait is the measurement)
   const errors = [];
   page.on('pageerror', e => errors.push(String(e.stack || e).slice(0, 200)));
   const cdp = await ctx.newCDPSession(page);
@@ -52,7 +53,7 @@ for (const key of pick) {
     try { localStorage.setItem('sixcharge.coach.seen', '1'); } catch {}
   });
   const t0 = Date.now();
-  await page.goto(`http://localhost:${server.address().port}/?modes=all`);
+  await page.goto(`http://localhost:${server.address().port}/?modes=all`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => [...document.querySelectorAll('section.screen')].some(s => !s.hidden) && !document.getElementById('splash')?.offsetParent, null, { timeout: 120000 }).catch(() => {});
   const homeS = (Date.now() - t0) / 1000;
   await page.waitForTimeout(1500);
