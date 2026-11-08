@@ -107,7 +107,7 @@ const FIELD_LABEL = { key: 'Fielding: key moments', all: 'Fielding: every chance
 const fitWatch = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => fitPage(e.target))) : null;
 function fitPage(pg) {
   if (pg.parentElement && getComputedStyle(pg.parentElement).flexGrow === '0') return;
-  if (pg.querySelector('.auc-stage')) { pg.classList.add('stagepage'); return; }   // (the auction's lot lays itself out to the height: its card and buttons are never shrunk or cut)
+  if (pg.querySelector('.auc-stage, .trs')) { pg.classList.add('stagepage'); return; }   // (the auction's lot lays itself out to the height: its card and buttons are never shrunk or cut)
   if (pg.querySelector('.chirp, .tcard')) { pg.classList.add('scrolls'); return; }   // (the feed and the net-trial lists are long: they scroll instead of shrinking)
   let box = pg.querySelector(':scope > .fitbox');
   if (!box) {
@@ -2288,7 +2288,7 @@ function paintTraining(c) {
       body.append(go);
       // (a coach who teaches him can run the drill instead: a few points, and it uses one of the day's drills)
       const coach = TG.coachFor(t, roster.get(netPick)), skip = el('button', 'mf-big alt nets-skip');
-      skip.append(el('b', '', 'Skip the drill'), el('small', '', coach ? `${coach.name} runs it · +${TG.skipPoints(coach)} XP` : `Hire a coach who teaches him to skip it`));
+      skip.append(el('b', '', 'Skip the drill'), el('small', '', coach ? `${coach.name} ${'★'.repeat(coach.lvl)} runs it · +${TG.skipPoints(coach)} XP` : `Hire a coach who teaches him to skip it`));
       skip.disabled = !coach || (left < 1 && !trainTest);
       skip.addEventListener('click', async () => {
         if (trainTest) return ui.toast('The nets are for your real club, not the practice one');
@@ -3063,7 +3063,8 @@ function renderCareer(notes = careerNotes) {
   ui.show('career');
   if (c.club) { fillTopbar($('careerTop'), c, () => renderCareer()); $('careerTop').hidden = false; } else $('careerTop').hidden = true;
   const bidding = c.phase === 'auction' && careerView !== 'squad' && !!currentLot(c); // the lot on the block: the auction stage's look (css .is-auction)
-  $('career').classList.toggle('is-auction', bidding);
+  const picking = c.phase === 'trials' && !!c.trial?.results && careerView !== 'squad';   // (and the squad pick, a slide to each candidate, has the same slim screen)
+  $('career').classList.toggle('is-auction', bidding || picking);
   $('career').classList.toggle('in-auction', c.phase === 'auction' && careerView !== 'squad'); // the auction's own backdrop (css), also on its closing card
   $('career').classList.toggle('hero-mode', (c.phase === 'season' || c.phase === 'playoff') && careerView !== 'squad');   // the next match as one page: the header above it is slimmer (css .hero-mode)
   $('careerTitle').textContent = bidding ? `Season ${c.season} auction` : `Season ${c.season}`;
@@ -3312,63 +3313,80 @@ function careerTrials(c, body) {
     return;
   }
   if (!trialSel || trialSel.c !== c) trialSel = { c, bats: new Set(), bowls: new Set() };
-  note.append(el('h3', '', '✅ Pick your squad'), el('p', 'tnote', `Choose ${TRIAL_PICKS.bat} batters and ${TRIAL_PICKS.bowl} bowlers. With the keeper and you, that makes eleven.`));
-  const sign = el('button', 'bigbtn primary', '');
-  note.append(sign); body.append(note);
-  const refresh = () => {
-    const nb = trialSel.bats.size, nw = trialSel.bowls.size, ok = nb === TRIAL_PICKS.bat && nw === TRIAL_PICKS.bowl;
-    sign.textContent = ok ? 'Sign the squad' : `Batters ${nb}/${TRIAL_PICKS.bat} · Bowlers ${nw}/${TRIAL_PICKS.bowl}`;
-    sign.disabled = !ok;
-    for (const b of body.querySelectorAll('.trc')) b.classList.toggle('on', (b.dataset.k === 'bat' ? trialSel.bats : trialSel.bowls).has(b.dataset.id));
-    for (const b of body.querySelectorAll('.trc-count')) { const bat = b.dataset.k === 'bat', n = bat ? nb : nw, max = bat ? TRIAL_PICKS.bat : TRIAL_PICKS.bowl; b.textContent = n === max ? `${n} of ${max} picked` : `Pick ${max}: ${n} so far`; b.classList.toggle('full', n === max); }
-  };
-  // each candidate is a card with his picture and what he did in the nets; the cards slide up and down in a pane, the batters and the bowlers on their own tabs
+  // the pick, one candidate at a time like the auction: his picture and what he did in the nets, a slide to each of them (up and down), no panel behind
   const club = teamById(c.club);
+  const stage = el('div', 'trs'), bar = el('div', 'trs-bar'), chips = el('div', 'trs-chips'), sign = el('button', 'mf-big trs-sign');
+  const chipBat = el('span', 'trs-chip'), chipBowl = el('span', 'trs-chip');
+  chips.append(el('b', '', 'Pick your squad'), chipBat, chipBowl);
+  bar.append(chips, sign);
+  const slides = el('div', 'trs-slides'), rail = el('div', 'trs-rail');
   const dotCls = v => (v === 'W' ? 'w' : v >= 6 ? 's6' : v === 4 ? 's4' : v === 0 ? 'z' : 'r');
   const score = (r, bat) => (bat ? r.runs - 6 * r.outs : r.outs * 8 - r.runs + 0.5 * r.dots);
-  const card = (id, kind, best) => {
+  const refresh = () => {
+    const nb = trialSel.bats.size, nw = trialSel.bowls.size, ok = nb === TRIAL_PICKS.bat && nw === TRIAL_PICKS.bowl;
+    chipBat.textContent = `Batters ${nb}/${TRIAL_PICKS.bat}`; chipBat.classList.toggle('full', nb === TRIAL_PICKS.bat);
+    chipBowl.textContent = `Bowlers ${nw}/${TRIAL_PICKS.bowl}`; chipBowl.classList.toggle('full', nw === TRIAL_PICKS.bowl);
+    sign.textContent = ok ? 'Sign the squad' : 'Pick all nine'; sign.disabled = !ok;
+    for (const sl of slides.children) {
+      const bat = sl.dataset.k === 'bat', on = (bat ? trialSel.bats : trialSel.bowls).has(sl.dataset.id), btn = sl.querySelector('.trs-pick');
+      sl.classList.toggle('on', on); btn.classList.toggle('on', on);
+      btn.firstChild.textContent = on ? 'Picked ✓' : bat ? 'Pick this batter' : 'Pick this bowler';
+      btn.lastChild.textContent = on ? 'Tap to put him back' : 'He joins your eleven';
+    }
+    [...rail.children].forEach((d, i) => d.classList.toggle('picked', (slides.children[i].dataset.k === 'bat' ? trialSel.bats : trialSel.bowls).has(slides.children[i].dataset.id)));
+  };
+  const slide = (id, kind, i, of, best) => {
     const p = c.players[id], bat = kind === 'bat', r = T.results[bat ? 'bats' : 'bowls'][id];
-    const el1 = el('button', 'trc'); el1.dataset.id = id; el1.dataset.k = kind;
-    const art = el('span', 'trc-art'), pic = el('span', 'pt-pic trc-pic');
-    pic.append(paintedPortrait(p, club, { framed: true }) || playerFace(p, 120));
+    const sl = el('div', 'trs-slide'); sl.dataset.id = id; sl.dataset.k = kind;
+    const kick = el('div', 'trs-kick'); kick.append(el('b', '', `${bat ? 'BATTER' : 'BOWLER'} ${i + 1} OF ${of}`), best ? el('i', 'trc-best', 'BEST IN THE NETS') : '');
+    const hero = el('div', 'auc-hero'), cardBox = el('div', `auc-card tier-${tierOf(ovr(p)).id}`), pic = el('div', 'pt-pic auc-pic');
+    pic.append(paintedPortrait(p, club, { framed: true }) || playerFace(p, 160));
+    fitAuctionPortrait(pic);
     const badge = el('span', 'pt-ovr'); badge.append(el('b', '', String(ovr(p))), el('small', '', ROLE_TAG[p.role] || ''));
-    art.append(pic, badge, el('span', 'trc-tick', '✓'));
-    const info = el('span', 'trc-info'), top = el('span', 'trc-top');
-    top.append(el('b', '', p.name), best ? el('i', 'trc-best', 'BEST IN THE NETS') : '');
-    const kindLine = bat ? p.label : bowlType(p.bowl).name;
-    info.append(top, el('span', 'trc-sub', `${flag(p)} ${kindLine} · ${p.age} · ${bat ? `Bat ${p.bat}` : `Bowl ${p.bowlSkill}`} · ${'★'.repeat(potentialStars(p))}${'☆'.repeat(5 - potentialStars(p))}`));
+    const plate = el('div', 'auc-plate');
+    plate.append(el('b', '', p.name), el('small', '', `${flag(p)} ${bat ? p.label : bowlType(p.bowl).name} · ${p.age}`), el('em', '', `${'★'.repeat(potentialStars(p))}${'☆'.repeat(5 - potentialStars(p))} potential`));
+    cardBox.append(pic, badge, plate);
+    const side = el('div', 'auc-side'), price = el('div', 'auc-price');
     if (r) {
-      const main = el('span', 'trc-main');
-      if (bat) main.append(el('b', '', `${r.runs}`), el('small', '', `off ${r.balls} · strike rate ${r.balls ? Math.round(r.runs / r.balls * 100) : 0}`));
-      else main.append(el('b', '', `${r.outs} for ${r.runs}`), el('small', '', `${r.balls} balls · economy ${r.balls ? (r.runs / r.balls * 6).toFixed(1) : '0.0'}`));
-      const chips = el('span', 'trc-chips');
-      const chip = (n, w, tone = '') => n || tone ? chips.append(el('i', `trc-chip ${tone}`, `${n} ${w}`)) : 0;
-      if (bat) { chip(r.fours, r.fours === 1 ? 'four' : 'fours', r.fours ? 'good' : ''); chip(r.sixes, r.sixes === 1 ? 'six' : 'sixes', r.sixes ? 'good' : ''); chips.append(el('i', `trc-chip ${r.outs ? 'bad' : 'good'}`, r.outs ? `out ${r.outs}×` : 'not out')); }
-      else { chip(r.dots, r.dots === 1 ? 'dot' : 'dots', r.dots ? 'good' : ''); chip(r.fours + r.sixes, 'hit for boundaries', r.fours + r.sixes ? 'bad' : ''); }
-      info.append(main, chips);
+      price.append(el('small', '', 'IN THE NETS'));
+      if (bat) price.append(el('b', '', `${r.runs}`), el('span', '', `off ${r.balls} · strike rate ${r.balls ? Math.round(r.runs / r.balls * 100) : 0}`));
+      else price.append(el('b', '', `${r.outs} for ${r.runs}`), el('span', '', `${r.balls} balls · economy ${r.balls ? (r.runs / r.balls * 6).toFixed(1) : '0.0'}`));
+      const chips2 = el('div', 'trc-chips'), chip = (n, w, tone) => chips2.append(el('i', `trc-chip ${tone}`, `${n} ${w}`));
+      if (bat) { chip(r.fours, r.fours === 1 ? 'four' : 'fours', r.fours ? 'good' : ''); chip(r.sixes, r.sixes === 1 ? 'six' : 'sixes', r.sixes ? 'good' : ''); chips2.append(el('i', `trc-chip ${r.outs ? 'bad' : 'good'}`, r.outs ? `out ${r.outs}×` : 'not out')); }
+      else { chip(r.dots, r.dots === 1 ? 'dot' : 'dots', r.dots ? 'good' : ''); chip(r.fours + r.sixes, r.fours + r.sixes === 1 ? 'boundary' : 'boundaries', r.fours + r.sixes ? 'bad' : ''); }
+      price.append(chips2);
       if (r.seq) {   // (ball by ball; the last ball of each trial is the power ball)
-        const strip = el('span', 'trc-seq');
-        r.seq.forEach((v, i) => { const d = el('i', `trc-ball ${dotCls(v)}${i === r.seq.length - 1 ? ' pw' : ''}`, String(v)); strip.append(d); });
+        const strip = el('div', 'trc-seq');
+        r.seq.forEach((v, k) => strip.append(el('i', `trc-ball ${dotCls(v)}${k === r.seq.length - 1 ? ' pw' : ''}`, String(v))));
         strip.append(el('small', '', 'ball by ball · last = power ball'));
-        info.append(strip);
+        price.append(strip);
       }
-    } else info.append(el('span', 'trc-main', 'Not tried'));
-    el1.append(art, info);
-    el1.addEventListener('click', () => {
+    } else price.append(el('small', '', 'IN THE NETS'), el('span', '', 'Not tried'));
+    const rate = el('div', 'trs-rate'); rate.append(el('small', '', bat ? 'BATTING' : 'BOWLING'), el('b', '', String(bat ? p.bat : p.bowlSkill)));
+    side.append(price, rate);
+    hero.append(cardBox, side);
+    const pick = el('button', 'mf-big trs-pick'); pick.append(el('b', ''), el('small', ''));
+    pick.addEventListener('click', () => {
       const set = bat ? trialSel.bats : trialSel.bowls, max = bat ? TRIAL_PICKS.bat : TRIAL_PICKS.bowl;
-      if (set.has(id)) set.delete(id); else if (set.size < max) set.add(id); else ui.toast(`You can only sign ${max} ${bat ? 'batters' : 'bowlers'}: put one back first`);
+      let added = false;
+      if (set.has(id)) set.delete(id); else if (set.size < max) { set.add(id); added = true; } else ui.toast(`You can only sign ${max} ${bat ? 'batters' : 'bowlers'}: put one back first`);
       sfx.click(); refresh();
+      if (added && sl.nextElementSibling) setTimeout(() => slides.scrollTo({ top: sl.offsetTop + sl.offsetHeight, behavior: 'smooth' }), 260);   // (on to the next one)
     });
-    return el1;
+    sl.append(kick, hero, pick);
+    return sl;
   };
-  const section = (title, ids, kind, max) => {
-    const bat = kind === 'bat', res = T.results[bat ? 'bats' : 'bowls'], box = el('div', 'panel paper statcard');
-    const top = ids.reduce((m, id) => (res[id] && (!m || score(res[id], bat) > score(res[m], bat)) ? id : m), null);
-    const count = el('p', 'trc-count'); count.dataset.k = kind;
-    box.append(el('h3', '', title), count, ...ids.map(id => card(id, kind, id === top)));
-    return box;
-  };
-  body.append(section('Batters', T.bats, 'bat', TRIAL_PICKS.bat), section('Bowlers', T.bowls, 'bowl', TRIAL_PICKS.bowl));
+  for (const [kind, ids] of [['bat', T.bats], ['bowl', T.bowls]]) {
+    const res = T.results[kind === 'bat' ? 'bats' : 'bowls'];
+    const top = ids.reduce((m, id) => (res[id] && (!m || score(res[id], kind === 'bat') > score(res[m], kind === 'bat')) ? id : m), null);
+    ids.forEach((id, i) => slides.append(slide(id, kind, i, ids.length, id === top)));
+  }
+  for (let i = 0; i < slides.children.length; i++) rail.append(el('i', ''));
+  const railSync = () => { const k = Math.round(slides.scrollTop / Math.max(1, slides.clientHeight)); [...rail.children].forEach((d, i) => d.classList.toggle('here', i === k)); };
+  slides.addEventListener('scroll', railSync, { passive: true });
+  const wrap = el('div', 'trs-wrap'); wrap.append(slides, rail);
+  stage.append(bar, wrap, el('p', 'trs-hint', 'Swipe up for the next one'));
+  body.append(stage);
   sign.addEventListener('click', () => {
     if (!signTrialists(c, [...trialSel.bats], [...trialSel.bowls])) return;
     trialSel = null; sfx.dhol(); saveProfile(profile);
@@ -3376,7 +3394,7 @@ function careerTrials(c, body) {
     renderCareer();
     coachOnce('trialsDone', DEV.trialsDone);
   });
-  refresh();
+  refresh(); requestAnimationFrame(railSync);
   coachOnce('trialsPick', DEV.trialsPick);
 }
 

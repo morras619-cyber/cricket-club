@@ -142,10 +142,10 @@ export function finishDrill(t, pid, r, now, ctx) {
   t.tp[pid] = (t.tp[pid] || 0) + pts;
   seal(t); return { ok: true, pts };
 }
-// Skipping the drill: a coach who teaches the player's kind runs it instead of you. It is worth a few points, never a played drill's best (a better coach gets a little more),
+// Skipping the drill: a coach who teaches the player's kind runs it instead of you. It is worth less than a good played drill, and the better the coach, the more it is worth,
 // and it uses one of the day's drills like a played one does.
 export const coachFor = (t, p) => (p ? t.coaches.filter(c => p.kinds.includes(c.kind)).sort((a, b) => b.lvl - a.lvl)[0] || null : null);
-export const skipPoints = coach => Math.round(TRAIN.DRILL_MIN + 4 * speedOf(coach));
+export const skipPoints = coach => Math.min(TRAIN.DRILL_MAX - 5, 4 + 10 * coach.lvl);   // (a one-star coach 14, two stars 24, three stars 34: a better coach is worth a lot more)
 export function skipDrill(t, pid, now, ctx) {
   const p = ctx.squad.get(pid);
   if (!sealed(t)) return no('The books do not add up');

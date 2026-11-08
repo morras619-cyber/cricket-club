@@ -133,6 +133,7 @@ test('net drills: a coach who teaches him can run the drill instead (a few point
   assert.ok(r.ok && r.pts === T.skipPoints(coach) && t.tp.a === r.pts);
   assert.ok(r.pts > TRAIN.DRILL_MIN - 1 && r.pts < TRAIN.DRILL_MAX, 'a few points: below the best a played drill can earn');
   assert.equal(T.drillsLeft(t, 0), TRAIN.DRILLS_DAY - 1, 'it used one of the day\'s drills');
+  assert.ok(T.skipPoints({ lvl: 2 }) > T.skipPoints({ lvl: 1 }) + 5 && T.skipPoints({ lvl: 3 }) > T.skipPoints({ lvl: 2 }) + 5 && T.skipPoints({ lvl: 3 }) < TRAIN.DRILL_MAX, 'the better the coach, the more XP: a lot more');
   for (let i = 1; i < TRAIN.DRILLS_DAY; i++) assert.ok(T.skipDrill(t, 'a', 0, ctx).ok);
   assert.equal(T.skipDrill(t, 'a', 0, ctx).ok, false, 'the nets close for the day');
   assert.ok(T.sealed(t), 'the books still add up');
