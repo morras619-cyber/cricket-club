@@ -2,7 +2,7 @@
 
 A comic-book superhero cricket game for mobile browsers: 30-ball innings, a Charge Meter that powers eight original heroes, swipe batting, line-and-length bowling, and hands-on fielding (Wicket-Keeper Mode and Outfield Mode). Built as a playable vertical slice of the game design document.
 
-Plain HTML5 canvas and ES modules — no framework, no build step, no downloads beyond two Google Fonts. Aimed at mid- and low-end Android phones.
+Plain HTML5 canvas and ES modules — no framework. The source runs straight from a static server (it loads two Google Fonts); `npm run build` makes the production build used for the Android app. Aimed at mid- and low-end Android phones.
 
 ## Run it
 
@@ -11,6 +11,37 @@ npm start            # serves the folder on http://localhost:8080
 ```
 
 Open it on a phone on the same network, or use desktop Chrome's device toolbar. ES modules don't load from `file://`, so use a local server (any static server works).
+
+## Build it and run it on Android
+
+The game is wrapped as an Android app with [Capacitor](https://capacitorjs.com): `npm run build` bundles the game into `dist/`, and the `android/` project shows `dist/` in a full-screen web view. **None of this has been run on a real phone yet** (it was set up in a cloud container with no Android SDK), so expect to fix small things on the first build and tell us what you hit.
+
+**You need:** [Node 20+](https://nodejs.org), [Android Studio](https://developer.android.com/studio) (it brings the Android SDK, a JDK and Gradle), and either a phone (Settings → About phone → tap *Build number* 7 times → Developer options → turn on *USB debugging*) or an emulator made in Android Studio's Device Manager.
+
+```bash
+npm install                 # once
+npm run android:sync        # builds dist/ and copies it into the Android project (run again after every code change)
+npx cap open android        # opens the project in Android Studio
+```
+
+In Android Studio: wait for the first Gradle sync to finish (it downloads the SDK pieces; accept the licence prompts), pick your phone or emulator in the device list at the top, and press the green **Run** triangle. If Studio says the SDK is missing, open *Settings → Languages & Frameworks → Android SDK* and install the platform it names.
+
+**What to look at first on a real phone** (nothing below is verified yet):
+- Does it start, and how long does the first load take?
+- Frame rate while batting and in the outfield view (`npm run android` measures a *simulated* slow phone in desktop Chrome; it is not a substitute).
+- Touch timing: run **Settings → Touch timing** and see what offset your phone reports.
+- Sound: crowd, music, and whether it stops when you switch apps.
+- Full screen: the status and navigation bars should be hidden; check around the camera notch that nothing is cut off.
+- Saves: play a match, force-stop the app, reopen it; the progress should be there. (A second copy of the saves is kept in the phone's own storage, `js/profile.js`.)
+
+**Before the Play Store** (not done):
+1. **App id.** `com.sixcharge.game` is a placeholder and can never change after the first upload. To change it, edit `appId` in `capacitor.config.json`, `namespace` and `applicationId` in `android/app/build.gradle`, and the package line in `MainActivity.java` (and move it to the matching folder under `android/app/src/main/java/`).
+2. **Version.** Raise `versionCode` (a whole number, up by one for every upload) and `versionName` in `android/app/build.gradle`.
+3. **Signing key.** In Android Studio: *Build → Generate Signed App Bundle / APK → Android App Bundle → Create new…* Keep the keystore file and its passwords somewhere safe and **backed up outside the repo**: losing it means you cannot update the app. (Let Google manage the signing key when Play Console offers it.)
+4. **Play Console** ($25 one-off developer account): create the app, upload the `.aab`, and fill in the listing (screenshots, description), the content rating, the data-safety form and a **privacy policy** link. Start with an *internal testing* track, then closed testing, before production. New personal accounts must run a closed test with testers for a set period before they can publish; check Google's current rules.
+5. **Purchases.** Diamond packs are stubs. Real-money purchases need Google Play Billing (not wired up), and the Play listing must say the game has in-app purchases once they exist.
+
+Launcher icons and splash screens are drawn by `python3 tools/build_android_icons.py` (needs Pillow). To test the production build in a desktop browser: `npm run build && npm run preview`.
 
 ## How to play
 
@@ -90,6 +121,8 @@ Not built yet: real-money store and cosmetics, online accounts and group leaderb
 | `js/quality.js` | High/low graphics setting, picked from the device |
 | `js/ui.js`, `js/main.js` | HUD, menus, squad picker and team sheet, the over-by-over bowler picker, results and sharing |
 | `js/sharecard.js`, `js/codec.js`, `js/profile.js` | Share card, challenge links, local progression |
+| `vite.config.js`, `fonts/` | The production build (`npm run build` → `dist/`): bundles code, turns embedded images into files, ships the fonts locally |
+| `capacitor.config.json`, `android/` | The Android app that wraps `dist/` (`npm run android:sync`) |
 
 ## Development Rules
 
