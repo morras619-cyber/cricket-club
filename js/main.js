@@ -44,6 +44,7 @@ import { EMBLEM_IDS, loadCrestMasks, paintCrest } from './crest.js';
 import { stadiumThumb } from './ownground.js';
 import { TossAnim, loadToss } from './toss.js';
 import { loadKitSprites, drawKitFielder } from './kitsprite.js';
+import { runCalibration, CAL } from './calibrate.js';
 
 // framed by another app (e.g. a viewer with its own header): don't add the notch space again
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch { document.documentElement.classList.add('embedded'); }
@@ -84,6 +85,7 @@ loadBowlSprites(profile.team || 'thunder');
 sound.on = profile.settings.sound;
 sound.haptics = profile.settings.haptics;
 game.settings.fielding = profile.settings.fielding;
+game.settings.inputOffsetMs = profile.settings.inputOffsetMs || 0;
 game.settings.bowlNew = !!profile.settings.bowlNew;   // (Bowling 2.0, a test: Settings > Tools)
 units.speed = profile.settings.units === 'mph' ? 'mph' : 'kmh';
 window.__sixcharge = { game, ui, profile, moment: m => { queueMoment(m); flushMoments(); }, renderCareer: (...a) => renderCareer(...a) };   // (renderCareer: for the tests)
@@ -420,11 +422,44 @@ function renderSettings() {
   state('setHaptics', sound.haptics ? 'On' : 'Off', sound.haptics);
   state('setField', { key: 'Key moments', all: 'Every chance', off: 'Auto' }[game.settings.fielding], game.settings.fielding !== 'off');
   state('setUnits', units.speed === 'mph' ? 'mph' : 'km/h', true);
+  state('setCalibrate', profile.settings.inputOffsetMs ? `${profile.settings.inputOffsetMs > 0 ? '+' : ''}${profile.settings.inputOffsetMs} ms` : 'Calibrate', true);
   $('setMapLevel').textContent = mapLevelText();
   $('setTokens').textContent = tokenSwitch.on ? 'Match limit: ON (a match every 4 hours)' : 'Match limit: OFF (play freely)';
   $('setBowlNew').textContent = game.settings.bowlNew ? 'Bowling 2.0 test: ON' : 'Bowling 2.0 test: off';
   $('setStadiumTest').textContent = stadiumTest.level ? `Test stadium: level ${stadiumTest.level}` : 'Test stadium: off';
 }
+// ---------- touch timing: this phone's delay, measured (js/calibrate.js) and taken off the batting timing ----------
+let calRun = null, calResult = null;
+const calStop = () => { calRun?.stop(); calRun = null; };
+function renderCalibrate() {
+  ui.show('calibrate'); calStop(); calResult = null;
+  const has = profile.settings.inputOffsetMs;
+  $('calSay').textContent = has ? `Your saved timing: ${has > 0 ? '+' : ''}${has} ms. Measure again any time, or if a new phone feels off.` : 'Tap the ball just as the ring closes on it. About 20 seconds.';
+  $('calCount').textContent = ''; $('calResult').hidden = true; $('calRing').style.opacity = '0';
+  for (const [id, on] of [['calStart', true], ['calSave', false], ['calRetry', false], ['calReset', !!has], ['calBack', true]]) $(id).hidden = !on;
+}
+$('setCalibrate').addEventListener('click', () => { unlockAudio(); sfx.click(); renderCalibrate(); });
+$('calStart').addEventListener('click', () => {
+  sfx.click();
+  for (const id of ['calStart', 'calSave', 'calRetry', 'calReset', 'calBack']) $(id).hidden = true;
+  $('calResult').hidden = true;
+  calRun = runCalibration({ stage: $('calStage'), ring: $('calRing'), ball: $('calBall'), count: $('calCount'), say: $('calSay') }, res => {
+    calRun = null; calResult = res;
+    const r = $('calResult'); r.hidden = false;
+    r.innerHTML = res.ok
+      ? `<b>${res.offset > 0 ? '+' : ''}${res.offset} ms</b>Your phone's touch delay. ${res.spread <= 30 ? 'Very steady taps.' : 'Steady enough.'}`
+      : `<b>Too uneven</b>${res.n < CAL.minTaps ? `Only ${res.n} taps were near a beat.` : `Your taps were spread over about ${res.spread} ms.`} Try again and keep to the beat.`;
+    $('calSay').textContent = res.ok ? 'Save it to use it in batting.' : '';
+    for (const [id, on] of [['calSave', res.ok], ['calRetry', true], ['calBack', true]]) $(id).hidden = !on;
+  });
+});
+$('calSave').addEventListener('click', () => {
+  if (!calResult?.ok) return;
+  profile.settings.inputOffsetMs = calResult.offset; game.settings.inputOffsetMs = calResult.offset; saveProfile(profile); sfx.click(); renderSettings();
+});
+$('calRetry').addEventListener('click', () => { sfx.click(); renderCalibrate(); });
+$('calReset').addEventListener('click', () => { profile.settings.inputOffsetMs = 0; game.settings.inputOffsetMs = 0; saveProfile(profile); sfx.click(); renderCalibrate(); });
+$('calBack').addEventListener('click', () => { calStop(); sfx.click(); renderSettings(); });
 $('btnSettings').addEventListener('click', () => { unlockAudio(); settingsFrom = null; renderSettings(); });
 $('settingsBack').addEventListener('click', () => { const f = settingsFrom; settingsFrom = null; (f || renderHome)(); });
 $('setClubMap').addEventListener('click', () => { unlockAudio(); sfx.click(); renderClubMap(true); });

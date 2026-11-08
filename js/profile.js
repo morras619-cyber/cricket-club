@@ -13,7 +13,7 @@ const fresh = () => ({
   daily: { day: 0, last: '' },
   pass: { season: 1, xp: 0, claimed: 0 }, // the season pass: tiers reached by playing, rewards claimed
   skill: { est: 50, n: 0 }, // how well you play, as the AI has learned it (js/adapt.js)
-  settings: { sound: true, haptics: true, fielding: 'key', units: 'kmh' },
+  settings: { sound: true, haptics: true, fielding: 'key', units: 'kmh', inputOffsetMs: 0 },   // (inputOffsetMs: this phone's touch delay, measured by the touch timing screen: js/calibrate.js)
 });
 
 export function loadProfile() {

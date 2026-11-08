@@ -153,6 +153,21 @@ vs a random team</small></button>
     </div>
   </section>
 
+  <section id="calibrate" class="screen" hidden>
+    <div class="screen-inner">
+      <h2 class="title">Touch timing</h2>
+      <p class="cal-say" id="calSay"></p>
+      <div class="cal-stage" id="calStage"><div class="cal-ring" id="calRing"></div><img class="cal-ball" id="calBall" src="img/ball.webp" alt=""></div>
+      <div class="cal-count" id="calCount"></div>
+      <div class="panel cal-result" id="calResult" hidden></div>
+      <button class="bigbtn" id="calStart">Start</button>
+      <button class="bigbtn" id="calSave" hidden>Save</button>
+      <button class="bigbtn ghost" id="calRetry" hidden>Try again</button>
+      <button class="bigbtn ghost" id="calReset">Reset to default</button>
+      <button class="bigbtn ghost" id="calBack">Back</button>
+    </div>
+  </section>
+
   <section id="settings" class="screen" hidden>
     <div class="mf set-mf">
       <header class="mf-head set-head"><b>Settings</b></header>
@@ -164,6 +179,7 @@ vs a random team</small></button>
         <button class="setcard" id="setHaptics"><img src="img/menu/icon-haptics.webp" alt=""><b>Vibration</b><span>On</span></button>
         <button class="setcard" id="setField"><img src="img/menu/icon-fielding.webp" alt=""><b>Fielding</b><span>Key moments</span></button>
         <button class="setcard" id="setUnits"><img src="img/menu/icon-fielding.webp" alt=""><b>Ball speed</b><span>km/h</span></button>
+        <button class="setcard" id="setCalibrate"><img src="img/menu/icon-haptics.webp" alt=""><b>Touch timing</b><span>Calibrate</span></button>
       </div>
           <div class="panel paper profile"><label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label></div>
         </div>

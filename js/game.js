@@ -109,7 +109,7 @@ export class Game {
     this.onInput = null;
     this.bot = !!window.__SIXCHARGE_BOT;
     this.speed = window.__SIXCHARGE_SPEED || 1;
-    this.settings = { fielding: 'key', bowlNew: false };
+    this.settings = { fielding: 'key', bowlNew: false, inputOffsetMs: 0 };
     this.armed = {};
     this.charge = new Charge();
     this.showFps = /[?&]fps=1/.test(location.search);
@@ -1143,7 +1143,7 @@ export class Game {
     this.fx.speed = 0;
 
     // ----- resolve -----
-    const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 : null;
+    const err = swing ? (swing.t - (S.ballT0 + d.tContact)) * 1000 - (this.settings.inputOffsetMs || 0) : null;   // (less this phone's touch delay: the touch timing screen)
     // Batting 2.0: the windows and the power come from the swipe's length, where the finger came down, and the rhythm
     let bnPower = 1, bnInfo = null, wUse = w;
     if (bn && swing && !swing.defend) {
@@ -1164,7 +1164,7 @@ export class Game {
     this.lastTiming = { err, grade };
     let res;
     if (fx.meteor) {
-      const e = tap ? Math.abs((tap.t - (S.ballT0 + d.tContact)) * 1000) / this.timeScale : 999;
+      const e = tap ? Math.abs((tap.t - (S.ballT0 + d.tContact)) * 1000 - (this.settings.inputOffsetMs || 0)) / this.timeScale : 999;
       const runs = Math.max(2, (e <= 60 ? 8 : e <= 130 ? 6 : 4) - (fx.counter === 'brace' ? BRACE.meteorLess : 0));
       grade = e <= 60 ? 'perfect' : e <= 130 ? 'good' : 'late';
       res = { outcome: 'hit', grade, meteorRuns: runs, angle: rng.range(-0.3, 0.3), loft: true, launchDeg: 36, v: 40, forced: { six: true } };

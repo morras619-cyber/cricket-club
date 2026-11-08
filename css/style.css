@@ -2270,3 +2270,12 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 /* the finishing light over the match views: laid over the canvas, under the buttons (see light.js lightCss) */
 #lightFx { position: absolute; inset: 0; pointer-events: none; }
 #lightFx[hidden] { display: none; }
+
+/* Touch timing: a ring closes on a ball, on a steady beat (js/calibrate.js) */
+.cal-say { text-align: center; font: 700 15px/1.3 var(--body); margin: 4px 0 0; color: var(--paper); }
+.cal-stage { position: relative; width: 260px; height: 260px; margin: 8px auto; display: grid; place-items: center; touch-action: none; user-select: none; border-radius: 18px; background: rgba(16, 22, 50, .55); }
+.cal-ball { width: 84px; height: 84px; transition: transform .08s; pointer-events: none; }
+.cal-ring { position: absolute; width: 84px; height: 84px; border: 4px solid var(--bolt); border-radius: 50%; opacity: 0; pointer-events: none; will-change: transform; }
+.cal-count { text-align: center; font: 400 22px/1 var(--display); letter-spacing: 1px; color: var(--bolt); min-height: 24px; }
+.cal-result { padding: 10px 14px; text-align: center; font: 700 15px/1.35 var(--body); }
+.cal-result b { font: 400 26px/1.1 var(--display); letter-spacing: 1px; display: block; color: var(--bolt); }
