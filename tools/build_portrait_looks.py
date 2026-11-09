@@ -97,6 +97,37 @@ def natural_skin(path, fr, fallback):
     return hexof(palette_at(ls))
 
 
+# The painted faces are all lit warm, so a face's own colour says little; what separates a fair face from a tan one is its lightness measured the same way for every
+# portrait: the middle of the face (cheeks, nose, forehead), skin-coloured pixels only, as the median lightness. Mapped straight onto the skin between the game's
+# 'medium brown' and its 'fair' (the black players are set by hand, BLACK_FIX), so a white player's picture gives a fair man and a darker South Asian's a tan one.
+FACE_MEDIUM, FACE_FAIR = 118.0, 188.0          # the median face lightness of the darkest and the fairest non-black portraits
+TONE_MEDIUM, TONE_FAIR = (168, 113, 79), (241, 197, 163)   # '#a8714f' and a fair '#f1c5a3'
+
+
+def face_lightness(path):
+    a = np.array(Image.open(path).convert('RGBA')).astype(np.float32)
+    op = a[..., 3] > 200
+    ys, xs = np.nonzero(op)
+    if len(ys) < 100:
+        return None
+    y0, y1, x0, x1 = ys.min(), ys.max(), xs.min(), xs.max()
+    H, W = y1 - y0, x1 - x0
+    box = a[y0 + int(.10 * H):y0 + int(.40 * H), x0 + int(.30 * W):x0 + int(.70 * W)]
+    h, s, v = hsv(box[..., :3])
+    m = (box[..., 3] > 200) & (h > 5) & (h < 40) & (s > 0.2) & (s < 0.75) & (v > 0.25)
+    if m.sum() < 50:
+        return None
+    return float(np.median(box[..., :3][m] @ np.array([0.299, 0.587, 0.114])))
+
+
+def calibrated_skin(path, fallback):
+    lm = face_lightness(path)
+    if lm is None:
+        return fallback
+    t = min(1.0, max(0.0, (lm - FACE_MEDIUM) / (FACE_FAIR - FACE_MEDIUM)))
+    return hexof(np.array(TONE_MEDIUM) * (1 - t) + np.array(TONE_FAIR) * t)
+
+
 def hexof(c):
     return '#%02x%02x%02x' % tuple(int(round(v)) for v in c)
 
@@ -156,7 +187,7 @@ def main():
         k = f[:-5]
         sk, hr = look(d + f)
         frames[k] = frame(d + f)
-        sk = natural_skin(d + f, frames[k], sk)
+        sk = calibrated_skin(d + f, natural_skin(d + f, frames[k], sk))
         out[k] = {'skin': SKIN_FIX.get(k, sk), 'hair': HAIR_FIX.get(k, hr)}
     with open('js/portrait-looks.js', 'w') as fh:
         fh.write('// Skin tone and hair colour read off each painted portrait, so the player on the pitch\n')
