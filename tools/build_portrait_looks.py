@@ -97,17 +97,18 @@ def natural_skin(path, fr, fallback):
     return hexof(palette_at(ls))
 
 
-# The painted faces are all lit warm, so a face's own colour says little; what separates a fair face from a tan one is its lightness measured the same way for every
-# portrait: the middle of the face (cheeks, nose, forehead), skin-coloured pixels only, as the median lightness. Mapped straight onto the skin between the game's
-# 'medium brown' and its 'fair' (the black players are set by hand, BLACK_FIX), so a white player's picture gives a fair man and a darker South Asian's a tan one.
-FACE_MEDIUM, FACE_FAIR = 118.0, 188.0          # the median face lightness of the darkest and the fairest non-black portraits
-TONE_MEDIUM, TONE_FAIR = (168, 113, 79), (241, 197, 163)   # '#a8714f' and a fair '#f1c5a3'
+# The painted faces are all lit warm, so how light a face is says little (an Indian's painted face is as bright as a white man's); what tells them apart in these
+# paintings is how orange the skin is: a fair face is pinker and less saturated, a darker complexion is more saturated and a little deeper in value. So the tone comes from the
+# median colour of the middle of the face (cheeks, nose, forehead; skin-coloured pixels only): its saturation first, its depth second, read onto a ramp from a fair tone to a brown
+# one. The black players are set by hand (BLACK_FIX), the faces below them are all lit alike.
+SAT_FAIR, SAT_DEEP = 0.47, 0.74          # the saturation of the fairest and of the most saturated non-black face
+VAL_DEEP, VAL_LIGHT = 0.74, 0.99         # the value of the deepest and the brightest
+RAMP = [(0.00, (241, 197, 163)), (0.25, (226, 170, 130)), (0.50, (200, 138, 90)), (0.75, (180, 118, 76)), (1.00, (160, 100, 62))]   # fair '#f1c5a3' .. a deep orange-brown '#a0643e' (a painted Indian face is as orange as this; a pale peach reads as a white man on the pitch)
 
 
-def face_lightness(path):
+def face_colour(path):
     a = np.array(Image.open(path).convert('RGBA')).astype(np.float32)
-    op = a[..., 3] > 200
-    ys, xs = np.nonzero(op)
+    ys, xs = np.nonzero(a[..., 3] > 200)
     if len(ys) < 100:
         return None
     y0, y1, x0, x1 = ys.min(), ys.max(), xs.min(), xs.max()
@@ -117,15 +118,22 @@ def face_lightness(path):
     m = (box[..., 3] > 200) & (h > 5) & (h < 40) & (s > 0.2) & (s < 0.75) & (v > 0.25)
     if m.sum() < 50:
         return None
-    return float(np.median(box[..., :3][m] @ np.array([0.299, 0.587, 0.114])))
+    return np.median(box[..., :3][m], 0)
 
 
 def calibrated_skin(path, fallback):
-    lm = face_lightness(path)
-    if lm is None:
+    c = face_colour(path)
+    if c is None:
         return fallback
-    t = min(1.0, max(0.0, (lm - FACE_MEDIUM) / (FACE_FAIR - FACE_MEDIUM)))
-    return hexof(np.array(TONE_MEDIUM) * (1 - t) + np.array(TONE_FAIR) * t)
+    r, g, b = c / 255
+    mx, mn = max(r, g, b), min(r, g, b)
+    sat, val = (mx - mn) / mx if mx else 0.0, mx
+    d = 0.6 * min(1, max(0, (sat - SAT_FAIR) / (SAT_DEEP - SAT_FAIR))) + 0.4 * min(1, max(0, (VAL_LIGHT - val) / (VAL_LIGHT - VAL_DEEP)))
+    for (d0, c0), (d1, c1) in zip(RAMP, RAMP[1:]):
+        if d <= d1:
+            t = (d - d0) / (d1 - d0)
+            return hexof(np.array(c0) * (1 - t) + np.array(c1) * t)
+    return hexof(np.array(RAMP[-1][1]))
 
 
 def hexof(c):
