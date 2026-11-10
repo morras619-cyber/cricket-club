@@ -138,3 +138,24 @@ test('net drills: a coach who teaches him can run the drill instead (a few point
   assert.equal(T.skipDrill(t, 'a', 0, ctx).ok, false, 'the nets close for the day');
   assert.ok(T.sealed(t), 'the books still add up');
 });
+
+test('net drills: a batter bats, a bowler bowls, an all-rounder chooses; bowling is paid by wickets and tight overs', () => {
+  assert.deepEqual(T.drillKinds({ role: 'bat' }), ['bat']);
+  assert.deepEqual(T.drillKinds({ role: 'wk' }), ['bat']);
+  assert.deepEqual(T.drillKinds({ role: 'bowl' }), ['bowl']);
+  assert.deepEqual(T.drillKinds({ role: 'all' }), ['bat', 'bowl']);
+  assert.deepEqual(T.drillKinds({}), ['bat'], 'an old roster with no role: as before');
+  const tidy = { balls: 10, runs: 6, outs: 2, dots: 6 }, loose = { balls: 10, runs: 22, outs: 0, dots: 1 };
+  assert.ok(T.drillPoints(tidy, 'bowl') > T.drillPoints(loose, 'bowl'));
+  assert.equal(T.drillPoints(loose, 'bowl'), TRAIN.DRILL_MIN, 'a hammering still earns the minimum');
+  assert.ok(T.drillPoints(tidy, 'bowl') <= TRAIN.DRILL_MAX);
+  assert.equal(T.drillPoints({ balls: 10, runs: 12, outs: 1 }), T.drillPoints({ balls: 10, runs: 12, outs: 1 }, 'bat'), 'batting is paid as it was');
+  const squad = squadOf({ bowler: { role: 'bowl', kinds: ['pace'] }, batter: { role: 'bat' }, all: { role: 'all', kinds: ['bat', 'pace'] } });
+  const ctx = mkCtx(0, { squad }), t = T.freshTraining(0);
+  assert.equal(T.finishDrill(t, 'bowler', tidy, 0, ctx, 'bat').ok, false, 'a bowler is not sent to bat');
+  assert.equal(T.finishDrill(t, 'batter', tidy, 0, ctx, 'bowl').ok, false, 'a batter is not sent to bowl');
+  const ok = T.finishDrill(t, 'bowler', tidy, 0, ctx, 'bowl');
+  assert.ok(ok.ok && ok.pts === T.drillPoints(tidy, 'bowl') && t.tp.bowler === ok.pts);
+  assert.ok(T.finishDrill(t, 'all', tidy, 0, ctx, 'bowl').ok && T.finishDrill(t, 'all', loose, 0, ctx, 'bat').ok, 'an all-rounder may do either');
+  assert.ok(T.sealed(t));
+});

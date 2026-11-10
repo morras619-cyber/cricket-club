@@ -1627,7 +1627,7 @@ function coachKinds(p) {
   if (p.role === 'bowl' || p.role === 'all') k.push(bowlType(p.bowl).spin ? 'spin' : 'pace');
   return k;
 }
-export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { name: p.name, ovr: ovr(p), age: p.age, pot: p.pot, kinds: coachKinds(p), xp: p.xp || 0, cost: xpNeed(p) }]));
+export const trainingRoster = c => new Map(clubPlayers(c, c.club).map(p => [p.id, { name: p.name, role: p.role, ovr: ovr(p), age: p.age, pot: p.pot, kinds: coachKinds(p), xp: p.xp || 0, cost: xpNeed(p) }]));
 
 // ---------- the merchandise factory's view of the club (js/merch.js) ----------
 export const fameOf = p => p.fame ?? startFame(ovr(p));

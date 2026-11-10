@@ -2187,18 +2187,20 @@ async function renderTraining(test = false) {
   trainTimer = setInterval(() => { if ($('training').hidden) { clearInterval(trainTimer); trainTimer = 0; return; } trainReport = trainTick(c) || trainReport; paintTraining(c); }, 15000);
 }
 // a net drill: the player faces the balls himself (the net trial code in game.js); only a finished drill earns the points
-async function runDrill(c, pid) {
+async function runDrill(c, pid, kind = 'bat') {
   const t = c.training;
   if (trainTick(c) === null || TG.drillsLeft(t, serverNow()) < 1) return;
+  if (!TG.drillKinds(trainingRoster(c).get(pid)).includes(kind)) return;   // (a batter bats and a bowler bowls: never the other way round)
   trainSheet = null; clearInterval(trainTimer); trainTimer = 0;
-  const sum = await startMatch({ mode: 'tutorial', trial: { bats: [pid], bowls: [], balls: TG.TRAIN.DRILL_BALLS } });
-  const r = sum?.trial?.bats?.[pid];
+  const bat = kind === 'bat';
+  const sum = await startMatch({ mode: 'tutorial', trial: { bats: bat ? [pid] : [], bowls: bat ? [] : [pid], balls: TG.TRAIN.DRILL_BALLS } });
+  const r = sum?.trial?.[bat ? 'bats' : 'bowls']?.[pid];
   await syncClock();
-  const res = r ? TG.finishDrill(t, pid, r, serverNow(), trainCtx(c)) : null;
+  const res = r ? TG.finishDrill(t, pid, r, serverNow(), trainCtx(c), kind) : null;
   if (res?.ok) { PC.addXp(c, PC.XP.DRILL); absorbTraining(c); }
   saveProfile(profile);
   await renderTraining();
-  if (res?.ok) { trainSheet = { type: 'drilled', pid, runs: r.runs, pts: res.pts }; paintTraining(c); }
+  if (res?.ok) { trainSheet = { type: 'drilled', pid, kind, runs: r.runs, outs: r.outs, pts: res.pts }; paintTraining(c); }
   else if (res) ui.toast(res.why);
 }
 // The painted portrait is as wide as its box allows and about twice as tall as wide, with the face in its top half; in a short box (a squeezed lot) the bottom of the box cuts
@@ -2275,17 +2277,22 @@ function paintTraining(c) {
     const hero = el('div', 'nets-hero'), balls = el('div', 'nets-balls');
     for (let i = 0; i < TG.TRAIN.DRILLS_DAY; i++) balls.append(ico('ball', i < left ? 'on' : ''));
     hero.append(el('b', '', 'Net session'), balls);
-    body.append(hero, hint('ball', `Face ${TG.TRAIN.DRILL_BALLS} balls in the nets yourself: a good drill earns the player up to ${TG.TRAIN.DRILL_MAX} XP.`));
+    const netKinds = TG.drillKinds(roster.get(netPick));
+    body.append(hero, hint('ball', netKinds.length > 1 ? `An all-rounder chooses: face ${TG.TRAIN.DRILL_BALLS} balls with the bat, or bowl ${TG.TRAIN.DRILL_BALLS} at a net batter. A good drill earns up to ${TG.TRAIN.DRILL_MAX} XP.`
+      : netKinds[0] === 'bowl' ? `Bowl ${TG.TRAIN.DRILL_BALLS} balls at a net batter yourself: wickets and tight bowling earn the player up to ${TG.TRAIN.DRILL_MAX} XP.` : `Face ${TG.TRAIN.DRILL_BALLS} balls in the nets yourself: a good drill earns the player up to ${TG.TRAIN.DRILL_MAX} XP.`));
     if (list.length) {
       const row = el('div', 'ptile-row');
       for (const [pid, p] of list) row.append(playerTile(c.players[pid], club, { ovr: p.ovr, sub: `XP ${Math.round(p.xp)} / ${p.cost}`, bar: p.xp / p.cost * 100, tone: 'green', selected: pid === netPick, onClick: () => { netPick = pid; sfx.click(); paintTraining(c); } }));
       body.append(row);
-      const who = c.players[netPick], go = el('button', 'mf-big cta nets-go'), txt = el('span', 'cta-txt'), orb = el('span', 'cta-orb');
-      orb.append(ico('ball')); txt.append(el('b', '', 'Pad up'), el('small', '', `${lastName(who.name)} · ${left} left`));
-      go.append(orb, txt, el('span', 'cta-arrow', '›'));
-      go.addEventListener('click', () => { if (trainTest) return ui.toast('The nets are for your real club, not the practice one'); if (clock.state !== 'ok') return ui.toast('The nets need the server clock: try again when you are online'); if (left < 1) return ui.toast('The nets are closed for today. They open again at midnight (UTC)'); runDrill(c, netPick); });
-      go.disabled = left < 1 && !trainTest;
-      body.append(go);
+      const who = c.players[netPick];
+      for (const kind of netKinds) {   // (a batter pads up, a bowler takes the ball, an all-rounder has both)
+        const go = el('button', 'mf-big cta nets-go'), txt = el('span', 'cta-txt'), orb = el('span', 'cta-orb');
+        orb.append(ico('ball')); txt.append(el('b', '', kind === 'bat' ? 'Pad up' : 'Take the ball'), el('small', '', `${lastName(who.name)} · ${kind === 'bat' ? 'bat' : 'bowl'} · ${left} left`));
+        go.append(orb, txt, el('span', 'cta-arrow', '›'));
+        go.addEventListener('click', () => { if (trainTest) return ui.toast('The nets are for your real club, not the practice one'); if (clock.state !== 'ok') return ui.toast('The nets need the server clock: try again when you are online'); if (left < 1) return ui.toast('The nets are closed for today. They open again at midnight (UTC)'); runDrill(c, netPick, kind); });
+        go.disabled = left < 1 && !trainTest;
+        body.append(go);
+      }
       // (a coach who teaches him can run the drill instead: a few points, and it uses one of the day's drills)
       const coach = TG.coachFor(t, roster.get(netPick)), skip = el('button', 'mf-big alt nets-skip');
       skip.append(el('b', '', 'Skip the drill'), el('small', '', coach ? `${coach.name} ${'★'.repeat(coach.lvl)} runs it · +${TG.skipPoints(coach)} XP` : `Hire a coach who teaches him to skip it`));
@@ -2347,14 +2354,17 @@ function paintTraining(c) {
     if (!info) { trainSheet = null; sh.hidden = true; return; }
     const hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(p, 96), true), el('b', '', info.name), close);
     const r = el('div', 'mf-row'); r.append(ico('ball'), el('span', '', `${TG.TRAIN.DRILL_BALLS} balls · about a minute · ${left} drill${left === 1 ? '' : 's'} left today`));
-    const go = mfBtn('mf-big', [ico('ball'), el('span', '', 'Pad up')], () => runDrill(c, pid));
-    go.disabled = trainTest || left < 1 || clock.state !== 'ok';
-    card.append(hd, r, go);
+    card.append(hd, r);
+    for (const kind of TG.drillKinds(info)) {
+      const go = mfBtn('mf-big', [ico('ball'), el('span', '', kind === 'bat' ? 'Pad up' : 'Take the ball')], () => runDrill(c, pid, kind));
+      go.disabled = trainTest || left < 1 || clock.state !== 'ok';
+      card.append(go);
+    }
     if (trainTest) card.append(el('p', 'sheetnote', 'The nets are for your real club, not the practice one.'));
     else if (clock.state !== 'ok') card.append(el('p', 'sheetnote', 'The nets need the server clock: try again when you are online.'));
     else if (left < 1) card.append(el('p', 'sheetnote', 'The nets are closed for today. They open again at midnight (UTC).'));
   } else if (trainSheet.type === 'drilled') {
-    const d = trainSheet, hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(c.players[d.pid], 96), true), el('b', '', `${d.runs} off ${TG.TRAIN.DRILL_BALLS}`), close);
+    const d = trainSheet, hd = el('div', 'mf-sheet-head'); hd.append(frameOf(playerFace(c.players[d.pid], 96), true), el('b', '', d.kind === 'bowl' ? `${d.outs} for ${d.runs}` : `${d.runs} off ${TG.TRAIN.DRILL_BALLS}`), close);
     const r = el('div', 'mf-row'); r.append(ico('up'), el('span', '', `+${d.pts} XP for ${lastName(c.players[d.pid].name)}`));
     card.append(hd, r);
   } else if (trainSheet.type === 'slot') {

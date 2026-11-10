@@ -128,17 +128,21 @@ export function drillsLeft(t, now) {
   if (d.seal !== dmark(d)) return 0;                      // edited: no more drills today
   return d.day === drillDay(now) ? Math.max(0, TRAIN.DRILLS_DAY - d.n) : TRAIN.DRILLS_DAY;
 }
-export const drillPoints = r => Math.max(TRAIN.DRILL_MIN, Math.min(TRAIN.DRILL_MAX, Math.round(15 + 3 * r.runs - 5 * r.outs)));
+// What a player does in the nets: a batter bats, a bowler bowls, an all-rounder chooses (the drill trains what he does: a bowler is never sent to bat).
+export const drillKinds = p => (p?.role === 'bowl' ? ['bowl'] : p?.role === 'all' ? ['bat', 'bowl'] : ['bat']);
+// batting: the runs, less 5 a dismissal. bowling: 10 balls at a net batter, a wicket is worth a lot, a run against less, a dot a little
+export const drillPoints = (r, kind = 'bat') => Math.max(TRAIN.DRILL_MIN, Math.min(TRAIN.DRILL_MAX, Math.round(kind === 'bowl' ? 25 + 10 * r.outs - 1.5 * r.runs + 0.5 * (r.dots || 0) : 15 + 3 * r.runs - 5 * r.outs)));
 const countDrill = (t, now) => { const day = drillDay(now), used = t.drills && t.drills.day === day ? t.drills.n : 0; t.drills = { day, n: used + 1 }; t.drills.seal = dmark(t.drills); };
 // a played drill: r is what the player did ({ balls, runs, outs }); returns the points given
-export function finishDrill(t, pid, r, now, ctx) {
+export function finishDrill(t, pid, r, now, ctx, kind = 'bat') {
   const p = ctx.squad.get(pid);
   if (!sealed(t)) return no('The books do not add up');
   if (!p || !canLearn(p)) return no('He cannot learn more right now');
+  if (!drillKinds(p).includes(kind)) return no(kind === 'bat' ? 'He is a bowler: he bowls in the nets' : 'He is a batter: he bats in the nets');
   if (!r || r.balls < TRAIN.DRILL_BALLS) return no('The drill was not finished');
   if (drillsLeft(t, now) < 1) return no('The nets are closed for today');
   countDrill(t, now);
-  const pts = drillPoints(r);
+  const pts = drillPoints(r, kind);
   t.tp[pid] = (t.tp[pid] || 0) + pts;
   seal(t); return { ok: true, pts };
 }
