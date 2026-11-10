@@ -3911,12 +3911,22 @@ export class Game {
     const edges = [0, 25, 60, 100];
     box.querySelectorAll('.bw-bar i').forEach((el, i) => { el.style.setProperty('--f', `${Math.round(100 * Math.max(0, Math.min(1, (v - edges[i]) / (edges[i + 1] - edges[i]))))}%`); });
   }
+  // the shot's result, as a card: the grade large, what led to it small (the shot, the line, the timing in ms)
   batNewReport({ band, near, stage }, err, grade, res) {
-    const bits = [band === 'push' ? 'PUSH' : band === 'drive' ? 'DRIVE' : 'BIG SWING', near === 'on the line' ? 'ON THE LINE' : near === 'close' ? 'CLOSE TO THE LINE' : 'REACHING'];
-    if (err != null) bits.push(Math.abs(err) <= 25 ? 'PERFECT TIMING' : `${err < 0 ? 'EARLY' : 'LATE'} ${Math.round(Math.abs(err))}MS`);
-    bits.push(res.outcome === 'hit' ? String(grade).toUpperCase() : String(res.outcome).toUpperCase());
-    this.ui.hint(bits.join(' · '));
-    clearTimeout(this.bnHintT); this.bnHintT = setTimeout(() => this.ui.hint(null), 2400);
+    const hit = res.outcome === 'hit', g = String(hit ? grade : res.outcome).toUpperCase();
+    const word = { PERFECT: 'PERFECT', GOOD: 'GOOD', OKAY: 'OKAY', EARLY: 'EARLY', LATE: 'LATE', EDGE: 'EDGED', BEATEN: 'BEATEN', MISS: 'MISSED', LEAVE: 'LEFT', DEFEND: 'DEFENDED', DEFENDED: 'DEFENDED' }[g] || g;
+    const tone = g === 'PERFECT' ? 'gold' : g === 'GOOD' || g === 'DEFEND' || g === 'DEFENDED' || g === 'LEAVE' ? 'good' : g === 'OKAY' || g === 'EARLY' || g === 'LATE' ? 'warn' : 'bad';
+    const shot = band === 'push' ? 'Push' : band === 'drive' ? 'Drive' : 'Big swing';
+    const line = near === 'on the line' ? 'on the line' : near === 'close' ? 'close to the line' : 'reaching';
+    const timing = err == null ? '' : Math.abs(err) <= 25 ? 'perfect timing' : `${Math.round(Math.abs(err))} ms ${err < 0 ? 'early' : 'late'}`;
+    this.ui.hint(null);   // (the instruction that was up gives way to the result)
+    let card = document.getElementById('shotRep');
+    if (!card) { card = document.createElement('div'); card.id = 'shotRep'; card.className = 'shot-rep'; card.innerHTML = '<b></b><small></small>'; document.getElementById('hud').append(card); }
+    card.dataset.tone = tone;
+    card.firstChild.textContent = word;
+    card.lastChild.textContent = [shot, line, timing].filter(Boolean).join(' · ');
+    card.classList.remove('show'); void card.offsetWidth; card.classList.add('show');
+    clearTimeout(this.bnHintT); this.bnHintT = setTimeout(() => card.classList.remove('show'), 2300);
   }
   drawTimingRing(cam, movingBall = null) {
     const ctx = this.ctx, S = this.S, d = S.delivery;

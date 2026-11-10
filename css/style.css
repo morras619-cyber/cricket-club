@@ -2333,3 +2333,12 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .trs-slide .auc-price { padding: 6px 6px 7px; gap: 3px; } .trs-slide .auc-price b { font-size: clamp(26px, 8.5vw, 36px); }
 .trs-why { padding: 6px 8px 7px; gap: 3px; } .trs-row { font-size: 11.5px; line-height: 1.22; }
 .trs-pick { min-height: 50px; } .trs-pick b { font-size: 22px; }
+
+/* the shot's result card (js/game.js batNewReport): the grade large, the detail small; a short pop in, then away */
+.shot-rep { position: absolute; left: 50%; bottom: calc(var(--safe-b) + 122px); transform: translate(-50%, 8px) scale(.92); display: grid; justify-items: center; gap: 2px; padding: 7px 22px 8px; min-width: 150px; max-width: 96%; width: max-content; border-radius: 16px; background: linear-gradient(180deg, rgba(14, 22, 66, .92), rgba(6, 10, 34, .94)); border: 2px solid var(--rc, #ffd23f); box-shadow: 0 6px 18px rgba(0, 0, 0, .5), 0 0 0 1px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .18); opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .22s cubic-bezier(.2, .9, .3, 1.3); z-index: 3; }
+.shot-rep.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.shot-rep b { font: 400 30px/1 var(--display); letter-spacing: 1.5px; color: var(--rc, #ffd23f); text-shadow: 0 2px 0 rgba(0, 0, 0, .55); }
+.shot-rep small { font: 800 11px/1.15 var(--body); letter-spacing: .5px; white-space: nowrap; text-transform: uppercase; color: #cfd8ff; text-align: center; }
+.shot-rep[data-tone="gold"] { --rc: #ffd23f; } .shot-rep[data-tone="good"] { --rc: #5dff9b; } .shot-rep[data-tone="warn"] { --rc: #ffa94d; } .shot-rep[data-tone="bad"] { --rc: #ff6b6b; }
+#hud.cutin-on .shot-rep, #hud.editing .shot-rep { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .shot-rep { transition: opacity .1s; } }
