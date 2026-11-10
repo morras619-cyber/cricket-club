@@ -337,14 +337,36 @@ function crestCanvas(id) {
   return c;
 }
 
+// where the middle of the shirt is, across the band the print covers, in sheet pixels from (x, y): the middle of the shirt's width on each row, averaged over the rows
+// that are not widened by a sleeve (a row far wider than the typical one is left out), and never more than a quarter of the print's width away from where the sheet put it
+const shiftCache = new Map();
+function printShift(mask, W, H, x, y, w, hb) {
+  const key = `${W}|${x}|${y}`;
+  if (shiftCache.has(key)) return shiftCache.get(key);
+  const sc = w / BLOCK.w, y0 = Math.max(0, Math.floor(y - hb * sc / 2)), y1 = Math.min(H - 1, Math.ceil(y + hb * sc / 2)), reach = Math.round(w * 2.2);
+  const mids = [], wids = [];
+  for (let r = y0; r <= y1; r++) {
+    let lo = -1, hi = -1;
+    for (let c = Math.max(0, Math.round(x - reach)); c <= Math.min(W - 1, Math.round(x + reach)); c++) if (mask[(r * W + c) * 4 + 1] > 127) { if (lo < 0) lo = c; hi = c; }
+    if (lo >= 0) { mids.push((lo + hi) / 2); wids.push(hi - lo); }
+  }
+  let out = 0;
+  if (wids.length) {
+    const med = [...wids].sort((p, q) => p - q)[wids.length >> 1], keep = mids.filter((_, i) => wids[i] <= 1.12 * med);
+    if (keep.length) out = Math.max(-0.25 * w, Math.min(0.25 * w, keep.reduce((p, q) => p + q, 0) / keep.length - x));
+  }
+  shiftCache.set(key, out);
+  return out;
+}
+
 // the name and number, laid out as one block 400 units wide (centre at 0, 0): name cap height
 // 52, gap 26, number cap height 190; each line squeezed only if wider than the block
 const BLOCK = { w: 400, name: 52, gap: 26, num: 190 };
-function printLine(g, text, cap, cy, fill, edge) {
+function printLine(g, text, cap, cy, fill, edge, limit = BLOCK.w) {
   g.font = `800 ${Math.round(cap / 0.7)}px "Barlow Condensed", "Arial Narrow", sans-serif`;
   const asc = g.measureText('H').actualBoundingBoxAscent || cap, size = Math.round(cap / 0.7) * cap / asc;
   g.font = `800 ${size}px "Barlow Condensed", "Arial Narrow", sans-serif`;
-  const wid = g.measureText(text).width, sx = Math.min(1, BLOCK.w / wid);
+  const wid = g.measureText(text).width, sx = Math.min(1, limit / wid);
   g.save();
   g.translate(0, cy + cap / 2);
   g.scale(sx, 1);
@@ -444,12 +466,15 @@ function playerFrame(view, team, look, mirror, idx) {
     const fill = `rgb(${tr.map((v, k) => Math.round(v + (su[k] * (dark ? 0.45 : 1) - v) * mixK)).join(',')})`, close = Math.abs(lum(...hexRgb(team.trim)) - lum(...hexRgb(team.suit))) <= 0.35 * 255;
     const edge = close ? `rgb(${hexRgb(team.suit).map(x => Math.round(x * 0.35)).join(',')})` : null;
     const hb = BLOCK.name + BLOCK.gap + BLOCK.num;
+    const batView = view.startsWith('bat-');
     for (const [x, y, w, sx, sy, ang, ndx, ndy, udx, udy] of meta.place) {
       if (!near(x, y)) continue;
+      // (the batter's back is turned to us at an angle, so the spot the sheet gives is not always the middle of the back: it is moved to the middle of the shirt where the print sits)
+      const shift = batView ? printShift(data.mask, W, H, x, y, w, hb) : 0;
       for (const [text, cap, cy, dx, dy] of [[name, BLOCK.name, -hb / 2 + BLOCK.name / 2, ndx, ndy], [String(num), BLOCK.num, hb / 2 - BLOCK.num / 2, udx, udy]]) {
         lg.save();
-        lg.translate(mx(x + dx), my(y + dy)); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(w / BLOCK.w * sx, w / BLOCK.w * sy);
-        printLine(lg, text, cap, cy, fill, edge);
+        lg.translate(mx(x + dx + shift), my(y + dy)); lg.rotate(ma(ang) * Math.PI / 180); lg.scale(w / BLOCK.w * sx, w / BLOCK.w * sy);
+        printLine(lg, text, cap, cy, fill, edge, cap === BLOCK.name && batView ? BLOCK.w * 0.74 : BLOCK.w);   // (on a batter's back the name keeps to the middle of the shirt, off the sleeves)
         lg.restore();
       }
     }
