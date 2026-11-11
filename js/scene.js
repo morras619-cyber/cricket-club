@@ -871,7 +871,57 @@ function drawPlumes(ctx, P, t, flare, hi) {
 }
 
 // Moving parts of the ground, drawn every frame over the painted stadium.
+// ---------- the floodlights' glow ----------
+// The painted stadiums have their lamps painted in, bright and hard-edged. They are found in the cached picture once (its brightest, whitest spots above the boundary board) and each is
+// given a soft bloom of warm light that breathes a little, and flares up with a six. (Several lights at once, drawn as one small picture each: cheap.)
+let glowTile = null;
+function glowSprite() {
+  if (glowTile) return glowTile;
+  const c = document.createElement('canvas'); c.width = c.height = 96;
+  const g = c.getContext('2d'), r = g.createRadialGradient(48, 48, 0, 48, 48, 48);
+  r.addColorStop(0, 'rgba(255,250,225,1)'); r.addColorStop(0.18, 'rgba(255,240,190,0.7)'); r.addColorStop(0.5, 'rgba(255,225,150,0.2)'); r.addColorStop(1, 'rgba(255,215,130,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 96, 96);
+  return (glowTile = c);
+}
+function findLights(src, cam) {
+  const k = src.width / cam.W, S = 4, sw = Math.max(8, Math.round(src.width / S)), sh = Math.max(8, Math.round(src.height / S));
+  const c = document.createElement('canvas'); c.width = sw; c.height = sh;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(src, 0, 0, sw, sh);
+  const d = g.getImageData(0, 0, sw, sh).data, lim = Math.floor(cam.hy * k / S * 0.97), hot = new Uint8Array(sw * sh);
+  for (let y = 0; y < lim; y++) for (let x = 0; x < sw; x++) {
+    const i = (y * sw + x) * 4, r = d[i], gg = d[i + 1], b = d[i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+    if (mx >= 238 && mx - mn < 70 && r > 200 && gg > 195) hot[y * sw + x] = 1;
+  }
+  const lights = [], seen = new Uint8Array(sw * sh), stack = [];
+  for (let start = 0; start < hot.length; start++) {
+    if (!hot[start] || seen[start]) continue;
+    let area = 0, sx = 0, sy = 0; stack.length = 0; stack.push(start); seen[start] = 1;
+    while (stack.length) {
+      const p = stack.pop(), x = p % sw, y = (p / sw) | 0; area++; sx += x; sy += y;
+      for (const q of [p - 1, p + 1, p - sw, p + sw]) { if (q >= 0 && q < hot.length && hot[q] && !seen[q] && Math.abs((q % sw) - x) <= 1) { seen[q] = 1; stack.push(q); } }
+    }
+    if (area >= 2 && area <= 900) lights.push({ x: (sx / area) * S / k, y: (sy / area) * S / k, area });
+  }
+  lights.sort((p, q) => q.area - p.area);
+  return lights.slice(0, 18).map(l => ({ x: l.x, y: l.y, r: Math.max(14, Math.min(52, 9 + 5.5 * Math.sqrt(l.area))) }));
+}
+function drawLightGlow(ctx, cam, t, flare) {
+  if (!quality.high || !cam.bg) return;
+  const dark = NIGHT[groundOf(HOME).time] ?? 1;   // (floodlights glow only when it is getting dark: a day ground's bright spots are clouds and signs)
+  if (dark < 0.6) return;
+  if (cam.lightsFor !== cam.bg) { try { cam.lights = findLights(cam.bg, cam); } catch { cam.lights = []; } cam.lightsFor = cam.bg; }
+  if (!cam.lights?.length) return;
+  const tile = glowSprite();
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  cam.lights.forEach((l, i) => {
+    const a = Math.min(0.9, (0.3 + 0.07 * Math.sin(t * 0.0026 + i * 1.9)) * dark * (1 + 1.3 * flare)), r = l.r * (1 + 0.5 * flare);
+    ctx.globalAlpha = a; ctx.drawImage(tile, l.x - r, l.y - r, r * 2, r * 2);
+  });
+  ctx.restore();
+}
+
 export function drawAtmosphere(ctx, cam, t, flare = 0) {
+  drawLightGlow(ctx, cam, t, flare);
   const L = cam.layout;
   if (!L) return;
   const { W, H } = cam, s = L.spots, hi = quality.high;
