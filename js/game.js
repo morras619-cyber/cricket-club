@@ -239,6 +239,19 @@ export class Game {
     this.onInput = null;
   }
   hitStop(ms) { this.hitStopUntil = this.realTime + ms; }
+  // a quick camera push-in on the scene (the pitch and the players; text and effects stay put): in over the first quarter, then easing back. k: how much (0.05 = 5%).
+  punch(cx, cy, k, ms) {
+    if (this.bot || (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    this.zoomPunch = { cx, cy, k, t0: this.realTime, ms };
+  }
+  punchScale() {
+    const z = this.zoomPunch;
+    if (!z) return 1;
+    const p = (this.realTime - z.t0) / z.ms;
+    if (p >= 1) { this.zoomPunch = null; return 1; }
+    const e = p < 0.25 ? p / 0.25 : 1 - (p - 0.25) / 0.75;   // up quickly, back slowly
+    return 1 + z.k * (e * e * (3 - 2 * e));
+  }
   board(msg, ms = 4000) {
     this.boardMsg = msg; this.boardUntil = this.realTime + ms;
     if (/SIX/.test(msg)) this.flareUntil = this.realTime + 1600; // the ground celebrates: flames, fireworks
@@ -1529,7 +1542,7 @@ export class Game {
   hitBlast(at, power, grade) {
     const big = Math.min(this.W * 0.95, 420);
     const set = this.fxSet(this.myTeam);
-    if (power) { this.fx.shake(16); return; }   // (a power shot has no coloured burst, glow or flash of its own: the shake, the sound and the words)
+    if (power) { this.fx.shake(16); this.punch(at.x, at.y, 0.085, 420); return; }   // (a power shot has no coloured burst, glow or flash of its own: the shake, the sound and the words)
     if (set && grade === 'perfect') return; // contactFeedback draws the electric hit
     if (grade === 'perfect') this.fx.blast(at.x, at.y, { size: big * 0.55, dur: 360 });
   }
@@ -1537,7 +1550,7 @@ export class Game {
   contactFeedback(grade, at, err) {
     if (grade === 'perfect') {
       const set = this.fxSet(this.myTeam);
-      this.hitStop(80); this.fx.flash(set ? '#cfeeff' : '#fff', 0.55);
+      this.hitStop(80); this.fx.flash(set ? '#cfeeff' : '#fff', 0.55); this.punch(at.x, at.y, 0.05, 300);
       if (set) this.electricHit(set, at); else this.fx.burst(at.x, at.y, { color: '#ffd23f' });
       this.fx.shake(10); sfx.bat('perfect'); buzz(45);
     } else if (grade === 'defend') {
@@ -1579,7 +1592,7 @@ export class Game {
   wicketFx(text, at) {
     this.wicketCrowd();
     this.board(text.replace('!', '') + '!');
-    this.fx.flash('#e8343b', 0.4); this.fx.shake(12);
+    this.fx.flash('#e8343b', 0.4); this.fx.shake(12); this.punch(this.W / 2, this.H * 0.55, 0.07, 380);
     this.fx.word(text, this.W / 2, this.H * 0.36, { size: 62, color: '#fff4da', stroke: '#e8343b', dur: 1500 });
     this.fx.sparks(at.x, at.y, 20, ['#fff4da', '#e8343b', '#f0c27a'], 9);
     sfx.wicket(); buzz([60, 40, 60]);
@@ -1967,6 +1980,7 @@ export class Game {
         if (sim.kind === 'six' && !o.caught) {
           const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
           this.fx.word('SIX!', p.x, p.y - 40, { size: 80 });
+          this.punch(p.x, p.y, 0.07, 480);
           if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3); }
           // the crowd where it lands jumps up; a perfect six shakes the whole ground
           const T = o.side === 'ai' ? this.myTeam : this.oppTeam;
@@ -3592,6 +3606,8 @@ export class Game {
     ctx.save();
     ctx.clearRect(0, 0, W, H);
     ctx.translate(ox, oy);
+    const zs = this.punchScale();
+    if (zs !== 1) { const z = this.zoomPunch; ctx.translate(z.cx, z.cy); ctx.scale(zs, zs); ctx.translate(-z.cx, -z.cy); }
     if (this.view === 'fieldedit' && this.E) this.renderFieldEditor();
     else if (this.view === 'outfield' && this.O) this.renderOutfield();
     else if (this.view === 'bat' || this.view === 'bowl' || this.view === 'keeper') this.render3D(this.view);

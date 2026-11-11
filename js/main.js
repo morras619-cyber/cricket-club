@@ -4086,11 +4086,12 @@ function showResult(summary) {
   $('resStash').append($('shareFig'), $('shareBox'), $('resStats')); // (back to the stash: the pages below are rebuilt each match)
   ui.show('result');
   $('resTitle').textContent = win ? 'YOU WON!' : summary.result.outcome === 'tie' ? 'TIED!' : 'SO CLOSE!';
+  $('result').dataset.outcome = win ? 'win' : summary.result.outcome === 'tie' ? 'tie' : 'loss';   // (the headline's colour and the winning card's glow follow it)
   $('resText').textContent = summary.result.text;
   const cards = $('resCards');
   cards.innerHTML = '';
   for (const inn of summary.innings) {
-    const c = el('div', 'panel card');
+    const c = el('div', `panel card${(inn.side === 'player') === win ? ' won' : ''}${inn.side === 'player' ? ' mine' : ''}`);
     const who = inn.side === 'player' ? `You · ${summary.myTeam?.name || ''}` : `${summary.oppTeam?.name || 'Opponents'}`;
     c.append(el('div', 'eyebrow', who.toUpperCase()), el('div', 'score', `${inn.runs}/${inn.wkts}`), el('div', 'sub', `${inn.overs} overs`));
     cards.append(c);

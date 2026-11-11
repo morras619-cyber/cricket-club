@@ -2347,3 +2347,36 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .power { position: relative; padding-bottom: 11px; }
 .power:disabled::after { content: ''; position: absolute; left: 9px; right: 9px; bottom: 4px; height: 4px; border-radius: 3px; background: linear-gradient(90deg, #ffb52e calc(var(--pc, 0) * 100%), rgba(255, 255, 255, .18) calc(var(--pc, 0) * 100%)); box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); opacity: 1; filter: none; transition: background .25s; }
 .power.ready::after, .power.armed::after { display: none; }
+
+/* ---------- the result and stats screens: larger, calmer, filling the phone ---------- */
+#result .screen-inner { gap: 12px; padding-top: 18px; }
+#result .title { font-size: 56px; line-height: 1; letter-spacing: 1.5px; text-shadow: 0 4px 0 rgba(0, 0, 0, .55), 0 0 28px rgba(255, 210, 63, .35); }
+#result[data-outcome="win"] .title { color: #ffd23f; text-shadow: 0 4px 0 #7a4a00, 0 0 34px rgba(255, 210, 63, .6); }
+#result[data-outcome="loss"] .title { color: #ffe9d6; text-shadow: 0 4px 0 #8a1d22, 0 0 30px rgba(255, 90, 95, .4); }
+#result .lede { font-size: 16px; font-weight: 800; color: #dfe6ff; }
+#result .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#result .card { padding: 12px 12px 14px; border-radius: 16px; text-align: center; opacity: .88; }
+#result .card .eyebrow { font-size: 13px; letter-spacing: 1.2px; }
+#result .card .score { font-size: 58px; line-height: 1; margin: 4px 0 2px; }
+#result .card .sub { font-size: 14px; font-weight: 800; }
+#result .card.won { opacity: 1; border-color: #ffd23f; box-shadow: 0 0 0 2px rgba(255, 210, 63, .5), 0 0 26px rgba(255, 210, 63, .45), 0 6px 0 rgba(0, 0, 0, .35); }
+#result .card.won .score { color: #ffd23f; }
+#result .card.mine .eyebrow::before { content: '★ '; color: #ffd23f; }
+#result .tabs .tab { min-height: 54px; font-size: 19px; }
+#result .matchstats, #result .page > .panel.paper { padding: 16px 16px 18px; gap: 11px; border-radius: 18px; }
+#result .matchstats .row b { font-size: 21px; }
+#result .matchstats .row span { font-size: 15px; line-height: 1.3; }
+#result .reward-chips { gap: 10px; }
+#result .rc { padding: 12px 6px 10px; border-radius: 14px; }
+#result .rc b { font-size: 38px; line-height: 1; }
+#result .rc small { font-size: 13px; letter-spacing: 1.2px; }
+#result .menu.row .bigbtn { min-height: 60px; font-size: 24px; }
+
+/* the career stats: no paper block, the same dark panels, bigger figures */
+#stats .panel.paper { background: linear-gradient(180deg, rgba(14, 24, 74, .94), rgba(6, 10, 34, .97)); color: #fff; border: 2px solid rgba(255, 210, 63, .7); border-radius: 18px; box-shadow: 0 6px 0 rgba(0, 0, 0, .35); }
+#stats .statcard { padding: 16px 16px 18px; gap: 14px; }
+#stats .statcard h3 { font-size: 30px; color: #ffd23f; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); }
+#stats .statgrid { grid-template-columns: repeat(3, 1fr); gap: 18px 10px; }
+#stats .statgrid b { font-size: 40px; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); }
+#stats .statgrid span { font-size: 12.5px; opacity: .82; color: #cfd8ff; letter-spacing: 1px; }
+#stats .statgrid div:nth-child(-n+3) b { color: #ffd23f; font-size: 46px; }
