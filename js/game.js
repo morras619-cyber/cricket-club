@@ -117,6 +117,13 @@ export class Game {
     this.showFps = /[?&]fps=1/.test(location.search);
     this.resize();
     addEventListener('resize', () => this.resize());
+    // where a centred comic word may sit: below the scoreboard and above the players, in the three batting/bowling/keeper cameras (the top-down view puts its words where things happen)
+    this.fx.band = (W, H) => {
+      if (!['bat', 'bowl', 'keeper'].includes(this.view)) return null;
+      const sb = document.querySelector('#hud .scorecard, #hud .hud-top, #hud .scoreboard'), r = sb?.getBoundingClientRect?.();
+      const top = Math.max(H * 0.2, r && r.bottom ? r.bottom - (this.canvas?.getBoundingClientRect?.().top || 0) + 6 : H * 0.28);
+      return [top, Math.min(H * 0.5, top + H * 0.12)];
+    };
     this.bindInput();
     requestAnimationFrame(t => this.frame(t));
   }

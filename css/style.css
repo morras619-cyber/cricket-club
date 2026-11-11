@@ -2342,3 +2342,8 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 .shot-rep[data-tone="gold"] { --rc: #ffd23f; } .shot-rep[data-tone="good"] { --rc: #5dff9b; } .shot-rep[data-tone="warn"] { --rc: #ffa94d; } .shot-rep[data-tone="bad"] { --rc: #ff6b6b; }
 #hud.cutin-on .shot-rep, #hud.editing .shot-rep { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .shot-rep { transition: opacity .1s; } }
+
+/* a power that is not ready yet: a thin bar along its foot fills as the charge climbs to its cost (js/ui.js powerProgress) */
+.power { position: relative; padding-bottom: 11px; }
+.power:disabled::after { content: ''; position: absolute; left: 9px; right: 9px; bottom: 4px; height: 4px; border-radius: 3px; background: linear-gradient(90deg, #ffb52e calc(var(--pc, 0) * 100%), rgba(255, 255, 255, .18) calc(var(--pc, 0) * 100%)); box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); opacity: 1; filter: none; transition: background .25s; }
+.power.ready::after, .power.armed::after { display: none; }

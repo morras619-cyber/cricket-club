@@ -163,7 +163,9 @@ export class UI {
 
   charge(value) {
     const c = $('charge');
+    this.lastCharge = value;
     $('chargeFill').style.width = `${value}%`;
+    this.powerProgress();
     $('chargeVal').textContent = `${Math.round(value)} ⚡`;
     const sp = $('chargeSpark');
     sp.hidden = value < 2;
@@ -171,6 +173,15 @@ export class UI {
     c.setAttribute('aria-valuenow', Math.round(value));
     c.classList.toggle('t2', value >= 60 && value < 100);
     c.classList.toggle('t3', value >= 100);
+  }
+
+  // how close each power that is not ready yet is: a thin bar along the foot of its button fills as the charge climbs towards its cost
+  powerProgress() {
+    const v = this.lastCharge || 0;
+    for (const b of document.querySelectorAll('#powers .power')) {
+      const cost = +b.dataset.cost;
+      b.style.setProperty('--pc', cost > 0 ? Math.max(0, Math.min(1, v / cost)).toFixed(3) : '1');
+    }
   }
 
   portraitFor(hero, pose) {
@@ -218,11 +229,13 @@ export class UI {
       if (pn.dataset.fit !== fitKey) { setFit(pn, label); pn.dataset.fit = `${label}|${pn.clientWidth}`; }
       b.querySelector('.pcost').textContent = p.state === 'armed' ? 'ARMED' : p.cost == null ? (p.sub || '') : `${p.cost} ⚡`;
       b.disabled = p.state === 'off';
+      if (p.cost != null) b.dataset.cost = p.cost; else delete b.dataset.cost;
       b.classList.toggle('armed', p.state === 'armed');
       b.classList.toggle('ready', p.state === 'ready');
       b.setAttribute('aria-label', `${p.name}, costs ${p.cost} charge${p.state === 'armed' ? ', armed' : ''}`);
       b._onTap = p.onTap;
     }
+    this.powerProgress();
   }
 
   toast(msg, ms = 1800) {

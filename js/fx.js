@@ -164,7 +164,8 @@ export class FX {
     // every bubble and word keeps clear of the ones already on screen (placed once, then it stays)
     const taken = [];
     for (const b of this.bubbles) taken.push(drawBubble(ctx, b, W, taken, H));
-    for (const w of this.words) taken.push(drawWord(ctx, w, W, H, taken));
+    const band = this.band ? this.band(W, H) : null;   // (the sky between the scoreboard and the players: where a centred word is kept)
+    for (const w of this.words) taken.push(drawWord(ctx, w, W, H, taken, band));
     if (this.flashA > 0) {
       ctx.globalAlpha = Math.min(1, this.flashA);
       ctx.fillStyle = this.flashColor; ctx.fillRect(0, 0, W, H);
@@ -185,7 +186,7 @@ function settle(r, taken, H) {
   return r;
 }
 
-function drawWord(ctx, w, W, H, taken = []) {
+function drawWord(ctx, w, W, H, taken = [], band = null) {
   const p = w.t / w.dur;
   const pop = p < 0.12 ? p / 0.12 * 1.25 : p < 0.2 ? 1.25 - (p - 0.12) / 0.08 * 0.25 : 1;
   ctx.save();
@@ -195,6 +196,7 @@ function drawWord(ctx, w, W, H, taken = []) {
   const pad = 10, halfW = (ctx.measureText(w.text).width + w.size * 0.3) / 2, halfH = w.size * 0.62;
   const fit = W ? Math.min(1, (W / 2 - pad) / (halfW * 1.25)) : 1;
   let x = w.x, y = w.y;
+  if (band && w.ly == null && Math.abs(w.x - W / 2) < W * 0.06) y = Math.max(band[0] + halfH * fit, Math.min(band[1] - halfH * fit, y));   // (a centred word stays in the sky, clear of the players)
   if (W) {
     const hx = halfW * 1.25 * fit, hy = halfH * 1.25 * fit;
     x = Math.max(pad + hx, Math.min(W - pad - hx, x));
