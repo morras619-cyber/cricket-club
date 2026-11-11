@@ -664,6 +664,23 @@ export function drawKeeperSprite(ctx, px, py, kPerM, frame, team, view, { flip =
 // An Outfield Mode player centred at (px, py), sizePx tall, drawn upright as on the sheet.
 // view 'top' looks up the screen (back to the camera), 'front' looks down it (face visible).
 // look: the player's skin and hair (only this pose is repainted, so a whole team can be on screen)
+// A top-down figure's shadow: its own silhouette (made once for each frame, at half size), thrown down and to the right on the turf, as the floodlights do in the other views.
+const topShadows = new WeakMap();
+function topShadow(img, sx, sy, w, h) {
+  let m = topShadows.get(img);
+  if (!m) topShadows.set(img, (m = new Map()));
+  const key = `${sx},${sy},${w},${h}`;
+  let c = m.get(key);
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * 0.5)); c.height = Math.max(1, Math.round(h * 0.5));
+    const g = c.getContext('2d');
+    g.drawImage(img, sx, sy, w, h, 0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'source-in'; g.fillStyle = '#021208'; g.fillRect(0, 0, c.width, c.height);
+    m.set(key, c);
+  }
+  return c;
+}
 export function drawTopSprite(ctx, px, py, sizePx, frame, team, view = 'top', flip = false, look = null) {
   const key = 'field-' + view, v = VIEWS[key];
   if (!v || !v.ready) return false;
@@ -674,8 +691,12 @@ export function drawTopSprite(ctx, px, py, sizePx, frame, team, view = 'top', fl
   const k = sizePx / 240;
   ctx.save();
   ctx.translate(px, py);
-  ctx.fillStyle = 'rgba(10,8,20,0.28)';
-  ctx.beginPath(); ctx.ellipse(2, h * k * 0.42, sizePx * 0.3, sizePx * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(10,8,20,0.2)';
+  ctx.beginPath(); ctx.ellipse(2, h * k * 0.42, sizePx * 0.24, sizePx * 0.08, 0, 0, Math.PI * 2); ctx.fill();
+  // the cast shadow, under the figure and thrown down-right (in screen terms, whichever way he faces)
+  { const sh = topShadow(img, sx, sy, w, h); ctx.save(); ctx.translate(sizePx * 0.1, sizePx * 0.085); if (flip) ctx.scale(-1, 1);
+    ctx.globalAlpha = 0.17; ctx.drawImage(sh, -cx * k - w * k * 0.02, -cy * k - h * k * 0.02, w * k * 1.04, h * k * 1.04);
+    ctx.globalAlpha = 0.3; ctx.drawImage(sh, -cx * k, -cy * k, w * k, h * k); ctx.restore(); }
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(img, sx, sy, w, h, -cx * k, -cy * k, w * k, h * k);
   ctx.restore();
