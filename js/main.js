@@ -3191,7 +3191,7 @@ const KIT_COLOURS = ['#1f5fd6', '#123a7a', '#5fb4e8', '#0f8a8a', '#1e7a32', '#9b
   '#e8262b', '#8b1c24', '#ec2f9a', '#6a22c4', '#1f1f26', '#8f9296', '#ffffff', '#c8913a'];
 let mk = null;
 function renderMakeClub(c) {
-  mk = mk?.c === c ? mk : { c, name: '', short: '', ground: '', groundSet: false, suit: '#e8262b', trim: '#ffcf1a', emblem: 'bolt', chant: 'default', pitch: 'flat', n: 0 };
+  mk = mk?.c === c ? mk : { c, name: '', short: '', ground: '', groundSet: false, suit: '#e8262b', trim: '#ffcf1a', emblem: 'lion', chant: 'default', pitch: 'flat', n: 0 };
   ui.show('makeclub');
   $('mkNameIn').value = mk.name; $('mkShortIn').value = mk.short; $('mkGroundIn').value = mk.ground;
   $('mkNameIn').placeholder = 'e.g. Mumbai Meteors'; $('mkShortIn').placeholder = 'MUM'; $('mkGroundIn').placeholder = 'e.g. Meteor Park';
