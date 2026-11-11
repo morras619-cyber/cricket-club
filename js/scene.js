@@ -1293,6 +1293,20 @@ export class OutfieldView {
         });
         g.restore();
       }
+      // floodlit turf: the light falls on the middle of the ground and the edges go darker, the 30-yard circle a shade fresher and the square the pitch sits in freshly mown
+      g.save();
+      g.beginPath(); g.ellipse(c.x, c.y, gr * k, gr * k * 0.78, 0, 0, Math.PI * 2); g.clip();
+      g.translate(c.x, c.y); g.scale(1, 0.78);
+      const lit = g.createRadialGradient(0, -R * k * 0.1, 0, 0, 0, gr * k);
+      lit.addColorStop(0, 'rgba(255,250,190,0.12)'); lit.addColorStop(0.4, 'rgba(255,250,190,0.02)'); lit.addColorStop(0.7, 'rgba(0,28,12,0.14)'); lit.addColorStop(1, 'rgba(0,18,8,0.5)');
+      g.fillStyle = lit; g.beginPath(); g.arc(0, 0, gr * k, 0, Math.PI * 2); g.fill();
+      // four pools of floodlight on the turf, where the towers throw it
+      for (const [px, py] of [[-0.55, -0.5], [0.55, -0.5], [-0.55, 0.5], [0.55, 0.5]]) {
+        const pool = g.createRadialGradient(px * gr * k, py * gr * k, 0, px * gr * k, py * gr * k, 0.5 * gr * k);
+        pool.addColorStop(0, 'rgba(255,248,200,0.10)'); pool.addColorStop(1, 'rgba(255,248,200,0)');
+        g.fillStyle = pool; g.beginPath(); g.arc(0, 0, gr * k, 0, Math.PI * 2); g.fill();
+      }
+      g.restore();
   }
   drawGround(ctx) {
     const { W, H, k } = this;
@@ -1355,7 +1369,10 @@ export class OutfieldView {
       const tr = trimOf(sa), sc = ctx.getTransform().a;
       const sm = sa.pitchFresh ? shrunk(sa, pt, (b.x - a.x) * sc, (b.y - a.y) * sc) : pt;   // (a strip drawn small is shrunk in steps: one big jump leaves it speckled and the bands and edges lost)
       ctx.imageSmoothingQuality = 'high';
+      ctx.save(); ctx.shadowColor = 'rgba(0,24,8,0.55)'; ctx.shadowBlur = Math.max(4, 0.55 * this.k); ctx.shadowOffsetY = Math.max(1, 0.12 * this.k); ctx.fillStyle = '#c9a874'; ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); ctx.restore();   // (the strip sits on the turf: its shadow)
       ctx.drawImage(sm, pw(sm) * tr, 0, pw(sm) * (1 - 2 * tr), ph(sm), a.x, a.y, b.x - a.x, b.y - a.y);
+      // the strip is lit and rolled: lighter down the middle, shaded to its edges, a soft shadow cast on the turf
+      { const g2 = ctx.createLinearGradient(a.x, 0, b.x, 0); g2.addColorStop(0, 'rgba(60,36,10,0.22)'); g2.addColorStop(0.3, 'rgba(255,240,200,0.10)'); g2.addColorStop(0.7, 'rgba(255,240,200,0.10)'); g2.addColorStop(1, 'rgba(60,36,10,0.22)'); ctx.fillStyle = g2; ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); }
       if (sa.pitchFresh) { ctx.strokeStyle = 'rgb(20,16,24)'; ctx.lineWidth = Math.max(1, 0.055 * this.k); }   // (the strip's ink edge, as fine as in the match views)
       else { ctx.strokeStyle = 'rgba(20,16,24,0.35)'; ctx.lineWidth = 0.6; }
       ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
