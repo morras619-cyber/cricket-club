@@ -1263,7 +1263,7 @@ export class Game {
       wasWide = true;
     } else if (res.outcome === 'leave' || res.outcome === 'beaten') {
       this.bowlCrowd(res.outcome === 'beaten' ? 'dot' : 'runs');
-      this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });
+      if (this.realTime - (this.cardAt || -1e9) >= 1500) this.fx.word(res.outcome === 'leave' ? 'LEFT' : 'BEATEN!', this.W / 2, this.H * 0.4, { size: 46, color: '#fff4da', stroke: '#3ec6ff' });   // (the result card under the batter says it)
       inn.ball({ runs: 0, missed: res.outcome === 'beaten' });
       if (res.outcome === 'beaten') this.charge.missed(); else this.charge.dot();   // (a swing and a miss costs charge; a leave, like a block, keeps it level)
     } else if (res.outcome === 'edge') {
@@ -1469,7 +1469,6 @@ export class Game {
       if (!wicketFell || inn.wkts < CFG.wickets) {
         this.playerRevenge = true;
         if (this.oppTeam.id !== this.home) this.boo(0.2); // the home crowd boos the visiting sledger
-        this.ui.banner('HE\'S TALKING', 'Hit a boundary next ball for +10 REVENGE', 1700);
         // you may answer him: it starts a duel
         if (!wicketFell && this.heatOn && !this.pairOn()) {
           await this.sleepReal(this.bot ? 50 : 700);
@@ -2721,7 +2720,6 @@ export class Game {
       this.lastBanterBall = inn.balls;
       this.say('batter', this.batterOf(inn), this.oppTeam, line('batterSledge', them.id, rng), { dur: 2000 });
       this.revenge = true;
-      this.ui.banner('THEY\'RE TALKING', 'Dot ball or wicket next = +10 REVENGE', 1800);
       await this.sleepReal(this.bot ? 50 : 1300);
       // you may answer him: it starts a duel
       if (this.heatOn && !this.pairOn()) await this.duelChoice(inn, line('sledge', me.id, rng), bowl(), 'ANSWER HIM?', 'Talk back to start a duel');
