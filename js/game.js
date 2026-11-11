@@ -30,7 +30,7 @@ import { CROWD_TIMING } from './chirp.js';
 import { DISCO_MS, DISCO_LEAD_MS, discoColors, lightColors, drawDisco } from './disco.js';
 import { quality } from './quality.js';
 import { groundOf, pitchOf, homeFromSeed } from './grounds.js';
-import { sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdSong, crowdRuns, sixMusic, crowdBoo, crowdClap, ambienceMood } from './audio.js';
+import { lively, sfx, buzz, unlockAudio, cheerStart, cheerStop, crowdOhh, crowdResolve, crowdSoften, crowdStop, crowdSing, crowdSong, crowdRuns, sixMusic, crowdBoo, crowdClap, ambienceMood } from './audio.js';
 import { heat, RUNAWAY, TROUBLE } from './crowdheat.js';
 import { TAUNTS, pick } from './story.js';
 import { Duels, FULL, HOLD, gainOf, hotSpec, Mind, COUNTERS, BRACE, STEADY_SQUEEZE, COUNTER_WINDOW_MS, affordable } from './heat.js';
@@ -1873,7 +1873,7 @@ export class Game {
       let tClear = end;
       if (six) for (let tt = 0; tt <= path.T + 0.01; tt += 0.02) { const q = path.ballAt(tt); if (Math.hypot(q.x, q.y - CFG.ground.centerY) > CFG.ground.boundaryR) { tClear = tt; break; } }
       cheerStart(tClear / ballK / 1.6, six ? (grade === 'perfect' ? 1.45 : 1.3) : 1.1);
-      if (six) this.disco = { at: this.realTime + tClear / ballK / 1.6 * 1000 - DISCO_LEAD_MS, colors: cosmetics.lights && this.myTeam.id === this.home ? lightColors(cosmetics.lights) : discoColors(teamById(this.home)) };   // (disco lights in the club's colours, as the ball clears the rope)
+      if (six && lively()) this.disco = { at: this.realTime + tClear / ballK / 1.6 * 1000 - DISCO_LEAD_MS, colors: cosmetics.lights && this.myTeam.id === this.home ? lightColors(cosmetics.lights) : discoColors(teamById(this.home)) };   // (disco lights in the club's colours, as the ball clears the rope)
       if (six) { const sec = tClear / ballK / 1.6; this.sing(sec + (sixMusic(sec) || 2.2), 4.5, 0.45); } // (the celebration music as the ball clears the rope, then directly after it the crowd sings a few seconds)
     } else if ((runs === 2 || runs === 3) && !o.caught && (o.side === 'ai' ? this.myTeam : this.oppTeam).id === this.home) {
       crowdRuns(0.1); this.runsCheered = true;   // (two or three for the home side: its own cheer, with the applause riding it)
@@ -1970,7 +1970,7 @@ export class Game {
           const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
           const huge = this.sixDistance(sim) >= HUGE_SIX_M;
           this.fx.word(huge ? 'OUT OF THE PARK!' : 'SIX!', p.x, p.y - 40, { size: huge ? 64 : 80 });
-          if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3); }
+          if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); if (lively()) this.fx.flash('#ffd23f', 0.3); }
           // the crowd where it lands jumps up; a perfect six shakes the whole ground
           const T = o.side === 'ai' ? this.myTeam : this.oppTeam;
           this.fx.ripple(p.x, p.y, { colors: [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], r: grade === 'perfect' ? 150 : 110 });

@@ -3,6 +3,10 @@ let ac = null, master = null, noiseBuf = null;
 export const sound = { on: true, haptics: true };
 // the net trials have no crowd: nothing of a crowd is heard while this is on (the bed, the cheers, the groans, the boos, the singing, the applause)
 export const crowdMute = { on: false };
+// how alive the stadium is: 1 is the top division's full atmosphere. A lower division plays to a thin crowd: every crowd sound is that much
+// quieter, and the celebration music, the singing and the disco lights are left out (lively() is false below 0.6). Set for a career match.
+export const atmosphere = { level: 1 };
+export const lively = () => atmosphere.level >= 0.6;
 
 export function unlockAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); musicSync(); return; }
@@ -103,7 +107,7 @@ export const sfx = {
   stumps() { noise(0.25, { gain: 0.8, freq: 900, q: 1.2 }); tone(220, 0.2, { type: 'square', gain: 0.15, to: 80 }); },
   glove() { noise(0.12, { gain: 0.7, freq: 400, q: 1 }); tone(110, 0.15, { gain: 0.6, to: 60 }); },
   trombone() { [392, 370, 349, 262].forEach((f, i) => tone(f, i === 3 ? 0.6 : 0.22, { type: 'sawtooth', gain: 0.12, delay: i * 0.22, to: i === 3 ? 220 : null })); },
-  crowd(intensity = 1) { if (crowdMute.on) return; if (ac && ac.currentTime < roarUntil) return; /* (the boundary cheer is the crowd) */ noise(1.6 * intensity, { gain: 0.18 * intensity, freq: 900, q: 0.4, attack: 0.25 }); },
+  crowd(intensity = 1) { if (crowdMute.on) return; if (ac && ac.currentTime < roarUntil) return; /* (the boundary cheer is the crowd) */ noise(1.6 * intensity, { gain: 0.18 * intensity * atmosphere.level, freq: 900, q: 0.4, attack: 0.25 }); },
   whoosh() { noise(0.35, { gain: 0.4, freq: 600, q: 0.6, type: 'lowpass', attack: 0.1 }); },
   boom() { tone(70, 0.8, { gain: 0.9, to: 30 }); noise(0.6, { gain: 0.6, freq: 200, q: 0.5, type: 'lowpass' }); },
   zap() { tone(1400, 0.18, { type: 'sawtooth', gain: 0.18, to: 200 }); noise(0.15, { gain: 0.3, freq: 4000, q: 3 }); },
@@ -153,7 +157,7 @@ export function cheerStart(sec, power = 1.2) {
   if (!cheerBuf) { loadCheer(); return; }
   const t = ac.currentTime, from = Math.max(0, CUE - sec), delay = Math.max(0, sec - CUE);
   const src = ac.createBufferSource(), vol = ac.createGain(), fadeIn = ac.createGain(), stopG = ac.createGain();
-  vol.gain.value = power * CHEER_SOFT;
+  vol.gain.value = power * CHEER_SOFT * atmosphere.level;
   if (from > 0) { fadeIn.gain.setValueAtTime(0.0001, t); fadeIn.gain.linearRampToValueAtTime(1, t + Math.max(0.3, Math.min(0.8, sec * 0.5))); }
   src.buffer = cheerBuf; src.connect(vol).connect(fadeIn).connect(stopG).connect(master); src.start(t + delay, from);
   cheerNow = { src, stopG };
@@ -189,7 +193,7 @@ export function crowdOhh() {
   if (!ready()) return;
   if (!bowlBufs) { loadBowlCrowd(); return; }
   const t = ac.currentTime, src = ac.createBufferSource(), vol = ac.createGain(), stopG = ac.createGain();
-  vol.gain.value = 1.1 * CHEER_SOFT;
+  vol.gain.value = 1.1 * CHEER_SOFT * atmosphere.level;
   src.buffer = bowlBufs.ohh; src.connect(vol).connect(stopG).connect(master); src.start(t);
   ohhNow = { src, stopG };
 }
@@ -211,7 +215,7 @@ export function crowdResolve(kind) {
   if (!ready() || (kind !== 'wicket' && kind !== 'dot')) return;
   if (!bowlBufs) { loadBowlCrowd(); return; }
   const t = ac.currentTime, src = ac.createBufferSource(), g = ac.createGain(), buf = kind === 'wicket' ? bowlBufs.wicket : bowlBufs.hoo;
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(kind === 'wicket' ? 1.1 * CHEER_SOFT : 0.95, t + 0.03);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime((kind === 'wicket' ? 1.1 * CHEER_SOFT : 0.95) * atmosphere.level, t + 0.03);
   const skip = kind === 'wicket' ? 0.1 : 0;                                  // (the wicket recording opens with 0.12 s of near-silence: start past it)
   src.buffer = buf; src.connect(g).connect(master); src.start(t, skip);
   roarUntil = Math.max(roarUntil, t + (buf.duration - skip) * 0.7);                 // (the synthetic crowd stays quiet under it)
@@ -265,12 +269,12 @@ export function crowdRuns(delay = 0) {
   const now = ac.currentTime, t = now + Math.max(0, delay);
   if (t < clapUntil || now < roarUntil) return;
   cheerStop(0.15); singDuck(0.4);
-  const d = runsBuf.duration - RUNS_FROM, src = ac.createBufferSource(), g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(RUNS_GAIN, t + 0.04);
-  g.gain.setValueAtTime(RUNS_GAIN, t + d - 0.45); g.gain.linearRampToValueAtTime(0.0001, t + d);   // (the recording is cut short: let it fade out)
+  const d = runsBuf.duration - RUNS_FROM, src = ac.createBufferSource(), g = ac.createGain(), rg = RUNS_GAIN * atmosphere.level;
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(rg, t + 0.04);
+  g.gain.setValueAtTime(rg, t + d - 0.45); g.gain.linearRampToValueAtTime(0.0001, t + d);   // (the recording is cut short: let it fade out)
   src.buffer = runsBuf; src.connect(g).connect(master); src.start(t, RUNS_FROM);
   const clap = moodBufs.claps[clapNext++ % moodBufs.claps.length], cs = ac.createBufferSource(), cg = ac.createGain(), tc = t + RUNS_CLAP_AT;
-  cg.gain.setValueAtTime(0.0001, tc); cg.gain.linearRampToValueAtTime(RUNS_CLAP, tc + 0.5);
+  cg.gain.setValueAtTime(0.0001, tc); cg.gain.linearRampToValueAtTime(RUNS_CLAP * atmosphere.level, tc + 0.5);
   cs.buffer = clap; cs.connect(cg).connect(master); cs.start(tc);
   clapUntil = tc + clap.duration;
   roarUntil = Math.max(roarUntil, tc + clap.duration * 0.7);                   // (the synthetic crowd stays quiet under it)
@@ -285,7 +289,7 @@ function loadSix() {
   return sixLoading;
 }
 export function sixMusic(sec = 0) {
-  if (crowdMute.on) return 0;
+  if (crowdMute.on || !lively()) return 0;
   if (!ready()) return 0;
   if (!sixBuf) { loadSix(); return 0; }
   const t = ac.currentTime + Math.max(0, sec), d = sixBuf.duration, src = ac.createBufferSource(), g = ac.createGain();
@@ -320,7 +324,7 @@ export async function previewChant(id) {
 }
 // sing for `sec` seconds starting `delay` seconds from now, at volume `vol`
 export function crowdSing(delay = 0, sec = 5, vol = 0.5) {
-  if (crowdMute.on) return;
+  if (crowdMute.on || !lively()) return;
   if (!ready()) return;
   const buf = song || defaultSong;
   if (!buf) { if (!songsLoading) crowdSong(songFor || 'thunder'); return; }   // (the singing has not arrived yet: it is fetched now and plays next time)
@@ -354,7 +358,7 @@ export function crowdClap(delay = 0) {
   if (t < clapUntil || now < roarUntil) return;
   const buf = moodBufs.claps[clapNext++ % moodBufs.claps.length], src = ac.createBufferSource(), g = ac.createGain();
   singDuck(0.4);
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(CLAP_VOL, t + 0.3);   // (applause sits well under the other crowd sounds, and swells in)
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(CLAP_VOL * atmosphere.level, t + 0.3);   // (applause sits well under the other crowd sounds, and swells in)
   src.buffer = buf; src.connect(g).connect(master); src.start(t);
   clapUntil = t + buf.duration;
   roarUntil = Math.max(roarUntil, t + buf.duration * 0.7);                 // (the synthetic crowd stays quiet under it)
@@ -367,7 +371,7 @@ export function crowdBoo(delay = 0) {
   if (!moodBufs) { loadMood(); return; }
   singDuck(0.4);
   const t = ac.currentTime + Math.max(0, delay), src = ac.createBufferSource(), g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.1);   // softer than it was, but in at once
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5 * atmosphere.level, t + 0.1);   // softer than it was, but in at once
   let pick; do pick = Math.floor(Math.random() * moodBufs.boos.length); while (pick === lastBoo);
   lastBoo = pick;
   src.buffer = moodBufs.boos[pick]; src.connect(g).connect(master); src.start(t);
@@ -397,7 +401,7 @@ export function startAmbience() {
     if (!buf || run !== ambRun || !ready()) return; // (stopped, or muted, while it loaded)
     const bus = ac.createGain(), t = ac.currentTime;
     bus.gain.setValueAtTime(0.0001, t); bus.gain.linearRampToValueAtTime(1, t + 1.5);
-    const moodG = ac.createGain(); moodG.gain.value = ambLevel;   // (the murmur follows how the match is going for the home side)
+    const moodG = ac.createGain(); moodG.gain.value = ambLevel * Math.sqrt(atmosphere.level);   // (the murmur follows how the match is going for the home side)
     bus.connect(moodG).connect(master);
     const srcs = AMBIENCE.map(({ rate, gain }, i) => {
       const src = ac.createBufferSource(), g = ac.createGain();
@@ -414,7 +418,7 @@ export function ambienceMood(x) {
   ambLevel = x < 0 ? 1 - 0.15 * x : 1 + 0.2 * x;
   if (!amb) return;
   const g = amb.moodG.gain, t = ac.currentTime;
-  g.cancelScheduledValues(t); g.setTargetAtTime(ambLevel, t, 0.8);
+  g.cancelScheduledValues(t); g.setTargetAtTime(ambLevel * Math.sqrt(atmosphere.level), t, 0.8);
 }
 export function stopAmbience() {
   ambRun++;
