@@ -64,6 +64,8 @@ const BOWL_RUNUP_M = 8.6, SPIN_BOWL_RUN_MS = 900, BOWL_RUN_MS = 930;
 // and its ball through the air, quicker than its km/h alone would make it (the speed shown stays)
 const SPIN_FLIGHT = 1.3;
 const nextTip = tipFeed();   // (shared by every loading screen of the session)
+// a six this far is out of the ground: over the stands and away (the boundary is 62 m; no extra runs, it is the moment that is bigger)
+const HUGE_SIX_M = 100;
 const SHOT_WORDS = ['THWACK!', 'DHOOM!', 'KRAK!', 'BLAM!', 'SMASH!'];
 
 // The opposing side's heroes: their own team's star, in his slot.
@@ -1720,7 +1722,7 @@ export class Game {
       sfx.crowd(this.home === this.myTeam.id ? 1.5 : 1.2);
       const powered = fx.thunder;
       if (powered) this.fx.word('KRAKOOOM!', this.W / 2, this.H * 0.3, { size: 76, color: '#5fc8ff', stroke: INK });
-      this.addMoment(powered ? 'powerSix' : 'six', powered ? `${this.sixDistance(sim)}m THUNDERCLAP SIX!` : `${this.sixDistance(sim)}m SIX!`, powered ? 'KRAKOOOM!' : 'SIX!', this.heroFor('bat'), { ballNo, detail: 'into the stands' });
+      this.addMoment(powered ? 'powerSix' : 'six', powered ? `${this.sixDistance(sim)}m THUNDERCLAP SIX!` : this.sixDistance(sim) >= HUGE_SIX_M ? `${this.sixDistance(sim)}m · OUT OF THE PARK!` : `${this.sixDistance(sim)}m SIX!`, powered ? 'KRAKOOOM!' : 'SIX!', this.heroFor('bat'), { ballNo, detail: 'into the stands' });
     } else if (runs === 4) {
       this.board('FOUR!');
       this.charge.award('four', 'FOUR');
@@ -1966,18 +1968,19 @@ export class Game {
         const p = this.of.to(b.x, b.y, b.h);
         if (sim.kind === 'six' && !o.caught) {
           const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
-          this.fx.word('SIX!', p.x, p.y - 40, { size: 80 });
+          const huge = this.sixDistance(sim) >= HUGE_SIX_M;
+          this.fx.word(huge ? 'OUT OF THE PARK!' : 'SIX!', p.x, p.y - 40, { size: huge ? 64 : 80 });
           if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); this.fx.flash('#ffd23f', 0.3); }
           // the crowd where it lands jumps up; a perfect six shakes the whole ground
           const T = o.side === 'ai' ? this.myTeam : this.oppTeam;
           this.fx.ripple(p.x, p.y, { colors: [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], r: grade === 'perfect' ? 150 : 110 });
           this.fx.sparks(p.x, p.y, grade === 'perfect' ? 30 : 18, [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], 6);
-          this.fx.shake(grade === 'perfect' ? 26 : 14);
-          sfx.crowd(grade === 'perfect' ? 1.8 : 1.2);
+          this.fx.shake(huge ? 30 : grade === 'perfect' ? 26 : 14);
+          sfx.crowd(huge ? 2 : grade === 'perfect' ? 1.8 : 1.2);
           // how far it went
           const m = this.sixDistance(sim);
           this.fx.word(`${m} METRES`, p.x, p.y + 30, { size: 40, color: '#fff4da', stroke: '#e8343b', rot: 0, dur: 1400 });
-          this.board(`${m}m SIX!`);
+          this.board(huge ? `${m}m · OUT OF THE PARK!` : `${m}m SIX!`);
         }
         else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
         else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); this.fieldingGroan(o.side === 'ai' ? this.oppTeam : this.myTeam); }

@@ -170,6 +170,8 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   const alignment = lateralInfluence * Math.sin(shot.angle);
   power *= 1 + alignment * 0.12;
   angle += lateralInfluence * 0.12;  let launchDeg = loft ? 28 + rng.range(0, 10) : 0;
+  const plainLoft = loft && !fx.thunder && !fx.tornado;   // (an ordinary lofted shot: its launch angle is the one drawn just above; the scoop, the top edge and the powers set their own)
+  const drawn = launchDeg;
   let label = '';
 
   if (d.length === 'yorker' && grade !== 'perfect') power *= 0.6;
@@ -203,6 +205,14 @@ export function resolveContact({ grade, errMs = 0, shot, d, fx = {}, rng, streng
   let v = (14 + 20 * power) * (1 + rng.range(-0.04, 0.04)) * strength * (fx.pitch?.carry || 1);   // (the pitch: shots carry on a flat deck, die on a slow one)
   if (fx.tornado) {
     v = Math.min(v, 15); loft = false; launchDeg = 0; forced = { cap: 2 };
+  }
+  // How high: the harder a lofted shot is hit, the higher it goes. A shot that is only just struck stays low and flat; a massive one climbs. The speed is trimmed to the angle so the
+  // distance the shot carries is what it always was (so sixes and fours stay as they were): only the arc changes, and with it the time in the air, which is the fielder's chance.
+  if (plainLoft && loft && launchDeg === drawn && !forced) {
+    const s = Math.max(0, Math.min(1, (v - 24) / 26));
+    const deg = 30 + 16 * s + (drawn - 33) * 0.6;
+    v *= Math.sqrt(Math.sin(66 * Math.PI / 180) / Math.sin(2 * deg * Math.PI / 180));
+    launchDeg = deg;
   }
   return { outcome: 'hit', grade, angle, loft, launchDeg, v, forced, label: across && !label ? 'ACROSS THE LINE' : label, roll: fx.pitch?.roll || 1, line: lm, across };
 }
