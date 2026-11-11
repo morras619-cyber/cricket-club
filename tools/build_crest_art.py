@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The painted crests of the club builder (img/crest-art.webp): twenty finished emblems (red and gold on dark ink) cut out of a
+"""The painted crests of the club builder (img/crest-art.webp, and inside js/crest.js): twenty finished emblems (red and gold on dark ink) cut out of a
 sheet (2 rows of 10, each on a dark blue tile), as transparent 192 px tiles, 5 across and 4 down, in ART order (js/crest.js).
 The game recolours them at run time: the red becomes the club's main colour, the gold its trim, the ink stays.
 usage: python3 tools/build_crest_art.py <sheet.png>
@@ -56,7 +56,14 @@ def main(src):
         cell.paste(crop, ((T - crop.width) // 2, (T - crop.height) // 2), crop)
         out.paste(cell, ((n % 5) * T, (n // 5) * T))
     out.save(OUT, 'WEBP', quality=92, method=6)
-    print('wrote', os.path.relpath(OUT), out.size, os.path.getsize(OUT), 'bytes')
+    # and into js/crest.js, between its markers, as a data URI: the picture ships inside the script
+    import base64, re
+    js = os.path.join(HERE, '..', 'js', 'crest.js')
+    src = open(js).read()
+    data = base64.b64encode(open(OUT, 'rb').read()).decode()
+    src = re.sub(r"// <crest-art>\nconst ART_DATA = '.*?';\n// </crest-art>", lambda m: "// <crest-art>\nconst ART_DATA = 'data:image/webp;base64," + data + "';\n// </crest-art>", src, flags=re.S)
+    open(js, 'w').write(src)
+    print('wrote', os.path.relpath(OUT), out.size, os.path.getsize(OUT), 'bytes, and js/crest.js')
 
 
 if __name__ == '__main__':
