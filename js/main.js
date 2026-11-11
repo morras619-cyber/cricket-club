@@ -3861,7 +3861,9 @@ function careerSquad(c, body) {
     const s = p.stats.season, xp = canGrow(p);
     const head = el('div', 'sd-head'); head.append(el('b', '', p.name), el('small', '', `${p.label}${p.age != null ? ` · age ${p.age}` : ''} · ${p.contract} season${p.contract === 1 ? '' : 's'} left`));
     const meter = el('div', 'mf-bar green'), fill = el('i'); fill.style.width = `${xp ? Math.max(4, Math.min(100, Math.round((p.xp || 0) / xpNeed(p) * 100))) : 100}%`; meter.append(fill);
-    detail.append(head, el('p', 'futnote', `This season ${s.runs} runs · ${s.wkts} wickets · ${xp ? `XP ${Math.round(p.xp || 0)} / ${xpNeed(p)}` : 'at his best'}`), meter);
+    const chips = el('div', 'sd-chips');   // (his season as three chips, and the growth bar under them)
+    for (const [big, small] of [[s.runs, 'RUNS'], [s.wkts, 'WICKETS'], [xp ? `${Math.round(p.xp || 0)}/${xpNeed(p)}` : 'MAX', xp ? 'XP' : 'AT HIS BEST']]) { const c2 = el('div', 'sd-chip'); c2.append(el('b', '', String(big)), el('small', '', small)); chips.append(c2); }
+    detail.append(head, el('p', 'futnote', 'This season'), chips, meter);
     if (pool.length > MIN_SQUAD && !p.heroId) {
       const rel = el('button', 'chipbtn', 'Release');
       confirmTap(rel, 'Tap again to release', () => { releasePlayer(c, p.id); saveProfile(profile); renderCareer(); });
