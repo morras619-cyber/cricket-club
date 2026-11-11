@@ -2407,3 +2407,8 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 #career .squad-detail .chipbtn { color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, .55); filter: hue-rotate(-42deg) saturate(1.5); }   /* (the painted yellow plate turned red: a warning, not a prize) */
 #career .squad-detail .chipbtn.confirming { filter: hue-rotate(-42deg) saturate(1.8) brightness(1.15); }
 #career .ghostchip { background: rgba(6, 10, 34, .55); color: #c9d4ff; border: 1.5px solid rgba(201, 212, 255, .5); border-radius: 999px; padding: 7px 18px; font-weight: 800; letter-spacing: .6px; }
+
+/* ---- cream paper cards on the settings and trophy screens become the dark glass of the rest of the game ---- */
+#settings .panel.paper, #trophies .panel.paper { border-radius: 16px; background: radial-gradient(120% 80% at 50% 0%, rgba(60, 96, 220, .32), rgba(6, 10, 34, 0) 65%), linear-gradient(180deg, rgba(14, 24, 74, .94), rgba(6, 10, 34, .97)); color: #fff; border: 2px solid rgba(255, 210, 63, .8); box-shadow: 0 0 0 1px rgba(255, 226, 122, .25) inset, 0 10px 24px rgba(0, 0, 0, .45); }
+#settings .panel.paper label, #trophies .panel.paper p, #trophies .panel.paper small { color: #dfe6ff; }
+#trophies .panel.paper h3, #trophies .panel.paper .eyebrow { color: #ffd23f; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); }
