@@ -1211,7 +1211,7 @@ export class Game {
       this.rhythm = rhythmNext(this.rhythm || 0, res.outcome === 'hit' || res.outcome === 'edge' ? grade : res.outcome === 'leave' ? 'leave' : 'miss');
       const after = rhythmStage(this.rhythm);
       this.batNewPaint();
-      if (after > before) { this.fx.word(RHYTHM_NAMES[after] + '!', this.W / 2, this.H * 0.2, { size: 34, color: after === 2 ? '#ff9f1c' : '#ffe45c', stroke: INK, rot: 0, dur: 1100 }); sfx.zing(60 + after * 20); }
+      if (after > before) sfx.zing(60 + after * 20);   // (the confidence meter at the side shows it; no word flashes up)
       if (bnInfo) this.batNewReport(bnInfo, err, grade, res);
     }
 
@@ -1220,7 +1220,6 @@ export class Game {
     const cs = this.cams.bat.project(contact.x, contact.y, contact.z) || { x: this.W / 2, y: this.H / 2 };
     if (res.outcome === 'hit' || res.outcome === 'edge') {
       this.contactFeedback(grade, cs, err);
-      if (res.label && grade !== 'perfect') this.fx.word(res.label, this.W / 2, this.H * 0.4, { size: 26, color: '#fff4da', stroke: INK, rot: 0, dur: 900 });   // (one big callout per ball; a perfect has its own)
       if (res.outcome === 'hit') this.hitBlast(cs, fx.meteor ? 'meteor' : fx.thunder ? 'thunder' : fx.mirror ? 'mirror' : null, grade);
       if (res.outcome === 'hit' && (grade === 'perfect' || grade === 'good')) {
         this.charge.award(grade === 'perfect' ? 'perfectBat' : 'goodBat', grade.toUpperCase());
@@ -1541,15 +1540,12 @@ export class Game {
       const set = this.fxSet(this.myTeam);
       this.hitStop(80); this.fx.flash(set ? '#cfeeff' : '#fff', 0.55);
       if (set) this.electricHit(set, at); else this.fx.burst(at.x, at.y, { color: '#ffd23f' });
-      this.fx.word('PERFECT', this.W / 2, this.H * 0.3, { size: 24, color: '#ffd23f', stroke: INK, rot: 0, dur: 900 });
-      this.fx.word(SHOT_WORDS[Math.floor(Math.random() * SHOT_WORDS.length)], this.W / 2, this.H * 0.37, { size: 52, color: '#fff4da', stroke: '#e8343b', dur: 750 });   // (up by the stands, clear of the batter, below the scoreboard and the pips)
       this.fx.shake(10); sfx.bat('perfect'); buzz(45);
     } else if (grade === 'defend') {
-      this.fx.word('DEFENDED', this.W / 2, this.H * 0.3, { size: 42, color: '#fff4da', stroke: INK, rot: 0 });
       if (this.myTeam.id === this.home) crowdClap(0.1); // (a well-timed defence at home is applauded)
       this.fx.shake(3); sfx.bat('good'); buzz(15);
     } else if (grade === 'good') {
-      this.hitStop(40); this.fx.word('NICE!', this.W / 2, this.H * 0.3, { size: 46, color: '#3ec6ff', stroke: INK });
+      this.hitStop(40);
       this.fx.sparks(at.x, at.y, 10); this.fx.shake(6); sfx.bat('good'); buzz(25);
     } else {
       sfx.thin(); this.fx.shake(2); buzz(10);
@@ -1561,7 +1557,7 @@ export class Game {
   }
 
   timingBar(err, grade, wrongLine = false) {
-    if (err == null) return;
+    if (err == null || this.realTime - (this.cardAt || -1e9) < 1500) return;   // (the result card under the batter already says how the swing was timed)
     // (a timing word says only how the swing was timed: when the ball was still missed, the line of the shot is why)
     const label = wrongLine && (grade === 'perfect' || grade === 'good') ? `${grade === 'perfect' ? 'PERFECT' : 'GOOD'} TIMING · WRONG LINE` : grade === 'perfect' ? 'PERFECT' : `${err < 0 ? 'EARLY' : 'LATE'} ${Math.round(Math.abs(err))}ms`;
     this.fx.word(label, this.W / 2, this.H * 0.62, { size: 24, color: '#fff4da', stroke: INK, dur: 1300, rot: 0 });
@@ -3927,6 +3923,7 @@ export class Game {
     const line = near === 'on the line' ? 'on the line' : near === 'close' ? 'close to the line' : 'reaching';
     const timing = err == null ? '' : Math.abs(err) <= 25 ? 'perfect timing' : `${Math.round(Math.abs(err))} ms ${err < 0 ? 'early' : 'late'}`;
     this.ui.hint(null);   // (the instruction that was up gives way to the result)
+    this.cardAt = this.realTime;
     let card = document.getElementById('shotRep');
     if (!card) { card = document.createElement('div'); card.id = 'shotRep'; card.className = 'shot-rep'; card.innerHTML = '<b></b><small></small>'; document.getElementById('hud').append(card); }
     card.dataset.tone = tone;
@@ -4329,7 +4326,7 @@ export class Game {
   // the batter's guess about the next ball: a small tag up top, clear of the pitch
   showTag(text, color = '#fff4da', ms = 1500) { this.tag = { text, color, until: this.realTime + ms }; }
   drawThinks(ctx, text, color = '#fff4da') {
-    const { W, H } = this, y = Math.max(H * 0.17, 128) + 14;
+    const { W, H } = this, band = this.fx.band?.(W, H), y = (band ? band[0] + 4 : Math.max(H * 0.17, 128)) + 14;   // (just under the scoreboard)
     ctx.save();
     ctx.font = '400 17px "Bangers", "Arial Black", sans-serif';
     const w = ctx.measureText(text).width + 28;
