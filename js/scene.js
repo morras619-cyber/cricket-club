@@ -1029,6 +1029,35 @@ function line(g, cam, x0, z0, x1, z1, color, w) {
 
 // lit: the match views, whose ground has the pool of warm light on it. The light is laid on the cached background once (a copy of it, so the menus' background is
 // as it was): painted over the picture every frame it was the dearest thing in the view.
+// Depth, put in once with the cached picture: the focus is on the pitch, so the far stands are a little soft (more the higher and further they are), a haze of floodlit air lies
+// between them and the pitch, and the corners of the picture fall off into the dark, as a broadcast lens does. The blur is a small copy drawn big (canvas blur filters are not on every
+// phone's browser).
+function depthPass(src, cam) {
+  const w = src.width, h = src.height, k = w / cam.W, hy = cam.hy * k;
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const g = out.getContext('2d');
+  g.drawImage(src, 0, 0);
+  // the soft stands: the picture shrunk and stretched back, laid over the stand band, strongest at the top
+  const small = document.createElement('canvas'); small.width = Math.max(8, Math.round(w / 5)); small.height = Math.max(8, Math.round(h / 5));
+  const sg = small.getContext('2d'); sg.imageSmoothingQuality = 'high'; sg.drawImage(src, 0, 0, small.width, small.height);
+  const soft = document.createElement('canvas'); soft.width = w; soft.height = Math.ceil(hy);
+  const fg = soft.getContext('2d'); fg.imageSmoothingQuality = 'high'; fg.drawImage(small, 0, 0, small.width, Math.max(1, small.height * hy / h), 0, 0, w, hy);   // (the top of the picture, up to the horizon)
+  fg.globalCompositeOperation = 'destination-in';
+  const fade = fg.createLinearGradient(0, 0, 0, hy);
+  fade.addColorStop(0, 'rgba(0,0,0,0.5)'); fade.addColorStop(0.55, 'rgba(0,0,0,0.3)'); fade.addColorStop(0.9, 'rgba(0,0,0,0.06)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+  fg.fillStyle = fade; fg.fillRect(0, 0, w, hy);
+  g.drawImage(soft, 0, 0);
+  // the haze at the horizon, thinning into the sky and down the ground
+  const haze = g.createLinearGradient(0, hy - 0.16 * h, 0, hy + 0.2 * h);
+  haze.addColorStop(0, 'rgba(190,210,255,0)'); haze.addColorStop(0.45, 'rgba(190,210,255,0.10)'); haze.addColorStop(1, 'rgba(190,210,255,0)');
+  g.fillStyle = haze; g.fillRect(0, Math.max(0, hy - 0.16 * h), w, 0.36 * h);
+  // the lens: the corners darker
+  const v = g.createRadialGradient(w / 2, h * 0.52, Math.min(w, h) * 0.35, w / 2, h * 0.52, Math.hypot(w, h) * 0.62);
+  v.addColorStop(0, 'rgba(0,0,24,0)'); v.addColorStop(1, 'rgba(0,0,24,0.3)');
+  g.fillStyle = v; g.fillRect(0, 0, w, h);
+  return out;
+}
+
 export function drawBackground(ctx, cam, lit = false) {
   if (!cam.bg) cam.bg = renderBackground(cam);
   let src = cam.bg;
@@ -1041,6 +1070,10 @@ export function drawBackground(ctx, cam, lit = false) {
       cam.bgLit = c; cam.bgLitFor = cam.bg;
     }
     src = cam.bgLit;
+  }
+  if (quality.high) {   // (the depth: made once for each cached picture)
+    if (cam.fxFor !== src) { try { cam.fxBg = depthPass(src, cam); cam.fxFor = src; } catch { cam.fxFor = src; cam.fxBg = null; } }
+    if (cam.fxBg) src = cam.fxBg;
   }
   ctx.drawImage(src, 0, 0, cam.W, cam.H);
 }

@@ -8,6 +8,31 @@ import { buildOf } from './builds.js';
 import { logoSrc } from './teams.js';
 
 const REF_HEIGHT_M = 1.85;
+
+// A figure's shadow on the turf: its own silhouette laid flat behind it and to one side, as a floodlight throws it. The silhouette of each frame is made once, at half size,
+// and goes when the frame does. (dir: 1, or -1 for a figure drawn mirrored, so every shadow falls the same way on screen)
+const silhouettes = new WeakMap();
+function silhouette(img) {
+  let s = silhouettes.get(img);
+  if (s) return s;
+  s = document.createElement('canvas');
+  s.width = Math.max(1, Math.round(img.width * 0.5)); s.height = Math.max(1, Math.round(img.height * 0.5));
+  const g = s.getContext('2d');
+  g.drawImage(img, 0, 0, s.width, s.height);
+  g.globalCompositeOperation = 'source-in'; g.fillStyle = '#021208'; g.fillRect(0, 0, s.width, s.height);
+  silhouettes.set(img, s);
+  return s;
+}
+function castShadow(ctx, img, dx, dy, dw, dh, feetY, dir = 1, alpha = 0.3) {
+  if (!img?.width) return;
+  const s = silhouette(img);
+  ctx.save();
+  // a point at height h above the feet goes 0.5 h sideways and is laid down to 0.26 h along the ground away from us
+  ctx.transform(1, 0, -0.5 * dir, 0.26, 0.5 * dir * feetY, 0.74 * feetY);
+  ctx.globalAlpha = alpha * 0.6; ctx.drawImage(s, dx - dw * 0.02, dy - dh * 0.02, dw * 1.04, dh * 1.04);   // (a wider, fainter copy under it: the soft edge of the shadow)
+  ctx.globalAlpha = alpha; ctx.drawImage(s, dx, dy, dw, dh);
+  ctx.restore();
+}
 // the game's frame names -> the sheet's poses (0-9, left to right, top row first)
 const POSE = {
   start: 0, run1: 1, run2: 2, run3: 8, gather: 3, coil: 4, frontarm: 4, release: 5,
@@ -554,6 +579,7 @@ export function drawKitFielder(ctx, px, py, kPerM, frame, team, look, flip = fal
   if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 14; }
   ctx.translate(px, py - lift * kPerM);
   if (flip) ctx.scale(-1, 1);
+  castShadow(ctx, img, -ax * kx, -ay * k, w * kx, h * k, lift ? lift * kPerM : 0, flip ? -1 : 1, 0.26);
   ctx.drawImage(img, -ax * kx, -ay * k, w * kx, h * k);
   ctx.restore();
   return true;
@@ -572,6 +598,7 @@ export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look)
   const [bh, bw] = buildOf(look), k = kPerM * REF_HEIGHT_M / meta.refPx * bh, kx = k * bw;
   ctx.save();
   softShadow(ctx, px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0.26);
+  castShadow(ctx, fr, px - ax * kx, py - ay * k, w * kx, h * k, py);
   ctx.drawImage(fr, 0, 0, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   ctx.restore();
   return true;
@@ -596,6 +623,7 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow, 
     const fi = indexOf(name);
     let [, , w, h, ax, ay] = meta.frames[fi];
     if (lefty) ax = w - ax;
+    if (alpha >= 1) { const a0 = ctx.globalAlpha; castShadow(ctx, fr, px - ax * kx, py - lift - ay * k, w * kx, h * k, py); ctx.globalAlpha = a0; }
     ctx.drawImage(fr, 0, 0, w, h, px - ax * kx, py - lift - ay * k, w * kx, h * k);
   };
   ctx.save();
