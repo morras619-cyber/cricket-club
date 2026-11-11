@@ -51,3 +51,11 @@ test('a failed dive can let a fast ground shot escape', () => {
   assert.ok(result.nearMiss);
   assert.equal(result.intercept, null);
 });
+
+test('a boundary with nobody near it is a clear four: no save is offered (no dive prompt for a fielder who cannot get there)', () => {
+  // a hard drive straight down the ground; the only fielders are on the far side of the field
+  const field = [{ id: 'a', name: 'A', x: -45, y: 70 }, { id: 'b', name: 'B', x: 40, y: 95 }];
+  const result = simulateHit({ angle: 0, v: 36, loft: false }, field, alwaysSuccess);
+  assert.equal(result.kind, 'four');
+  assert.equal(result.save, null);
+});

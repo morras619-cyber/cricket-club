@@ -18,14 +18,15 @@ export const bowlerSqueeze = bowlSkill => clamp(1 - ((bowlSkill ?? 75) - 75) / 3
 // the computer batting: how widely his timing strays (bigger = more mistimed). A 94 is
 // clean almost every ball, a 64 mistimes plenty; a good bowler (yours) makes him mistime more
 export const aiSpread = skill => clamp(1 + (75 - (skill ?? 75)) / 90, 0.9, 1.5);
-export const bowlerTrouble = bowlSkill => clamp(1 + ((bowlSkill ?? 75) - 75) / 150, 0.85, 1.15);
+export const bowlerTrouble = bowlSkill => clamp(1 + ((bowlSkill ?? 75) - 75) / 120, 0.8, 1.2);
 
 // your bowler: a better one moves it more and bowls quicker
-export const movementFor = bowlSkill => clamp(0.7 + (bowlSkill ?? 75) / 250, 0.85, 1.1);
-export const paceFor = bowlSkill => clamp(0.95 + (bowlSkill ?? 75) / 1500, 0.97, 1.02);
+// (a rating is felt: a 60 bowls about 8% slower than a 72 and a 82 about 7% quicker; the ball moves a quarter less, or a quarter more)
+export const movementFor = bowlSkill => clamp(1 + ((bowlSkill ?? 75) - 72) * 0.025, 0.72, 1.3);
+export const paceFor = bowlSkill => clamp(1 + ((bowlSkill ?? 75) - 72) * 0.0075, 0.88, 1.1);
 
 // a fielding side: how fast its men get to the ball, from the side's average overall
-export const fieldSpeed = avgOvr => clamp(1 + ((avgOvr ?? 72) - 72) / 120, 0.85, 1.15);
+export const fieldSpeed = avgOvr => clamp(1 + ((avgOvr ?? 72) - 72) / 70, 0.78, 1.2);
 
 // the wicket-keeper's rating: how much time and room his chances give you (1 for a 75: a 93 gets 18% more, a 53 is rushed by 20%)
 export const keeperEase = r => clamp(1 + ((r ?? 75) - 75) / 100, 0.8, 1.2);
@@ -92,9 +93,8 @@ export function matchup(batter, bowler, ctx = {}) {
 }
 
 // ---------- club difficulty (a career, a quick match, the league, the cup) ----------
-// How good the club across from you is has to be felt, but no club is a pushover and none is out of reach. A club's ratings are pulled in towards the middle
-// (and up a little), so a weak side is still a side and a top side is beatable; their bowlers shrink your timing windows and move the ball more the better they are.
-// (Measured on whole simulated innings: with a squad of 70, about 74% against a 58 club, 57% against a 68 and 32% against an 80, most of them within a dozen runs.)
-export const careerBatSkill = s => 68 + ((s ?? 75) - 68) * 0.3 + 3;
-export const careerBowlWindow = bowlSkill => clamp(1 - 0.01 * ((bowlSkill ?? 75) - 68), 0.85, 1.15);
-export const careerBowlMove = bowlSkill => clamp(1 + 0.015 * ((bowlSkill ?? 75) - 68), 0.85, 1.3);
+// How good the club across from you is has to be felt: a Division 3 batter plays like one and a Super League batter like one. The ratings are only softened a little
+// at the very ends (a weak side is still a side), and their bowlers shrink your timing windows and move the ball more the better they are.
+export const careerBatSkill = s => 70 + ((s ?? 75) - 70) * 0.65;
+export const careerBowlWindow = bowlSkill => clamp(1 - 0.015 * ((bowlSkill ?? 75) - 68), 0.8, 1.2);
+export const careerBowlMove = bowlSkill => clamp(1 + 0.02 * ((bowlSkill ?? 75) - 68), 0.8, 1.4);

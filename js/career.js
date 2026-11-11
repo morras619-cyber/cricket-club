@@ -40,7 +40,7 @@ const AI_BUDGET = { 1: 6, 2: 8, 3: 10, 4: 13 };
 export const DIV_ORDER = ['asl', 'd2', 'd3'];
 const DIV_MONEY = { asl: 1, d2: 0.55, d3: 0.35 };
 // how alive the stadium is in each division (audio.js atmosphere): the Super League is the big stage; below it a thin crowd that is not paying much attention
-export const ATMOSPHERE = { asl: 1, d2: 0.45, d3: 0.3 };
+export const ATMOSPHERE = { asl: 1, d2: 0.35, d3: 0.15 };
 const START_BUDGET = { d2: 4.5, d3: 3 };
 const AI_INCOME = 3;
 const LOTS = 16;                       // lots you bid on yourself; the rest are settled quickly

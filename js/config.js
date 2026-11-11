@@ -33,7 +33,7 @@ export const CFG = {
   },
 
   fielding: {
-    cap: 6, minP: 0.05, maxP: 0.9,
+    cap: 6, minP: 0.05, saveMinP: 0.3, maxP: 0.9,
     keeperWindow: 800, elasticWindow: 1000, keeperClean: 200, slowmo: 0.35,
     catchPerfect: 240, catchGood: 420, rejuggleMs: 700,
     collectWindow: 200, stumpWindow: 400,

@@ -7,6 +7,7 @@ export const crowdMute = { on: false };
 // quieter, and the celebration music, the singing and the disco lights are left out (lively() is false below 0.6). Set for a career match.
 export const atmosphere = { level: 1 };
 export const lively = () => atmosphere.level >= 0.6;
+const murmur = () => Math.max(0.2, atmosphere.level);   // (the bed of crowd noise under a whole match: a thin crowd is nearly silent between the big moments, but never dead)
 
 export function unlockAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); musicSync(); return; }
@@ -401,7 +402,7 @@ export function startAmbience() {
     if (!buf || run !== ambRun || !ready()) return; // (stopped, or muted, while it loaded)
     const bus = ac.createGain(), t = ac.currentTime;
     bus.gain.setValueAtTime(0.0001, t); bus.gain.linearRampToValueAtTime(1, t + 1.5);
-    const moodG = ac.createGain(); moodG.gain.value = ambLevel * Math.sqrt(atmosphere.level);   // (the murmur follows how the match is going for the home side)
+    const moodG = ac.createGain(); moodG.gain.value = ambLevel * murmur();   // (the murmur follows how the match is going for the home side)
     bus.connect(moodG).connect(master);
     const srcs = AMBIENCE.map(({ rate, gain }, i) => {
       const src = ac.createBufferSource(), g = ac.createGain();
@@ -418,7 +419,7 @@ export function ambienceMood(x) {
   ambLevel = x < 0 ? 1 - 0.15 * x : 1 + 0.2 * x;
   if (!amb) return;
   const g = amb.moodG.gain, t = ac.currentTime;
-  g.cancelScheduledValues(t); g.setTargetAtTime(ambLevel * Math.sqrt(atmosphere.level), t, 0.8);
+  g.cancelScheduledValues(t); g.setTargetAtTime(ambLevel * murmur(), t, 0.8);
 }
 export function stopAmbience() {
   ambRun++;

@@ -1863,7 +1863,17 @@ export class Game {
     const roEndId = ro && (ro.margins.striker < ro.margins.bowler ? 'striker' : 'bowler');
     const roEnd = ro && ENDS[roEndId], roThrow = ro ? ro.t + 0.45 : 0, roFlight = ro ? Math.max(0.2, dist(ro.point, roEnd) / F.throwSpeed) : 0;
     let roDone = false;
-    const dur = Math.max(0.8, endT + 0.6, miss ? miss.t + 1.5 : 0, runTime, ro ? roThrow + roFlight + 1.1 : 0);
+    // a fielder never keeps the ball: every pick-up (and a boundary save) is thrown back in to the keeper. It leaves his hand once he has gathered it, and not before the
+    // batters have made their ground, so a throw in is never a run-out chance (that is the run-out event, above)
+    const back = (() => {
+      const took = !A || ro || o.caught || o.dropped ? null : sim.intercept || (o.saved && sim.save) || null;
+      if (!took) return null;
+      const K = fs.find(f => f.keeper), to = K ? { x: K.x, y: K.y } : { ...ENDS.striker }, from = { ...took.point };
+      const flight = Math.max(0.3, dist(from, to) / (F.throwSpeed * 0.8));
+      const t0 = Math.max(took.t + (took.action === 'dive' ? 0.7 : 0.45), runTime + 0.2 - flight);
+      return { t0, flight, from, to, thrown: false };
+    })();
+    const dur = Math.max(0.8, endT + 0.6, miss ? miss.t + 1.5 : 0, runTime, ro ? roThrow + roFlight + 1.1 : 0, back ? back.t0 + back.flight + 0.5 : 0);
     this.timeScale = 1.6;
     const t0 = this.gameTime;
     // an obvious four or six: the crowd builds as the ball flies and roars as it clears the rope (js/audio.js), but
@@ -1889,7 +1899,7 @@ export class Game {
       if (!cleared && (six ? Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR : tb >= end)) cleared = true;
       // the ball is loose (nobody may be drawn holding it) until it's caught or gathered; a boundary
       // never is, even when it runs past a fielder diving for it
-      this.O.loose = boundary || tb < end || !(A && (o.caught || sim.intercept || o.saved));
+      this.O.loose = boundary || tb < end || !(A && (o.caught || sim.intercept || o.saved)) || !!(back && tb >= back.t0);
       // a perfect six: everything slows for a beat as it sails over the rope
       if (!slowed && Math.hypot(b.x, b.y - CFG.ground.centerY) > CFG.ground.boundaryR) { slowed = true; slowUntil = this.realTime + 380; }
       if (toRope && tb > end) {
@@ -1943,6 +1953,11 @@ export class Game {
           else { this.fx.word('SAFE!', es.x, es.y - 40, { size: 52, color: '#fff4da', stroke: INK }); this.fieldingGroan(o.side === 'ai' ? this.oppTeam : this.myTeam); }
         }
       }
+      if (back && tb >= back.t0) {
+        const p = Math.min(1, (tb - back.t0) / back.flight);
+        b.x = lerp(back.from.x, back.to.x, p); b.y = lerp(back.from.y, back.to.y, p); b.h = 0.3 + 0.9 * Math.sin(p * Math.PI) * 0.6 + 0.5 * p;
+        if (!back.thrown) { back.thrown = true; A.throwT0 = this.realTime; const a1 = this.of.to(A.x, A.y), b1 = this.of.to(back.to.x, back.to.y); A.throwFace = Math.atan2(b1.y - a1.y, b1.x - a1.x); }
+      }
       // a six by a side with painted effects flies as a comet; a four races along with a streak
       const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
       const trail = sim.kind === 'six' && !o.caught ? 'comet1' : toRope ? 'streak' : null;
@@ -1953,7 +1968,7 @@ export class Game {
       this.O.ball = six && said ? null : b;
       this.runBatters(t, ro ? ro.attempt : legs);
       // once the ball is dealt with, hurry through the rest of the running
-      this.timeScale = this.realTime < slowUntil ? 0.35 : ro ? 1.2 : t > endT + 0.6 ? 2.6 : 1.6;
+      this.timeScale = this.realTime < slowUntil ? 0.35 : ro ? 1.2 : t > endT + 0.6 && !(back && t < back.t0 + back.flight + 0.3) ? 2.6 : 1.6;
       if (six && said) {
         // the six has landed: a quick push in on the strike
         landed = landed || { x: b.x, y: b.y };
@@ -3210,15 +3225,17 @@ export class Game {
     const relay = !!this.armed.relay;
     const ms = this.of.to(me.x, me.y);
     let endId = margins.striker < margins.bowler ? 'striker' : 'bowler', direct = false, extra = 0.8, wild = false;
+    // a side that fields well throws straighter; a poor one does not (its rating, js/ratings.js): a throw is never a sure thing
+    const acc = clamp(1 + (this.sideRating(this.mySide) - 72) / 60, 0.7, 1.25);
     if (sw?.tapEnd) {
-      // tapped the stumps: thrown straight at them (a fumble costs a little accuracy)
+      // tapped the stumps: thrown at them (a fumble costs a little accuracy), and it does not always find them
       endId = sw.tapEnd;
-      if (fumble) extra = 0.3; else { direct = true; extra = 0; }
+      if (fumble) extra = 0.3; else if (makeRng((this.seed ^ Math.floor(ts)) >>> 0).chance(clamp(0.55 * acc, 0.35, 0.75))) { direct = true; extra = 0; } else extra = 0.35;
     } else if (sw) {
       const got = Math.atan2(sw.dy, sw.dx);
       const errs = ['striker', 'bowler'].map(id => { const s = this.of.to(ENDS[id].x, ENDS[id].y); return { id, e: angDiff(Math.atan2(s.y - ms.y, s.x - ms.x), got) }; }).sort((a, b) => a.e - b.e);
       endId = errs[0].id;
-      const inner = (relay ? 15 : 6) * Math.PI / 180, outer = (relay ? 32 : 16) * Math.PI / 180;
+      const inner = (relay ? 15 : 6) * acc * Math.PI / 180, outer = (relay ? 32 : 16) * acc * Math.PI / 180;
       const speedPx = Math.hypot(sw.dx, sw.dy) / Math.max(40, sw.t - sw.t0);
       const d = dist(P, ENDS[endId]);
       if (errs[0].e <= inner) { direct = true; extra = 0; }
@@ -4053,17 +4070,6 @@ export class Game {
         ctx.beginPath(); this.bowlTrail.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
       }
       ctx.restore();
-      // read-out next to the finger
-      const last = this.bowlTrail[this.bowlTrail.length - 1];
-      const weak = S.weak && S.weak.lengths.includes(S.aim.length) && (!S.weak.lanes || S.weak.lanes.includes(laneFor(S.aim.x)));
-      const txt = `${LENGTH_LABEL[S.aim.length]} · ${S.aim.slower ? S.aim.type : S.aim.type}${weak ? ' · WEAK SPOT' : ''}`;
-      ctx.font = `600 14px ${'"Baloo 2", system-ui, sans-serif'}`;
-      const w = ctx.measureText(txt).width + 16;
-      const x = clamp(last.x - w / 2, 8, this.W - w - 8), y = Math.max(this.H * 0.3, last.y - 64);
-      ctx.fillStyle = weak ? '#e8343b' : '#fff4da'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.roundRect(x, y, w, 24, 12); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = weak ? '#fff4da' : INK; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-      ctx.fillText(txt, x + 8, y + 12.5);
       this.drawPaceBar(S.aim.speedP);
     }
     // aftertouch budget while the ball is in the air

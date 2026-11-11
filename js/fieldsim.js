@@ -218,7 +218,8 @@ export function simulateHit(res, fielders, rng, opts = {}) {
         const pr = sigmoid(m);
         if (!best || pr > best.p) best = { fielder: f, p: pr, t, point: p, action: fielderRunDistance(t - F.react, sp) + F.reach >= dist(f, p) ? 'pickup' : 'dive' };
       }
-      if (best && best.p >= F.minP && !res.forced?.uncatchable && res.forced?.cap == null) {
+      // (a fielder who cannot get near it does not save it: nobody to dive, a clear four)
+      if (best && best.p >= F.saveMinP && !res.forced?.uncatchable && res.forced?.cap == null) {
         // he stops it a stride inside the rope, never standing over it: when the ball got there
         let ts = t;
         while (ts > t0 && Math.hypot(path.ballAt(ts).x, path.ballAt(ts).y - CY) > R - ROPE_GAP) ts -= 0.02;

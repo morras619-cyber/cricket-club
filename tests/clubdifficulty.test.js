@@ -1,20 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { careerBatSkill, careerBowlWindow, careerBowlMove } from '../js/ratings.js';
+import { careerBatSkill, careerBowlWindow, careerBowlMove, paceFor, movementFor, fieldSpeed } from '../js/ratings.js';
 
-test('a club\'s batters are pulled in towards the middle: no pushover, none out of reach', () => {
-  assert.ok(careerBatSkill(58) > 58 + 8, 'a weak club is lifted');
-  assert.ok(careerBatSkill(80) < 80, 'a top club is brought down a little');
-  assert.ok(careerBatSkill(58) < careerBatSkill(68) && careerBatSkill(68) < careerBatSkill(80), 'but the order of the clubs is kept');
-  assert.ok(careerBatSkill(80) - careerBatSkill(58) < 10, 'and the gap between the best and the worst is a few points, not twenty');
+test('a club\'s batters play as good as their rating: the order of the clubs is kept and the gap is felt', () => {
+  assert.ok(careerBatSkill(58) < careerBatSkill(68) && careerBatSkill(68) < careerBatSkill(80), 'the order of the clubs is kept');
+  assert.ok(careerBatSkill(80) - careerBatSkill(58) >= 13, 'a 58 and an 80 are a dozen points apart, not a few');
+  assert.ok(careerBatSkill(58) > 58 && careerBatSkill(80) < 80, 'softened a little at the ends, never reversed');
 });
 
-test('a better bowler squeezes your windows and moves it more, a weaker one gives you room', () => {
+test('a better bowler squeezes your windows, moves it more and bowls quicker; a weaker one gives you room', () => {
   assert.ok(careerBowlWindow(80) < 1 && careerBowlWindow(58) > 1 && careerBowlWindow(68) === 1);
   assert.ok(careerBowlMove(80) > 1 && careerBowlMove(58) < 1 && careerBowlMove(68) === 1);
-  assert.ok(careerBowlWindow(0) <= 1.15 && careerBowlWindow(200) >= 0.85, 'it is capped');
-  assert.ok(careerBowlMove(0) >= 0.85 && careerBowlMove(200) <= 1.3);
-  assert.ok(Math.abs(careerBowlWindow(94) - 1) < 0.3, 'even a star is a few percent, not a different game');
+  assert.ok(careerBowlWindow(0) <= 1.2 && careerBowlWindow(200) >= 0.8, 'it is capped');
+  assert.ok(careerBowlMove(0) >= 0.8 && careerBowlMove(200) <= 1.4);
+  assert.ok(paceFor(60) < paceFor(72) && paceFor(72) < paceFor(82), 'the better the bowler, the quicker');
+  assert.ok(paceFor(82) / paceFor(60) > 1.12, 'a Division 3 bowler is clearly slower than a Super League one');
+  assert.ok(movementFor(82) > movementFor(60));
+});
+
+test('a better fielding side gets to the ball quicker, a poor one is slower', () => {
+  assert.ok(fieldSpeed(60) < 0.9 && fieldSpeed(80) > 1.05);
 });
 
 test('it applies to the modes that adapt to you, and not to the fixed ones', async () => {

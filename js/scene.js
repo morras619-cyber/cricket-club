@@ -1411,8 +1411,8 @@ export class OutfieldView {
   shakeRope(x, y) { this.ropeWave = { ang: Math.atan2(y - CY, x), t0: performance.now() }; }
   ball(ctx, b) {
     const sh = this.to(b.x, b.y), p = this.to(b.x, b.y, b.h);
-    // from up here a real ball would be a speck: drawn a little bigger (about a fielder's fist), a shadow under it
-    const r = Math.max(3.2, 0.07 * this.k);
+    // from up here a real ball would be a speck: drawn a little bigger than life (a fielder's fist is bigger than it), a shadow under it
+    const r = Math.max(2, 0.042 * this.k);
     ctx.fillStyle = 'rgba(10,8,20,0.4)';
     ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.1, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
     paintBall(ctx, p.x, p.y, r * (1 + Math.min(0.12, (b.h || 0) * 0.01)), ballSpin(b.x, b.y * 1.1, (b.h || 0) * 0.5));
