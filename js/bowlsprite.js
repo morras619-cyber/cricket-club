@@ -424,7 +424,7 @@ import { PACE_STEPS } from './squads.js';
 import { loadHair, hairReady, piecesOf, piecesKey, headsOf, dressSheet } from './hair.js';
 import { KIT_LOGOS } from './kitlogos.js';
 import { sheetOf, logoSrc } from './teams.js';
-import { buildOf } from './builds.js';
+import { buildOf, styleOf } from './builds.js';
 const tinted = new Map();
 
 // club crests for the shirts and helmets (the front sheets have a blank badge spot for them)
@@ -486,21 +486,23 @@ export function spriteStatus() {
 // Which frame the bowler shows. spr: { anim: 'start'|'run'|'deliver'|'react'|'celebrate', p, t0 }
 // The back view has a fuller load-up: gather, coil, then front arm up.
 // Spinners ('spin-front' / 'spin-back') take a few walking strides, then gather and coil.
-export function bowlFrame(spr, gameTime, realTime, view = 'front') {
+// look: the bowler's own cadence, load-up and follow-through (builds.js styleOf)
+export function bowlFrame(spr, gameTime, realTime, view = 'front', look = null) {
   if (!spr) return 'start';
+  const st = styleOf(look).bowl, steps = PACE_STEPS * st.cad, ld = st.load;
   switch (spr.anim) {
     case 'run':
       if (view.startsWith('spin') && KIT_VIEW[view] === view.slice(5)) {
         // the fast bowler's frames at about a third of his stride rate: a few easy, walking-pace strides
-        if (view === 'spin-back') return spr.p < 0.72 ? RUN_CYCLE[Math.floor(spr.p * 5) % 4] : spr.p < 0.82 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
-        return spr.p < 0.78 ? RUN_CYCLE[Math.floor(spr.p * 5) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
+        if (view === 'spin-back') return spr.p < 0.72 - ld ? RUN_CYCLE[Math.floor(spr.p * 5 * st.cad) % 4] : spr.p < 0.82 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
+        return spr.p < 0.78 - ld ? RUN_CYCLE[Math.floor(spr.p * 5 * st.cad) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
       }
-      if (view.startsWith('spin')) return spr.p < 0.7 ? SPIN_CYCLE[Math.floor(spr.p * 4) % 2] : spr.p < 0.85 ? 'gather' : 'coil';
-      if (view === 'back') return spr.p < 0.74 ? RUN_CYCLE[Math.floor(spr.p * PACE_STEPS) % 4] : spr.p < 0.83 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
-      return spr.p < 0.8 ? RUN_CYCLE[Math.floor(spr.p * PACE_STEPS) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
+      if (view.startsWith('spin')) return spr.p < 0.7 - ld ? SPIN_CYCLE[Math.floor(spr.p * 4 * st.cad) % 2] : spr.p < 0.85 ? 'gather' : 'coil';
+      if (view === 'back') return spr.p < 0.74 - ld ? RUN_CYCLE[Math.floor(spr.p * steps) % 4] : spr.p < 0.83 ? 'gather' : spr.p < 0.92 ? 'coil' : 'frontarm';
+      return spr.p < 0.8 - ld ? RUN_CYCLE[Math.floor(spr.p * steps) % 4] : spr.p < 0.9 ? 'gather' : 'coil';
     case 'deliver': {
       let t = (gameTime - spr.t0) * 1000;
-      for (const [f, ms] of view.startsWith('spin') ? SPIN_DELIVERY : DELIVERY) { if (t < ms) return f; t -= ms; }
+      for (const [f, ms0] of view.startsWith('spin') ? SPIN_DELIVERY : DELIVERY) { const ms = ms0 * st.follow; if (t < ms) return f; t -= ms; }
       return 'finish';
     }
     case 'react': return 'react';

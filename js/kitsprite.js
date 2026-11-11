@@ -4,7 +4,7 @@
 import { softShadow } from './light.js';
 import { KIT_SHEETS } from './kitsheets.js';
 import { skinHex, hairHex, hsv, rgb } from './looks.js';
-import { buildOf } from './builds.js';
+import { buildOf, styleOf } from './builds.js';
 import { logoSrc } from './teams.js';
 
 const REF_HEIGHT_M = 1.85;
@@ -569,9 +569,11 @@ export function drawKitSprite(ctx, px, py, kPerM, frame, team, flip, view, look)
   let [, , w, h, ax, ay] = meta.frames[pose];
   if (flip) ax = w - ax;
   // his own build: taller or shorter, broader or slighter, about his feet
-  const [bh, bw] = buildOf(look), k = kPerM * REF_HEIGHT_M / meta.refPx * bh, kx = k * bw;
+  const st = styleOf(look).bowl, [bh0, bw] = buildOf(look), bh = bh0 * st.stoop, k = kPerM * REF_HEIGHT_M / meta.refPx * bh, kx = k * bw;
   ctx.save();
   softShadow(ctx, px, py, 0.5 * kPerM * bw, 0.11 * kPerM, 0.26);
+  // (his action leans one way: about his feet; a left-armer's the other)
+  if (st.lean) { ctx.translate(px, py); ctx.transform(1, 0, -st.lean * (flip ? -1 : 1), 1, 0, 0); ctx.translate(-px, -py); }
   ctx.drawImage(fr, 0, 0, w, h, px - ax * kx, py - ay * k, w * kx, h * k);
   ctx.restore();
   return true;
@@ -590,7 +592,10 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow, 
   const indexOf = name => (usePaint ? pm.names[pm.names[name] != null ? name : PAINT_STAND_IN[name] ?? 'def1'] : POSE_BAT[name] ?? POSE_BAT[OLD_STAND_IN[name]] ?? 0);
   const cur = playerFrame(view, team, look, lefty, indexOf(f));
   if (!cur) return false;
-  const [bh, bw] = buildOf(look), k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
+  // his own way of standing: how low he crouches, which way he leans, and (waiting for the ball) how he rocks
+  const st = styleOf(look).bat, [bh0, bw] = buildOf(look), bh = bh0 * st.crouch, k = kPerM * BAT_HEIGHT_M / meta.refPx * bh, kx = k * bw;
+  const sway = st.hz && a >= 1 && (f === 'ready' || f === 'backlift') ? Math.sin(performance.now() / 1000 * st.hz * Math.PI * 2) : 0;
+  const shear = st.lean * (lefty ? -1 : 1) + sway * st.rock * 1.2;
   const one = (name, alpha, fr) => {
     ctx.globalAlpha = alpha;
     const fi = indexOf(name);
@@ -601,6 +606,7 @@ export function drawKitBatter(ctx, px, py, kPerM, f, prev, a, team, look, glow, 
   ctx.save();
   softShadow(ctx, px, py, 0.55 * kPerM * bw, 0.12 * kPerM, 0.28);
   if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 22; }
+  if (shear) { ctx.translate(px, py); ctx.transform(1, 0, -shear, 1, 0, 0); ctx.translate(-px, -py); }   // (leaning about his feet)
   if (prev && a < 1) { const pf = playerFrame(view, team, look, lefty, indexOf(prev)); if (pf) one(prev, (1 - a) * 0.6, pf); }
   one(f, 1, cur);
   ctx.restore();

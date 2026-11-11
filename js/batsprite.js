@@ -1,6 +1,7 @@
 import { peopleSheet, loadPeopleMask } from './looks.js';
 import { softShadow } from './light.js';
 import { sheetOf, teamById } from './teams.js';
+import { styleOf } from './builds.js';
 import { drawKitBatter, painted } from './kitsprite.js';
 // Hand-drawn batter frames (back view) for the batting and keeper cameras.
 // One atlas per team (img/batter-<team>.webp), all cut from the same layout by
@@ -116,10 +117,12 @@ export function batFrame(b, now) {
   if (b.anim === 'celebrate') return { f: 'celebrate' };
   if (b.shot) {
     const seq = SEQ[b.shot.anim] || SEQ.drive;
-    let t = now - b.shot.t0, prev = b.shot.from || 'backlift';
+    // (his own tempo: an elegant batter's poses stay on screen longer, a slugger's are gone quicker; and how long he holds the finish)
+    const st = styleOf(b.people).bat, hold = b.shot.anim === 'bowled' ? FINISH_HOLD_MS : st.hold;
+    let t = (now - b.shot.t0) / st.tempo, prev = b.shot.from || 'backlift';
     for (const [f, ms] of seq) {
       // (the last pose of a shot is held a moment, then he settles back to his stance: a batter never stands frozen in his follow-through while the next ball is waited for)
-      if (ms === Infinity && t >= FINISH_HOLD_MS && b.shot.anim !== 'bowled') return { f: 'ready', prev: f, a: Math.min(1, (t - FINISH_HOLD_MS) / SETTLE_MS) };
+      if (ms === Infinity && t >= hold && b.shot.anim !== 'bowled') return { f: 'ready', prev: f, a: Math.min(1, (t - hold) / SETTLE_MS) };
       if (t < ms) return { f, prev, a: Math.min(1, t / BLEND_MS) };
       t -= ms; prev = f;
     }

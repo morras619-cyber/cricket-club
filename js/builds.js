@@ -33,3 +33,46 @@ export function buildOf(look) {
   const h = hashStr(look.who);
   return [0.96 + (h % 9) * 0.01, 0.95 + ((h >>> 8) % 11) * 0.01];
 }
+
+// ---------- how each player moves ----------
+// Everyone is drawn from the same poses, so what tells two players apart is how they play them: how long
+// a batter holds his finish, whether he rocks in his stance or stands like a post, how low he crouches;
+// how a bowler's run-up cadence runs, where he leans in his action, how long he gathers and follows through.
+// Fixed by his name (the same man every time) and drawing only: no ball, no shot and no result reads it.
+const BAT_STYLES = [
+  // tempo: share of the usual time each pose of a shot is on screen (>1 = slower, more elegant); hold: ms the finish is held;
+  // rock/hz: sway of his stance (metres, per second); lean: shear (+ = to the off side); crouch: height scale
+  { id: 'stylist',  tempo: 1.22, hold: 560, rock: 0.012, hz: 0.5,  lean: -0.012, crouch: 1.0 },
+  { id: 'slugger',  tempo: 0.82, hold: 300, rock: 0.0,   hz: 0,    lean: 0.01,   crouch: 0.97 },
+  { id: 'rocker',   tempo: 1.0,  hold: 420, rock: 0.05,  hz: 0.9,  lean: 0,      crouch: 1.0 },
+  { id: 'twitchy',  tempo: 0.92, hold: 360, rock: 0.02,  hz: 2.1,  lean: 0.015,  crouch: 0.985 },
+  { id: 'crouched', tempo: 1.05, hold: 440, rock: 0.0,   hz: 0,    lean: 0.03,   crouch: 0.94 },
+  { id: 'tall',     tempo: 1.12, hold: 480, rock: 0.008, hz: 0.4,  lean: -0.03,  crouch: 1.02 },
+  { id: 'steady',   tempo: 1.0,  hold: 420, rock: 0.0,   hz: 0,    lean: 0,      crouch: 1.0 },
+];
+const BOWL_STYLES = [
+  // cad: run-up stride rate (>1 = quicker feet); load: share of the run-up he spends gathering and coiling (>0 = longer load-up);
+  // follow: how slowly he follows through (>1 = slower); lean: shear in the run and delivery (+ = towards the off side); stoop: height scale
+  { id: 'smooth',   cad: 1.0,  load: 0,     follow: 1.15, lean: 0,      stoop: 1.0 },
+  { id: 'hurried',  cad: 1.3,  load: -0.03, follow: 0.85, lean: 0.015,  stoop: 0.985 },
+  { id: 'slinger',  cad: 1.0,  load: 0.02,  follow: 1.0,  lean: 0.075,  stoop: 0.975 },
+  { id: 'upright',  cad: 0.85, load: 0.03,  follow: 1.25, lean: -0.035, stoop: 1.02 },
+  { id: 'wound-up', cad: 1.1,  load: 0.06,  follow: 0.95, lean: -0.015, stoop: 1.0 },
+  { id: 'shuffler', cad: 1.45, load: -0.02, follow: 1.0,  lean: 0.03,   stoop: 0.98 },
+];
+const NEUTRAL_STYLE = { bat: { id: 'steady', tempo: 1, hold: 420, rock: 0, hz: 0, lean: 0, crouch: 1 }, bowl: { id: 'smooth', cad: 1, load: 0, follow: 1, lean: 0, stoop: 1 } };
+const styles = new Map();
+// { bat, bowl } for a player's look (look.who: his name); no name, no style
+export function styleOf(look) {
+  if (!look?.who) return NEUTRAL_STYLE;
+  const key = slug(look.who);
+  if (styles.has(key)) return styles.get(key);
+  const h = hashStr(key + '|style'), at = k => ((h >>> k) & 255) / 255 - 0.5;   // (-0.5..0.5, a different one for each trait)
+  const b = BAT_STYLES[h % BAT_STYLES.length], w = BOWL_STYLES[(h >>> 5) % BOWL_STYLES.length];
+  const s = {
+    bat: { ...b, tempo: b.tempo * (1 + at(8) * 0.12), hold: b.hold * (1 + at(12) * 0.2), rock: b.rock * (1 + at(16) * 0.4), hz: b.hz * (1 + at(20) * 0.3), lean: b.lean + at(24) * 0.01 },
+    bowl: { ...w, cad: w.cad * (1 + at(10) * 0.12), load: w.load + at(14) * 0.02, follow: w.follow * (1 + at(18) * 0.16), lean: w.lean + at(22) * 0.02 },
+  };
+  styles.set(key, s);
+  return s;
+}
