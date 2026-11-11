@@ -1085,7 +1085,7 @@ export class Game {
 
     // a hot duel: a quick bowls faster, a spinner turns it more
     const hotBall = !opt.assist && this.duelHot(inn);
-    if (hotBall) { spec = hotSpec(spec, btype.spin); this.fx.word(btype.spin ? 'HE\'S TURNING IT!' : 'HE\'S BOWLING FASTER!', this.W / 2, this.H * 0.3, { size: 36, color: '#ff9f1c', stroke: INK, dur: 1100 }); }
+    if (hotBall) spec = hotSpec(spec, btype.spin);   // (a hot duel: the ball is faster or turns more; no word flashes up over the delivery)
     const myC = this.myCounter; this.myCounter = null;   // my answer to his power
     if (myC === 'brace' && aiPower === 'tornado') spec = { ...spec, kmh: BRACE.tornadoKmh };
     fx.squeeze = aiPower === 'googly' || stormNow ? (myC === 'brace' ? 0.93 : 0.85) : 0;   // (he reads it wrong, so my timing is that much tighter)
