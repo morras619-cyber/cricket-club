@@ -1162,7 +1162,7 @@ async function startMatch(opts) {
   setStartEnergy(mode === 'career' && profile.career.medical ? startEnergies(profile.career) : {});   // (the medical centre: your players start the match on their fitness)
   try {
     summary = await game.runMatch({
-      mode, story: !!opts.story, opening: !!opts.opening, trial: opts.drill ? opts.drill : opts.trial ? { balls: opts.trial.balls, bats: opts.trial.bats.map(id => profile.career.players[id]).map(enginePlayer), bowls: opts.trial.bowls.map(id => profile.career.players[id]).map(enginePlayer) } : null, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
+      scout: opts.scout || null, mode, story: !!opts.story, opening: !!opts.opening, trial: opts.drill ? opts.drill : opts.trial ? { balls: opts.trial.balls, bats: opts.trial.bats.map(id => profile.career.players[id]).map(enginePlayer), bowls: opts.trial.bowls.map(id => profile.career.players[id]).map(enginePlayer) } : null, seed, order, team, opp, home, squad: sq, lineup, levels, pools, rival, scenario: opts.scenario, challenge: opts.challenge,
       records: { longestSix: careerStats(profile).bat.longestSix || 0 }, field: mode === 'tutorial' ? null : profile.field, level: levelOf(profile.skill), crowd: mode === 'career' && profile.career?.chirp ? crowdOf(profile.career) : 0,
     });
   } catch (e) {
@@ -3370,9 +3370,21 @@ async function offerTutorial() {
 let trialSel = null;
 const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const statLine = (r, bat) => (bat ? `${r.runs} off ${r.balls} · ${pl(r.fours, 'four')} · ${pl(r.sixes, 'six').replace('sixs', 'sixes')} · out ${r.outs ? pl(r.outs, 'time') : 'never'}` : `${r.outs} for ${r.runs} · ${pl(r.dots, 'dot')} · ${pl(r.fours + r.sixes, 'boundary').replace('boundarys', 'boundaries')}`);
+// what each net candidate's card says as he walks in: how he fits this squad (the same reading as the pick screen: career.js trialFit), his potential, his own line
+function scoutData(c, T) {
+  const out = {};
+  for (const [kind, ids] of [['bat', T.bats], ['bowl', T.bowls]]) ids.forEach((id, i) => {
+    const p = c.players[id]; if (!p) return;
+    let fit = null; try { fit = trialFit(c, id, kind, []); } catch { /* the card is shown without a verdict */ }
+    const rows = fit?.rows || [];
+    out[id] = { kind, i: i + 1, n: ids.length, verdict: fit?.verdict || '', tone: fit?.tone || 'ok', stars: potentialStars(p), ageNote: ageNote(p),
+      pros: rows.filter(r => r.tone === 'pro').map(r => r.text).slice(0, 2), cons: rows.filter(r => r.tone === 'con').map(r => r.text).slice(0, 2) };
+  });
+  return out;
+}
 async function runTrials(c) {
   const T = c.trial;
-  const sum = await startMatch({ mode: 'tutorial', trial: { bats: T.bats, bowls: T.bowls } });
+  const sum = await startMatch({ mode: 'tutorial', trial: { bats: T.bats, bowls: T.bowls }, scout: scoutData(c, T) });
   if (sum?.trial) { T.results = sum.trial; saveProfile(profile); }
   renderCareer();
 }

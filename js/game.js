@@ -15,7 +15,7 @@ import { Innings, matchResult } from './match.js';
 import { lookOf, faceCanvas, masksReady, colourLook } from './looks.js';
 import { flag } from './nations.js';
 import { dailyOutcome } from './daily.js';
-import { cardFor } from './cards.js';
+import { cardFor, scoutCard } from './cards.js';
 import { portraitFace, paintedPortrait } from './futcard.js';
 import { paceTired, tiredness } from './stamina.js';
 import { matchup, keeperEase, hitStrength, timingFor, bowlerSqueeze, movementFor, paceFor, fieldSpeed, careerBatSkill, careerBowlWindow, careerBowlMove } from './ratings.js';
@@ -342,6 +342,7 @@ export class Game {
     this.crowdLift = opts.crowd && this.home === this.myTeam.id ? CROWD_TIMING * opts.crowd : 0;
     this.pitch = pitchOf(this.home);
     preloadEffects('electric');
+    this.scout = opts.scout || null;   // (the nets: what to say about each candidate as he walks in, by id)
     this.nets = !!opts.trial;   // the net trials: a practice net (scene.js setGround), no non-striker, the ball stopped by the nets
     setGround(this.home, () => { for (const c of Object.values(this.cams)) c.bg = null; this.of.bg = null; }, { nets: this.nets });
     // the two XIs: batting orders and bowling attacks (heroes are the stars of each side)
@@ -3358,8 +3359,10 @@ export class Game {
       this.innings.push(inn);
       inn.setBatter(cand); inn.setBowler(net);
       this.hud(inn);
-      this.ui.banner(`NET TRIAL ${bi + 1}/${bats.length}`, `${cand.name} · ${cand.label}`, 2200);
-      await this.sleepReal(this.bot ? 100 : 2300);
+      if (!await this.scoutIntro(cand, 'bat')) {
+        this.ui.banner(`NET TRIAL ${bi + 1}/${bats.length}`, `${cand.name} · ${cand.label}`, 2200);
+        await this.sleepReal(this.bot ? 100 : 2300);
+      }
       for (let k = 0; k < N; k++) {
         const spec = script[(bi * N + k) % script.length];
         const bp = powerBall && k === N - 1 ? powersOf(cand).bat : null;
@@ -3384,8 +3387,10 @@ export class Game {
       this.innings.push(inn);
       inn.setBowler(cand); inn.setBatter(netBat); inn.setPartner(netMate);
       this.hud(inn);
-      this.ui.banner(`NET TRIAL ${bi + 1}/${bowls.length}`, `${cand.name} · ${cand.label}`, 2200);
-      await this.sleepReal(this.bot ? 100 : 2300);
+      if (!await this.scoutIntro(cand, 'bowl')) {
+        this.ui.banner(`NET TRIAL ${bi + 1}/${bowls.length}`, `${cand.name} · ${cand.label}`, 2200);
+        await this.sleepReal(this.bot ? 100 : 2300);
+      }
       while (inn.balls < N) {
         const wk = inn.wkts;
         const wp = powerBall && inn.balls === N - 1 ? powersOf(cand).bowl : null;
@@ -3406,6 +3411,27 @@ export class Game {
     }
     this.ui.fieldButton(false);
     return { mode: 'tutorial', trial: out, innings: this.innings, result: { outcome: 'win', text: '' }, moments: [], team: this.team, rival: this.rival, seed: this.seed, stats: this.stats };
+  }
+
+  // A net candidate walks in: his scouting card fills the screen at once (who he is, what he is good and bad at, how he fits the squad), until you tap (or ten seconds go by).
+  // False when there is nothing to show (a drill, a bot, a player with no data): the old banner is used.
+  async scoutIntro(cand, kind) {
+    const d = this.scout?.[cand.id];
+    if (!d || this.bot) return false;
+    let host = document.getElementById('scoutHost');
+    if (!host) { host = document.createElement('div'); host.id = 'scoutHost'; host.className = 'scout-host'; host.hidden = true; document.body.append(host); }
+    host.innerHTML = '';
+    const wrap = document.createElement('div'); wrap.className = 'scout-wrap';
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'scout-go'; go.textContent = kind === 'bat' ? 'TAP TO PICK UP THE BAT' : 'TAP TO TAKE THE BALL';
+    const timer = document.createElement('div'); timer.className = 'scout-timer'; timer.append(document.createElement('i'));
+    wrap.append(scoutCard(cand, this.myTeam, d), go, timer); host.append(wrap);
+    host.hidden = false; sfx.whoosh?.();
+    let done = false; host.onpointerdown = () => { done = true; };
+    try {
+      for (let t = 0; t < 10000 && !done; t += 100) await this.sleepReal(100);
+    } finally { host.hidden = true; host.onpointerdown = null; host.innerHTML = ''; }
+    sfx.click();
+    return true;
   }
 
   // the story's first match (js/comic.js, then main.js careerOpening): the final, Thunder Strikers batting first on 34 for 1 after three overs.
