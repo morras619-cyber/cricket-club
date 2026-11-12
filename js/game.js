@@ -1581,7 +1581,7 @@ export class Game {
   wicketFx(text, at) {
     this.wicketCrowd();
     this.board(text.replace('!', '') + '!');
-    this.fx.flash('#e8343b', 0.18); this.fx.shake(20); this.fx.glow('#ff2a3a', 0.36, this.W / 2, this.H * 0.5, { dur: 1400, r: 1 });
+    this.fx.flash('#e8343b', 0.4); this.fx.shake(20);
     this.fx.word(text, this.W / 2, this.H * 0.36, { size: 62, color: '#fff4da', stroke: '#e8343b', dur: 1500 });
     this.fx.sparks(at.x, at.y, 20, ['#fff4da', '#e8343b', '#f0c27a'], 9);
     sfx.wicket(); buzz([60, 40, 60]);
@@ -1985,8 +1985,7 @@ export class Game {
           const hitSet = this.fxSet(o.side === 'ai' ? this.myTeam : this.oppTeam);
           const huge = this.sixDistance(sim) >= HUGE_SIX_M;
           this.fx.word(huge ? 'OUT OF THE PARK!' : 'SIX!', p.x, p.y - 40, { size: huge ? 64 : 80 });
-          if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); if (lively()) this.fx.flash('#ffd23f', 0.12); }
-          if (lively()) this.fx.glow(o.side === 'ai' ? (this.myTeam?.trim || '#ffd23f') : (this.oppTeam?.trim || '#ffd23f'), huge ? 0.5 : grade === 'perfect' ? 0.4 : 0.3, p.x, p.y, { dur: huge ? 2000 : 1500 });
+          if (hitSet) this.skyStrike(hitSet, p.x, p.y, { w: 220, burst: 'burst1' }); else { this.fx.burst(p.x, p.y); if (lively()) this.fx.flash('#ffd23f', 0.3); }
           // the crowd where it lands jumps up; a perfect six shakes the whole ground
           const T = o.side === 'ai' ? this.myTeam : this.oppTeam;
           this.fx.ripple(p.x, p.y, { colors: [T?.suit || '#ffd23f', T?.trim || '#fff4da', '#fff4da'], r: grade === 'perfect' ? 150 : 110 });
@@ -1998,7 +1997,7 @@ export class Game {
           this.fx.word(`${m} METRES`, p.x, p.y + 30, { size: 40, color: '#fff4da', stroke: '#e8343b', rot: 0, dur: 1400 });
           this.board(huge ? `${m}m · OUT OF THE PARK!` : `${m}m SIX!`);
         }
-        else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); if (lively()) this.fx.glow('#3ec6ff', 0.2, p.x, p.y, { dur: 1000, r: 0.7 }); }
+        else if (sim.kind === 'four' && !o.saved) { this.fx.word('FOUR!', p.x, p.y - 40, { size: 70, color: '#3ec6ff', stroke: INK }); }
         else if (o.dropped) { this.fx.word('DROPPED!', p.x, p.y - 30, { size: 50 }); sfx.trombone(); this.fieldingGroan(o.side === 'ai' ? this.oppTeam : this.myTeam); }
         else if (o.runOut !== undefined) { /* the throw says RUN OUT! or SAFE! */ }
         else if (!o.caught) this.fx.word(`${runs} RUN${runs === 1 ? '' : 'S'}`, this.W / 2, this.H * (D ? 0.62 : 0.3), { size: 44, color: '#fff4da', stroke: INK });
@@ -2038,7 +2037,7 @@ export class Game {
     this.view = 'bat';
     this.fx.reset();
     S.batter.anim = 'celebrate'; S.batter.cel0 = this.realTime; S.batter.shot = null; S.delivery = null; S.flight = null;
-    this.fx.flash('#ffd23f', 0.12); this.fx.shake(8); this.fx.glow('#ffc21a', 0.45, this.W / 2, this.H * 0.5, { dur: 1800, r: 1 });
+    this.fx.flash('#ffd23f', 0.32); this.fx.shake(8);
     this.fx.burst(this.W / 2, this.H * 0.55, { color: '#ffd23f', rays: 24, r: 340, dur: 600 });
     this.fx.sparks(this.W * 0.3, this.H * 0.5, 22); this.fx.sparks(this.W * 0.7, this.H * 0.5, 22);
     this.fx.ripple(this.W / 2, this.H * 0.5, { r: 150, dur: 900 });

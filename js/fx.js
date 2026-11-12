@@ -76,7 +76,7 @@ export class FX {
   constructor() { this.reset(); loadBurst(); }
   reset() {
     this.words = []; this.bubbles = []; this.parts = []; this.bursts = []; this.blasts = []; this.effects = []; this.ripples = [];
-    this.flashA = 0; this.flashColor = '#fff'; this.shakeA = 0; this.speed = 0; this.vignette = null; this.glows = [];
+    this.flashA = 0; this.flashColor = '#fff'; this.shakeA = 0; this.speed = 0; this.vignette = null;
   }
 
   word(text, x, y, { size = 64, color = '#ffd23f', stroke = '#e8343b', dur = 1100, rot = (Math.random() - 0.5) * 0.25 } = {}) {
@@ -99,8 +99,6 @@ export class FX {
     colors.forEach((c, i) => this.ripples.push({ x, y, color: c, r, dur, squash, t: -i * 110 }));
   }
   flash(color = '#fff', a = 0.9) { this.flashColor = color; this.flashA = a; }
-  // A big moment's glow: light that swells over a moment and then settles slowly (no flicker), a bloom round (x, y) (the middle of the screen if none) and a tint pushed in from the edges.
-  glow(color, a = 0.5, x = null, y = null, { dur = 1300, r = 0.85 } = {}) { this.glows.push({ color, a, x, y, dur, r, t: 0 }); if (this.glows.length > 4) this.glows.shift(); }
   shake(a = 10) { this.shakeA = Math.max(this.shakeA, a); }
   burst(x, y, { color = '#ffd23f', dur = 260, rays = 18, r = 300 } = {}) { this.bursts.push({ x, y, color, dur, rays, r, t: 0 }); }
   sparks(x, y, n = 16, colors = ['#ffd23f', '#fff4da', '#e8343b'], speed = 7) {
@@ -118,8 +116,6 @@ export class FX {
     for (const b of this.blasts) b.t += dtMs;
     this.blasts = this.blasts.filter(b => b.t < b.dur);
     for (const e of this.effects) e.t += dtMs;
-    for (const g of this.glows) g.t += dtMs;
-    this.glows = this.glows.filter(g => g.t < g.dur);
     for (const r of this.ripples) r.t += dtMs;
     this.ripples = this.ripples.filter(r => r.t < r.dur);
     this.effects = this.effects.filter(e => e.t < e.dur);
@@ -170,29 +166,12 @@ export class FX {
     for (const b of this.bubbles) taken.push(drawBubble(ctx, b, W, taken, H));
     const band = this.band ? this.band(W, H) : null;   // (the sky between the scoreboard and the players: where a centred word is kept)
     for (const w of this.words) taken.push(drawWord(ctx, w, W, H, taken, band));
-    for (const g of this.glows) drawGlow(ctx, g, W, H);
     if (this.flashA > 0) {
       ctx.globalAlpha = Math.min(1, this.flashA);
       ctx.fillStyle = this.flashColor; ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = 1;
     }
   }
-}
-
-// one glow: it swells over the first tenth, then eases away (a slow curve, so it reads as light and not a strobe)
-function drawGlow(ctx, g, W, H) {
-  const p = g.t / g.dur, env = p < 0.1 ? p / 0.1 : Math.pow(1 - (p - 0.1) / 0.9, 1.7), a = g.a * env;
-  if (a <= 0.003) return;
-  const cx = g.x ?? W / 2, cy = g.y ?? H * 0.45, R = Math.max(W, H) * g.r;
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-  bloom.addColorStop(0, g.color); bloom.addColorStop(0.35, g.color); bloom.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.globalAlpha = Math.min(1, a * 0.55); ctx.fillStyle = bloom; ctx.fillRect(0, 0, W, H);
-  // the tint at the edges of the screen
-  const edge = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) * 0.62);
-  edge.addColorStop(0, 'rgba(0,0,0,0)'); edge.addColorStop(1, g.color);
-  ctx.globalAlpha = Math.min(1, a * 0.7); ctx.fillStyle = edge; ctx.fillRect(0, 0, W, H);
-  ctx.restore();
 }
 
 const hits = (r, list) => list.find(q => q && r.x < q.x + q.w + 6 && r.x + r.w + 6 > q.x && r.y < q.y + q.h + 6 && r.y + r.h + 6 > q.y);
