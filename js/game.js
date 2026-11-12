@@ -1833,8 +1833,9 @@ export class Game {
     const end = o.caught ? sim.catch.t : o.saved ? sim.save.t : sim.kind === 'field' && sim.intercept ? sim.intercept.t : toRope ? sim.ropeT : six ? Math.min(crowdT ?? path.T, path.T, 4) : Math.min(sim.duration, 3);
     // ...with the nearest fielder chasing it, and running out of rope
     let chaser = null, cStart = null;
+    const missedId = !o.caught && !o.dropped ? (sim.catch ? sim.catch.fielder : sim.nearMiss?.fielder)?.id : null;   // (the man who dived and missed is not the one who then chases it)
     if (toRope && !A) {
-      const outfield = fs.filter(f => !f.keeper && f.id !== 'bowler');
+      const outfield = fs.filter(f => !f.keeper && f.id !== 'bowler' && f.id !== missedId);
       chaser = outfield.reduce((b, f) => (!b || Math.hypot(f.x - sim.ropePoint.x, f.y - sim.ropePoint.y) < Math.hypot(b.x - sim.ropePoint.x, b.y - sim.ropePoint.y) ? f : b), null);
       if (chaser) cStart = { x: chaser.x, y: chaser.y };
     }
@@ -1849,6 +1850,8 @@ export class Game {
       dStop = { x: miss.point.x - dx / L * s, y: miss.point.y - dy / L * s };
     }
     let missSaid = false;
+    // who is on the ball: the catcher or the one who stops it, the one who dives, the one who chases a four. Nobody else is sent in after it (a backup only goes when no one is already on it)
+    this.O.primaries = [A, D, chaser].filter(Boolean).map(f => f.id);
     // the replay lasts until the batters have made their ground (for a boundary they cross once)
     const legs = runs >= 4 ? 1 : runs;
     const runTime = legs ? CFG.running.first + CFG.running.next * (legs - 1) + 0.3 : 0;
@@ -3693,7 +3696,9 @@ export class Game {
         // camera, watching the batter; those between him and the bowler show their backs
         const faceCam = kind === 'bat' || f.y < 3.5;
         const team = kind === 'bat' ? this.oppTeam : this.myTeam, people = S.field3dPeople?.[fi];
-        if (p && people && drawKitFielder(ctx, p.x, p.y, p.k, faceCam ? 'ready_front' : 'ready_back', team, people)) return;
+        // out to the side compared with how deep he stands (point, cover, mid-wicket, square leg): he turns side-on, to the batter, and not straight at or away from the camera
+        const side = Math.abs(f.x) > 1.1 * Math.max(Math.abs(f.y), 3), bp = side ? cam.project(0, 0, 0) : null;
+        if (p && people && drawKitFielder(ctx, p.x, p.y, p.k, side ? 'ready_side' : faceCam ? 'ready_front' : 'ready_back', team, people, !!(side && bp && p.x > bp.x))) return;
         if (p && drawBowlSprite(ctx, p.x, p.y, p.k, 'field', team, f.x > 0, faceCam ? 'front' : 'back')) return;
         drawFigure3D(ctx, cam, f.x, f.y, teamLook(kind === 'bat' ? this.oppTeam : this.myTeam, f.x > 0 ? 1 : 0), POSES.crouch(), { noShadow: false });
       });
@@ -4387,7 +4392,8 @@ export class Game {
     }
 
     let assigned = backup;
-    if (!assigned) {
+    const busy = !assigned && O.primaries?.length > 0;   // (someone is already on it: the rest hold their places and watch)
+    if (!assigned && !busy) {
       const candidate = O.fielders
         .filter(f => !f.keeper && !f.onPlay && !f.ctrl && !f.backup)
         .map(f => ({ f, d: Math.hypot(f.x - b.x, f.y - b.y) }))
