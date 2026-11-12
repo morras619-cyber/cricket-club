@@ -74,6 +74,16 @@ export const NATION_WEIGHTS = { IN: 18, PK: 14, EN: 12, AU: 12, ZA: 9, NZ: 8, WI
 export const nation = code => NATIONS[code] || null;
 export const flag = p => NATIONS[p?.nation]?.flag || '';
 export const nationName = p => NATIONS[p?.nation]?.name || '';
+// The career's home region: where a new career's players come from. Asia is the one open region (South Asia: the five nations below); a player from anywhere else comes only from a scout.
+export const HOME_NATIONS = { asia: ['IN', 'PK', 'BD', 'LK', 'AF'] };
+export const homeNations = c => HOME_NATIONS[c?.region] || HOME_NATIONS.asia;
+// a nation from `list`, by the same weights as pickNation
+export function pickNationFrom(rng, list) {
+  const w = list.map(k => [k, NATION_WEIGHTS[k] || 1]), total = w.reduce((a, [, x]) => a + x, 0);
+  let r = rng.next() * total;
+  for (const [k, x] of w) if ((r -= x) <= 0) return k;
+  return list[0];
+}
 export function pickNation(rng) {
   const total = Object.values(NATION_WEIGHTS).reduce((a, b) => a + b, 0);
   let r = rng.next() * total;

@@ -215,7 +215,7 @@ test('painted players are as old as they look, in new and saved careers', async 
   const { PORTRAIT_AGE } = await import('../js/portraits-list.js');
   const c = newCareer(42);
   const find = n => Object.values(c.players).find(p => p.name === n);
-  assert.equal(find('Thabo Mthembu').age, PORTRAIT_AGE['thabo-mthembu']);
+  assert.equal(find('Hamid Noorzai').age, PORTRAIT_AGE['hamid-noorzai']);
   assert.equal(find('Thunder Raja').age, PORTRAIT_AGE['thunder-raja']);
   // an older save: wrong ages get fixed once, older by the seasons played
   const p = find('Rakibul Karim'); p.age = 31; delete c.lookAges; c.season = 3;

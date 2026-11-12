@@ -34,9 +34,12 @@ test('a career saved with a mismatched borrowed face has it changed once, and on
   const c0 = make(23);
   const keyOf = q => (q.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const batterFaces = new Set(Object.values(c0.players).filter(q => q.role === 'bat' || q.role === 'wk').map(keyOf));   // (a face painted for a batter: the kind rule leaves it alone)
+  // (the careers' made-up players have no look of their own now, his look follows his face; an older save's players did: give a candidate the look his own face has, as such a save would)
+  c0.players[c0.trial.bats[0]].app = { skin: 5 };   // (a dark tone: the careers' painted faces are mostly lighter, so a face three or more steps off is easy to find)
   let id = null, wrong = null;
   for (const cand of c0.trial.bats) {
-    const w = PORTRAIT_KEYS.find(k => batterFaces.has(k) && Math.abs(step(PORTRAIT_LOOKS[k].skin) - c0.players[cand].app.skin) >= 3);
+    if (!c0.players[cand].app) continue;
+    const w = PORTRAIT_KEYS.filter(k => batterFaces.has(k) && Math.abs(step(PORTRAIT_LOOKS[k].skin) - c0.players[cand].app.skin) >= 3).sort((x, y) => step(PORTRAIT_LOOKS[x].skin) - step(PORTRAIT_LOOKS[y].skin))[0];   // (the lightest: the furthest from his tone)
     if (w) { id = cand; wrong = w; break; }
   }
   assert.ok(id, 'a batter with a face three steps from his own tone exists');
@@ -46,7 +49,7 @@ test('a career saved with a mismatched borrowed face has it changed once, and on
   C.ensurePics(saved);
   const p = saved.players[id];
   assert.notEqual(p.pic, wrong);
-  assert.ok(Math.abs(step(PORTRAIT_LOOKS[p.pic].skin) - p.app.skin) <= 1, 'the new face fits his skin');
+  assert.ok(Math.abs(step(PORTRAIT_LOOKS[p.pic].skin) - p.app.skin) < Math.abs(step(PORTRAIT_LOOKS[wrong].skin) - p.app.skin), 'the new face is nearer his skin than the one taken away (there are few dark faces to choose from)');
   for (const q of Object.values(saved.players)) if (q.id !== id) assert.equal(q.pic, before[q.id], `${q.name} keeps his face`);
   const again = structuredClone(saved); again.players[id].pic = wrong;
   C.ensurePics(again);

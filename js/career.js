@@ -11,7 +11,7 @@ import { TEAMS, CLUBS, LEAGUE_CLUBS, teamById, divisionName, setMyClub } from '.
 import { HEROES, heroById } from './heroes.js';
 import { roster, heroPlayer, defaultLineup, overPlan, bowlType, ovr, teamRating, WEAK, BOWL_TYPES } from './squads.js';
 import { newLeague, simLeague, advance, playerResult, table, finish, nextFixture } from './tournament.js';
-import { NATIONS, pickNation } from './nations.js';
+import { NATIONS, pickNation, pickNationFrom, homeNations } from './nations.js';
 import { randomLook, SKIN } from './looks.js';
 import { PORTRAIT_LOOKS } from './portrait-looks.js';
 import { ensureRivals, nemesisOf, say, afterMatch, messageNote, rivalKind, meetings, speakerOf } from './rivals.js';
@@ -95,10 +95,26 @@ export function newCareer(seed = Date.now() >>> 0) {
     const main = Math.max(...primary(rest).map(k => rest[k]));
     c.players[h.id] = newPlayer(rest, { heroId: h.id, age: lookAge(rest) ?? rng.int(25, 31), pot: Math.min(97, main + 2), team: null, contract: 0, home: teamOfStar(h.id) });
   }
+  homeRegion(c);
   youthIntake(c, rng, 6);
   c.lookAges = {};
   for (const p of Object.values(c.players)) { const a = lookAge(p); if (a != null) c.lookAges[p.id] = a; }
   return c;
+}
+// A new career starts in its home region (South Asia): every regular who was written as coming from somewhere else becomes a player of the home region, with the same role, ratings,
+// age and way of playing, and a name, a nickname and a look of his own. (The heroes are fixed characters and stay as they are.) A career already saved is left alone:
+// its players have history. Players from other regions come to a career only from a scout.
+function homeRegion(c) {
+  const rng = makeRng(hashStr(`home-${c.seed}`)), home = homeNations(c), used = new Set(Object.values(c.players).map(p => p.name));
+  for (const id of Object.keys(c.players).sort()) {
+    const p = c.players[id];
+    if (p.heroId || home.includes(p.nation)) continue;
+    let nation, name;
+    do { nation = pickNationFrom(rng, home); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+    used.add(name);
+    Object.assign(p, { name, nation, short: name.split(' ').slice(1).join(' '), nick: rng.pick(NICKS) });
+    delete p.pic; delete p.app;   // (no look of his own: he borrows a painted face, and his skin and hair follow it, so his face and his sprite always agree)
+  }
 }
 function startDivisions() {
   return { asl: TEAMS.map(t => t.id), d2: LEAGUE_CLUBS.filter(t => t.div === 'd2').map(t => t.id), d3: LEAGUE_CLUBS.filter(t => t.div === 'd3').map(t => t.id) };
@@ -132,6 +148,9 @@ export function ensurePics(c) {
   const owner = new Map();
   for (const q of ps) { const k = keyOfP(q); if (HAS_PIC.has(k)) owner.set(k, q); }
   const lent = new Map();   // key -> how many have borrowed it
+  // a painted face nobody owns (the careers' players come from one region, so the other regions' painted people are free) can be lent to a player from his own country: where the name on the picture comes from
+  const nationOfKey = key => { const [f, ...r] = key.split('-'), l = r.join('-'); for (const [n, N] of Object.entries(NATIONS)) if (N.first.some(x => portraitKey(x) === f) && N.last.some(x => portraitKey(x) === l)) return n; return null; };
+  const freeKeys = PORTRAIT_KEYS.filter(k => !owner.has(k));
   // what a picture shows: the portraits painted for a bowler hold a ball and those painted for a batter or a keeper a bat, so a made-up player borrows one painted for his kind of player
   const kindOf = p => p.role === 'bowl' ? 'bowl' : p.role === 'bat' || p.role === 'wk' ? 'bat' : 'all', clash = (a, b) => (a === 'bowl' && b === 'bat') || (a === 'bat' && b === 'bowl');
   // (a career saved before this: a bowler holding a bat gets another picture)
@@ -160,6 +179,16 @@ export function ensurePics(c) {
       sc += (hashStr(`${p.id}-${k}`) % 1000) / 1000;         // a stable tie-break
       if (sc > bestScore) { bestScore = sc; best = k; }
     }
+    // ...and the free painted faces, for a player of that face's country (never for another's: no European face on a South Asian player)
+    for (const k of freeKeys) {
+      if (mates.has(k)) continue;
+      const kn = nationOfKey(k);
+      if (!kn || kn !== p.nation) continue;
+      let sc = (lent.get(k) || 0) * -6 + 25;   // (a face painted for a person of his own country, with nobody wearing it: his before any other)
+      const a = PORTRAIT_AGE[k]; if (a != null && p.age != null) sc -= Math.min(6, Math.abs(a - p.age)) * 0.7;
+      sc += (hashStr(`${p.id}-${k}`) % 1000) / 1000;
+      if (sc > bestScore) { bestScore = sc; best = k; }
+    }
     if (best) { p.pic = best; lent.set(best, (lent.get(best) || 0) + 1); }
   }
 }
@@ -173,9 +202,9 @@ export function youthIntake(c, rng, n) {
   const used = new Set(Object.values(c.players).map(p => p.name));
   const out = [];
   for (let i = 0; i < n; i++) {
-    // academy graduates come from every cricket nation
+    // academy graduates come from the club's own region (a player from further away comes from a scout)
     let name, nation;
-    do { nation = pickNation(rng); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
+    do { nation = pickNationFrom(rng, homeNations(c)); name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
     used.add(name);
     const [role, label] = rng.pick(ROLES);
     const spin = label.startsWith('Spin');
@@ -189,7 +218,7 @@ export function youthIntake(c, rng, n) {
     const p = newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), role, label, bat, bowl, bowlSkill,
       trait: pot >= 86 ? 'Academy wonderkid' : 'Academy graduate', hero: false,
       ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
-    { age: rng.int(17, 20), pot, team: null, contract: 0, youth: true, app: randomLook(nation, rng) });
+    { age: rng.int(17, 20), pot, team: null, contract: 0, youth: true });   // (no look of his own: he borrows a painted face and his look follows it)
     c.players[id] = p;
     out.push(p);
   }
@@ -461,14 +490,14 @@ export const TRIAL_BOWLS = ['express', 'swing', 'seam', 'leftpace', 'offspin', '
 export const TRIAL_PICKS = { bat: 4, bowl: 5 };
 const KABIR = { id: 'kabir-anand', name: 'Kabir Anand', short: 'Kabir', nick: 'The Founder', nation: 'IN', role: 'bat', label: 'Tactical batter', trait: 'Plays through the pain', bat: 66, bowl: null, bowlSkill: 0, number: 9, hero: false };
 function trialPlayer(c, rng, base, extra) {
-  const nation = pickNation(rng), used = new Set(Object.values(c.players).map(p => p.name));
+  const nation = pickNationFrom(rng, homeNations(c)), used = new Set(Object.values(c.players).map(p => p.name));
   let name;
   do { name = `${rng.pick(NATIONS[nation].first)} ${rng.pick(NATIONS[nation].last)}`; } while (used.has(name));
   const id = `tr-${++c.youthNo}`;
   const w = rng.int(0, WEAK.length - 1);
   return newPlayer({ id, name, nation, nick: rng.pick(NICKS), short: name.split(' ').slice(1).join(' '), hero: false, ...base,
     ai: { ...WEAK[w], honesty: rng.range(0.5, 0.85), fire: rng.range(0.2, 0.5), rattle: rng.range(0.3, 0.55) } },
-  { age: rng.int(18, 24), pot: rng.int(62, 84), team: null, contract: 0, trial: true, app: randomLook(nation, rng), ...extra });
+  { age: rng.int(18, 24), pot: rng.int(62, 84), team: null, contract: 0, trial: true, ...extra });   // (no look of his own: he borrows a painted face and his look follows it)
 }
 function makeTrialists(c) {
   const rng = makeRng(hashStr(`trial-${c.seed}`));
