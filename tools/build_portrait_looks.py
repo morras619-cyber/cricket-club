@@ -20,7 +20,7 @@ HAIR_FIX = {
     # the last batch: a turban, a helmet and a headband hide the hair
     'rohit-grewal': '#141010', 'faizan-paracha': '#141010', 'rhys-mckenzie': '#9a7a48',
     # (a flat cap, a headband and a bat)
-    'bilal-noorzai': '#1c1410', 'jermaine-granger': '#141010', 'captain-comet': '#2a1a14', 'iron-wall-ian': '#2a1a14',
+    'bilal-noorzai': '#1c1410', 'jermaine-granger': '#141010', 'captain-comet': '#2a1a14', 'iron-wall-imran': '#2a1a14',
     # the black-background sheets: a red headband over dark hair, and golden curls the outline darkens
     'ahsan-gondal': '#2a1612', 'blake-ruawai': '#b5873f',
     # the sky-background sheets: two turbans and four caps/hats hide the hair
@@ -39,7 +39,7 @@ BLACK_FIX = {k: '#6b412a' for k in [
     'tevin-hollis', 'thabo-botha', 'thabo-mthembu', 'andre-granger']}
 BROWN_FIX = {k: '#8a5a3a' for k in ['akeem-bascombe', 'kyle-jacobs', 'qais-safi', 'nuwan-jayasena']}
 SKIN_FIX = {**BLACK_FIX, **BROWN_FIX, 'callum-fraser': '#f0ac82', 'thunder-raja': '#c98e63', 'andre-belgrave': '#7a4a2e', 'captain-comet': '#c27a52', 'cyclone-zaheer': '#cd8458',
-            'iron-wall-ian': '#f0ac82', 'rubber-rocket-rory': '#f0ac82'}   # (the two Westerners: the peach of their painted faces, a fair tone between the game's two lightest)
+            'iron-wall-imran': '#f0ac82', 'rubber-rocket-rohan': '#f0ac82'}   # (the two Westerners: the peach of their painted faces, a fair tone between the game's two lightest)
 
 
 def hsv(rgb):

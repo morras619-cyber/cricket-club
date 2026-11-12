@@ -329,6 +329,11 @@ export function finishScouts(c) { if (c.phase === 'scouts') startAuction(c); }
 // nations from the squads, heroes get theirs, and older academy graduates get one.
 export function migrateCareer(c) {
   if (!c) return c;
+  // the heroes' names and countries come from the hero list: a career saved under an older name or country takes the current one
+  for (const p of Object.values(c.players || {})) {
+    const h = p.heroId && heroById(p.heroId);
+    if (h) { const hp = heroPlayer(h); p.name = hp.name; p.short = hp.short; p.nation = hp.nation; }
+  }
   // careers from before the divisions: the eight are the Super League (where a club already
   // chosen stays), and the sixteen lower-division clubs join with their squads
   if (!c.divisions) {

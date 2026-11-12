@@ -6,12 +6,11 @@ import { makeRng } from '../js/rng.js';
 
 const SA = HOME_NATIONS.asia;
 
-test('a new career starts in South Asia: every regular, free agent and youngster is from the home region (only the fixed hero characters are not)', () => {
+test('a new career starts in South Asia: every regular, free agent, youngster and hero is from the home region', () => {
   for (const seed of [8, 77, 2024]) {
     const c = C.newCareer(seed);
     const out = Object.values(c.players).filter(p => !SA.includes(p.nation));
-    assert.ok(out.every(p => p.heroId), `seed ${seed}: only heroes are from elsewhere (${out.filter(p => !p.heroId).map(p => p.name).join(', ')})`);
-    assert.ok(out.length <= 2);
+    assert.equal(out.length, 0, `seed ${seed}: ${out.map(p => `${p.name} ${p.nation}`).join(', ')}`);
   }
 });
 
@@ -44,4 +43,15 @@ test('pickNationFrom only picks from the list, by weight; the home region is Asi
   for (let i = 0; i < 400; i++) seen.add(pickNationFrom(rng, ['IN', 'PK']));
   assert.deepEqual([...seen].sort(), ['IN', 'PK']);
   assert.deepEqual(homeNations({}), SA); assert.deepEqual(homeNations({ region: 'asia' }), SA);
+});
+
+test('a career saved with the old hero names and countries takes the current ones, and the portraits are found under the new names', async () => {
+  const c = C.newCareer(8);
+  const imran = c.players.imran, rani = c.players.rani;
+  Object.assign(imran, { name: 'Iron Wall Ian', short: 'Wall Ian', nation: 'ZA' }); Object.assign(rani, { name: 'Rubber Rocket Rory', short: 'Rocket Rory', nation: 'AU' });
+  C.migrateCareer(c);
+  assert.deepEqual([imran.name, imran.nation, rani.name, rani.nation], ['Iron Wall Imran', 'PK', 'Rubber Rocket Rohan', 'IN']);
+  const { PORTRAIT_KEYS } = await import('../js/portraits-list.js');
+  assert.ok(PORTRAIT_KEYS.includes('iron-wall-imran') && PORTRAIT_KEYS.includes('rubber-rocket-rohan'));
+  assert.ok(!PORTRAIT_KEYS.includes('iron-wall-ian') && !PORTRAIT_KEYS.includes('rubber-rocket-rory'));
 });

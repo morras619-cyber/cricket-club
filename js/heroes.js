@@ -66,7 +66,7 @@ export const HEROES = [
     alts: [GOOGLY],
   },
   {
-    id: 'imran', name: 'Iron Wall Ian', slot: 'bowl', role: 'Seam bowler', emblem: 'hex', bowls: 'pace',
+    id: 'imran', name: 'Iron Wall Imran', slot: 'bowl', role: 'Seam bowler', emblem: 'hex', bowls: 'pace',
     look: { suit: '#8a95a5', trim: '#ff3b3b', cape: '#3a4250', skin: '#b07a58', hair: '#202020', mask: '#ff3b3b' , style: 'short' },
     quote: 'Calculated.',
     power: { kind: 'shatter', name: 'Shatter Seam', cost: 60, word: 'KRAK!',
@@ -74,7 +74,7 @@ export const HEROES = [
     alts: [CUTTER, STORM],
   },
   {
-    id: 'rani', name: 'Rubber Rocket Rory', slot: 'field', role: 'Wicket-keeper', emblem: 'spring',
+    id: 'rani', name: 'Rubber Rocket Rohan', slot: 'field', role: 'Wicket-keeper', emblem: 'spring',
     look: { suit: '#e0245e', trim: '#ffe14d', cape: '#7d0f33', skin: '#c48a64', hair: '#2a1a14', mask: '#ffe14d' , style: 'bun' },
     quote: 'Oh, try harder!',
     power: { kind: 'elastic', name: 'Elastic Grab', cost: 60, word: 'BOING!',

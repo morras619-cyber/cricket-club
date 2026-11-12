@@ -251,3 +251,14 @@ Format: tile number, **name** (used as the file name), country the name is from,
 - [ ] Skin tones match their step. The step 4 and 5 faces are clearly deep, not washed out.
 - [ ] No two faces alike.
 - [ ] Plain blue polo with a yellow collar, no props, no glasses.
+
+
+## 10. Two extra portraits: the superheroes Imran and Rohan
+
+Two of the eight superhero characters are now South Asian: **Iron Wall Imran** (a Pakistani seam bowler, was "Iron Wall Ian") and **Rubber Rocket Rohan** (an Indian wicket-keeper, was "Rubber Rocket Rory"). Their current portraits (`img/cards/portraits/iron-wall-imran.webp` and `rubber-rocket-rohan.webp`) still show fair-skinned men, so they no longer match. They need new portraits, **keeping everything else about them the same**:
+
+- **Iron Wall Imran**: same pose as today (a big, bald, powerfully built man holding a cricket ball up at his shoulder, looking sideways at the viewer), thick dark moustache, a heavy brow, age about 35. Skin **step 3 (medium-deep brown, #a8714f)**. Same blue and yellow lightning-pattern polo.
+- **Rubber Rocket Rohan**: same pose as today (a keeper crouched, both gloved hands held together in front of him, intense look), short curly very dark hair, a thin moustache, age about 28. Skin **step 3 (medium-deep brown, #a8714f)**. Same blue and yellow lightning-pattern polo and white-and-blue keeping gloves.
+- Same style, size and flat sky-blue background as the sheets (one tile each, 300 px wide or larger, or a 1254 px tile). They are recoloured in the game exactly like the other portraits.
+
+Until these arrive, the game shows the old art under the new names.
