@@ -587,7 +587,7 @@ canvas.face { border: 2.5px solid var(--ink); border-radius: 12px; flex: none; }
 
 /* the match pop-up card: painted portrait on the team-coloured frame (480 x 497) */
 .mcard { position: relative; width: min(48vw, 200px); aspect-ratio: 480 / 497; container-type: inline-size; animation: cardin .32s cubic-bezier(.2, 1.4, .4, 1); }
-.mcard-pic { position: absolute; left: 6%; top: 0; width: 88%; height: 66%; overflow: hidden; -webkit-mask-image: radial-gradient(ellipse 50% 52% at 50% 46%, #000 60%, transparent 100%); mask-image: radial-gradient(ellipse 50% 52% at 50% 46%, #000 60%, transparent 100%); }
+.mcard-pic { position: absolute; left: 6%; top: 0; width: 88%; height: 66%; overflow: hidden; -webkit-mask-image: radial-gradient(ellipse 52% 54% at 50% 44%, #000 38%, rgba(0, 0, 0, .55) 66%, transparent 100%), linear-gradient(to bottom, #000 52%, transparent 96%); -webkit-mask-composite: source-in; mask-image: radial-gradient(ellipse 52% 54% at 50% 44%, #000 38%, rgba(0, 0, 0, .55) 66%, transparent 100%), linear-gradient(to bottom, #000 52%, transparent 96%); mask-composite: intersect; }   /* (a long soft fade on every side, and on the bottom most of all: no hard line where the shoulders end) */
 .mcard-pic canvas { width: 100%; height: 100%; object-fit: contain; object-position: 50% 30%; display: block; }
 .mcard-pic.mcard-drawn { object-fit: contain; height: 60%; top: 3%; }
 .mcard-ovr { position: absolute; right: 6%; top: 4%; font-family: "Barlow Condensed", var(--body); font-style: italic; font-weight: 800; font-size: 19cqw; line-height: 1; color: #ffd23f; -webkit-text-stroke: 1.5px #000; paint-order: stroke fill; text-shadow: 2px 3px 0 #000; }
@@ -2412,3 +2412,29 @@ small.tier.common { background: #d9d9d9; } small.tier.rare { background: #7fc4ff
 #settings .panel.paper, #trophies .panel.paper { border-radius: 16px; background: radial-gradient(120% 80% at 50% 0%, rgba(60, 96, 220, .32), rgba(6, 10, 34, 0) 65%), linear-gradient(180deg, rgba(14, 24, 74, .94), rgba(6, 10, 34, .97)); color: #fff; border: 2px solid rgba(255, 210, 63, .8); box-shadow: 0 0 0 1px rgba(255, 226, 122, .25) inset, 0 10px 24px rgba(0, 0, 0, .45); }
 #settings .panel.paper label, #trophies .panel.paper p, #trophies .panel.paper small { color: #dfe6ff; }
 #trophies .panel.paper h3, #trophies .panel.paper .eyebrow { color: #ffd23f; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); }
+
+/* ---- your profile: the picture, the record, the form ---- */
+.avatarrow { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.avatarbtn { position: relative; flex: none; width: 72px; height: 72px; padding: 0; border-radius: 50%; border: 3px solid var(--bolt); background: radial-gradient(circle at 35% 30%, #3a5fd0, #12204f); overflow: visible; box-shadow: 0 4px 10px rgba(0, 0, 0, .45); }
+.avatarbtn img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.avatarbtn b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 400; font-size: 34px; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); }
+.avatarbtn i { position: absolute; right: -4px; bottom: -4px; width: 26px; height: 26px; border-radius: 50%; background: var(--bolt); color: var(--ink); font-style: normal; font-weight: 900; line-height: 22px; text-align: center; border: 2px solid var(--ink); }
+.avatarside { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.avatarside small { font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; font-size: 11px; color: #b8c6ff; }
+.avatarside > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#settings .avatarside .chipbtn { min-height: 34px; font-size: 14px; }
+.avatar-badge { flex: none; width: var(--sz, 64px); height: var(--sz, 64px); border-radius: 50%; border: 3px solid var(--bolt); background: radial-gradient(circle at 35% 30%, #3a5fd0, #12204f); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, .45); }
+.avatar-badge img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-badge b { font-family: var(--display); font-weight: 400; font-size: calc(var(--sz, 64px) * .5); color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); }
+#stats .profilehead { display: flex; align-items: center; gap: 14px; padding: 12px 14px; }
+#stats .ph-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#stats .ph-who b { font-family: var(--display); font-weight: 400; font-size: 28px; letter-spacing: .6px; color: #fff; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#stats .ph-who small { font-weight: 800; letter-spacing: .6px; color: #c9d4ff; font-size: 13px; }
+.formlabel { display: block; margin: 8px 0 4px; font-weight: 800; letter-spacing: 1.1px; text-transform: uppercase; font-size: 10px; color: #b8c6ff; }
+.formrow { display: flex; gap: 5px; flex-wrap: wrap; }
+.formrow i { width: 24px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-style: normal; font-weight: 900; font-size: 13px; color: #06102e; border: 1.5px solid rgba(255, 255, 255, .5); }
+.formrow .form-W { background: #5dff9b; } .formrow .form-L { background: #ff6b6f; } .formrow .form-T { background: #ffe27a; }
+.formrow small { color: #c9d4ff; font-weight: 700; }
+#stats .modetable { margin-top: 8px; }
+#stats .statnote { margin: 4px 2px 0; font-size: 11px; line-height: 1.35; color: #b8c6ff; }
+#stats .panel.profilehead { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; text-align: left; gap: 14px; }

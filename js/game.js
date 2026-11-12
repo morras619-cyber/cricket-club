@@ -4264,7 +4264,7 @@ export class Game {
     const V = this.of, O = this.O, pose = f.pose?.name, ctx = this.ctx;
     const { p, face, moving } = this.topFace(f, O.ball);
     const team = O.side === 'ai' ? this.oppTeam : this.myTeam; // side 'ai': the AI's team fields
-    const size = Math.max(30, 2.5 * V.k) * (f.ctrl ? 1.15 : 1);   // (bigger than life from up here: a fielder you can read, not a speck)
+    const size = Math.max(22, 1.58 * V.k) * (f.ctrl ? 1.15 : 1);   // (the same height on screen as the fielders drawn from the kit sheet, 1.5 m: the keeper and any fielder drawn from the old sheet match them)
     // everyone watches the pitch: beyond it on screen they face down (front sheet), in front of it up (back sheet)
     const c = V.to(0, 10);
     let view = p.y < c.y ? 'front' : 'top';
@@ -4292,7 +4292,7 @@ export class Game {
     const V = this.of, O = this.O;
     const { p, face } = this.topFace(b, null);
     const team = O.side === 'ai' ? this.myTeam : this.oppTeam;
-    const size = Math.max(26, 2.5 * V.k * 0.8);
+    const size = Math.max(22, 1.47 * V.k);   // (the batters, running or waiting: the fielders' height too, with the pads and bat)
     const frame = (i ? 'batB' : 'batA') + (O.running ? 1 + (Math.floor(this.gameTime * 8) % 2) : 1);
     // running up the screen shows his back, down the screen his face
     const view = O.running ? (Math.sin(face) > 0 ? 'front' : 'top') : (i ? 'front' : 'top');

@@ -198,7 +198,14 @@ vs a random team</small></button>
         <button class="setcard" id="setUnits"><img src="img/menu/icon-fielding.webp" alt=""><b>Ball speed</b><span>km/h</span></button>
         <button class="setcard" id="setCalibrate"><img src="img/menu/icon-haptics.webp" alt=""><b>Touch timing</b><span>Calibrate</span></button>
       </div>
-          <div class="panel paper profile"><label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label></div>
+          <div class="panel paper profile">
+            <div class="avatarrow">
+              <button class="avatarbtn" id="avatarBtn" type="button" aria-label="Choose a profile picture"><img id="avatarImg" alt="" hidden><b id="avatarInit">?</b><i>＋</i></button>
+              <div class="avatarside"><small>Your picture</small><div><button class="chipbtn" id="avatarPick" type="button">Choose a photo</button><button class="chipbtn ghostchip" id="avatarClear" type="button" hidden>Remove</button></div></div>
+              <input type="file" id="avatarFile" accept="image/*" hidden>
+            </div>
+            <label class="namefield">Your name <input id="playerName" maxlength="14" autocomplete="nickname" placeholder="Player"></label>
+          </div>
         </div>
         <div class="set-pane set-grid" data-pane="more" hidden>
           <button class="mf-big" id="setTrophies">Trophies</button>
@@ -576,7 +583,7 @@ vs a random team</small></button>
 
   <section id="stats" class="screen" hidden>
     <div class="screen-inner wide">
-      <h2 class="title">Career stats</h2>
+      <h2 class="title">Your stats</h2>
       <p class="lede">Each dismissal ends a batting innings. Run-outs don't count as bowler wickets.</p>
       <div id="statsBody"></div>
       <button class="bigbtn ghost" id="statsBack">Back</button>

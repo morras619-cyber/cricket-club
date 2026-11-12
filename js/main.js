@@ -25,7 +25,7 @@ import { renderShareCard } from './sharecard.js';
 import { levelOf, levelName, learn, adaptScale } from './adapt.js';
 import { preMatch } from './rivals.js';
 import { ensureChirp, faceOfPress, faceStyle, compact, buzzWord, handleOf, sponsorBonus, crowdOf, CROWD_TIMING, engagement } from './chirp.js';
-import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, fmt, unlockHero,
+import { loadProfile, saveProfile, level, dailyAvailable, claimDaily, matchRewards, DAILY, careerStats, recordStats, matchRecord, recordResult, winRate, avatarOf, fmt, unlockHero,
   passState, passReward, claimPass, PASS_TIERS, GEM_DEALS, buyCoins } from './profile.js';
 import { sound, atmosphere, unlockAudio, sfx, buzz, markTap, startAmbience, stopAmbience, crowdStop, crowdSing, crowdMute, CHANTS, previewChant } from './audio.js';
 import { FEATURES } from './config.js';
@@ -289,8 +289,8 @@ function fillHubClub() {
   head.append(crest, who);
   const lvl = el('div', 'hc-level'), bar = el('div', 'mf-bar green'), fill = el('i'); fill.style.width = `${Math.round(progress * 100)}%`; bar.append(fill);
   lvl.append(el('b', '', `Level ${lv}`), bar, el('small', '', lv >= 50 ? 'Top level' : `${Math.round(progress * 100)}% to level ${lv + 1}`));
-  const rate = profile.matches ? Math.round(profile.wins / profile.matches * 100) : 0;
-  const stats = el('div', 'hc-stats'); stats.append(stat(profile.matches || 0, 'Matches'), stat(profile.wins || 0, 'Wins'), stat(`${rate}%`, 'Win rate'), stat(profile.best || 0, 'Best score'));
+  const rec = matchRecord(profile), rate = winRate(rec), hs = careerStats(profile).bat;
+  const stats = el('div', 'hc-stats'); stats.append(stat(rec.played, 'Matches'), stat(rec.won, 'Wins'), stat(`${rate}%`, 'Win rate'), stat(hs.inns ? fmt.hs(hs) : Math.max(profile.best || 0, 0), 'Best score'));
   const tro = el('div', 'hc-row'); tro.append(ico('trophy'), el('span', '', `${Object.keys(profile.achievements || {}).length} of ${ACHIEVEMENTS.length} trophies and medals`));
   body.replaceChildren(head, lvl, stats, tro);
   if (c?.club) {
@@ -419,11 +419,53 @@ function makeSetTabs() {
   });
   body.addEventListener('pointercancel', () => { x0 = null; });
 }
+// ---------- your profile picture ----------
+// A photo from this phone, cut to its middle square and shrunk to 192 px (a JPEG of about 10 KB: it travels with the save), kept as profile.avatar. Nothing is uploaded anywhere.
+const AVATAR_PX = 192;
+async function avatarFromFile(file) {
+  if (!file || !/^image\//.test(file.type || '')) throw new Error('That is not a picture');
+  if (file.size > 30e6) throw new Error('That picture is too big');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image(); img.src = url; await img.decode();
+    const w = img.naturalWidth, h = img.naturalHeight, s = Math.min(w, h);
+    if (!s) throw new Error('That picture cannot be read');
+    const c = document.createElement('canvas'); c.width = c.height = AVATAR_PX;
+    const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.fillStyle = '#10163a'; g.fillRect(0, 0, AVATAR_PX, AVATAR_PX);
+    g.drawImage(img, (w - s) / 2, (h - s) / 2, s, s, 0, 0, AVATAR_PX, AVATAR_PX);
+    return c.toDataURL('image/jpeg', 0.85);
+  } finally { URL.revokeObjectURL(url); }
+}
+const initialOf = () => ((profile.name || '').trim().charAt(0) || 'P').toUpperCase();
+function fillAvatar() {
+  const src = avatarOf(profile), img = $('avatarImg'), init = $('avatarInit');
+  img.hidden = !src; if (src) img.src = src;
+  init.hidden = !!src; init.textContent = initialOf();
+  $('avatarClear').hidden = !src;
+  $('avatarPick').textContent = src ? 'Change photo' : 'Choose a photo';
+}
+// the picture (or, with none, his initial on a coloured disc) as a round badge of this size
+function avatarBadge(size) {
+  const src = avatarOf(profile), d = el('div', 'avatar-badge');
+  d.style.setProperty('--sz', `${size}px`);
+  if (src) { const i = el('img'); i.src = src; i.alt = ''; d.append(i); } else d.append(el('b', '', initialOf()));
+  return d;
+}
+$('avatarBtn').addEventListener('click', () => $('avatarFile').click());
+$('avatarPick').addEventListener('click', () => $('avatarFile').click());
+$('avatarFile').addEventListener('change', async e => {
+  const file = e.target.files?.[0]; e.target.value = '';
+  if (!file) return;
+  try { profile.avatar = await avatarFromFile(file); saveProfile(profile); fillAvatar(); sfx.chime(); ui.toast('Profile picture set'); }
+  catch (err) { ui.toast(err?.message?.startsWith('That') ? err.message : 'That picture could not be read: try a JPEG or PNG'); }
+});
+$('avatarClear').addEventListener('click', () => { delete profile.avatar; saveProfile(profile); fillAvatar(); ui.toast('Picture removed'); });
 function renderSettings() {
   ui.show('settings');
   for (const id of DEV_BUTTONS) $(id).hidden = !DEV_TOOLS;
   makeSetTabs(); showSetPane(setPane);
   $('playerName').value = profile.name;
+  fillAvatar();
   const state = (id, text, on) => { const b = $(id); b.querySelector('span').textContent = text; b.classList.toggle('off', !on); };
   state('setSound', sound.on ? 'On' : 'Off', sound.on);
   state('setHaptics', sound.haptics ? 'On' : 'Off', sound.haptics);
@@ -535,7 +577,7 @@ $('setStadiumTest').addEventListener('click', () => {   // (testing only: shows 
   try { localStorage.setItem('sixcharge.stadiumTest', String(stadiumTest.level)); } catch { /* private window: it lasts until you reload */ }
   renderSettings();
 });
-$('playerName').addEventListener('input', e => { profile.name = e.target.value.trim().slice(0, 14); saveProfile(profile); });
+$('playerName').addEventListener('input', e => { profile.name = e.target.value.trim().slice(0, 14); saveProfile(profile); if (!avatarOf(profile)) $('avatarInit').textContent = initialOf(); });
 $('setSound').addEventListener('click', () => { sound.on = !sound.on; profile.settings.sound = sound.on; saveProfile(profile); unlockAudio(); renderSettings(); });
 $('setHaptics').addEventListener('click', () => { sound.haptics = !sound.haptics; profile.settings.haptics = sound.haptics; saveProfile(profile); renderSettings(); });
 $('setField').addEventListener('click', () => {
@@ -756,7 +798,29 @@ function renderStats() {
   body.innerHTML = '';
   body.className = 'statsbody';
   const card = (title, grid) => { const c = el('div', 'panel paper statcard'); c.append(el('h3', '', title), grid); return c; };
-  const pages = [['Batting', card('Batting', statGrid(batItems(s.bat)))], ['Bowling', card('Bowling', statGrid(bowlItems(s.bowl)))]];
+  // the Profile page: your picture and name, your record (every finished match but the tutorial and the warm-up), your form, and your best
+  const rec = matchRecord(profile), lvl = level(profile.xp).lv;
+  const head = el('div', 'panel paper statcard profilehead'), who = el('div', 'ph-who');
+  who.append(el('b', '', profile.name || 'Player'), el('small', '', `Level ${lvl} · ${rec.played} ${rec.played === 1 ? 'match' : 'matches'} played`));
+  head.append(avatarBadge(76), who);
+  const streak = rec.streak > 0 ? `${rec.streak} W` : rec.streak < 0 ? `${-rec.streak} L` : '—';
+  const recCard = card('Record', statGrid([['Played', rec.played], ['Won', rec.won], ['Lost', rec.lost], ['Tied', rec.tied], ['Win rate', `${winRate(rec)}%`], ['Streak', streak]]));
+  const form = el('div', 'formrow');
+  if (rec.last.length) for (const m of rec.last.slice(0, 10)) { const chip = el('i', `form-${m.r}`, m.r); chip.title = `${m.opp ? `v ${m.opp}` : ''} ${m.me && m.them ? `· ${m.me} to ${m.them}` : ''}`.trim(); form.append(chip); }
+  else form.append(el('small', '', 'Your results will show here.'));
+  recCard.append(el('small', 'formlabel', 'Last results · newest first'), form);
+  const best = card('Your best', statGrid([['Highest score', fmt.hs(s.bat)], ['Best bowling', fmt.best(s.bowl)], ['Total runs', s.bat.runs], ['Wickets', s.bowl.wkts], ['Sixes', s.bat.sixes], ['Longest six', s.bat.longestSix ? `${s.bat.longestSix} m` : '—']]));
+  const modeNames = { quick: 'Quick match', league: 'Super League', cup: 'Knockout Cup', career: 'Career', war: 'Weekend War', challenge: 'Challenges', daily: 'Daily' };
+  const modeRows = Object.entries(rec.modes).filter(([, m]) => m.p);
+  if (modeRows.length) {
+    const t = el('table', 'herotable modetable'), hr = el('tr');
+    for (const h of ['Mode', 'P', 'W', 'L', 'Win %']) hr.append(el('th', '', h));
+    t.append(hr);
+    for (const [k, m] of modeRows) { const tr = el('tr'); tr.append(el('td', '', modeNames[k] || k), el('td', '', m.p), el('td', '', m.w), el('td', '', m.l), el('td', '', `${Math.round(m.w / m.p * 100)}%`)); t.append(tr); }
+    const wrap = el('div', 'tablewrap'); wrap.append(t); best.append(wrap);
+  }
+  const note = el('p', 'statnote', rec.carried ? `Every finished match counts, except the tutorial and warm-ups. ${rec.carried} earlier matches were carried over from before this record.` : 'Every finished match counts, except the tutorial and warm-ups.');
+  const pages = [['Profile', [head, recCard, best, note]], ['Batting', card('Batting', statGrid(batItems(s.bat)))], ['Bowling', card('Bowling', statGrid(bowlItems(s.bowl)))]];
   const table = (title, slot, kind, cols) => {
     const c = el('div', 'panel paper statcard');
     c.append(el('h3', '', title));
@@ -4059,6 +4123,7 @@ function showResult(summary) {
   if (adapts) profile.skill = learn(profile.skill, summary);
   const counts = mode !== 'tutorial' && mode !== 'daily'; // full matches go in the career record
   const rec = counts ? recordStats(profile, summary) : null;
+  recordResult(profile, summary);   // (your win/loss record: every finished match but the tutorial and the warm-up)
   const win = summary.result.outcome === 'win';
   if (counts && win && !summary.oppTeam.national) profile.beaten = [...new Set([...(profile.beaten || []), summary.oppTeam.id])];
   const events = [];

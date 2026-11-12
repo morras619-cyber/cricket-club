@@ -30,6 +30,7 @@ export function migrate(p) {
   let v = Number.isInteger(p?.v) ? p.v : 1;
   while (v < SCHEMA) { v++; if (MIGRATIONS[v]) p = MIGRATIONS[v](p) || p; }
   p.v = SCHEMA;
+  matchRecord(p);   // (the win/loss record is made when the save is read, so an older save's matches are carried over before any new match is played)
   return p;
 }
 // what a good save looks like, enough that a code pasted in or a copy read back is not rubbish
@@ -248,6 +249,45 @@ export function recordStats(p, summary) {
   }
   return out;
 }
+
+// ---------- your record: every finished match, counted once ----------
+// Wins, losses, ties, the current and best streak, your last twenty results and a line for each mode. Every finished match counts, except the tutorial and the Weekend
+// War warm-up (practice). A match you quit has no result and is not counted. (The first time it is read, matches played before this record existed are carried over
+// from the old counters: those had no ties, so a tie counts there as a loss.)
+export const RECORDED_MODES = ['quick', 'league', 'cup', 'career', 'war', 'challenge', 'daily'];
+const recBlank = () => ({ played: 0, won: 0, lost: 0, tied: 0, streak: 0, bestWinStreak: 0, last: [], modes: {}, carried: 0 });
+export function matchRecord(p) {
+  const stats = careerStats(p);
+  if (!stats.record) {
+    stats.record = recBlank();
+    const before = Math.max(0, p.matches | 0), won = Math.min(before, Math.max(0, p.wins | 0));
+    if (before) Object.assign(stats.record, { played: before, won, lost: before - won, carried: before, bestWinStreak: 0 });
+  }
+  for (const [k, v] of Object.entries(recBlank())) if (stats.record[k] === undefined) stats.record[k] = v;   // (a field a later version adds is filled in, in place)
+  return stats.record;
+}
+export const winRate = r => (r.played ? Math.round((r.won / r.played) * 100) : 0);
+// Adds one finished match to the record (once: a summary already counted is not counted again). Returns the record.
+export function recordResult(p, summary) {
+  const r = matchRecord(p);
+  if (!summary || summary.recorded || !RECORDED_MODES.includes(summary.mode)) return r;
+  const outcome = summary.result?.outcome;
+  if (outcome !== 'win' && outcome !== 'loss' && outcome !== 'tie') return r;
+  summary.recorded = true;
+  const key = outcome === 'win' ? 'W' : outcome === 'loss' ? 'L' : 'T';
+  r.played++;
+  if (key === 'W') { r.won++; r.streak = r.streak > 0 ? r.streak + 1 : 1; r.bestWinStreak = Math.max(r.bestWinStreak, r.streak); }
+  else if (key === 'L') { r.lost++; r.streak = r.streak < 0 ? r.streak - 1 : -1; }
+  else { r.tied++; r.streak = 0; }
+  const m = (r.modes[summary.mode] = r.modes[summary.mode] || { p: 0, w: 0, l: 0, t: 0 });
+  m.p++; m[key.toLowerCase()]++;
+  const mine = summary.innings?.find(i => i.side === 'player'), theirs = summary.innings?.find(i => i.side !== 'player');
+  r.last.unshift({ r: key, opp: summary.oppTeam?.name || '', mode: summary.mode, me: mine ? `${mine.runs}/${mine.wkts}` : '', them: theirs ? `${theirs.runs}/${theirs.wkts}` : '', at: Date.now() });
+  r.last.length = Math.min(r.last.length, 20);
+  return r;
+}
+// the profile picture: a small square JPEG as a data URL (made by the settings screen), or none
+export const avatarOf = p => (typeof p?.avatar === 'string' && p.avatar.startsWith('data:image/') ? p.avatar : null);
 
 // Display helpers
 export const fmt = {
